@@ -33,7 +33,7 @@ providing a standard and consistent communication mechanism that allows plugin
 developers to use their preferred programming languages.
 
 %prep
-%autosetup -n %{name}-%{version}
+%goprep -k
 
 %build
 BUILD_DATE_GO=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
@@ -55,7 +55,7 @@ GO_BUILD_BINDIR=./bin
 mkdir -p ${GO_BUILD_BINDIR}
 
 # Not calling the macro for more control on go env variables
-go build -mod=vendor -o ${GO_BUILD_BINDIR}/ -ldflags="${GO_LD_EXTRAFLAGS}" ./cmd/...
+go build -buildmode=pie -o ${GO_BUILD_BINDIR}/ -ldflags="${GO_LD_EXTRAFLAGS}" ./cmd/...
 
 %install
 # Install complyctl directories
