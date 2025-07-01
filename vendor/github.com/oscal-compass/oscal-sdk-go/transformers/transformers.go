@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/defenseunicorns/go-oscal/src/pkg/uuid"
 	oscalTypes "github.com/defenseunicorns/go-oscal/src/types/oscal-1-1-3"
 
 	"github.com/oscal-compass/oscal-sdk-go/internal/plans"
@@ -36,11 +37,46 @@ func ComponentDefinitionsToAssessmentPlan(ctx context.Context, definitions []osc
 			}
 		}
 	}
-	implementationSettings, err := settings.Framework(framework, allImplementations)
+	implementationSettings, frameworkSrc, err := settings.ByFramework(framework, allImplementations)
 	if err != nil || implementationSettings == nil {
 		return nil, fmt.Errorf("cannot transform definitions for framework %s: %w", framework, err)
 	}
-	return plans.GenerateAssessmentPlan(ctx, allComponents, *implementationSettings)
+	assessmentPlan, err := plans.GenerateAssessmentPlan(ctx, allComponents, *implementationSettings)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add control source resource to maintain traceability to original control set.
+	controlSource := oscalTypes.Resource{
+		UUID:        uuid.NewUUID(),
+		Description: frameworkSrc.Description,
+		Title:       frameworkSrc.Title,
+		Rlinks: &[]oscalTypes.ResourceLink{
+			{
+				MediaType: "application/oscal+json",
+				Href:      frameworkSrc.Href,
+			},
+		},
+	}
+	backmatter := oscalTypes.BackMatter{
+		Resources: &[]oscalTypes.Resource{controlSource},
+	}
+	assessmentPlan.BackMatter = &backmatter
+
+	// Add a link to the ReviewedControls to source
+	sourceRef := oscalTypes.Link{
+		Href: fmt.Sprintf("#%s", controlSource.UUID),
+		Rel:  "includes-controls-from-source",
+		Text: "The reviewed controls are derived from the linked OSCAL profile.",
+	}
+
+	if assessmentPlan.ReviewedControls.Links == nil {
+		assessmentPlan.ReviewedControls.Links = &[]oscalTypes.Link{}
+	}
+
+	*assessmentPlan.ReviewedControls.Links = append(*assessmentPlan.ReviewedControls.Links, sourceRef)
+
+	return assessmentPlan, nil
 }
 
 // SSPToAssessmentPlan transforms the data from a System Security Plan at a given import location to a single OSCAL Assessment Plan.

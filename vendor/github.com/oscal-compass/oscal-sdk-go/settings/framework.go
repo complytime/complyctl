@@ -46,10 +46,18 @@ func GetFrameworkShortName(implementation oscalTypes.ControlImplementationSet) (
 	return "", false
 }
 
-// Framework returns ImplementationSettings from a list of OSCAL Control Implementations for a given framework. If multiple matches are found, the
+// FrameworkSource defines data for a control source or framework.
+type FrameworkSource struct {
+	Title       string
+	Description string
+	Href        string
+}
+
+// ByFramework returns ImplementationSettings and FrameworkSource from a list of OSCAL Control Implementations for a given framework. If multiple matches are found, the
 // implementation settings are merged together.
-func Framework(framework string, controlImplementations []oscalTypes.ControlImplementationSet) (*ImplementationSettings, error) {
+func ByFramework(framework string, controlImplementations []oscalTypes.ControlImplementationSet) (*ImplementationSettings, FrameworkSource, error) {
 	var implementationSettings *ImplementationSettings
+	var frameworkSource FrameworkSource
 
 	for _, controlImplementation := range controlImplementations {
 		frameworkShortName, found := GetFrameworkShortName(controlImplementation)
@@ -57,6 +65,9 @@ func Framework(framework string, controlImplementations []oscalTypes.ControlImpl
 		if found && frameworkShortName == framework {
 			if implementationSettings == nil {
 				implementationSettings = NewImplementationSettings(implementationAdapter)
+				frameworkSource.Description = controlImplementation.Description
+				frameworkSource.Href = controlImplementation.Source
+				frameworkSource.Title = framework
 			} else {
 				implementationSettings.merge(implementationAdapter)
 			}
@@ -64,7 +75,7 @@ func Framework(framework string, controlImplementations []oscalTypes.ControlImpl
 	}
 
 	if implementationSettings == nil {
-		return implementationSettings, fmt.Errorf("framework %s is not in control implementations", framework)
+		return implementationSettings, frameworkSource, fmt.Errorf("framework %s is not in control implementations", framework)
 	}
-	return implementationSettings, nil
+	return implementationSettings, frameworkSource, nil
 }
