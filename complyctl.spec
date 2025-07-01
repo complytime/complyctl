@@ -13,8 +13,6 @@ License:        Apache-2.0
 URL:            %{base_url}
 Source0:        %{base_url}/archive/refs/tags/v%{version}.tar.gz
 
-# git is temporarily used
-BuildRequires:  git
 BuildRequires:  golang
 BuildRequires:  go-rpm-macros
 
@@ -22,7 +20,7 @@ BuildRequires:  go-rpm-macros
 
 %description
 %{name} leverages OSCAL to perform compliance assessment activities, using
-plugins for each stage of the lifecycle.
+plugins for each stage of the life-cycle.
 
 %package        openscap-plugin
 Summary:        A plugin which extends complyctl capabilities to use OpenSCAP
@@ -30,9 +28,9 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}
 Requires:       scap-security-guide
 %description    openscap-plugin
 openscap-plugin is a plugin which extends the complyctl capabilities to use
-OpenSCAP. The plugin communicates with complyctl via gRPC, providing a
-standard and consistent communication mechanism that gives independence for
-plugin developers to choose their preferred languages.
+OpenSCAP. The plugin communicates with complyctl using Remote Procedure Calls,
+providing a standard and consistent communication mechanism that allows plugin
+developers to use their preferred programming languages.
 
 %prep
 %autosetup -n %{name}-%{version}
