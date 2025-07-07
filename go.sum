@@ -243,8 +243,8 @@ github.com/openshift/machine-config-operator v0.0.1-0.20230815171034-c2bb862bc08
 github.com/openshift/machine-config-operator v0.0.1-0.20230815171034-c2bb862bc08a/go.mod h1:kP51fbL8QBSY/mAkFicoF73x0QSraPrX4BjWIdzFPio=
 github.com/oscal-compass/compliance-to-policy-go/v2 v2.0.0-20250612165759-929b7bb27d96 h1:xW4+zQf7BMwfzzpOZ9t5ipJuevfvMQcinst6MNosnOw=
 github.com/oscal-compass/compliance-to-policy-go/v2 v2.0.0-20250612165759-929b7bb27d96/go.mod h1:CK6EAtX9c07mrR1uOS/CCZyb3PKlLQLShoDluz6TjYU=
-github.com/oscal-compass/oscal-sdk-go v0.0.3 h1:hFoJT29nG/kJTgvUNB23+8tIPovkVuUP57lFTcgh++k=
-github.com/oscal-compass/oscal-sdk-go v0.0.3/go.mod h1:D75S58qemUznO4weI2F1/RhxDc+VJc9FI3m9wHjHBXU=
+github.com/oscal-compass/oscal-sdk-go v0.0.4 h1:86pHRboQ+uQpllSWZHNuELL7TOi3UkUryrI+Ca5SRQ8=
+github.com/oscal-compass/oscal-sdk-go v0.0.4/go.mod h1:D75S58qemUznO4weI2F1/RhxDc+VJc9FI3m9wHjHBXU=
 github.com/pjbgf/sha1cd v0.3.2 h1:a9wb0bp1oC2TGwStyn0Umc/IGKQnEgF0vVaZ8QF8eo4=
 github.com/pjbgf/sha1cd v0.3.2/go.mod h1:zQWigSxVmsHEZow5qaLtPYxpcKMMQpa09ixqBxuCS6A=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
