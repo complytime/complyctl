@@ -4,17 +4,17 @@ package plan
 
 import (
 	"fmt"
-	"sort"
-
 	oscalTypes "github.com/defenseunicorns/go-oscal/src/types/oscal-1-1-3"
 	"github.com/hashicorp/go-hclog"
 	"github.com/oscal-compass/oscal-sdk-go/extensions"
+	"sort"
 )
 
 // ControlEntry represents a control in the assessment scope
 type ControlEntry struct {
-	ControlID string   `yaml:"controlId"`
-	Rules     []string `yaml:"includeRules"`
+	ControlID    string   `yaml:"controlId"`
+	ControlTitle string   `yaml:"controlTitle"`
+	Rules        []string `yaml:"includeRules"`
 }
 
 // AssessmentScope sets up the yaml mapping type for writing to config file.
@@ -71,11 +71,17 @@ func NewAssessmentScopeFromCDs(frameworkId string, cds ...oscalTypes.ComponentDe
 	}
 
 	controlIDs := includeControls.All()
+	for _, id := range controlIDs {
+		if includeControls.Has(id) {
+			includeControls.Added(id)
+		}
+	}
 	scope.IncludeControls = make([]ControlEntry, len(controlIDs))
 	for i, id := range controlIDs {
 		scope.IncludeControls[i] = ControlEntry{
-			ControlID: id,
-			Rules:     []string{"*"}, // by default, include all rules
+			ControlID:    id,
+			ControlTitle: controlIDs[i],
+			Rules:        []string{"*"}, // by default, include all rules
 		}
 	}
 	sort.Slice(scope.IncludeControls, func(i, j int) bool {
@@ -179,8 +185,23 @@ func filterControlSelection(controlSelection *oscalTypes.AssessedControls, inclu
 
 	originalIncludedControls := includeControlsSet{}
 	if controlSelection.IncludeControls != nil {
+		//TODO: testing for name
+		for _, controlSelect := range *controlSelection.IncludeControls {
+			originalIncludedControls.Add(controlSelect.ControlId)
+			for _, controlSelected := range *controlSelection.Props {
+				controlTitle := ControlEntry{
+					ControlTitle: controlSelected.Name,
+				}
+				*controlSelection.Props = append(*controlSelection.Props, controlSelected)
+				//controlTitle.ControlTitle = controlSelect.Value
+				originalIncludedControls.Added(controlTitle.ControlTitle)
+			}
+		}
 		for _, controlId := range *controlSelection.IncludeControls {
 			originalIncludedControls.Add(controlId.ControlId)
+		}
+		for _, controlTitle := range *controlSelection.Props {
+			originalIncludedControls.Added(controlTitle.Name)
 		}
 	}
 	var newIncludedControls []oscalTypes.AssessedControlsSelectControlById
@@ -215,4 +236,8 @@ func (i includeControlsSet) All() []string {
 func (i includeControlsSet) Has(controlID string) bool {
 	_, found := i[controlID]
 	return found
+}
+
+func (i includeControlsSet) Added(controlTitle string) {
+	i[controlTitle] = struct{}{}
 }
