@@ -7,8 +7,41 @@ import (
 	oscalTypes "github.com/defenseunicorns/go-oscal/src/types/oscal-1-1-3"
 	"github.com/hashicorp/go-hclog"
 	"github.com/oscal-compass/oscal-sdk-go/extensions"
+	"github.com/oscal-compass/oscal-sdk-go/validation"
 	"github.com/stretchr/testify/require"
 )
+
+// Test implementations for testing
+type testAppDir struct{}
+
+func (t *testAppDir) AppDir() string    { return "/test/app" }
+func (t *testAppDir) BundleDir() string { return "/test/bundle" }
+
+type testValidator struct{}
+
+func (t *testValidator) Validate(oscalTypes.OscalModels) error { return nil }
+
+type testProfileLoader struct{}
+
+func (t *testProfileLoader) LoadProfile(appDir ApplicationDirectory, controlSource string, validator validation.Validator) (*oscalTypes.Profile, error) {
+	return &oscalTypes.Profile{
+		Imports: []oscalTypes.Import{
+			{Href: "catalog.json"},
+		},
+	}, nil
+}
+func (t *testProfileLoader) LoadCatalogSource(appDir ApplicationDirectory, catalogSource string, validator validation.Validator) (*oscalTypes.Catalog, error) {
+	return &oscalTypes.Catalog{
+		Groups: &[]oscalTypes.Group{
+			{
+				Controls: &[]oscalTypes.Control{
+					{ID: "control-1", Title: "Example Control 1"},
+					{ID: "control-2", Title: "Example Control 2"},
+				},
+			},
+		},
+	}, nil
+}
 
 func TestNewAssessmentScopeFromCDs(t *testing.T) {
 	_, err := NewAssessmentScopeFromCDs("example")
@@ -27,6 +60,7 @@ func TestNewAssessmentScopeFromCDs(t *testing.T) {
 								Ns:    extensions.TrestleNameSpace,
 							},
 						},
+						Source: "profile.json",
 						ImplementedRequirements: []oscalTypes.ImplementedRequirementControlImplementation{
 							{
 								ControlId: "control-1",
@@ -44,11 +78,17 @@ func TestNewAssessmentScopeFromCDs(t *testing.T) {
 	wantScope := AssessmentScope{
 		FrameworkID: "example",
 		IncludeControls: []ControlEntry{
-			{ControlID: "control-1", Rules: []string{"*"}},
-			{ControlID: "control-2", Rules: []string{"*"}},
+			{ControlID: "control-1", ControlTitle: "Example Control 1", Rules: []string{"*"}},
+			{ControlID: "control-2", ControlTitle: "Example Control 2", Rules: []string{"*"}},
 		},
 	}
-	scope, err := NewAssessmentScopeFromCDs("example", cd)
+
+	// Test with test implementations to retrieve actual control titles
+	testAppDir := &testAppDir{}
+	testValidator := &testValidator{}
+	testProfileLoader := &testProfileLoader{}
+
+	scope, err := NewAssessmentScopeFromCDsWithTitles("example", testAppDir, testValidator, testProfileLoader, cd)
 	require.NoError(t, err)
 	require.Equal(t, wantScope, scope)
 
@@ -64,6 +104,7 @@ func TestNewAssessmentScopeFromCDs(t *testing.T) {
 						Ns:    extensions.TrestleNameSpace,
 					},
 				},
+				Source: "profile.json",
 				ImplementedRequirements: []oscalTypes.ImplementedRequirementControlImplementation{
 					{
 						ControlId: "control-1",
@@ -77,7 +118,7 @@ func TestNewAssessmentScopeFromCDs(t *testing.T) {
 	}
 	*cd.Components = append(*cd.Components, anotherComponent)
 
-	scope, err = NewAssessmentScopeFromCDs("example", cd)
+	scope, err = NewAssessmentScopeFromCDsWithTitles("example", testAppDir, testValidator, testProfileLoader, cd)
 	require.NoError(t, err)
 	require.Equal(t, wantScope, scope)
 }
@@ -112,7 +153,7 @@ func TestAssessmentScope_ApplyScope(t *testing.T) {
 			scope: AssessmentScope{
 				FrameworkID: "test",
 				IncludeControls: []ControlEntry{
-					{ControlID: "example-2", Rules: []string{"*"}},
+					{ControlID: "example-2", ControlTitle: "Example Control 2", Rules: []string{"*"}},
 				},
 			},
 			wantSelections: []oscalTypes.AssessedControls{
@@ -132,6 +173,7 @@ func TestAssessmentScope_ApplyScope(t *testing.T) {
 				ReviewedControls: oscalTypes.ReviewedControls{
 					ControlSelections: []oscalTypes.AssessedControls{
 						{
+
 							IncludeControls: &[]oscalTypes.AssessedControlsSelectControlById{
 								{
 									ControlId: "",
@@ -169,8 +211,8 @@ func TestAssessmentScope_ApplyScope(t *testing.T) {
 			scope: AssessmentScope{
 				FrameworkID: "test",
 				IncludeControls: []ControlEntry{
-					{ControlID: "example-1", Rules: []string{"*"}},
-					{ControlID: "example-2", Rules: []string{"*"}},
+					{ControlID: "example-1", ControlTitle: "Example Control 1", Rules: []string{"*"}},
+					{ControlID: "example-2", ControlTitle: "Example Control 2", Rules: []string{"*"}},
 				},
 			},
 			wantSelections: []oscalTypes.AssessedControls{
