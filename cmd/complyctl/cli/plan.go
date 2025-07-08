@@ -154,6 +154,16 @@ func loadPlan(opts *option.ComplyTime, validator validation.Validator) (*oscalTy
 	return assessmentPlan, apCleanedPath, nil
 }
 
+// getControlTitleForPlan is a wrapper function that converts the ApplicationDirectory interface
+// to the concrete complytime.ApplicationDirectory type and calls complytime.GetControlTitle
+func getControlTitleForPlan(controlID string, controlSource string, appDir plan.ApplicationDirectory, validator validation.Validator) (string, error) {
+	concreteAppDir, ok := appDir.(complytime.ApplicationDirectory)
+	if !ok {
+		return "", fmt.Errorf("invalid application directory type")
+	}
+	return complytime.GetControlTitle(controlID, controlSource, concreteAppDir, validator)
+}
+
 // planDryRun leverages the AssessmentScope structure to populate tailoring config.
 // The config is written to stdout.
 func planDryRun(frameworkId string, cds []oscalTypes.ComponentDefinition, output string) error {
@@ -165,15 +175,7 @@ func planDryRun(frameworkId string, cds []oscalTypes.ComponentDefinition, output
 
 	validator := validation.NewSchemaValidator()
 
-	getControlTitleFunc := func(controlID string, controlSource string, appDir plan.ApplicationDirectory, validator validation.Validator) (string, error) {
-		concreteAppDir, ok := appDir.(complytime.ApplicationDirectory)
-		if !ok {
-			return "", fmt.Errorf("invalid application directory type")
-		}
-		return getControlTitle(controlID, controlSource, concreteAppDir, validator)
-	}
-
-	scope, err := plan.NewAssessmentScopeFromCDs(frameworkId, appDir, validator, getControlTitleFunc, cds...)
+	scope, err := plan.NewAssessmentScopeFromCDs(frameworkId, appDir, validator, getControlTitleForPlan, cds...)
 	if err != nil {
 		return fmt.Errorf("error creating assessment scope for %s: %w", frameworkId, err)
 	}
