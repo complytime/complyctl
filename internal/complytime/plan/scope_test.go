@@ -2,6 +2,7 @@
 package plan
 
 import (
+	"fmt"
 	"testing"
 
 	oscalTypes "github.com/defenseunicorns/go-oscal/src/types/oscal-1-1-3"
@@ -21,30 +22,23 @@ type testValidator struct{}
 
 func (t *testValidator) Validate(oscalTypes.OscalModels) error { return nil }
 
-type testProfileLoader struct{}
+// Test function implementation for getting control titles
+func testGetControlTitle(controlID string, controlSource string, appDir ApplicationDirectory, validator validation.Validator) (string, error) {
+	// Mock control titles for testing
+	controlTitles := map[string]string{
+		"control-1": "Example Control 1",
+		"control-2": "Example Control 2",
+	}
 
-func (t *testProfileLoader) LoadProfile(appDir ApplicationDirectory, controlSource string, validator validation.Validator) (*oscalTypes.Profile, error) {
-	return &oscalTypes.Profile{
-		Imports: []oscalTypes.Import{
-			{Href: "catalog.json"},
-		},
-	}, nil
-}
-func (t *testProfileLoader) LoadCatalogSource(appDir ApplicationDirectory, catalogSource string, validator validation.Validator) (*oscalTypes.Catalog, error) {
-	return &oscalTypes.Catalog{
-		Groups: &[]oscalTypes.Group{
-			{
-				Controls: &[]oscalTypes.Control{
-					{ID: "control-1", Title: "Example Control 1"},
-					{ID: "control-2", Title: "Example Control 2"},
-				},
-			},
-		},
-	}, nil
+	if title, exists := controlTitles[controlID]; exists {
+		return title, nil
+	}
+
+	return "", fmt.Errorf("title for control '%s' not found", controlID)
 }
 
 func TestNewAssessmentScopeFromCDs(t *testing.T) {
-	_, err := NewAssessmentScopeFromCDs("example")
+	_, err := NewAssessmentScopeFromCDs("example", nil, nil, nil)
 	require.EqualError(t, err, "no component definitions found")
 
 	cd := oscalTypes.ComponentDefinition{
@@ -83,12 +77,11 @@ func TestNewAssessmentScopeFromCDs(t *testing.T) {
 		},
 	}
 
-	// Test with test implementations to retrieve actual control titles
+	// Test with function implementations to retrieve actual control titles
 	testAppDir := &testAppDir{}
 	testValidator := &testValidator{}
-	testProfileLoader := &testProfileLoader{}
 
-	scope, err := NewAssessmentScopeFromCDsWithTitles("example", testAppDir, testValidator, testProfileLoader, cd)
+	scope, err := NewAssessmentScopeFromCDs("example", testAppDir, testValidator, testGetControlTitle, cd)
 	require.NoError(t, err)
 	require.Equal(t, wantScope, scope)
 
@@ -118,7 +111,7 @@ func TestNewAssessmentScopeFromCDs(t *testing.T) {
 	}
 	*cd.Components = append(*cd.Components, anotherComponent)
 
-	scope, err = NewAssessmentScopeFromCDsWithTitles("example", testAppDir, testValidator, testProfileLoader, cd)
+	scope, err = NewAssessmentScopeFromCDs("example", testAppDir, testValidator, testGetControlTitle, cd)
 	require.NoError(t, err)
 	require.Equal(t, wantScope, scope)
 }

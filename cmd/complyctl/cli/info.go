@@ -196,7 +196,7 @@ func processControlImplementations(components []oscalTypes.DefinedComponent, rul
 					controlDetails, ok := controlMap[ir.ControlId]
 					if !ok {
 						// Initialize controlDetails if not already present
-						controlTitle, err := getControlTitle(ir.ControlId, controlImp, appDir, validator)
+						controlTitle, err := getControlTitle(ir.ControlId, controlImp.Source, appDir, validator)
 						if err != nil {
 							logger.Warn("could not get title for control %s: %v", ir.ControlId, err)
 							controlTitle = "N/A"
@@ -258,40 +258,6 @@ func processComponentProperties(compDefs []oscalTypes.DefinedComponent) (ruleRem
 		}
 	}
 	return ruleRemarksMap, remarksPropsMap
-}
-
-// getControlTitle retrieves the title for a given control ID from the associated catalog.
-func getControlTitle(controlID string, controlImplementation oscalTypes.ControlImplementationSet, appDir complytime.ApplicationDirectory, validator *validation.SchemaValidator) (string, error) {
-	profile, err := complytime.LoadProfile(appDir, controlImplementation.Source, validator)
-	if err != nil {
-		return "", fmt.Errorf("failed to load profile from source '%s': %w", controlImplementation.Source, err)
-	}
-
-	if profile.Imports == nil {
-		return "", fmt.Errorf("profile '%s' has no imports", controlImplementation.Source)
-	}
-
-	for _, imp := range profile.Imports {
-		catalog, err := complytime.LoadCatalogSource(appDir, imp.Href, validator)
-		if err != nil {
-			logger.Warn("failed to load catalog from href '%s': %v", imp.Href, err)
-			continue
-		}
-		if catalog.Groups == nil {
-			continue
-		}
-		for _, group := range *catalog.Groups {
-			if group.Controls == nil {
-				continue
-			}
-			for _, control := range *group.Controls {
-				if control.ID == controlID && control.Title != "" {
-					return control.Title, nil
-				}
-			}
-		}
-	}
-	return "", fmt.Errorf("title for control '%s' not found in catalog", controlID)
 }
 
 // loadComponents retrieves components from component definitions by framework ID.

@@ -21,27 +21,6 @@ import (
 
 const assessmentPlanLocation = "assessment-plan.json"
 
-// complytimeProfileLoader implements the ProfileLoader interface
-type complytimeProfileLoader struct{}
-
-func (c complytimeProfileLoader) LoadProfile(appDir plan.ApplicationDirectory, controlSource string, validator validation.Validator) (*oscalTypes.Profile, error) {
-	// Type assertion to convert interface back to concrete type
-	concreteAppDir, ok := appDir.(complytime.ApplicationDirectory)
-	if !ok {
-		return nil, fmt.Errorf("invalid application directory type")
-	}
-	return complytime.LoadProfile(concreteAppDir, controlSource, validator)
-}
-
-func (c complytimeProfileLoader) LoadCatalogSource(appDir plan.ApplicationDirectory, catalogSource string, validator validation.Validator) (*oscalTypes.Catalog, error) {
-	// Type assertion to convert interface back to concrete type
-	concreteAppDir, ok := appDir.(complytime.ApplicationDirectory)
-	if !ok {
-		return nil, fmt.Errorf("invalid application directory type")
-	}
-	return complytime.LoadCatalogSource(concreteAppDir, catalogSource, validator)
-}
-
 // PlanOptions defines options for the "plan" subcommand
 type planOptions struct {
 	*option.Common
@@ -185,10 +164,16 @@ func planDryRun(frameworkId string, cds []oscalTypes.ComponentDefinition, output
 	}
 
 	validator := validation.NewSchemaValidator()
-	profileLoader := complytimeProfileLoader{}
 
-	// Retrieve control titles
-	scope, err := plan.NewAssessmentScopeFromCDsWithTitles(frameworkId, appDir, validator, profileLoader, cds...)
+	getControlTitleFunc := func(controlID string, controlSource string, appDir plan.ApplicationDirectory, validator validation.Validator) (string, error) {
+		concreteAppDir, ok := appDir.(complytime.ApplicationDirectory)
+		if !ok {
+			return "", fmt.Errorf("invalid application directory type")
+		}
+		return getControlTitle(controlID, controlSource, concreteAppDir, validator)
+	}
+
+	scope, err := plan.NewAssessmentScopeFromCDs(frameworkId, appDir, validator, getControlTitleFunc, cds...)
 	if err != nil {
 		return fmt.Errorf("error creating assessment scope for %s: %w", frameworkId, err)
 	}
