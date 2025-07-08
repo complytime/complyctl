@@ -4,10 +4,12 @@ package plan
 
 import (
 	"fmt"
+	"sort"
+
 	oscalTypes "github.com/defenseunicorns/go-oscal/src/types/oscal-1-1-3"
 	"github.com/hashicorp/go-hclog"
 	"github.com/oscal-compass/oscal-sdk-go/extensions"
-	"sort"
+	"github.com/oscal-compass/oscal-sdk-go/validation"
 )
 
 // ControlEntry represents a control in the assessment scope
@@ -28,6 +30,51 @@ type AssessmentScope struct {
 	IncludeControls []ControlEntry `yaml:"includeControls"`
 }
 
+// ApplicationDirectory interface to avoid import cycle
+type ApplicationDirectory interface {
+	AppDir() string
+	BundleDir() string
+}
+
+// ProfileLoader interface to avoid import cycle
+type ProfileLoader interface {
+	LoadProfile(appDir ApplicationDirectory, controlSource string, validator validation.Validator) (*oscalTypes.Profile, error)
+	LoadCatalogSource(appDir ApplicationDirectory, catalogSource string, validator validation.Validator) (*oscalTypes.Catalog, error)
+}
+
+// getControlTitle retrieves the title for a control from the catalog
+func getControlTitle(controlID string, controlImplementation oscalTypes.ControlImplementationSet, appDir ApplicationDirectory, validator validation.Validator, profileLoader ProfileLoader) (string, error) {
+	profile, err := profileLoader.LoadProfile(appDir, controlImplementation.Source, validator)
+	if err != nil {
+		return "", fmt.Errorf("failed to load profile from source '%s': %w", controlImplementation.Source, err)
+	}
+
+	if profile.Imports == nil {
+		return "", fmt.Errorf("profile '%s' has no imports", controlImplementation.Source)
+	}
+
+	for _, imp := range profile.Imports {
+		catalog, err := profileLoader.LoadCatalogSource(appDir, imp.Href, validator)
+		if err != nil {
+			continue
+		}
+		if catalog.Groups == nil {
+			continue
+		}
+		for _, group := range *catalog.Groups {
+			if group.Controls == nil {
+				continue
+			}
+			for _, control := range *group.Controls {
+				if control.ID == controlID && control.Title != "" {
+					return control.Title, nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("title for control '%s' not found in catalog", controlID)
+}
+
 // NewAssessmentScope creates an AssessmentScope struct for a given framework id.
 func NewAssessmentScope(frameworkID string) AssessmentScope {
 	return AssessmentScope{
@@ -38,11 +85,21 @@ func NewAssessmentScope(frameworkID string) AssessmentScope {
 // NewAssessmentScopeFromCDs creates and populates an AssessmentScope struct for a given framework id and set of
 // OSCAL Component Definitions.
 func NewAssessmentScopeFromCDs(frameworkId string, cds ...oscalTypes.ComponentDefinition) (AssessmentScope, error) {
+	// For backward compatibility, this function will not retrieve control titles
+	// Use NewAssessmentScopeFromCDsWithTitles for full functionality
+	return NewAssessmentScopeFromCDsWithTitles(frameworkId, nil, nil, nil, cds...)
+}
+
+// NewAssessmentScopeFromCDsWithTitles creates and populates an AssessmentScope struct for a given framework id and set of
+// OSCAL Component Definitions, with control titles retrieved from the catalog.
+func NewAssessmentScopeFromCDsWithTitles(frameworkId string, appDir ApplicationDirectory, validator validation.Validator, profileLoader ProfileLoader, cds ...oscalTypes.ComponentDefinition) (AssessmentScope, error) {
 	includeControls := make(includeControlsSet)
+	controlTitles := make(map[string]string)
 	scope := NewAssessmentScope(frameworkId)
 	if cds == nil {
 		return AssessmentScope{}, fmt.Errorf("no component definitions found")
 	}
+
 	for _, componentDef := range cds {
 		if componentDef.Components == nil {
 			continue
@@ -63,6 +120,22 @@ func NewAssessmentScopeFromCDs(frameworkId string, cds ...oscalTypes.ComponentDe
 					for _, ir := range ci.ImplementedRequirements {
 						if ir.ControlId != "" {
 							includeControls.Add(ir.ControlId)
+
+							// Get control title if we have the required dependencies
+							if appDir != nil && validator != nil && profileLoader != nil {
+								if _, exists := controlTitles[ir.ControlId]; !exists {
+									title, err := getControlTitle(ir.ControlId, ci, appDir, validator, profileLoader)
+									if err != nil {
+										// If we can't get the title, use the control ID as fallback
+										controlTitles[ir.ControlId] = ir.ControlId
+									} else {
+										controlTitles[ir.ControlId] = title
+									}
+								}
+							} else {
+								// If we don't have the dependencies, use control ID as title
+								controlTitles[ir.ControlId] = ir.ControlId
+							}
 						}
 					}
 				}
@@ -80,7 +153,7 @@ func NewAssessmentScopeFromCDs(frameworkId string, cds ...oscalTypes.ComponentDe
 	for i, id := range controlIDs {
 		scope.IncludeControls[i] = ControlEntry{
 			ControlID:    id,
-			ControlTitle: controlIDs[i],
+			ControlTitle: controlTitles[id],
 			Rules:        []string{"*"}, // by default, include all rules
 		}
 	}
@@ -109,7 +182,16 @@ func (a AssessmentScope) applyControlScope(assessmentPlan *oscalTypes.Assessment
 		includedControls.Add(entry.ControlID)
 	}
 	logger.Debug("Found included controls", "count", len(includedControls))
-
+	for _, controlT := range assessmentPlan.ReviewedControls.ControlSelections {
+		if controlT.IncludeControls != nil {
+			if controlT.Props != nil {
+				for _, control := range *controlT.Props {
+					// Process control properties if needed
+					_ = control.Name
+				}
+			}
+		}
+	}
 	if assessmentPlan.LocalDefinitions != nil {
 		if assessmentPlan.LocalDefinitions.Activities != nil {
 			for activityI := range *assessmentPlan.LocalDefinitions.Activities {
@@ -185,23 +267,22 @@ func filterControlSelection(controlSelection *oscalTypes.AssessedControls, inclu
 
 	originalIncludedControls := includeControlsSet{}
 	if controlSelection.IncludeControls != nil {
-		//TODO: testing for name
 		for _, controlSelect := range *controlSelection.IncludeControls {
 			originalIncludedControls.Add(controlSelect.ControlId)
-			for _, controlSelected := range *controlSelection.Props {
-				controlTitle := ControlEntry{
-					ControlTitle: controlSelected.Name,
+			if controlSelection.Props != nil {
+				for _, controlSelected := range *controlSelection.Props {
+					// Process control properties if needed
+					originalIncludedControls.Added(controlSelected.Name)
 				}
-				*controlSelection.Props = append(*controlSelection.Props, controlSelected)
-				//controlTitle.ControlTitle = controlSelect.Value
-				originalIncludedControls.Added(controlTitle.ControlTitle)
 			}
 		}
 		for _, controlId := range *controlSelection.IncludeControls {
 			originalIncludedControls.Add(controlId.ControlId)
 		}
-		for _, controlTitle := range *controlSelection.Props {
-			originalIncludedControls.Added(controlTitle.Name)
+		if controlSelection.Props != nil {
+			for _, controlTitle := range *controlSelection.Props {
+				originalIncludedControls.Added(controlTitle.Name)
+			}
 		}
 	}
 	var newIncludedControls []oscalTypes.AssessedControlsSelectControlById

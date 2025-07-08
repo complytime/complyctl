@@ -21,6 +21,27 @@ import (
 
 const assessmentPlanLocation = "assessment-plan.json"
 
+// complytimeProfileLoader implements the ProfileLoader interface
+type complytimeProfileLoader struct{}
+
+func (c complytimeProfileLoader) LoadProfile(appDir plan.ApplicationDirectory, controlSource string, validator validation.Validator) (*oscalTypes.Profile, error) {
+	// Type assertion to convert interface back to concrete type
+	concreteAppDir, ok := appDir.(complytime.ApplicationDirectory)
+	if !ok {
+		return nil, fmt.Errorf("invalid application directory type")
+	}
+	return complytime.LoadProfile(concreteAppDir, controlSource, validator)
+}
+
+func (c complytimeProfileLoader) LoadCatalogSource(appDir plan.ApplicationDirectory, catalogSource string, validator validation.Validator) (*oscalTypes.Catalog, error) {
+	// Type assertion to convert interface back to concrete type
+	concreteAppDir, ok := appDir.(complytime.ApplicationDirectory)
+	if !ok {
+		return nil, fmt.Errorf("invalid application directory type")
+	}
+	return complytime.LoadCatalogSource(concreteAppDir, catalogSource, validator)
+}
+
 // PlanOptions defines options for the "plan" subcommand
 type planOptions struct {
 	*option.Common
@@ -157,10 +178,21 @@ func loadPlan(opts *option.ComplyTime, validator validation.Validator) (*oscalTy
 // planDryRun leverages the AssessmentScope structure to populate tailoring config.
 // The config is written to stdout.
 func planDryRun(frameworkId string, cds []oscalTypes.ComponentDefinition, output string) error {
-	scope, err := plan.NewAssessmentScopeFromCDs(frameworkId, cds...)
+	// Create the application directory and validator to retrieve control titles
+	appDir, err := complytime.NewApplicationDirectory(true)
 	if err != nil {
-		return fmt.Errorf("error creating assessment scope for %s", frameworkId)
+		return fmt.Errorf("failed to initialize application directory: %w", err)
 	}
+
+	validator := validation.NewSchemaValidator()
+	profileLoader := complytimeProfileLoader{}
+
+	// Retrieve control titles
+	scope, err := plan.NewAssessmentScopeFromCDsWithTitles(frameworkId, appDir, validator, profileLoader, cds...)
+	if err != nil {
+		return fmt.Errorf("error creating assessment scope for %s: %w", frameworkId, err)
+	}
+
 	data, err := yaml.Marshal(&scope)
 	if err != nil {
 		return fmt.Errorf("error marshalling yaml content: %v", err)
