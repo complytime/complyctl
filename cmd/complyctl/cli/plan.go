@@ -154,14 +154,9 @@ func loadPlan(opts *option.ComplyTime, validator validation.Validator) (*oscalTy
 	return assessmentPlan, apCleanedPath, nil
 }
 
-// getControlTitleForPlan is a wrapper function that converts the ApplicationDirectory interface
-// to the concrete complytime.ApplicationDirectory type and calls complytime.GetControlTitle
+// getControlTitleForPlan is a wrapper function that calls complytime.GetControlTitle
 func getControlTitleForPlan(controlID string, controlSource string, appDir plan.ApplicationDirectory, validator validation.Validator) (string, error) {
-	concreteAppDir, ok := appDir.(complytime.ApplicationDirectory)
-	if !ok {
-		return "", fmt.Errorf("invalid application directory type")
-	}
-	return complytime.GetControlTitle(controlID, controlSource, concreteAppDir, validator)
+	return complytime.GetControlTitle(controlID, controlSource, appDir.(complytime.ApplicationDirectory), validator)
 }
 
 // planDryRun leverages the AssessmentScope structure to populate tailoring config.
