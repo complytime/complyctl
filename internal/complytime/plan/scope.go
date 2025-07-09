@@ -37,7 +37,7 @@ type ApplicationDirectory interface {
 }
 
 // GetControlTitleFunc is a function type for getting control titles
-type GetControlTitleFunc func(controlID string, controlSource string, appDir ApplicationDirectory, validator validation.Validator) (string, error)
+type GetControlTitleFunc func(controlID string, controlSource string, appDir interface{}, validator validation.Validator) (string, error)
 
 // NewAssessmentScope creates an AssessmentScope struct for a given framework id.
 func NewAssessmentScope(frameworkID string) AssessmentScope {

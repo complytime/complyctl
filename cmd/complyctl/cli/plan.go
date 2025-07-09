@@ -154,11 +154,6 @@ func loadPlan(opts *option.ComplyTime, validator validation.Validator) (*oscalTy
 	return assessmentPlan, apCleanedPath, nil
 }
 
-// getControlTitleForPlan is a wrapper function that calls complytime.GetControlTitle
-func getControlTitleForPlan(controlID string, controlSource string, appDir plan.ApplicationDirectory, validator validation.Validator) (string, error) {
-	return complytime.GetControlTitle(controlID, controlSource, appDir.(complytime.ApplicationDirectory), validator)
-}
-
 // planDryRun leverages the AssessmentScope structure to populate tailoring config.
 // The config is written to stdout.
 func planDryRun(frameworkId string, cds []oscalTypes.ComponentDefinition, output string) error {
@@ -170,7 +165,9 @@ func planDryRun(frameworkId string, cds []oscalTypes.ComponentDefinition, output
 
 	validator := validation.NewSchemaValidator()
 
-	scope, err := plan.NewAssessmentScopeFromCDs(frameworkId, appDir, validator, getControlTitleForPlan, cds...)
+	scope, err := plan.NewAssessmentScopeFromCDs(frameworkId, appDir, validator, func(controlID, controlSource string, appDir interface{}, validator validation.Validator) (string, error) {
+		return complytime.GetControlTitle(controlID, controlSource, appDir.(complytime.ApplicationDirectory), validator)
+	}, cds...)
 	if err != nil {
 		return fmt.Errorf("error creating assessment scope for %s: %w", frameworkId, err)
 	}

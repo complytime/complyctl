@@ -23,7 +23,7 @@ type testValidator struct{}
 func (t *testValidator) Validate(oscalTypes.OscalModels) error { return nil }
 
 // testGetControlTitle is a test implementation for getting control titles
-func testGetControlTitle(controlID string, controlSource string, appDir ApplicationDirectory, validator validation.Validator) (string, error) {
+func testGetControlTitle(controlID string, controlSource string, appDir interface{}, validator validation.Validator) (string, error) {
 	// Mock control titles for testing
 	controlTitles := map[string]string{
 		"control-1": "Example Control 1",
