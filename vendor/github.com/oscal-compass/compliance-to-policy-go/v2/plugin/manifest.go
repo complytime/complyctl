@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/hashicorp/go-hclog"
 )
 
 // Manifest is metadata about a plugin to support discovering and
@@ -71,10 +73,10 @@ func (m *Manifest) ResolvePath(pluginDir string) error {
 
 // ResolveOptions validates and applies given configuration selections against the manifest
 // declared configuration and returns the resolved options.
-func (m *Manifest) ResolveOptions(configSelections map[string]string) (map[string]string, error) {
+func (m *Manifest) ResolveOptions(configSelections map[string]string, log hclog.Logger) (map[string]string, error) {
 	configMap := make(map[string]string)
+	processedOptions := make(map[string]struct{})
 	for _, option := range m.Configuration {
-
 		// Grab the defaults for each
 		if option.Default != nil {
 			configMap[option.Name] = *option.Default
@@ -85,10 +87,20 @@ func (m *Manifest) ResolveOptions(configSelections map[string]string) (map[strin
 		selected, ok := configSelections[option.Name]
 		if ok {
 			configMap[option.Name] = selected
+			processedOptions[option.Name] = struct{}{}
 		} else if option.Required {
 			return nil,
 				fmt.Errorf("required value not supplied for option %q", option.Name)
 		}
+	}
+	var unknownKeys []string
+	for key := range configSelections {
+		if _, found := processedOptions[key]; !found {
+			unknownKeys = append(unknownKeys, key)
+		}
+	}
+	if len(unknownKeys) > 0 {
+		log.Warn(fmt.Sprintf("Unknown configuration options found: %s", strings.Join(unknownKeys, ", ")))
 	}
 	return configMap, nil
 }

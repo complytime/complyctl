@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pkg
+package utils
 
 import (
 	"encoding/json"
@@ -151,7 +151,7 @@ func (g *GitUtils) gitClone(url string) (string, error) {
 		}
 		if username != "" && token != "" {
 			logger.Info("Git Clone with Auth given by 'username' and 'token' in environment variables ")
-			cloneOption.Auth = &githttp.BasicAuth{Username: username, Password: token}
+			cloneOption.Auth = &githttp.BasicAuth{Username: username, Password: token} // pragma: allowlist secret
 		}
 		if _, err := git.PlainClone(dir, false, cloneOption); err != nil {
 			return "", err

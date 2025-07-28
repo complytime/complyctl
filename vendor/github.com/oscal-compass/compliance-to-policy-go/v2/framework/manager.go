@@ -96,7 +96,7 @@ func (m *PluginManager) configurePlugin(policyPlugin policy.Provider, manifest p
 		selections = make(map[string]string)
 		m.log.Debug("No overrides set for plugin %s, using defaults...", manifest.ID)
 	}
-	configMap, err := manifest.ResolveOptions(selections)
+	configMap, err := manifest.ResolveOptions(selections, m.log)
 	if err != nil {
 		return err
 	}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pkg
+package utils
 
 import (
 	"encoding/json"
@@ -254,14 +254,14 @@ func (fc *filenameCreator) Get(fname string) string {
 	return _fname
 }
 
-func PathFromPkgDirectory(relativePath string) string {
+func PathFromInternalDirectory(relativePath string) string {
 	_, filename, _, _ := runtime.Caller(0)
-	dir := path.Join(path.Dir(filename), relativePath)
+	dir := path.Join(path.Dir(filename), "../", relativePath)
 	return dir
 }
 
-func ChdirFromPkgDirectory(relativePath string) string {
-	dir := PathFromPkgDirectory(relativePath)
+func ChdirFromInternalDirectory(relativePath string) string {
+	dir := PathFromInternalDirectory(relativePath)
 	if err := os.Chdir(dir); err != nil {
 		panic(err)
 	}
