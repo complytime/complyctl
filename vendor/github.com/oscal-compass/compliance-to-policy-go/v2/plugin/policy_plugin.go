@@ -31,7 +31,7 @@ func FromPVP(pe policy.Provider) proto.PolicyEngineServer {
 }
 
 func (p *pvpService) Configure(ctx context.Context, request *proto.ConfigureRequest) (*proto.ConfigureResponse, error) {
-	if err := p.Impl.Configure(request.Settings); err != nil {
+	if err := p.Impl.Configure(ctx, request.Settings); err != nil {
 		return &proto.ConfigureResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
@@ -41,7 +41,7 @@ func (p *pvpService) Configure(ctx context.Context, request *proto.ConfigureRequ
 
 func (p *pvpService) Generate(ctx context.Context, request *proto.PolicyRequest) (*proto.GenerateResponse, error) {
 	policy := NewPolicyFromProto(request)
-	if err := p.Impl.Generate(policy); err != nil {
+	if err := p.Impl.Generate(ctx, policy); err != nil {
 		return &proto.GenerateResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
@@ -51,7 +51,7 @@ func (p *pvpService) Generate(ctx context.Context, request *proto.PolicyRequest)
 
 func (p *pvpService) GetResults(ctx context.Context, request *proto.PolicyRequest) (*proto.ResultsResponse, error) {
 	policy := NewPolicyFromProto(request)
-	result, err := p.Impl.GetResults(policy)
+	result, err := p.Impl.GetResults(ctx, policy)
 	if err != nil {
 		return &proto.ResultsResponse{}, status.Error(codes.Internal, err.Error())
 	}

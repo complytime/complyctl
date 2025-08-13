@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pkg
+package utils
 
 import (
 	"encoding/json"
@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -56,7 +57,7 @@ func GetLogger(name string) *zap.Logger {
 }
 
 func LoadYaml(path string) ([]*unstructured.Unstructured, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return nil, err
 	}
@@ -99,12 +100,13 @@ func NilIfEmpty[T any](slice *[]T) *[]T {
 }
 
 func CopyFile(src string, dest string) error {
-	input, err := os.ReadFile(src)
+	cleanedPath := filepath.Clean(src)
+	input, err := os.ReadFile(cleanedPath)
 	if err != nil {
 		return err
 	}
 
-	err = os.WriteFile(dest, input, os.ModePerm)
+	err = os.WriteFile(dest, input, 0600)
 	if err != nil {
 		return err
 	}
@@ -112,7 +114,7 @@ func CopyFile(src string, dest string) error {
 }
 
 func MakeDir(path string) (string, error) {
-	if err := os.MkdirAll(path, os.ModePerm); err != nil {
+	if err := os.MkdirAll(path, 0750); err != nil {
 		return "", err
 	}
 	return path, nil
@@ -129,12 +131,13 @@ func WriteObjToYamlFile(path string, in interface{}) error {
 	if yamlData, err := sigyaml.Marshal(in); err != nil {
 		return err
 	} else {
-		return os.WriteFile(path, yamlData, os.ModePerm)
+		return os.WriteFile(path, yamlData, 0600)
 	}
 }
 
 func WriteObjToYamlFileByGoYaml(path string, in interface{}) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
+	cleanedPath := filepath.Clean(path)
+	file, err := os.OpenFile(cleanedPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return err
 	}
@@ -147,7 +150,7 @@ func WriteObjToJsonFile(path string, in interface{}) error {
 	if jsonData, err := json.MarshalIndent(in, "", "\t"); err != nil {
 		return err
 	} else {
-		return os.WriteFile(path, jsonData, os.ModePerm)
+		return os.WriteFile(path, jsonData, 0600)
 	}
 }
 
@@ -155,7 +158,8 @@ func WriteObjToJsonFile(path string, in interface{}) error {
 // Maps and pointers (to a struct, string, int, etc) are accepted as out
 // values.
 func LoadYamlFileToObject(path string, out interface{}) error {
-	yamlData, err := os.ReadFile(path)
+	cleanedPath := filepath.Clean(path)
+	yamlData, err := os.ReadFile(cleanedPath)
 	if err != nil {
 		return err
 	}
@@ -166,7 +170,8 @@ func LoadYamlFileToObject(path string, out interface{}) error {
 }
 
 func LoadJsonFileToObject(path string, out interface{}) error {
-	jsonData, err := os.ReadFile(path)
+	cleanedPath := filepath.Clean(path)
+	jsonData, err := os.ReadFile(cleanedPath)
 	if err != nil {
 		return err
 	}
@@ -177,7 +182,8 @@ func LoadJsonFileToObject(path string, out interface{}) error {
 }
 
 func LoadYamlFileToK8sTypedObject(path string, out interface{}) error {
-	yamlData, err := os.ReadFile(path)
+	cleanedPath := filepath.Clean(path)
+	yamlData, err := os.ReadFile(cleanedPath)
 	if err != nil {
 		return err
 	}
@@ -254,14 +260,14 @@ func (fc *filenameCreator) Get(fname string) string {
 	return _fname
 }
 
-func PathFromPkgDirectory(relativePath string) string {
+func PathFromInternalDirectory(relativePath string) string {
 	_, filename, _, _ := runtime.Caller(0)
-	dir := path.Join(path.Dir(filename), relativePath)
+	dir := path.Join(path.Dir(filename), "../", relativePath)
 	return dir
 }
 
-func ChdirFromPkgDirectory(relativePath string) string {
-	dir := PathFromPkgDirectory(relativePath)
+func ChdirFromInternalDirectory(relativePath string) string {
+	dir := PathFromInternalDirectory(relativePath)
 	if err := os.Chdir(dir); err != nil {
 		panic(err)
 	}

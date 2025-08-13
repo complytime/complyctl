@@ -6,6 +6,7 @@
 package framework
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/hashicorp/go-hclog"
@@ -69,7 +70,7 @@ func (m *PluginManager) FindRequestedPlugins(requestedPlugins []plugin.ID) (plug
 // LaunchPolicyPlugins launches requested policy plugins and configures each plugin to make it ready for use with defined plugin workflows.
 // The plugin is configured based on default options and given options.
 // Given options are represented by config.PluginConfig.
-func (m *PluginManager) LaunchPolicyPlugins(manifests plugin.Manifests, pluginConfig PluginConfig) (map[plugin.ID]policy.Provider, error) {
+func (m *PluginManager) LaunchPolicyPlugins(ctx context.Context, manifests plugin.Manifests, pluginConfig PluginConfig) (map[plugin.ID]policy.Provider, error) {
 	pluginsByIds := make(map[plugin.ID]policy.Provider)
 	for _, manifest := range manifests {
 		policyPlugin, err := plugin.NewPolicyPlugin(manifest, m.clientFactory)
@@ -82,7 +83,7 @@ func (m *PluginManager) LaunchPolicyPlugins(manifests plugin.Manifests, pluginCo
 
 		// Get all the base configuration
 		if len(manifest.Configuration) > 0 {
-			if err := m.configurePlugin(policyPlugin, manifest, pluginConfig); err != nil {
+			if err := m.configurePlugin(ctx, policyPlugin, manifest, pluginConfig); err != nil {
 				return pluginsByIds, fmt.Errorf("failed to configure plugin %s: %w", manifest.ID, err)
 			}
 		}
@@ -90,17 +91,17 @@ func (m *PluginManager) LaunchPolicyPlugins(manifests plugin.Manifests, pluginCo
 	return pluginsByIds, nil
 }
 
-func (m *PluginManager) configurePlugin(policyPlugin policy.Provider, manifest plugin.Manifest, pluginConfig PluginConfig) error {
+func (m *PluginManager) configurePlugin(ctx context.Context, policyPlugin policy.Provider, manifest plugin.Manifest, pluginConfig PluginConfig) error {
 	selections := pluginConfig(manifest.ID)
 	if selections == nil {
 		selections = make(map[string]string)
 		m.log.Debug("No overrides set for plugin %s, using defaults...", manifest.ID)
 	}
-	configMap, err := manifest.ResolveOptions(selections)
+	configMap, err := manifest.ResolveOptions(selections, m.log)
 	if err != nil {
 		return err
 	}
-	if err := policyPlugin.Configure(configMap); err != nil {
+	if err := policyPlugin.Configure(ctx, configMap); err != nil {
 		return err
 	}
 	return nil

@@ -5,14 +5,16 @@
 
 package policy
 
+import "context"
+
 // Provider defines methods for a policy engine C2P plugin.
 type Provider interface {
 	// Configure send configuration options and selected values to the
 	// plugin.
-	Configure(map[string]string) error
+	Configure(context.Context, map[string]string) error
 	// Generate policy artifacts for a specific policy engine.
-	Generate(Policy) error
+	Generate(context.Context, Policy) error
 	// GetResults from a specific policy engine and transform into
 	// PVPResults.
-	GetResults(Policy) (PVPResult, error)
+	GetResults(context.Context, Policy) (PVPResult, error)
 }

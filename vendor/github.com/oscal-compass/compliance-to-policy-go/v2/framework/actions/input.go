@@ -35,28 +35,35 @@ type InputContext struct {
 	rulesStore rules.Store
 	// Settings define adjustable rule settings parsed from framework-specific implementation
 	Settings settings.Settings
+	// action concurrency
+	MaxConcurrency int
 }
 
-// NewContext returns an InputContext for the given OSCAL Components.
-func NewContext(components []components.Component) (*InputContext, error) {
-	inputCtx := &InputContext{
-		requestedProviders: make(map[plugin.ID]string),
+func NewContext(providers map[plugin.ID]string, store rules.Store) *InputContext {
+	return &InputContext{
+		requestedProviders: providers,
+		rulesStore:         store,
+		MaxConcurrency:     3,
 	}
+}
+
+// NewContextFromComponents returns an InputContext for the given OSCAL Components.
+func NewContextFromComponents(components []components.Component) (*InputContext, error) {
+	requestedProviders := make(map[plugin.ID]string)
 	for _, comp := range components {
 		if comp.Type() == pluginComponentType {
 			pluginId, err := GetPluginIDFromComponent(comp)
 			if err != nil {
-				return inputCtx, err
+				return nil, err
 			}
-			inputCtx.requestedProviders[pluginId] = comp.Title()
+			requestedProviders[pluginId] = comp.Title()
 		}
 	}
 	store, err := DefaultStore(components)
 	if err != nil {
-		return inputCtx, err
+		return nil, err
 	}
-	inputCtx.rulesStore = store
-	return inputCtx, nil
+	return NewContext(requestedProviders, store), nil
 }
 
 // RequestedProviders returns the provider ids requested in the parsed input.

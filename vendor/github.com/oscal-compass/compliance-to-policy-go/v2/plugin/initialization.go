@@ -61,8 +61,11 @@ func ClientFactory(logger hclog.Logger) ClientFactoryFunc {
 			Managed:          true,
 			AutoMTLS:         true,
 			AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-			Cmd:              exec.Command(manifest.ExecutablePath),
-			Plugins:          SupportedPlugins,
+			// The #nosec comment is added with justification that by using manifest.ResolvePath()
+			// the manifest.ExecutablePath is validated as a plugin in the user-specified directory
+			// and sanitized.
+			Cmd:     exec.Command(manifest.ExecutablePath), /* #nosec G204 */
+			Plugins: SupportedPlugins,
 			SecureConfig: &plugin.SecureConfig{
 				Checksum: manifestSum,
 				Hash:     sha256.New(),

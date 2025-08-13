@@ -160,7 +160,8 @@ func manifestMatchesType(manifest Manifest, pluginType string) bool {
 
 // readManifestFile reads and parses the manifest from JSON.
 func readManifestFile(pluginName ID, manifestPath string) (Manifest, error) {
-	manifestFile, err := os.Open(manifestPath)
+	cleanedPath := filepath.Clean(manifestPath)
+	manifestFile, err := os.Open(cleanedPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return Manifest{}, &ManifestNotFoundError{File: manifestPath, PluginID: pluginName.String()}

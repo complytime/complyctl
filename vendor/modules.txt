@@ -349,14 +349,14 @@ github.com/openshift/api/machineconfiguration/v1alpha1
 # github.com/openshift/library-go v0.0.0-20250129210218-fe56c2cf5d70
 ## explicit; go 1.23.0
 github.com/openshift/library-go/pkg/crypto
-# github.com/oscal-compass/compliance-to-policy-go/v2 v2.0.0-20250612165759-929b7bb27d96
+# github.com/oscal-compass/compliance-to-policy-go/v2 v2.0.0-alpha.2
 ## explicit; go 1.24.0
 github.com/oscal-compass/compliance-to-policy-go/v2/api/proto
 github.com/oscal-compass/compliance-to-policy-go/v2/framework
 github.com/oscal-compass/compliance-to-policy-go/v2/framework/actions
 github.com/oscal-compass/compliance-to-policy-go/v2/framework/template
+github.com/oscal-compass/compliance-to-policy-go/v2/internal/utils
 github.com/oscal-compass/compliance-to-policy-go/v2/logging
-github.com/oscal-compass/compliance-to-policy-go/v2/pkg
 github.com/oscal-compass/compliance-to-policy-go/v2/plugin
 github.com/oscal-compass/compliance-to-policy-go/v2/policy
 # github.com/oscal-compass/oscal-sdk-go v0.0.5

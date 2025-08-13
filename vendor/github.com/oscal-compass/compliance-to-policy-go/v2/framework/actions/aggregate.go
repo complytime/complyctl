@@ -7,9 +7,11 @@ package actions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/oscal-compass/oscal-sdk-go/settings"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/oscal-compass/compliance-to-policy-go/v2/logging"
 	"github.com/oscal-compass/compliance-to-policy-go/v2/plugin"
@@ -21,24 +23,60 @@ import (
 //
 // The rule set passed to each plugin can be configured with compliance specific settings based on the InputContext.
 func AggregateResults(ctx context.Context, inputContext *InputContext, pluginSet map[plugin.ID]policy.Provider) ([]policy.PVPResult, error) {
-	var allResults []policy.PVPResult
 	log := logging.GetLogger("aggregator")
-	for providerId, policyPlugin := range pluginSet {
-		componentTitle, err := inputContext.ProviderTitle(providerId)
-		if err != nil {
-			return nil, err
-		}
-		log.Debug(fmt.Sprintf("Aggregating results for provider %s", providerId))
-		appliedRuleSet, err := settings.ApplyToComponent(ctx, componentTitle, inputContext.Store(), inputContext.Settings)
-		if err != nil {
-			return allResults, fmt.Errorf("failed to get rule sets for component %s: %w", componentTitle, err)
-		}
 
-		pluginResults, err := policyPlugin.GetResults(appliedRuleSet)
-		if err != nil {
-			return allResults, fmt.Errorf("plugin %s: %w", providerId, err)
-		}
-		allResults = append(allResults, pluginResults)
+	var allResults []policy.PVPResult
+	resultChan := make(chan policy.PVPResult, len(pluginSet))
+
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.SetLimit(inputContext.MaxConcurrency)
+	for providerId, policyPlugin := range pluginSet {
+		func(providerId plugin.ID, plugin policy.Provider) {
+			eg.Go(func() error {
+				select {
+				case <-egCtx.Done():
+					return fmt.Errorf("%s skipped due to context cancellation/timeout: %w", providerId.String(), egCtx.Err())
+				default:
+				}
+
+				componentTitle, err := inputContext.ProviderTitle(providerId)
+				if err != nil {
+					if errors.Is(err, ErrMissingProvider) {
+						log.Warn(fmt.Sprintf("skipping %s provider: missing validation component", providerId))
+						return nil
+					}
+					return err
+				}
+				log.Debug(fmt.Sprintf("Aggregating results for provider %s", providerId))
+
+				appliedRuleSet, err := settings.ApplyToComponent(egCtx, componentTitle, inputContext.Store(), inputContext.Settings)
+				if err != nil {
+					return fmt.Errorf("failed to get rule sets for component %s: %w", componentTitle, err)
+				}
+
+				pluginResults, err := policyPlugin.GetResults(egCtx, appliedRuleSet)
+				if err != nil {
+					return err
+				}
+				resultChan <- pluginResults
+				return nil
+			})
+		}(providerId, policyPlugin)
 	}
+
+	go func() {
+		_ = eg.Wait()
+		close(resultChan)
+	}()
+
+	for result := range resultChan {
+		allResults = append(allResults, result)
+	}
+
+	// Calling Wait() again to avoid data races
+	if err := eg.Wait(); err != nil {
+		return allResults, err
+	}
+
 	return allResults, nil
 }

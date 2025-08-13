@@ -17,8 +17,8 @@ import (
 	"github.com/oscal-compass/oscal-sdk-go/rules"
 	"github.com/oscal-compass/oscal-sdk-go/transformers"
 
+	"github.com/oscal-compass/compliance-to-policy-go/v2/internal/utils"
 	"github.com/oscal-compass/compliance-to-policy-go/v2/logging"
-	"github.com/oscal-compass/compliance-to-policy-go/v2/pkg"
 	"github.com/oscal-compass/compliance-to-policy-go/v2/policy"
 )
 
@@ -160,7 +160,7 @@ func Report(ctx context.Context, inputContext *InputContext, planHref string, pl
 		}
 	}
 
-	assessmentResults.Results[0].Findings = pkg.NilIfEmpty(&oscalFindings)
+	assessmentResults.Results[0].Findings = utils.NilIfEmpty(&oscalFindings)
 
 	// If inventory items were created then add to result
 	if len(invItemMap) > 0 {
@@ -350,8 +350,8 @@ func toOscalObservation(observationByCheck policy.ObservationByCheck, ruleSet ex
 		Description:      observationByCheck.Description,
 		Methods:          observationByCheck.Methods,
 		Collected:        observationByCheck.Collected,
-		Subjects:         pkg.NilIfEmpty(&subjects),
-		RelevantEvidence: pkg.NilIfEmpty(&relevantEvidences),
+		Subjects:         utils.NilIfEmpty(&subjects),
+		RelevantEvidence: utils.NilIfEmpty(&relevantEvidences),
 	}
 
 	props := []oscalTypes.Property{
