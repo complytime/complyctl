@@ -3,6 +3,8 @@
 [![OpenSSF Best Practices status](https://www.bestpractices.dev/projects/9761/badge)](https://www.bestpractices.dev/projects/9761)
 [![GoDoc](https://img.shields.io/static/v1?label=godoc&message=reference&color=blue)](https://pkg.go.dev/github.com/complytime/complyctl)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/complytime/complyctl/badge)](https://scorecard.dev/viewer/?uri=github.com/complyctl/complyctl)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rh-psce_complyctl&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rh-psce_complyctl)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rh-psce_complyctl&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=rh-psce_complyctl)
 
 ComplyCTL leverages [OSCAL](https://github.com/usnistgov/OSCAL/) to perform compliance assessment activities, using plugins for each stage of the lifecycle.
 
