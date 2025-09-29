@@ -130,17 +130,32 @@ func GenerateAssessmentResults(plan oscalTypes.AssessmentPlan, opts ...GenerateO
 					TaskUuid: task.UUID,
 					Subjects: &assocActivity.Subjects,
 				}
-
+				var methods []oscalTypes.Property
+				if activity.Props != nil {
+					methods = extensions.FindAllProps(*activity.Props, extensions.WithName("method"), extensions.WithNamespace(""))
+				}
+				setWaivedProp := false
+				waived, found := extensions.GetTrestleProp(extensions.WaivedRulesProperty, *activity.Props)
+				if found && waived.Value == "true" {
+					setWaivedProp = true
+				}
 				// Activity Title == Rule
 				// One Observation per Activity Step
 				// Observation Title == Check
 				for _, step := range *activity.Steps {
 					observation := observationManager.createOrGet(step.Title)
-
-					if activity.Props != nil {
-						methods := extensions.FindAllProps(*activity.Props, extensions.WithName("method"), extensions.WithNamespace(""))
-						for _, method := range methods {
-							observation.Methods = append(observation.Methods, method.Value)
+					for _, method := range methods {
+						observation.Methods = append(observation.Methods, method.Value)
+					}
+					// Add a waived property to each observation subject if the activity is waived
+					if setWaivedProp {
+						for _, subject := range *observation.Subjects {
+							property := oscalTypes.Property{
+								Name:  extensions.WaivedRulesProperty,
+								Value: "true",
+								Ns:    extensions.TrestleNameSpace,
+							}
+							*subject.Props = append(*subject.Props, property)
 						}
 					}
 
