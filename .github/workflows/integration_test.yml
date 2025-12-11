@@ -93,6 +93,20 @@ jobs:
       - name: Test complyctl scan
         run: complyctl scan --with-md
 
+      - name: Print fedora version
+        run: cat /etc/redhat-release
+
+      - name: Print openscap version
+        run: dnf list --installed | grep openscap
+
+      - name: Print UMASK
+        run: cat /etc/login.defs | grep UMASK
+
+      - name: Print assessment result
+        run: |
+          jq -e -r '.["assessment-results"].results[].observations[] |
+          select(.title == "xccdf_org.ssgproject.content_rule_accounts_umask_etc_login_defs")' complytime/assessment-results.json
+
       # Check content_rule_accounts_umask_etc_login_defs scan result, it should be fail
       - name: Check assessment-result
         run: |
