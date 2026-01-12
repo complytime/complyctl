@@ -28,29 +28,13 @@ jobs:
   sonarcloud:
     if: ${{ github.event.pull_request.base.repo.url == github.event.pull_request.head.repo.url }}
     needs: generate-coverage
-    name: SonarCloud
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-      - name: Get coverage
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          name: coverage
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9 # v7.0.0
-        env:
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}" # Needed to get PR information, if any
-          SONAR_TOKEN: "${{ secrets.SONAR_TOKEN }}"
-        with:
-          args: >
-            "-Dsonar.go.coverage.reportPaths=coverage.out"
-            "-Dsonar.projectKey=rh-psce_complyctl"
-            "-Dsonar.organization=rh-psce"
-      - name: SonarQube Quality Gate check
-        uses: sonarsource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b #v1.2.0
-        # Force to fail step after specific time
-        timeout-minutes: 5
-        env:
-          SONAR_TOKEN: "${{ secrets.SONAR_TOKEN }}"
+    uses: complytime/org-infra/.github/workflows/reusable_sonarqube.yml@main
+    with:
+      sonar_organization: "rh-psce"
+      sonar_project_key: "rh-psce_complyctl"
+      coverage_artifact_name: "coverage"
+      coverage_file_path: "coverage.out"
+      language_scanner_property: "sonar.go.coverage.reportPaths"
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

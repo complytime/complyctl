@@ -14,6 +14,7 @@ import (
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
+	fmt.Println("complyctl is running")
 	complyctl := cli.New()
 	if err := complyctl.ExecuteContext(ctx); err != nil {
 		cli.Error(fmt.Sprintf("error running complyctl: %v", err))
