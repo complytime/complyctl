@@ -118,7 +118,7 @@ def create_pull_request(workflow, owner, repo, workflow_branch):
             "base": "main",
             "head": f"{owner}:{workflow_branch}"
     }
-    cmd = f'curl -L -s X POST {cmd_header} {pulls_api} -d \'{json.dumps(data)}\''
+    cmd = f'curl -L -s -X POST {cmd_header} {pulls_api} -d \'{json.dumps(data)}\''
 
     print(f"Creating a pull request for {workflow} workflow update")
     try:
