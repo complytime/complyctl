@@ -1,0 +1,5 @@
+{
+  "policy_id": "branch-protection-policy",
+  "passed": false,
+  "error": "failed to fetch branch protection data: API rate limit exceeded"
+}

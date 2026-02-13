@@ -1,0 +1,29 @@
+{
+  "id": "branch-protection-policy",
+  "meta": {
+    "runtime": "cel@v14.0",
+    "description": "Branch protection policy generated from complyctl assessment plan",
+    "assert_mode": "AND",
+    "version": 1,
+    "controls": [],
+    "enforce": "ON"
+  },
+  "tenets": [
+    {
+      "id": "check-pr-required",
+      "title": "Verify that pull requests are required for the branch",
+      "predicates": {
+        "types": ["http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml"]
+      },
+      "code": "predicate.require_pr == true"
+    },
+    {
+      "id": "check-force-push-blocked",
+      "title": "Verify that force pushes are blocked",
+      "predicates": {
+        "types": ["http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml"]
+      },
+      "code": "predicate.block_force_push == true"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+repositories:
+  - url: not-a-valid-url
+    branches:
+      - main
+  - url: http://github.com/myorg/repo
+    branches:
+      - main

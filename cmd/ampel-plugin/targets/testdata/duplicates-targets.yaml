@@ -1,0 +1,10 @@
+repositories:
+  - url: https://github.com/myorg/repo1
+    branches:
+      - main
+  - url: https://github.com/myorg/repo1
+    branches:
+      - main
+  - url: https://gitlab.com/myorg/repo2
+    branches:
+      - main

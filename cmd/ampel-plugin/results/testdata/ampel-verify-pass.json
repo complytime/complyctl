@@ -1,0 +1,18 @@
+{
+  "policy_id": "branch-protection-policy",
+  "passed": true,
+  "results": [
+    {
+      "tenet_id": "check-pr-required",
+      "title": "Verify that pull requests are required for the branch",
+      "passed": true,
+      "reason": "Pull request requirement is enabled"
+    },
+    {
+      "tenet_id": "check-force-push-blocked",
+      "title": "Verify that force pushes are blocked",
+      "passed": true,
+      "reason": "Force push is blocked"
+    }
+  ]
+}

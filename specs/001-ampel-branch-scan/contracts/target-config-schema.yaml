@@ -1,0 +1,33 @@
+# Target Repository Configuration Schema
+# File: {workspace}/ampel/ampel-targets.yaml
+#
+# This file defines which GitHub/GitLab repositories the AMPEL
+# plugin scans for branch protection compliance.
+
+# Example:
+# repositories:
+#   - url: https://github.com/myorg/myrepo
+#     branches:
+#       - main
+#       - release
+#   - url: https://gitlab.com/myorg/another-repo
+#     branches:
+#       - main
+
+# Schema definition (expressed as Go struct tags for reference):
+#
+# type TargetConfig struct {
+#     Repositories []TargetRepository `yaml:"repositories"`
+# }
+#
+# type TargetRepository struct {
+#     URL      string   `yaml:"url"`
+#     Branches []string `yaml:"branches"`
+# }
+#
+# Validation rules:
+# - repositories: required, non-empty array
+# - url: required, valid HTTPS URL, must point to github.com or
+#   gitlab.com (or self-hosted instances)
+# - branches: required, non-empty array of branch name strings
+# - Duplicate url+branch combinations: warned and deduplicated

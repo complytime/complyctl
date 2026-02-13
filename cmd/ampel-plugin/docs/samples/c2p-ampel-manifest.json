@@ -1,0 +1,40 @@
+{
+  "metadata": {
+    "id": "ampel",
+    "description": "AMPEL Branch Protection Plugin for complyctl",
+    "version": "0.1.0",
+    "types": ["pvp"]
+  },
+  "executablePath": "ampel-plugin",
+  "sha256": "",
+  "configuration": [
+    {
+      "name": "workspace",
+      "description": "Directory for writing plugin artifacts",
+      "required": true
+    },
+    {
+      "name": "profile",
+      "description": "The compliance profile to use",
+      "required": true
+    },
+    {
+      "name": "policy_dir",
+      "description": "Directory for AMPEL policy files",
+      "required": false,
+      "default": "policy"
+    },
+    {
+      "name": "results_dir",
+      "description": "Directory for per-repository result files",
+      "required": false,
+      "default": "results"
+    },
+    {
+      "name": "targets_file",
+      "description": "Path to target repository configuration",
+      "required": false,
+      "default": "ampel-targets.yaml"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+repositories:
+  - url: https://github.com/myorg/myrepo
+    branches:
+      - main
+      - release
+  - url: https://gitlab.com/myorg/another-repo
+    branches:
+      - main

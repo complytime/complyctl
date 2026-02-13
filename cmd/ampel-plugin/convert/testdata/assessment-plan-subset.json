@@ -1,0 +1,40 @@
+[
+  {
+    "rule": {
+      "id": "require-pull-request",
+      "description": "Require pull requests for branch changes",
+      "parameters": [
+        {
+          "id": "require_pr",
+          "description": "Whether pull requests are required",
+          "value": "true"
+        }
+      ]
+    },
+    "checks": [
+      {
+        "id": "check-pr-required",
+        "description": "Verify that pull requests are required for the branch"
+      }
+    ]
+  },
+  {
+    "rule": {
+      "id": "block-force-push",
+      "description": "Block force pushes to protected branches",
+      "parameters": [
+        {
+          "id": "block_force_push",
+          "description": "Whether force pushes are blocked",
+          "value": "true"
+        }
+      ]
+    },
+    "checks": [
+      {
+        "id": "check-force-push-blocked",
+        "description": "Verify that force pushes are blocked"
+      }
+    ]
+  }
+]

@@ -1,0 +1,193 @@
+package results
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/oscal-compass/compliance-to-policy-go/v2/policy"
+	"github.com/stretchr/testify/require"
+)
+
+func loadFixture(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	return data
+}
+
+func TestParseAmpelOutput_Pass(t *testing.T) {
+	data := loadFixture(t, "testdata/ampel-verify-pass.json")
+	result, err := ParseAmpelOutput(data, "https://github.com/myorg/repo1", "main")
+	require.NoError(t, err)
+	require.Equal(t, "pass", result.Status)
+	require.Len(t, result.Findings, 2)
+	for _, f := range result.Findings {
+		require.Equal(t, "pass", f.Result)
+	}
+}
+
+func TestParseAmpelOutput_Fail(t *testing.T) {
+	data := loadFixture(t, "testdata/ampel-verify-fail.json")
+	result, err := ParseAmpelOutput(data, "https://github.com/myorg/repo1", "main")
+	require.NoError(t, err)
+	require.Equal(t, "fail", result.Status)
+	require.Len(t, result.Findings, 2)
+
+	var failCount int
+	for _, f := range result.Findings {
+		if f.Result == "fail" {
+			failCount++
+		}
+	}
+	require.Equal(t, 1, failCount)
+}
+
+func TestParseAmpelOutput_Error(t *testing.T) {
+	data := loadFixture(t, "testdata/ampel-verify-error.json")
+	result, err := ParseAmpelOutput(data, "https://github.com/myorg/repo1", "main")
+	require.NoError(t, err)
+	require.Equal(t, "error", result.Status)
+	require.NotEmpty(t, result.Error)
+}
+
+func TestParseAmpelOutput_Empty(t *testing.T) {
+	_, err := ParseAmpelOutput([]byte{}, "repo", "main")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "empty")
+}
+
+func TestParseAmpelOutput_MalformedJSON(t *testing.T) {
+	_, err := ParseAmpelOutput([]byte("{invalid json"), "repo", "main")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "parsing")
+}
+
+func TestParseAmpelOutput_ControlCharsStripped(t *testing.T) {
+	output := AmpelVerifyOutput{
+		PolicyID: "test",
+		Passed:   true,
+		Results: []AmpelVerifyResult{
+			{
+				TenetID: "check-1",
+				Title:   "Test\x00Title\x01With\x02Controls",
+				Passed:  true,
+				Reason:  "OK\x07bell",
+			},
+		},
+	}
+	data, err := json.Marshal(output)
+	require.NoError(t, err)
+
+	result, err := ParseAmpelOutput(data, "repo", "main")
+	require.NoError(t, err)
+	require.Equal(t, "TestTitleWithControls", result.Findings[0].Title)
+	require.Equal(t, "OKbell", result.Findings[0].Reason)
+}
+
+func TestParseAmpelOutput_OversizedField(t *testing.T) {
+	output := AmpelVerifyOutput{
+		PolicyID: "test",
+		Passed:   true,
+		Results: []AmpelVerifyResult{
+			{
+				TenetID: "check-1",
+				Title:   strings.Repeat("x", maxFieldSize+1),
+				Passed:  true,
+				Reason:  "OK",
+			},
+		},
+	}
+	data, err := json.Marshal(output)
+	require.NoError(t, err)
+
+	_, err = ParseAmpelOutput(data, "repo", "main")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "exceeds maximum size")
+}
+
+func TestWritePerRepoResult(t *testing.T) {
+	dir := t.TempDir()
+	result := &PerRepoResult{
+		Repository: "https://github.com/myorg/repo1",
+		Branch:     "main",
+		Status:     "pass",
+		Findings: []Finding{
+			{TenetID: "t1", Title: "Test", Result: "pass", Reason: "OK"},
+		},
+	}
+	err := WritePerRepoResult(result, dir)
+	require.NoError(t, err)
+
+	files, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	require.Contains(t, files[0].Name(), "myorg-repo1-main.json")
+}
+
+func TestWritePerRepoResult_Overwrites(t *testing.T) {
+	dir := t.TempDir()
+	r1 := &PerRepoResult{Repository: "https://github.com/org/repo", Branch: "main", Status: "pass"}
+	r2 := &PerRepoResult{Repository: "https://github.com/org/repo", Branch: "main", Status: "fail"}
+
+	require.NoError(t, WritePerRepoResult(r1, dir))
+	require.NoError(t, WritePerRepoResult(r2, dir))
+
+	files, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+
+	data, err := os.ReadFile(filepath.Join(dir, files[0].Name()))
+	require.NoError(t, err)
+	require.Contains(t, string(data), `"fail"`)
+}
+
+func TestToPVPResult(t *testing.T) {
+	results := []*PerRepoResult{
+		{
+			Repository: "https://github.com/myorg/repo1",
+			Branch:     "main",
+			Status:     "pass",
+			Findings: []Finding{
+				{TenetID: "check-1", Title: "Check 1", Result: "pass", Reason: "OK"},
+			},
+		},
+		{
+			Repository: "https://gitlab.com/myorg/repo2",
+			Branch:     "main",
+			Status:     "fail",
+			Findings: []Finding{
+				{TenetID: "check-1", Title: "Check 1", Result: "fail", Reason: "Not configured"},
+			},
+		},
+	}
+
+	pvp := ToPVPResult(results)
+	require.Len(t, pvp.ObservationsByCheck, 2)
+
+	// First observation should be pass
+	require.Equal(t, policy.ResultPass, pvp.ObservationsByCheck[0].Subjects[0].Result)
+	require.Equal(t, "https://github.com/myorg/repo1", pvp.ObservationsByCheck[0].Subjects[0].ResourceID)
+
+	// Second observation should be fail
+	require.Equal(t, policy.ResultFail, pvp.ObservationsByCheck[1].Subjects[0].Result)
+	require.Equal(t, "https://gitlab.com/myorg/repo2", pvp.ObservationsByCheck[1].Subjects[0].ResourceID)
+}
+
+func TestToPVPResult_ErrorRepo(t *testing.T) {
+	results := []*PerRepoResult{
+		{
+			Repository: "https://github.com/myorg/repo1",
+			Branch:     "main",
+			Status:     "error",
+			Error:      "connection refused",
+		},
+	}
+
+	pvp := ToPVPResult(results)
+	require.Len(t, pvp.ObservationsByCheck, 1)
+	require.Equal(t, policy.ResultError, pvp.ObservationsByCheck[0].Subjects[0].Result)
+	require.Equal(t, "connection refused", pvp.ObservationsByCheck[0].Subjects[0].Reason)
+}

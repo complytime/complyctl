@@ -1,0 +1,97 @@
+[
+  {
+    "rule": {
+      "id": "require-pull-request",
+      "description": "Require pull requests for branch changes",
+      "parameters": [
+        {
+          "id": "require_pr",
+          "description": "Whether pull requests are required",
+          "value": "true"
+        }
+      ]
+    },
+    "checks": [
+      {
+        "id": "check-pr-required",
+        "description": "Verify that pull requests are required for the branch"
+      }
+    ]
+  },
+  {
+    "rule": {
+      "id": "minimum-approvals",
+      "description": "Require minimum number of approvals before merge",
+      "parameters": [
+        {
+          "id": "min_approvals",
+          "description": "Minimum number of required approvals",
+          "value": "2"
+        }
+      ]
+    },
+    "checks": [
+      {
+        "id": "check-min-approvals",
+        "description": "Verify minimum approval count is configured"
+      }
+    ]
+  },
+  {
+    "rule": {
+      "id": "block-force-push",
+      "description": "Block force pushes to protected branches",
+      "parameters": [
+        {
+          "id": "block_force_push",
+          "description": "Whether force pushes are blocked",
+          "value": "true"
+        }
+      ]
+    },
+    "checks": [
+      {
+        "id": "check-force-push-blocked",
+        "description": "Verify that force pushes are blocked"
+      }
+    ]
+  },
+  {
+    "rule": {
+      "id": "require-code-owner-review",
+      "description": "Require code owner review for changes",
+      "parameters": [
+        {
+          "id": "require_code_owners",
+          "description": "Whether code owner reviews are required",
+          "value": "true"
+        }
+      ]
+    },
+    "checks": [
+      {
+        "id": "check-code-owner-review",
+        "description": "Verify that code owner review is required"
+      }
+    ]
+  },
+  {
+    "rule": {
+      "id": "dismiss-stale-reviews",
+      "description": "Dismiss stale pull request reviews on new commits",
+      "parameters": [
+        {
+          "id": "dismiss_stale",
+          "description": "Whether stale reviews are dismissed",
+          "value": "true"
+        }
+      ]
+    },
+    "checks": [
+      {
+        "id": "check-stale-review-dismissal",
+        "description": "Verify that stale reviews are dismissed on new commits"
+      }
+    ]
+  }
+]
