@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 package config
 
 import (
@@ -140,4 +141,9 @@ func (c *Config) ResultsDirPath() string {
 // TargetsFilePath returns the resolved absolute path for the targets file.
 func (c *Config) TargetsFilePath() string {
 	return c.TargetsFile
+}
+
+// SpecDirPath returns the path for the embedded spec files directory.
+func (c *Config) SpecDirPath() string {
+	return filepath.Join(c.ampelDir(), "specs")
 }

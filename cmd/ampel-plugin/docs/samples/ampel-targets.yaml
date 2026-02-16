@@ -1,8 +1,8 @@
 repositories:
-  - url: https://github.com/myorg/myrepo
+  - url: https://github.com/complytime/complyctl
+    branches:
+      - main
+  - url: https://gitlab.com/complytime/org-infra
     branches:
       - main
       - release
-  - url: https://gitlab.com/myorg/another-repo
-    branches:
-      - main

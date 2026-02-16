@@ -94,9 +94,16 @@ func (s PluginServer) GetResults(_ context.Context, p policy.Policy) (policy.PVP
 
 	policyDir := s.Config.PolicyDirPath()
 	resultsDir := s.Config.ResultsDirPath()
+	specDir := s.Config.SpecDirPath()
+
+	if err := scan.WriteSpecFiles(specDir); err != nil {
+		return policy.PVPResult{}, fmt.Errorf("writing spec files: %w", err)
+	}
+
 	scanCfg := scan.ScanConfig{
 		PolicyPath: policyDir + "/" + convert.PolicyFileName,
 		OutputDir:  resultsDir,
+		SpecDir:    specDir,
 	}
 
 	var repoResults []*results.PerRepoResult

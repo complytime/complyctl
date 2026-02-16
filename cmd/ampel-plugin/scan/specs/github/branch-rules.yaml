@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: Copyright 2025 Carabiner Systems, Inc
+# SPDX-License-Identifier: Apache-2.0
+---
+id: github.com/${ORG}/${REPO}@${BRANCH}
+name: github.com/${ORG}/${REPO}@${BRANCH}
+url: git+https://github.com/${ORG}/${REPO}/@${BRANCH}
+type: http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml
+endpoint: repos/${ORG}/${REPO}/rules/branches/${BRANCH}
+method: GET
+payload: "array"

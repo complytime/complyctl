@@ -41,6 +41,24 @@ func makeTestPolicy() policy.Policy {
 	}
 }
 
+func makeTestAttestation() []byte {
+	stmt := map[string]interface{}{
+		"_type": "https://in-toto.io/Statement/v1",
+		"subject": []map[string]interface{}{
+			{
+				"name": "test-subject",
+				"digest": map[string]string{
+					"sha256": "abc123def456",
+				},
+			},
+		},
+		"predicateType": "http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml",
+		"predicate":     map[string]interface{}{},
+	}
+	data, _ := json.Marshal(stmt)
+	return data
+}
+
 func setupServer(t *testing.T) (PluginServer, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -121,17 +139,21 @@ func TestConfigure_MissingWorkspace(t *testing.T) {
 	require.Contains(t, err.Error(), "workspace")
 }
 
-// mockScanRunner returns pre-configured ampel verify output for testing.
+// mockScanRunner returns different outputs for snappy vs ampel calls.
 type mockScanRunner struct {
-	output []byte
-	err    error
+	snappyOutput []byte
+	ampelOutput  []byte
+	err          error
 }
 
 func (m *mockScanRunner) Run(name string, args ...string) ([]byte, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	return m.output, nil
+	if name == "snappy" {
+		return m.snappyOutput, nil
+	}
+	return m.ampelOutput, nil
 }
 
 func setupServerWithTargets(t *testing.T) (PluginServer, string) {
@@ -167,11 +189,14 @@ func TestGetResults_ValidScan(t *testing.T) {
 			{TenetID: "check-pr-required", Title: "Check PR", Passed: true, Reason: "OK"},
 		},
 	}
-	data, err := json.Marshal(ampelOutput)
+	ampelData, err := json.Marshal(ampelOutput)
 	require.NoError(t, err)
 
 	origRunner := ScanRunner
-	ScanRunner = &mockScanRunner{output: data}
+	ScanRunner = &mockScanRunner{
+		snappyOutput: makeTestAttestation(),
+		ampelOutput:  ampelData,
+	}
 	defer func() { ScanRunner = origRunner }()
 
 	pvp, err := s.GetResults(context.Background(), makeTestPolicy())
@@ -179,11 +204,11 @@ func TestGetResults_ValidScan(t *testing.T) {
 	require.Len(t, pvp.ObservationsByCheck, 1)
 	require.Equal(t, policy.ResultPass, pvp.ObservationsByCheck[0].Subjects[0].Result)
 
-	// Verify per-repo file was created
+	// Verify per-repo result and attestation files were created
 	resultsDir := filepath.Join(dir, "ampel", "results")
 	files, err := os.ReadDir(resultsDir)
 	require.NoError(t, err)
-	require.Len(t, files, 1)
+	require.Len(t, files, 2) // attestation + per-repo result
 }
 
 func TestGetResults_ScanError_ContinuesScanning(t *testing.T) {
@@ -203,21 +228,22 @@ func TestGetResults_ScanError_ContinuesScanning(t *testing.T) {
 		[]byte(targetsContent), 0600,
 	))
 
-	// Mock runner that fails for first call, succeeds for second
+	// Mock runner that fails for first repo's snappy call, succeeds for second
 	callCount := 0
+	ampelOutput := results.AmpelVerifyOutput{
+		PolicyID: "test", Passed: true,
+		Results: []results.AmpelVerifyResult{
+			{TenetID: "check-1", Title: "Check", Passed: true, Reason: "OK"},
+		},
+	}
+	ampelData, _ := json.Marshal(ampelOutput)
+
 	origRunner := ScanRunner
 	ScanRunner = &mockCallCountRunner{
-		successOutput: func() []byte {
-			out, _ := json.Marshal(results.AmpelVerifyOutput{
-				PolicyID: "test", Passed: true,
-				Results: []results.AmpelVerifyResult{
-					{TenetID: "check-1", Title: "Check", Passed: true, Reason: "OK"},
-				},
-			})
-			return out
-		}(),
-		failOnCall: 1,
-		callCount:  &callCount,
+		snappyOutput: makeTestAttestation(),
+		ampelOutput:  ampelData,
+		failOnCall:   1,
+		callCount:    &callCount,
 	}
 	defer func() { ScanRunner = origRunner }()
 
@@ -228,26 +254,32 @@ func TestGetResults_ScanError_ContinuesScanning(t *testing.T) {
 }
 
 type mockCallCountRunner struct {
-	successOutput []byte
-	failOnCall    int
-	callCount     *int
+	snappyOutput []byte
+	ampelOutput  []byte
+	failOnCall   int
+	callCount    *int
 }
 
 func (m *mockCallCountRunner) Run(name string, args ...string) ([]byte, error) {
 	*m.callCount++
-	// Each ScanRepository calls Run twice (snappy + ampel)
 	// Fail on the snappy call for the first repo
 	if *m.callCount <= 1 && m.failOnCall == 1 {
 		return nil, fmt.Errorf("connection refused")
 	}
-	return m.successOutput, nil
+	if name == "snappy" {
+		return m.snappyOutput, nil
+	}
+	return m.ampelOutput, nil
 }
 
 func TestGetResults_MissingTargetsFile(t *testing.T) {
 	s, _ := setupServer(t)
 
 	origRunner := ScanRunner
-	ScanRunner = &mockScanRunner{output: []byte("{}")}
+	ScanRunner = &mockScanRunner{
+		snappyOutput: makeTestAttestation(),
+		ampelOutput:  []byte("{}"),
+	}
 	defer func() { ScanRunner = origRunner }()
 
 	_, err := s.GetResults(context.Background(), makeTestPolicy())
@@ -255,11 +287,10 @@ func TestGetResults_MissingTargetsFile(t *testing.T) {
 	require.Contains(t, err.Error(), "loading targets")
 }
 
-// T031: Tool check integration tests
+// Tool check integration tests
 func TestGenerate_MissingToolReturnsError(t *testing.T) {
 	s, _ := setupServer(t)
 
-	// Enable tool checking and set required tools to something that doesn't exist
 	origSkip := SkipToolCheck
 	SkipToolCheck = false
 	origTools := toolcheck.RequiredTools
@@ -310,7 +341,7 @@ func TestToolCheckError_IncludesToolName(t *testing.T) {
 	require.Contains(t, err.Error(), "PATH")
 }
 
-// T034: Custom path configuration tests
+// Custom path configuration tests
 
 func TestGenerate_CustomPolicyDir(t *testing.T) {
 	dir := t.TempDir()
@@ -362,22 +393,25 @@ func TestGetResults_CustomResultsDir(t *testing.T) {
 			{TenetID: "check-pr-required", Title: "Check PR", Passed: true, Reason: "OK"},
 		},
 	}
-	data, err := json.Marshal(ampelOutput)
+	ampelData, err := json.Marshal(ampelOutput)
 	require.NoError(t, err)
 
 	origRunner := ScanRunner
-	ScanRunner = &mockScanRunner{output: data}
+	ScanRunner = &mockScanRunner{
+		snappyOutput: makeTestAttestation(),
+		ampelOutput:  ampelData,
+	}
 	defer func() { ScanRunner = origRunner }()
 
 	pvp, err := s.GetResults(context.Background(), makeTestPolicy())
 	require.NoError(t, err)
 	require.Len(t, pvp.ObservationsByCheck, 1)
 
-	// Verify results are in custom dir
+	// Verify results are in custom dir (attestation + per-repo result)
 	customResultsDir := filepath.Join(dir, "ampel", "custom-res")
 	files, err := os.ReadDir(customResultsDir)
 	require.NoError(t, err)
-	require.Len(t, files, 1)
+	require.Len(t, files, 2)
 }
 
 // Ensure unused imports are used
