@@ -23,9 +23,9 @@ type ampelResultStatement struct {
 
 // ampelResultSetPred represents the ResultSet predicate from ampel verify.
 type ampelResultSetPred struct {
-	Status  string               `json:"status"`
-	Results []ampelPolicyResult  `json:"results"`
-	Error   *ampelError          `json:"error,omitempty"`
+	Status  string              `json:"status"`
+	Results []ampelPolicyResult `json:"results"`
+	Error   *ampelError         `json:"error,omitempty"`
 }
 
 // ampelPolicyResult represents a single policy evaluation result.
@@ -206,9 +206,9 @@ func WritePerRepoResult(result *PerRepoResult, dir string) error {
 // and prevents last-write-wins overwrites in the downstream observation manager.
 func ToPVPResult(repoResults []*PerRepoResult) policy.PVPResult {
 	type checkGroup struct {
-		title    string
-		checkID  string
-		subjects []policy.Subject
+		title     string
+		checkID   string
+		subjects  []policy.Subject
 		collected time.Time
 	}
 
@@ -315,7 +315,6 @@ func isPrintableASCII(s string) bool {
 	}
 	return true
 }
-
 
 func sanitizeForFilename(repoURL string) string {
 	name := repoURL

@@ -2,8 +2,8 @@ package convert
 
 // AmpelPolicyBundle is the top-level document written to disk for ampel verify.
 type AmpelPolicyBundle struct {
-	ID       string        `json:"id"`
-	Meta     BundleMeta    `json:"meta"`
+	ID       string         `json:"id"`
+	Meta     BundleMeta     `json:"meta"`
 	Policies []*AmpelPolicy `json:"policies"`
 }
 
@@ -20,8 +20,8 @@ type Framework struct {
 
 // AmpelPolicy represents a single AMPEL policy (one per granular file).
 type AmpelPolicy struct {
-	ID     string      `json:"id"`
-	Meta   PolicyMeta  `json:"meta"`
+	ID     string       `json:"id"`
+	Meta   PolicyMeta   `json:"meta"`
 	Tenets []AmpelTenet `json:"tenets"`
 }
 
