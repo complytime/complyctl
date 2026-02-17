@@ -251,7 +251,10 @@ func ScanRepository(repo targets.TargetRepository, branch, specPath string, cfg 
 	ampelResultFile := filepath.Join(cfg.OutputDir, filePrefix+"-ampel.intoto.json")
 	ampelArgs := constructAmpelVerifyCommand(subjectHash, cfg.PolicyPath, attestationFile, ampelResultFile)
 	logger.Info("running ampel verify", "repo", repo.URL, "branch", branch, "spec", specPath, "subject", subjectHash)
-	_, err = runner.Run(ampelArgs[0], ampelArgs[1:]...)
+	ampelCmdOutput, err := runner.Run(ampelArgs[0], ampelArgs[1:]...)
+	if len(ampelCmdOutput) > 0 {
+		logger.Debug("ampel verify output", "repo", repo.URL, "branch", branch, "output", string(ampelCmdOutput))
+	}
 	if err != nil {
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
