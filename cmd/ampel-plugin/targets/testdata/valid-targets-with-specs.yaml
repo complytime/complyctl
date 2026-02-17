@@ -3,7 +3,7 @@ repositories:
     branches:
       - main
     specs:
-      - github/branch-rules.yaml
+      - builtin:github/branch-rules.yaml
       - /opt/specs/custom-check.yaml
   - url: https://github.com/myorg/repo2
     branches:

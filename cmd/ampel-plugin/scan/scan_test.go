@@ -208,16 +208,12 @@ func TestResolveSpecPath(t *testing.T) {
 		{"custom-check.yaml", "/tmp/specs", "/tmp/specs/custom-check.yaml"},
 		{"custom-check.yml", "/tmp/specs", "/tmp/specs/custom-check.yml"},
 		{"builtin-name", "/tmp/specs", "builtin-name"},
+		{"builtin:github/branch-rules.yaml", "/tmp/specs", "builtin:github/branch-rules.yaml"},
 	}
 	for _, tc := range tests {
 		got := ResolveSpecPath(tc.specRef, tc.specDir)
 		require.Equal(t, tc.expected, got, "specRef=%s specDir=%s", tc.specRef, tc.specDir)
 	}
-}
-
-func TestDefaultSpecs(t *testing.T) {
-	specs := DefaultSpecs()
-	require.Equal(t, []string{"github/branch-rules.yaml"}, specs)
 }
 
 func TestSanitizeSpecName(t *testing.T) {
@@ -229,6 +225,7 @@ func TestSanitizeSpecName(t *testing.T) {
 		{"/opt/specs/custom-check.yaml", "custom-check"},
 		{"branch-rules.yml", "branch-rules"},
 		{"builtin-name", "builtin-name"},
+		{"builtin:github/branch-rules.yaml", "branch-rules"},
 	}
 	for _, tc := range tests {
 		got := sanitizeSpecName(tc.input)

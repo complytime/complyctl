@@ -248,11 +248,13 @@ func setupServerWithTargets(t *testing.T) (PluginServer, string) {
 	t.Helper()
 	s, dir := setupServer(t)
 
-	// Write a targets file
+	// Write a targets file with explicit specs
 	targetsContent := `repositories:
   - url: https://github.com/myorg/repo1
     branches:
       - main
+    specs:
+      - builtin:github/branch-rules.yaml
 `
 	targetsDir := filepath.Join(dir, "ampel")
 	require.NoError(t, os.MkdirAll(targetsDir, 0750))
@@ -289,6 +291,46 @@ func TestGetResults_ValidScan(t *testing.T) {
 	files, err := os.ReadDir(resultsDir)
 	require.NoError(t, err)
 	require.Len(t, files, 2) // snappy attestation + ampel intoto result
+}
+
+func TestGetResults_NoSpecs_SkipsRepo(t *testing.T) {
+	s, dir := setupServer(t)
+
+	// Write targets where one repo has specs and one does not
+	targetsContent := `repositories:
+  - url: https://github.com/myorg/repo-no-specs
+    branches:
+      - main
+  - url: https://github.com/myorg/repo-with-specs
+    branches:
+      - main
+    specs:
+      - builtin:github/branch-rules.yaml
+`
+	targetsDir := filepath.Join(dir, "ampel")
+	require.NoError(t, os.MkdirAll(targetsDir, 0750))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(targetsDir, "ampel-targets.yaml"),
+		[]byte(targetsContent), 0600,
+	))
+
+	// Generate a policy bundle so paths exist
+	require.NoError(t, s.Generate(context.Background(), makeTestPolicy()))
+
+	ampelOutput := makeAmpelResultAttestation()
+
+	origRunner := ScanRunner
+	ScanRunner = &mockScanRunner{
+		snappyOutput: makeTestAttestation(),
+		ampelOutput:  ampelOutput,
+	}
+	defer func() { ScanRunner = origRunner }()
+
+	pvp, err := s.GetResults(context.Background(), makeTestPolicy())
+	require.NoError(t, err)
+	// Only repo-with-specs should be scanned; repo-no-specs is skipped
+	require.Len(t, pvp.ObservationsByCheck, 1)
+	require.Equal(t, policy.ResultPass, pvp.ObservationsByCheck[0].Subjects[0].Result)
 }
 
 func TestGetResults_MultipleSpecs(t *testing.T) {
@@ -337,14 +379,18 @@ func TestGetResults_MultipleSpecs(t *testing.T) {
 func TestGetResults_ScanError_ContinuesScanning(t *testing.T) {
 	s, dir := setupServerWithTargets(t)
 
-	// Write targets with two repos
+	// Write targets with two repos, both with specs
 	targetsContent := `repositories:
   - url: https://github.com/myorg/repo1
     branches:
       - main
+    specs:
+      - builtin:github/branch-rules.yaml
   - url: https://github.com/myorg/repo2
     branches:
       - main
+    specs:
+      - builtin:github/branch-rules.yaml
 `
 	require.NoError(t, os.WriteFile(
 		filepath.Join(dir, "ampel", "ampel-targets.yaml"),
@@ -522,11 +568,13 @@ func TestGetResults_CustomResultsDir(t *testing.T) {
 	policyDir := s.Config.PolicyDirPath()
 	writeGranularPolicies(t, policyDir, "SC-CODE-01.01")
 
-	// Write targets file
+	// Write targets file with explicit specs
 	targetsContent := `repositories:
   - url: https://github.com/myorg/repo1
     branches:
       - main
+    specs:
+      - builtin:github/branch-rules.yaml
 `
 	require.NoError(t, os.WriteFile(
 		s.Config.TargetsFilePath(),

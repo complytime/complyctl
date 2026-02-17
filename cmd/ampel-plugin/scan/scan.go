@@ -64,17 +64,15 @@ func WriteSpecFiles(specDir string) error {
 	return nil
 }
 
-// DefaultSpecs returns the default spec file paths used when a target
-// does not specify any specs.
-func DefaultSpecs() []string {
-	return []string{"github/" + GitHubSpecFile}
-}
-
 // ResolveSpecPath resolves a spec reference to an absolute path.
-// Absolute paths are returned as-is. Relative paths containing a "/"
-// or ending in ".yaml"/".yml" are resolved against specDir. Bare names
-// (snappy built-ins) are passed through unchanged.
+// Specs with the "builtin:" prefix are passed through unchanged for snappy
+// to handle. Absolute paths are returned as-is. Relative paths containing
+// a "/" or ending in ".yaml"/".yml" are resolved against specDir. Bare
+// names (snappy built-ins) are passed through unchanged.
 func ResolveSpecPath(specRef, specDir string) string {
+	if strings.HasPrefix(specRef, "builtin:") {
+		return specRef
+	}
 	if filepath.IsAbs(specRef) {
 		return specRef
 	}
@@ -88,8 +86,11 @@ func ResolveSpecPath(specRef, specDir string) string {
 
 // sanitizeSpecName extracts a filesystem-safe label from a spec reference.
 // For example, "github/branch-rules.yaml" becomes "branch-rules".
+// The "builtin:" prefix is stripped before extracting the base name,
+// so "builtin:github/branch-rules.yaml" also becomes "branch-rules".
 func sanitizeSpecName(specRef string) string {
-	base := filepath.Base(specRef)
+	name := strings.TrimPrefix(specRef, "builtin:")
+	base := filepath.Base(name)
 	ext := filepath.Ext(base)
 	if ext != "" {
 		base = base[:len(base)-len(ext)]

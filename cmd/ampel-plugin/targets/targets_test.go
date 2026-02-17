@@ -80,7 +80,7 @@ func TestLoadTargets_WithSpecs(t *testing.T) {
 	require.Len(t, config.Repositories, 2)
 
 	// First repo has explicit specs
-	require.Equal(t, []string{"github/branch-rules.yaml", "/opt/specs/custom-check.yaml"}, config.Repositories[0].Specs)
+	require.Equal(t, []string{"builtin:github/branch-rules.yaml", "/opt/specs/custom-check.yaml"}, config.Repositories[0].Specs)
 	// Second repo has no specs (nil)
 	require.Nil(t, config.Repositories[1].Specs)
 }

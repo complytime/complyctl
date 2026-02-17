@@ -117,13 +117,13 @@ func (s PluginServer) GetResults(_ context.Context, p policy.Policy) (policy.PVP
 	var repoResults []*results.PerRepoResult
 
 	for _, repo := range targetConfig.Repositories {
-		specs := repo.Specs
-		if len(specs) == 0 {
-			specs = scan.DefaultSpecs()
+		if len(repo.Specs) == 0 {
+			logger.Warn("skipping repository with no specs defined", "url", repo.URL)
+			continue
 		}
 
 		for _, branch := range repo.Branches {
-			for _, specRef := range specs {
+			for _, specRef := range repo.Specs {
 				specPath := scan.ResolveSpecPath(specRef, scanCfg.SpecDir)
 				logger.Info("scanning repository", "url", repo.URL, "branch", branch, "spec", specRef)
 
