@@ -42,7 +42,8 @@ func (s PluginServer) Configure(_ context.Context, configMap map[string]string) 
 	return s.Config.LoadSettings(configMap)
 }
 
-// Generate translates OSCAL assessment plan rules into AMPEL policy files.
+// Generate matches OSCAL assessment plan rules against granular AMPEL policy
+// files and merges the matched policies into a single bundle for scan.
 func (s PluginServer) Generate(_ context.Context, p policy.Policy) error {
 	logger := hclog.Default()
 
@@ -52,23 +53,30 @@ func (s PluginServer) Generate(_ context.Context, p policy.Policy) error {
 
 	logger.Info("generating AMPEL policy")
 
-	cfg := convert.ConvertConfig{Profile: s.Config.Profile}
-	ampelPolicy, err := convert.PolicyToAmpel(p, cfg)
+	sourceDir := s.Config.PolicyDirPath()
+	outputDir := s.Config.GeneratedPolicyDirPath()
+
+	granular, err := convert.LoadGranularPolicies(sourceDir)
 	if err != nil {
-		return fmt.Errorf("converting policy to AMPEL format: %w", err)
+		return fmt.Errorf("loading granular policies: %w", err)
 	}
 
-	if ampelPolicy == nil {
-		logger.Info("no applicable rules found, skipping policy generation")
+	matched, warnings := convert.MatchPolicies(p, granular)
+	for _, w := range warnings {
+		logger.Warn(w)
+	}
+
+	if len(matched) == 0 {
+		logger.Info("no matching policies found, skipping policy generation")
 		return nil
 	}
 
-	policyDir := s.Config.PolicyDirPath()
-	if err := convert.WritePolicy(ampelPolicy, policyDir); err != nil {
-		return fmt.Errorf("writing AMPEL policy: %w", err)
+	bundle := convert.MergeToBundle(matched)
+	if err := convert.WritePolicy(bundle, outputDir); err != nil {
+		return fmt.Errorf("writing AMPEL policy bundle: %w", err)
 	}
 
-	logger.Info("AMPEL policy written", "path", policyDir)
+	logger.Info("AMPEL policy bundle written", "path", outputDir, "policies", len(matched))
 	return nil
 }
 
@@ -92,7 +100,7 @@ func (s PluginServer) GetResults(_ context.Context, p policy.Policy) (policy.PVP
 		logger.Warn(w)
 	}
 
-	policyDir := s.Config.PolicyDirPath()
+	generatedDir := s.Config.GeneratedPolicyDirPath()
 	resultsDir := s.Config.ResultsDirPath()
 	specDir := s.Config.SpecDirPath()
 
@@ -101,7 +109,7 @@ func (s PluginServer) GetResults(_ context.Context, p policy.Policy) (policy.PVP
 	}
 
 	scanCfg := scan.ScanConfig{
-		PolicyPath: policyDir + "/" + convert.PolicyFileName,
+		PolicyPath: generatedDir + "/" + convert.PolicyFileName,
 		OutputDir:  resultsDir,
 		SpecDir:    specDir,
 	}
@@ -145,9 +153,6 @@ func (s PluginServer) GetResults(_ context.Context, p policy.Policy) (policy.PVP
 			}
 
 			repoResults = append(repoResults, parsed)
-			if err := results.WritePerRepoResult(parsed, resultsDir); err != nil {
-				logger.Error("failed to write result", "repo", repo.URL, "error", err)
-			}
 		}
 	}
 

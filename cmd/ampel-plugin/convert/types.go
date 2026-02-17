@@ -1,35 +1,50 @@
 package convert
 
-// AmpelPolicy represents a complete AMPEL verification policy.
+// AmpelPolicyBundle is the top-level document written to disk for ampel verify.
+type AmpelPolicyBundle struct {
+	ID       string        `json:"id"`
+	Meta     BundleMeta    `json:"meta"`
+	Policies []*AmpelPolicy `json:"policies"`
+}
+
+// BundleMeta holds metadata for the policy bundle.
+type BundleMeta struct {
+	Frameworks []Framework `json:"frameworks"`
+}
+
+// Framework identifies a compliance framework referenced by the bundle.
+type Framework struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// AmpelPolicy represents a single AMPEL policy (one per granular file).
 type AmpelPolicy struct {
-	ID     string       `json:"id"`
-	Meta   AmpelMeta    `json:"meta"`
+	ID     string      `json:"id"`
+	Meta   PolicyMeta  `json:"meta"`
 	Tenets []AmpelTenet `json:"tenets"`
 }
 
-// AmpelMeta holds policy metadata.
-type AmpelMeta struct {
-	Runtime     string    `json:"runtime"`
-	Description string    `json:"description"`
-	AssertMode  string    `json:"assert_mode"`
-	Version     int64     `json:"version"`
-	Controls    []Control `json:"controls"`
-	Enforce     string    `json:"enforce"`
+// PolicyMeta holds metadata for an individual policy.
+type PolicyMeta struct {
+	Description string          `json:"description"`
+	Controls    []PolicyControl `json:"controls"`
+}
+
+// PolicyControl references a compliance control associated with the policy.
+type PolicyControl struct {
+	Framework string `json:"framework"`
+	Class     string `json:"class"`
+	ID        string `json:"id"`
 }
 
 // AmpelTenet represents a single verification check within a policy.
 type AmpelTenet struct {
-	ID         string            `json:"id"`
-	Title      string            `json:"title"`
-	Predicates PredicateSpec     `json:"predicates"`
-	Code       string            `json:"code"`
-	Outputs    map[string]Output `json:"outputs,omitempty"`
-}
-
-// Control references an OSCAL control associated with the policy.
-type Control struct {
-	Source string `json:"source"`
-	ID     string `json:"id"`
+	ID         string        `json:"id"`
+	Code       string        `json:"code"`
+	Predicates PredicateSpec `json:"predicates"`
+	Assessment TenetMessage  `json:"assessment"`
+	Error      TenetError    `json:"error"`
 }
 
 // PredicateSpec defines the attestation predicate types a tenet evaluates.
@@ -37,8 +52,13 @@ type PredicateSpec struct {
 	Types []string `json:"types"`
 }
 
-// Output defines a named output extractor from a tenet evaluation.
-type Output struct {
-	Code  string `json:"code"`
-	Value string `json:"value"`
+// TenetMessage holds the assessment message for a passing tenet.
+type TenetMessage struct {
+	Message string `json:"message"`
+}
+
+// TenetError holds the error message and remediation guidance for a failing tenet.
+type TenetError struct {
+	Message  string `json:"message"`
+	Guidance string `json:"guidance"`
 }

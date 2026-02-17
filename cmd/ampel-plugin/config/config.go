@@ -12,8 +12,10 @@ import (
 const (
 	// PluginDir is the subdirectory name for ampel artifacts within the workspace.
 	PluginDir = "ampel"
-	// DefaultPolicyDir is the default directory name for AMPEL policy files.
+	// DefaultPolicyDir is the default directory name for granular AMPEL policy source files.
 	DefaultPolicyDir = "policy"
+	// GeneratedPolicyDir is the workspace subdirectory for generated policy artifacts.
+	GeneratedPolicyDir = "policy"
 	// DefaultResultsDir is the default directory name for per-repository result files.
 	DefaultResultsDir = "results"
 	// DefaultTargetsFile is the default filename for the target repository configuration.
@@ -100,11 +102,44 @@ func (c *Config) ampelDir() string {
 	return filepath.Join(c.Workspace, PluginDir)
 }
 
+// expandTilde replaces a leading ~ with the user's home directory.
+func expandTilde(path string) (string, error) {
+	if path == "" || path[0] != '~' {
+		return path, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("expanding home directory: %w", err)
+	}
+	if len(path) == 1 {
+		return home, nil
+	}
+	if path[1] == '/' || path[1] == filepath.Separator {
+		return filepath.Join(home, path[2:]), nil
+	}
+	return path, nil
+}
+
 // ResolvePaths resolves PolicyDir, ResultsDir, and TargetsFile to absolute
-// paths. Relative paths are resolved against {Workspace}/ampel/. Directories
+// paths. Paths starting with ~ are expanded to the user's home directory.
+// Relative paths are resolved against {Workspace}/ampel/. Directories
 // for PolicyDir and ResultsDir are created if they do not exist.
 func (c *Config) ResolvePaths() error {
 	logger := hclog.Default()
+
+	var err error
+	c.PolicyDir, err = expandTilde(c.PolicyDir)
+	if err != nil {
+		return err
+	}
+	c.ResultsDir, err = expandTilde(c.ResultsDir)
+	if err != nil {
+		return err
+	}
+	c.TargetsFile, err = expandTilde(c.TargetsFile)
+	if err != nil {
+		return err
+	}
 
 	if !filepath.IsAbs(c.PolicyDir) {
 		c.PolicyDir = filepath.Join(c.ampelDir(), c.PolicyDir)
@@ -141,6 +176,12 @@ func (c *Config) ResultsDirPath() string {
 // TargetsFilePath returns the resolved absolute path for the targets file.
 func (c *Config) TargetsFilePath() string {
 	return c.TargetsFile
+}
+
+// GeneratedPolicyDirPath returns the workspace path for generated policy output.
+// This is always within the workspace, separate from the granular source policies.
+func (c *Config) GeneratedPolicyDirPath() string {
+	return filepath.Join(c.ampelDir(), GeneratedPolicyDir)
 }
 
 // SpecDirPath returns the path for the embedded spec files directory.

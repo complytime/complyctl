@@ -1,0 +1,54 @@
+{
+  "id": "SC-CODE-02.01",
+  "meta": {
+    "description": "Validate minimum approval count and prevent self-approval via GitHub API or GitLab API",
+    "controls": [
+      { "framework": "SC", "class": "SC-CODE", "id": "02" },
+      { "framework": "OSPS", "class": "OSPS-QA", "id": "07" }
+    ]
+  },
+  "tenets": [
+    {
+      "id": "01",
+      "code": "has(predicates[0].data.values) ? predicates[0].data.values.exists(rule, rule.type == \"pull_request\" && rule.parameters.required_approving_review_count >= 1) : false",
+      "predicates": {
+        "types": ["http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml"]
+      },
+      "assessment": {
+        "message": "Minimum one non-author approval is required"
+      },
+      "error": {
+        "message": "PRs can be merged without peer review.",
+        "guidance": "Ensure the pull request rule requires at least one approving review."
+      }
+    },
+    {
+      "id": "02",
+      "code": "has(predicates[0].data.values) ? predicates[0].data.values.exists(rule, rule.type == \"pull_request\" && rule.parameters.dismiss_stale_reviews_on_push == true) : false",
+      "predicates": {
+        "types": ["http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml"]
+      },
+      "assessment": {
+        "message": "New, reviewable commits pushed will dismiss previous PR review approvals."
+      },
+      "error": {
+        "message": "Approvals are not dismissed when new commits are pushed.",
+        "guidance": "Create a branch ruleset protecting your default branch and enable \"Dismiss stale pull request approvals when new commits are pushed\""
+      }
+    },
+    {
+      "id": "03",
+      "code": "has(predicates[0].data.values) ? predicates[0].data.values.exists(rule, rule.type == \"pull_request\" && rule.parameters.require_last_push_approval == true) : false",
+      "predicates": {
+        "types": ["http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml"]
+      },
+      "assessment": {
+        "message": "The most recent push must be approved by someone other than the person who pushed it."
+      },
+      "error": {
+        "message": "The most recent reviewable push is not approved by someone other than the person who pushed it.",
+        "guidance": "Create a branch ruleset protecting your default branch and enable \"Require approval of the most recent reviewable push\""
+      }
+    }
+  ]
+}

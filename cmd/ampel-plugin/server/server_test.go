@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/complytime/complyctl/cmd/ampel-plugin/convert"
-	"github.com/complytime/complyctl/cmd/ampel-plugin/results"
 	"github.com/complytime/complyctl/cmd/ampel-plugin/scan"
 	"github.com/complytime/complyctl/cmd/ampel-plugin/toolcheck"
 )
@@ -28,14 +27,11 @@ func makeTestPolicy() policy.Policy {
 	return policy.Policy{
 		{
 			Rule: extensions.Rule{
-				ID:          "require-pull-request",
-				Description: "Require pull requests",
-				Parameters: []extensions.Parameter{
-					{ID: "require_pr", Value: "true"},
-				},
+				ID:          "SC-CODE-01.01",
+				Description: "Validate branch protection settings require pull requests",
 			},
 			Checks: []extensions.Check{
-				{ID: "check-pr-required", Description: "Check PR required"},
+				{ID: "check-SC-CODE-01.01", Description: "Verify pull request reviews are required"},
 			},
 		},
 	}
@@ -59,6 +55,67 @@ func makeTestAttestation() []byte {
 	return data
 }
 
+func makeAmpelResultAttestation() []byte {
+	stmt := map[string]interface{}{
+		"_type": "https://in-toto.io/Statement/v1",
+		"subject": []map[string]interface{}{
+			{
+				"name":   "test-subject",
+				"digest": map[string]string{"sha256": "abc123def456"},
+			},
+		},
+		"predicateType": "https://carabiner.dev/ampel/resultset/v0",
+		"predicate": map[string]interface{}{
+			"status": "PASS",
+			"results": []map[string]interface{}{
+				{
+					"status": "PASS",
+					"policy": map[string]string{"id": "SC-CODE-01.01"},
+					"eval_results": []map[string]interface{}{
+						{
+							"id":         "01",
+							"status":     "PASS",
+							"assessment": map[string]string{"message": "OK"},
+						},
+					},
+					"meta": map[string]string{"description": "Check PR"},
+				},
+			},
+		},
+	}
+	data, _ := json.Marshal(stmt)
+	return data
+}
+
+// writeGranularPolicies creates granular policy files in the given directory
+// so that Generate can load and match them.
+func writeGranularPolicies(t *testing.T, dir string, policyIDs ...string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(dir, 0750))
+	for _, id := range policyIDs {
+		p := convert.AmpelPolicy{
+			ID: id,
+			Meta: convert.PolicyMeta{
+				Description: "Test policy " + id,
+				Controls:    []convert.PolicyControl{{Framework: "SC", Class: "SC-CODE", ID: "01"}},
+			},
+			Tenets: []convert.AmpelTenet{
+				{
+					ID:         "01",
+					Code:       "true",
+					Predicates: convert.PredicateSpec{Types: []string{"http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml"}},
+					Assessment: convert.TenetMessage{Message: "OK"},
+					Error:      convert.TenetError{Message: "FAIL", Guidance: "Fix it"},
+				},
+			},
+		}
+		data, err := json.MarshalIndent(p, "", "  ")
+		require.NoError(t, err)
+		filename := filepath.Join(dir, id+".json")
+		require.NoError(t, os.WriteFile(filename, data, 0600))
+	}
+}
+
 func setupServer(t *testing.T) (PluginServer, string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -68,6 +125,11 @@ func setupServer(t *testing.T) (PluginServer, string) {
 		"profile":   "test-profile",
 	})
 	require.NoError(t, err)
+
+	// Write granular policy files to the default policy dir
+	policyDir := s.Config.PolicyDirPath()
+	writeGranularPolicies(t, policyDir, "SC-CODE-01.01")
+
 	return s, dir
 }
 
@@ -76,10 +138,11 @@ func TestGenerate_ValidPolicy(t *testing.T) {
 	err := s.Generate(context.Background(), makeTestPolicy())
 	require.NoError(t, err)
 
-	policyPath := filepath.Join(dir, "ampel", "policy", convert.PolicyFileName)
-	data, err := os.ReadFile(policyPath)
+	outputPath := filepath.Join(dir, "ampel", "policy", convert.PolicyFileName)
+	data, err := os.ReadFile(outputPath)
 	require.NoError(t, err)
-	require.Contains(t, string(data), "check-pr-required")
+	require.Contains(t, string(data), "SC-CODE-01.01")
+	require.Contains(t, string(data), "complytime-ampel-policy")
 }
 
 func TestGenerate_EmptyPolicy(t *testing.T) {
@@ -87,35 +150,53 @@ func TestGenerate_EmptyPolicy(t *testing.T) {
 	err := s.Generate(context.Background(), policy.Policy{})
 	require.NoError(t, err)
 
-	policyPath := filepath.Join(dir, "ampel", "policy", convert.PolicyFileName)
-	_, err = os.Stat(policyPath)
+	outputPath := filepath.Join(dir, "ampel", "policy", convert.PolicyFileName)
+	_, err = os.Stat(outputPath)
 	require.True(t, os.IsNotExist(err), "no policy file should be created for empty input")
+}
+
+func TestGenerate_NoMatchingPolicies(t *testing.T) {
+	s, dir := setupServer(t)
+
+	// Use a policy with a rule ID that doesn't match any granular file
+	noMatchPolicy := policy.Policy{
+		{
+			Rule:   extensions.Rule{ID: "nonexistent-rule"},
+			Checks: []extensions.Check{{ID: "check-1", Description: "Test"}},
+		},
+	}
+	err := s.Generate(context.Background(), noMatchPolicy)
+	require.NoError(t, err)
+
+	outputPath := filepath.Join(dir, "ampel", "policy", convert.PolicyFileName)
+	_, err = os.Stat(outputPath)
+	require.True(t, os.IsNotExist(err), "no policy file should be created when no rules match")
 }
 
 func TestGenerate_OverwritesExistingPolicy(t *testing.T) {
 	s, dir := setupServer(t)
 
-	p1 := policy.Policy{
-		{
-			Rule:   extensions.Rule{ID: "r1", Parameters: []extensions.Parameter{{ID: "p1", Value: "true"}}},
-			Checks: []extensions.Check{{ID: "first-check", Description: "First"}},
-		},
-	}
+	// Add a second granular policy
+	policyDir := s.Config.PolicyDirPath()
+	writeGranularPolicies(t, policyDir, "SC-CODE-03.01")
+
+	p1 := makeTestPolicy()
 	p2 := policy.Policy{
 		{
-			Rule:   extensions.Rule{ID: "r2", Parameters: []extensions.Parameter{{ID: "p2", Value: "true"}}},
-			Checks: []extensions.Check{{ID: "second-check", Description: "Second"}},
+			Rule:   extensions.Rule{ID: "SC-CODE-03.01"},
+			Checks: []extensions.Check{{ID: "check-SC-CODE-03.01", Description: "Force push"}},
 		},
 	}
 
 	require.NoError(t, s.Generate(context.Background(), p1))
 	require.NoError(t, s.Generate(context.Background(), p2))
 
-	policyPath := filepath.Join(dir, "ampel", "policy", convert.PolicyFileName)
-	data, err := os.ReadFile(policyPath)
+	outputPath := filepath.Join(dir, "ampel", "policy", convert.PolicyFileName)
+	data, err := os.ReadFile(outputPath)
 	require.NoError(t, err)
-	require.Contains(t, string(data), "second-check")
-	require.NotContains(t, string(data), "first-check")
+	require.Contains(t, string(data), "SC-CODE-03.01")
+	// The second generate should have overwritten with only SC-CODE-03.01
+	// (it only matched one policy from p2)
 }
 
 func TestConfigure_ValidConfig(t *testing.T) {
@@ -153,7 +234,14 @@ func (m *mockScanRunner) Run(name string, args ...string) ([]byte, error) {
 	if name == "snappy" {
 		return m.snappyOutput, nil
 	}
-	return m.ampelOutput, nil
+	// Write ampel output to the results path specified by --results-path
+	for i, arg := range args {
+		if arg == "--results-path" && i+1 < len(args) {
+			_ = os.WriteFile(args[i+1], m.ampelOutput, 0600)
+			break
+		}
+	}
+	return nil, nil
 }
 
 func setupServerWithTargets(t *testing.T) (PluginServer, string) {
@@ -173,7 +261,7 @@ func setupServerWithTargets(t *testing.T) (PluginServer, string) {
 		[]byte(targetsContent), 0600,
 	))
 
-	// Write a policy file so paths exist
+	// Generate a policy bundle so paths exist
 	require.NoError(t, s.Generate(context.Background(), makeTestPolicy()))
 
 	return s, dir
@@ -182,20 +270,12 @@ func setupServerWithTargets(t *testing.T) (PluginServer, string) {
 func TestGetResults_ValidScan(t *testing.T) {
 	s, dir := setupServerWithTargets(t)
 
-	ampelOutput := results.AmpelVerifyOutput{
-		PolicyID: "test",
-		Passed:   true,
-		Results: []results.AmpelVerifyResult{
-			{TenetID: "check-pr-required", Title: "Check PR", Passed: true, Reason: "OK"},
-		},
-	}
-	ampelData, err := json.Marshal(ampelOutput)
-	require.NoError(t, err)
+	ampelOutput := makeAmpelResultAttestation()
 
 	origRunner := ScanRunner
 	ScanRunner = &mockScanRunner{
 		snappyOutput: makeTestAttestation(),
-		ampelOutput:  ampelData,
+		ampelOutput:  ampelOutput,
 	}
 	defer func() { ScanRunner = origRunner }()
 
@@ -204,11 +284,11 @@ func TestGetResults_ValidScan(t *testing.T) {
 	require.Len(t, pvp.ObservationsByCheck, 1)
 	require.Equal(t, policy.ResultPass, pvp.ObservationsByCheck[0].Subjects[0].Result)
 
-	// Verify per-repo result and attestation files were created
+	// Verify snappy attestation and ampel intoto result files were created
 	resultsDir := filepath.Join(dir, "ampel", "results")
 	files, err := os.ReadDir(resultsDir)
 	require.NoError(t, err)
-	require.Len(t, files, 2) // attestation + per-repo result
+	require.Len(t, files, 2) // snappy attestation + ampel intoto result
 }
 
 func TestGetResults_ScanError_ContinuesScanning(t *testing.T) {
@@ -228,20 +308,14 @@ func TestGetResults_ScanError_ContinuesScanning(t *testing.T) {
 		[]byte(targetsContent), 0600,
 	))
 
+	ampelOutput := makeAmpelResultAttestation()
+
 	// Mock runner that fails for first repo's snappy call, succeeds for second
 	callCount := 0
-	ampelOutput := results.AmpelVerifyOutput{
-		PolicyID: "test", Passed: true,
-		Results: []results.AmpelVerifyResult{
-			{TenetID: "check-1", Title: "Check", Passed: true, Reason: "OK"},
-		},
-	}
-	ampelData, _ := json.Marshal(ampelOutput)
-
 	origRunner := ScanRunner
 	ScanRunner = &mockCallCountRunner{
 		snappyOutput: makeTestAttestation(),
-		ampelOutput:  ampelData,
+		ampelOutput:  ampelOutput,
 		failOnCall:   1,
 		callCount:    &callCount,
 	}
@@ -269,11 +343,24 @@ func (m *mockCallCountRunner) Run(name string, args ...string) ([]byte, error) {
 	if name == "snappy" {
 		return m.snappyOutput, nil
 	}
-	return m.ampelOutput, nil
+	// Write ampel output to the results path specified by --results-path
+	for i, arg := range args {
+		if arg == "--results-path" && i+1 < len(args) {
+			_ = os.WriteFile(args[i+1], m.ampelOutput, 0600)
+			break
+		}
+	}
+	return nil, nil
 }
 
 func TestGetResults_MissingTargetsFile(t *testing.T) {
-	s, _ := setupServer(t)
+	dir := t.TempDir()
+	s := New()
+	err := s.Configure(context.Background(), map[string]string{
+		"workspace": dir,
+		"profile":   "test-profile",
+	})
+	require.NoError(t, err)
 
 	origRunner := ScanRunner
 	ScanRunner = &mockScanRunner{
@@ -282,7 +369,7 @@ func TestGetResults_MissingTargetsFile(t *testing.T) {
 	}
 	defer func() { ScanRunner = origRunner }()
 
-	_, err := s.GetResults(context.Background(), makeTestPolicy())
+	_, err = s.GetResults(context.Background(), makeTestPolicy())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "loading targets")
 }
@@ -306,7 +393,13 @@ func TestGenerate_MissingToolReturnsError(t *testing.T) {
 }
 
 func TestGetResults_MissingToolReturnsError(t *testing.T) {
-	s, _ := setupServer(t)
+	dir := t.TempDir()
+	s := New()
+	err := s.Configure(context.Background(), map[string]string{
+		"workspace": dir,
+		"profile":   "test-profile",
+	})
+	require.NoError(t, err)
 
 	origSkip := SkipToolCheck
 	SkipToolCheck = false
@@ -317,7 +410,7 @@ func TestGetResults_MissingToolReturnsError(t *testing.T) {
 		toolcheck.RequiredTools = origTools
 	}()
 
-	_, err := s.GetResults(context.Background(), makeTestPolicy())
+	_, err = s.GetResults(context.Background(), makeTestPolicy())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "nonexistent-ampel-tool-xyz")
 }
@@ -353,13 +446,23 @@ func TestGenerate_CustomPolicyDir(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// Write granular policies to custom source dir
+	sourceDir := s.Config.PolicyDirPath()
+	writeGranularPolicies(t, sourceDir, "SC-CODE-01.01")
+
 	err = s.Generate(context.Background(), makeTestPolicy())
 	require.NoError(t, err)
 
-	policyPath := filepath.Join(dir, "ampel", "custom-pol", convert.PolicyFileName)
-	data, err := os.ReadFile(policyPath)
+	// Generated output goes to workspace generated-policy dir, not the custom source dir
+	outputPath := filepath.Join(dir, "ampel", "policy", convert.PolicyFileName)
+	data, err := os.ReadFile(outputPath)
 	require.NoError(t, err)
-	require.Contains(t, string(data), "check-pr-required")
+	require.Contains(t, string(data), "SC-CODE-01.01")
+
+	// Verify the bundle was NOT written to the custom source dir
+	sourcePath := filepath.Join(dir, "ampel", "custom-pol", convert.PolicyFileName)
+	_, err = os.Stat(sourcePath)
+	require.True(t, os.IsNotExist(err), "generated bundle should not be in the source policy dir")
 }
 
 func TestGetResults_CustomResultsDir(t *testing.T) {
@@ -371,6 +474,10 @@ func TestGetResults_CustomResultsDir(t *testing.T) {
 		"results_dir": "custom-res",
 	})
 	require.NoError(t, err)
+
+	// Write granular policies
+	policyDir := s.Config.PolicyDirPath()
+	writeGranularPolicies(t, policyDir, "SC-CODE-01.01")
 
 	// Write targets file
 	targetsContent := `repositories:
@@ -386,20 +493,12 @@ func TestGetResults_CustomResultsDir(t *testing.T) {
 	// Generate policy first
 	require.NoError(t, s.Generate(context.Background(), makeTestPolicy()))
 
-	ampelOutput := results.AmpelVerifyOutput{
-		PolicyID: "test",
-		Passed:   true,
-		Results: []results.AmpelVerifyResult{
-			{TenetID: "check-pr-required", Title: "Check PR", Passed: true, Reason: "OK"},
-		},
-	}
-	ampelData, err := json.Marshal(ampelOutput)
-	require.NoError(t, err)
+	ampelOutput := makeAmpelResultAttestation()
 
 	origRunner := ScanRunner
 	ScanRunner = &mockScanRunner{
 		snappyOutput: makeTestAttestation(),
-		ampelOutput:  ampelData,
+		ampelOutput:  ampelOutput,
 	}
 	defer func() { ScanRunner = origRunner }()
 
@@ -407,7 +506,7 @@ func TestGetResults_CustomResultsDir(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, pvp.ObservationsByCheck, 1)
 
-	// Verify results are in custom dir (attestation + per-repo result)
+	// Verify results are in custom dir (snappy attestation + ampel intoto result)
 	customResultsDir := filepath.Join(dir, "ampel", "custom-res")
 	files, err := os.ReadDir(customResultsDir)
 	require.NoError(t, err)

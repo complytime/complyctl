@@ -1,39 +1,25 @@
 [
   {
     "rule": {
-      "id": "require-pull-request",
-      "description": "Require pull requests for branch changes",
-      "parameters": [
-        {
-          "id": "require_pr",
-          "description": "Whether pull requests are required",
-          "value": "true"
-        }
-      ]
+      "id": "SC-CODE-01.01",
+      "description": "Validate branch protection settings require pull requests"
     },
     "checks": [
       {
-        "id": "check-pr-required",
-        "description": "Verify that pull requests are required for the branch"
+        "id": "check-SC-CODE-01.01",
+        "description": "Verify pull request reviews are required"
       }
     ]
   },
   {
     "rule": {
-      "id": "block-force-push",
-      "description": "Block force pushes to protected branches",
-      "parameters": [
-        {
-          "id": "block_force_push",
-          "description": "Whether force pushes are blocked",
-          "value": "true"
-        }
-      ]
+      "id": "SC-CODE-03.01",
+      "description": "Validate force push blocking is enabled on protected branches"
     },
     "checks": [
       {
-        "id": "check-force-push-blocked",
-        "description": "Verify that force pushes are blocked"
+        "id": "check-SC-CODE-03.01",
+        "description": "Verify force pushes are blocked"
       }
     ]
   }

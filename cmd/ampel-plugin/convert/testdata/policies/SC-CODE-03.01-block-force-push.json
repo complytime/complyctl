@@ -1,0 +1,26 @@
+{
+  "id": "SC-CODE-03.01",
+  "meta": {
+    "description": "Validate force push blocking is enabled on protected branches via GitHub API or GitLab API",
+    "controls": [
+      { "framework": "SC", "class": "SC-CODE", "id": "03" },
+      { "framework": "OSPS", "class": "OSPS-QA", "id": "07" }
+    ]
+  },
+  "tenets": [
+    {
+      "id": "01",
+      "code": "has(predicates[0].data.values) ? predicates[0].data.values.exists(rule, rule.type == \"non_fast_forward\") : false",
+      "predicates": {
+        "types": ["http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml"]
+      },
+      "assessment": {
+        "message": "Force pushing is disabled in default branch."
+      },
+      "error": {
+        "message": "Force pushes can be sent to main branch",
+        "guidance": "Create a branch ruleset protecting your default branch and enable \"Block force pushes\""
+      }
+    }
+  ]
+}

@@ -20,181 +20,285 @@ func loadPolicy(t *testing.T, path string) policy.Policy {
 	return policy.Policy(ruleSets)
 }
 
-func loadExpectedPolicy(t *testing.T, path string) *AmpelPolicy {
+func loadExpectedBundle(t *testing.T, path string) *AmpelPolicyBundle {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	require.NoError(t, err, "reading expected fixture %s", path)
-	var expected AmpelPolicy
+	var expected AmpelPolicyBundle
 	require.NoError(t, json.Unmarshal(data, &expected), "unmarshaling expected fixture %s", path)
 	return &expected
 }
 
-func TestPolicyToAmpel(t *testing.T) {
-	cfg := ConvertConfig{Profile: "branch-protection-baseline"}
+// --- LoadGranularPolicies tests ---
 
-	tests := []struct {
-		name           string
-		inputFixture   string
-		expectedFile   string
-		expectedTenets int
-		wantNil        bool
-		wantErr        bool
-	}{
-		{
-			name:           "full plan produces full policy",
-			inputFixture:   "testdata/assessment-plan-full.json",
-			expectedFile:   "testdata/ampel-policy-expected-full.json",
-			expectedTenets: 5,
-		},
-		{
-			name:           "subset plan produces subset policy",
-			inputFixture:   "testdata/assessment-plan-subset.json",
-			expectedFile:   "testdata/ampel-policy-expected-subset.json",
-			expectedTenets: 2,
-		},
-		{
-			name:    "empty policy input returns nil",
-			wantNil: true,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			var input policy.Policy
-			if tc.inputFixture != "" {
-				input = loadPolicy(t, tc.inputFixture)
-			} else {
-				input = policy.Policy{}
-			}
-
-			result, err := PolicyToAmpel(input, cfg)
-
-			if tc.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-
-			if tc.wantNil {
-				require.Nil(t, result)
-				return
-			}
-
-			require.NotNil(t, result)
-			require.Len(t, result.Tenets, tc.expectedTenets)
-
-			if tc.expectedFile != "" {
-				expected := loadExpectedPolicy(t, tc.expectedFile)
-				require.Equal(t, expected.ID, result.ID)
-				require.Equal(t, expected.Meta.AssertMode, result.Meta.AssertMode)
-				require.Equal(t, expected.Meta.Runtime, result.Meta.Runtime)
-				require.Equal(t, len(expected.Tenets), len(result.Tenets))
-				for i, tenet := range expected.Tenets {
-					require.Equal(t, tenet.ID, result.Tenets[i].ID, "tenet %d ID mismatch", i)
-					require.Equal(t, tenet.Title, result.Tenets[i].Title, "tenet %d Title mismatch", i)
-					require.Equal(t, tenet.Code, result.Tenets[i].Code, "tenet %d Code mismatch", i)
-					require.Equal(t, tenet.Predicates, result.Tenets[i].Predicates, "tenet %d Predicates mismatch", i)
-				}
-			}
-		})
-	}
-}
-
-func TestPolicyToAmpel_NilInput(t *testing.T) {
-	cfg := ConvertConfig{Profile: "test"}
-	_, err := PolicyToAmpel(nil, cfg)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "must not be nil")
-}
-
-func TestPolicyToAmpel_RuleWithNoChecks(t *testing.T) {
-	cfg := ConvertConfig{Profile: "test"}
-	input := policy.Policy{
-		{
-			Rule: extensions.Rule{
-				ID:          "rule-no-checks",
-				Description: "Rule with no checks",
-			},
-			Checks: nil,
-		},
-	}
-	result, err := PolicyToAmpel(input, cfg)
+func TestLoadGranularPolicies(t *testing.T) {
+	policies, err := LoadGranularPolicies("testdata/policies")
 	require.NoError(t, err)
-	require.Nil(t, result, "rule with no checks should produce nil output")
+	require.Len(t, policies, 5)
+
+	expectedIDs := []string{
+		"SC-CODE-01.01",
+		"SC-CODE-02.01",
+		"SC-CODE-03.01",
+		"SC-CODE-04.01",
+		"SC-CODE-05.01",
+	}
+	for _, id := range expectedIDs {
+		p, ok := policies[id]
+		require.True(t, ok, "expected policy %q to be loaded", id)
+		require.Equal(t, id, p.ID)
+		require.NotEmpty(t, p.Tenets, "policy %q should have tenets", id)
+	}
 }
 
-func TestPolicyToAmpel_EmptyCheckID(t *testing.T) {
-	cfg := ConvertConfig{Profile: "test"}
+func TestLoadGranularPolicies_EmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	policies, err := LoadGranularPolicies(dir)
+	require.NoError(t, err)
+	require.Empty(t, policies)
+}
+
+func TestLoadGranularPolicies_MalformedJSON(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "bad.json"), []byte("{invalid"), 0600))
+
+	_, err := LoadGranularPolicies(dir)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "parsing policy file")
+}
+
+func TestLoadGranularPolicies_EmptyPolicyID(t *testing.T) {
+	dir := t.TempDir()
+	data := `{"id": "", "meta": {"description": "test"}, "tenets": []}`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "empty-id.json"), []byte(data), 0600))
+
+	_, err := LoadGranularPolicies(dir)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "empty id field")
+}
+
+func TestLoadGranularPolicies_SkipsOutputFile(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write a valid granular policy
+	p := AmpelPolicy{ID: "test-01", Meta: PolicyMeta{Description: "test"}, Tenets: []AmpelTenet{}}
+	data, err := json.Marshal(p)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "test-01.json"), data, 0600))
+
+	// Write the output file (should be skipped)
+	bundle := AmpelPolicyBundle{ID: "complytime-ampel-policy"}
+	bdata, err := json.Marshal(bundle)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, PolicyFileName), bdata, 0600))
+
+	policies, err := LoadGranularPolicies(dir)
+	require.NoError(t, err)
+	require.Len(t, policies, 1)
+	require.Contains(t, policies, "test-01")
+}
+
+func TestLoadGranularPolicies_SkipsNonJSON(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write a valid granular policy
+	p := AmpelPolicy{ID: "test-01", Meta: PolicyMeta{Description: "test"}, Tenets: []AmpelTenet{}}
+	data, err := json.Marshal(p)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "test-01.json"), data, 0600))
+
+	// Write a non-JSON file (should be skipped)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("hello"), 0600))
+
+	policies, err := LoadGranularPolicies(dir)
+	require.NoError(t, err)
+	require.Len(t, policies, 1)
+}
+
+// --- MatchPolicies tests ---
+
+func TestMatchPolicies(t *testing.T) {
+	granular, err := LoadGranularPolicies("testdata/policies")
+	require.NoError(t, err)
+
+	input := loadPolicy(t, "testdata/assessment-plan-full.json")
+	matched, warnings := MatchPolicies(input, granular)
+
+	require.Len(t, matched, 5)
+	require.Empty(t, warnings)
+
+	// Verify sorted order
+	for i := 1; i < len(matched); i++ {
+		require.True(t, matched[i-1].ID < matched[i].ID,
+			"expected sorted order, got %s before %s", matched[i-1].ID, matched[i].ID)
+	}
+}
+
+func TestMatchPolicies_Subset(t *testing.T) {
+	granular, err := LoadGranularPolicies("testdata/policies")
+	require.NoError(t, err)
+
+	input := loadPolicy(t, "testdata/assessment-plan-subset.json")
+	matched, warnings := MatchPolicies(input, granular)
+
+	require.Len(t, matched, 2)
+	require.Empty(t, warnings)
+	require.Equal(t, "SC-CODE-01.01", matched[0].ID)
+	require.Equal(t, "SC-CODE-03.01", matched[1].ID)
+}
+
+func TestMatchPolicies_UnmatchedRule(t *testing.T) {
+	granular, err := LoadGranularPolicies("testdata/policies")
+	require.NoError(t, err)
+
 	input := policy.Policy{
 		{
-			Rule: extensions.Rule{
-				ID:          "rule-empty-check",
-				Description: "Rule with empty check ID",
-			},
-			Checks: []extensions.Check{
-				{ID: "", Description: "Empty ID check"},
-			},
+			Rule:   extensions.Rule{ID: "SC-CODE-01.01"},
+			Checks: []extensions.Check{{ID: "check-1"}},
+		},
+		{
+			Rule:   extensions.Rule{ID: "nonexistent-rule"},
+			Checks: []extensions.Check{{ID: "check-2"}},
 		},
 	}
-	_, err := PolicyToAmpel(input, cfg)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "check ID must not be empty")
+
+	matched, warnings := MatchPolicies(input, granular)
+	require.Len(t, matched, 1)
+	require.Equal(t, "SC-CODE-01.01", matched[0].ID)
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], "nonexistent-rule")
 }
 
-func TestPolicyToAmpel_ChangingParameterChangesOutput(t *testing.T) {
-	cfg := ConvertConfig{Profile: "test"}
+func TestMatchPolicies_AllUnmatched(t *testing.T) {
+	granular, err := LoadGranularPolicies("testdata/policies")
+	require.NoError(t, err)
 
-	makePolicy := func(value string) policy.Policy {
-		return policy.Policy{
-			{
-				Rule: extensions.Rule{
-					ID:          "min-approvals",
-					Description: "Minimum approvals",
-					Parameters: []extensions.Parameter{
-						{ID: "min_approvals", Description: "Min approvals", Value: value},
-					},
-				},
-				Checks: []extensions.Check{
-					{ID: "check-min-approvals", Description: "Check min approvals"},
-				},
-			},
+	input := policy.Policy{
+		{
+			Rule:   extensions.Rule{ID: "no-such-rule-1"},
+			Checks: []extensions.Check{{ID: "check-1"}},
+		},
+		{
+			Rule:   extensions.Rule{ID: "no-such-rule-2"},
+			Checks: []extensions.Check{{ID: "check-2"}},
+		},
+	}
+
+	matched, warnings := MatchPolicies(input, granular)
+	require.Empty(t, matched)
+	require.Len(t, warnings, 2)
+}
+
+func TestMatchPolicies_EmptyInput(t *testing.T) {
+	granular, err := LoadGranularPolicies("testdata/policies")
+	require.NoError(t, err)
+
+	matched, warnings := MatchPolicies(policy.Policy{}, granular)
+	require.Empty(t, matched)
+	require.Empty(t, warnings)
+}
+
+// --- MergeToBundle tests ---
+
+func TestMergeToBundle(t *testing.T) {
+	policies := []*AmpelPolicy{
+		{ID: "SC-CODE-01.01", Meta: PolicyMeta{Description: "PR required"}, Tenets: []AmpelTenet{{ID: "01"}}},
+		{ID: "SC-CODE-03.01", Meta: PolicyMeta{Description: "Force push"}, Tenets: []AmpelTenet{{ID: "01"}}},
+	}
+
+	bundle := MergeToBundle(policies)
+	require.Equal(t, "complytime-ampel-policy", bundle.ID)
+	require.Len(t, bundle.Meta.Frameworks, 1)
+	require.Equal(t, "ComplyTime-AMPEL-Policy", bundle.Meta.Frameworks[0].ID)
+	require.Len(t, bundle.Policies, 2)
+	require.Equal(t, "SC-CODE-01.01", bundle.Policies[0].ID)
+	require.Equal(t, "SC-CODE-03.01", bundle.Policies[1].ID)
+}
+
+func TestMergeToBundle_Empty(t *testing.T) {
+	bundle := MergeToBundle(nil)
+	require.Equal(t, "complytime-ampel-policy", bundle.ID)
+	require.Empty(t, bundle.Policies)
+}
+
+// --- End-to-end: load, match, merge, compare to expected ---
+
+func TestEndToEnd_FullPlan(t *testing.T) {
+	granular, err := LoadGranularPolicies("testdata/policies")
+	require.NoError(t, err)
+
+	input := loadPolicy(t, "testdata/assessment-plan-full.json")
+	matched, warnings := MatchPolicies(input, granular)
+	require.Empty(t, warnings)
+	require.Len(t, matched, 5)
+
+	bundle := MergeToBundle(matched)
+	expected := loadExpectedBundle(t, "testdata/ampel-bundle-expected-full.json")
+
+	require.Equal(t, expected.ID, bundle.ID)
+	require.Equal(t, expected.Meta, bundle.Meta)
+	require.Len(t, bundle.Policies, len(expected.Policies))
+	for i, ep := range expected.Policies {
+		require.Equal(t, ep.ID, bundle.Policies[i].ID, "policy %d ID mismatch", i)
+		require.Equal(t, ep.Meta, bundle.Policies[i].Meta, "policy %d meta mismatch", i)
+		require.Equal(t, len(ep.Tenets), len(bundle.Policies[i].Tenets), "policy %d tenet count mismatch", i)
+		for j, et := range ep.Tenets {
+			require.Equal(t, et.ID, bundle.Policies[i].Tenets[j].ID, "policy %d tenet %d ID mismatch", i, j)
+			require.Equal(t, et.Code, bundle.Policies[i].Tenets[j].Code, "policy %d tenet %d Code mismatch", i, j)
 		}
 	}
-
-	result1, err := PolicyToAmpel(makePolicy("2"), cfg)
-	require.NoError(t, err)
-	require.NotNil(t, result1)
-
-	result2, err := PolicyToAmpel(makePolicy("3"), cfg)
-	require.NoError(t, err)
-	require.NotNil(t, result2)
-
-	require.NotEqual(t, result1.Tenets[0].Code, result2.Tenets[0].Code,
-		"changing parameter value should change CEL expression")
-	require.Contains(t, result1.Tenets[0].Code, "2")
-	require.Contains(t, result2.Tenets[0].Code, "3")
 }
+
+func TestEndToEnd_SubsetPlan(t *testing.T) {
+	granular, err := LoadGranularPolicies("testdata/policies")
+	require.NoError(t, err)
+
+	input := loadPolicy(t, "testdata/assessment-plan-subset.json")
+	matched, warnings := MatchPolicies(input, granular)
+	require.Empty(t, warnings)
+	require.Len(t, matched, 2)
+
+	bundle := MergeToBundle(matched)
+	expected := loadExpectedBundle(t, "testdata/ampel-bundle-expected-subset.json")
+
+	require.Equal(t, expected.ID, bundle.ID)
+	require.Len(t, bundle.Policies, len(expected.Policies))
+	for i, ep := range expected.Policies {
+		require.Equal(t, ep.ID, bundle.Policies[i].ID, "policy %d ID mismatch", i)
+	}
+}
+
+// --- WritePolicy tests ---
 
 func TestWritePolicy(t *testing.T) {
-	t.Run("writes policy file", func(t *testing.T) {
+	t.Run("writes bundle file", func(t *testing.T) {
 		dir := t.TempDir()
-		p := &AmpelPolicy{
-			ID:   "test-policy",
-			Meta: AmpelMeta{Runtime: "cel@v14.0", AssertMode: "AND", Enforce: "ON", Controls: []Control{}},
-			Tenets: []AmpelTenet{
-				{ID: "t1", Title: "Test", Predicates: PredicateSpec{Types: []string{"type"}}, Code: "true"},
+		bundle := &AmpelPolicyBundle{
+			ID: "test-bundle",
+			Meta: BundleMeta{
+				Frameworks: []Framework{{ID: "test", Name: "Test"}},
+			},
+			Policies: []*AmpelPolicy{
+				{
+					ID:   "policy-1",
+					Meta: PolicyMeta{Description: "Test policy"},
+					Tenets: []AmpelTenet{
+						{ID: "01", Code: "true", Predicates: PredicateSpec{Types: []string{"type"}}},
+					},
+				},
 			},
 		}
-		err := WritePolicy(p, dir)
+		err := WritePolicy(bundle, dir)
 		require.NoError(t, err)
 
 		path := filepath.Join(dir, PolicyFileName)
 		data, err := os.ReadFile(path)
 		require.NoError(t, err)
-		require.Contains(t, string(data), "test-policy")
+		require.Contains(t, string(data), "test-bundle")
+		require.Contains(t, string(data), "policy-1")
 	})
 
-	t.Run("nil policy writes nothing", func(t *testing.T) {
+	t.Run("nil bundle writes nothing", func(t *testing.T) {
 		dir := t.TempDir()
 		err := WritePolicy(nil, dir)
 		require.NoError(t, err)
@@ -204,14 +308,26 @@ func TestWritePolicy(t *testing.T) {
 		require.Empty(t, entries)
 	})
 
+	t.Run("empty policies writes nothing", func(t *testing.T) {
+		dir := t.TempDir()
+		bundle := &AmpelPolicyBundle{ID: "empty", Policies: nil}
+		err := WritePolicy(bundle, dir)
+		require.NoError(t, err)
+
+		entries, err := os.ReadDir(dir)
+		require.NoError(t, err)
+		require.Empty(t, entries)
+	})
+
 	t.Run("creates directory if missing", func(t *testing.T) {
 		dir := filepath.Join(t.TempDir(), "subdir", "nested")
-		p := &AmpelPolicy{
-			ID:     "test",
-			Meta:   AmpelMeta{Controls: []Control{}},
-			Tenets: []AmpelTenet{{ID: "t1", Code: "true", Predicates: PredicateSpec{Types: []string{"type"}}}},
+		bundle := &AmpelPolicyBundle{
+			ID: "test",
+			Policies: []*AmpelPolicy{
+				{ID: "p1", Tenets: []AmpelTenet{{ID: "01", Code: "true", Predicates: PredicateSpec{Types: []string{"type"}}}}},
+			},
 		}
-		err := WritePolicy(p, dir)
+		err := WritePolicy(bundle, dir)
 		require.NoError(t, err)
 
 		_, err = os.Stat(filepath.Join(dir, PolicyFileName))
@@ -220,11 +336,21 @@ func TestWritePolicy(t *testing.T) {
 
 	t.Run("overwrites existing file", func(t *testing.T) {
 		dir := t.TempDir()
-		p1 := &AmpelPolicy{ID: "first", Meta: AmpelMeta{Controls: []Control{}}, Tenets: []AmpelTenet{{ID: "t1", Code: "v1", Predicates: PredicateSpec{Types: []string{"type"}}}}}
-		p2 := &AmpelPolicy{ID: "second", Meta: AmpelMeta{Controls: []Control{}}, Tenets: []AmpelTenet{{ID: "t1", Code: "v2", Predicates: PredicateSpec{Types: []string{"type"}}}}}
+		b1 := &AmpelPolicyBundle{
+			ID: "first",
+			Policies: []*AmpelPolicy{
+				{ID: "p1", Tenets: []AmpelTenet{{ID: "01", Code: "v1", Predicates: PredicateSpec{Types: []string{"type"}}}}},
+			},
+		}
+		b2 := &AmpelPolicyBundle{
+			ID: "second",
+			Policies: []*AmpelPolicy{
+				{ID: "p2", Tenets: []AmpelTenet{{ID: "01", Code: "v2", Predicates: PredicateSpec{Types: []string{"type"}}}}},
+			},
+		}
 
-		require.NoError(t, WritePolicy(p1, dir))
-		require.NoError(t, WritePolicy(p2, dir))
+		require.NoError(t, WritePolicy(b1, dir))
+		require.NoError(t, WritePolicy(b2, dir))
 
 		data, err := os.ReadFile(filepath.Join(dir, PolicyFileName))
 		require.NoError(t, err)

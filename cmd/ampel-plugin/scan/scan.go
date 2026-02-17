@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -99,17 +100,22 @@ func constructSnappyCommand(org, repo, branch, specPath string) []string {
 		"--var", fmt.Sprintf("REPO=%s", repo),
 		"--var", fmt.Sprintf("BRANCH=%s", branch),
 		specPath,
+		"--attest",
 	}
 }
 
 // constructAmpelVerifyCommand builds the ampel verify CLI arguments.
 // The subject is the sha256 hash extracted from the snappy attestation.
-func constructAmpelVerifyCommand(subject, policyPath, attestationPath string) []string {
+// resultsPath is the file where ampel writes the in-toto attestation with evaluation results.
+func constructAmpelVerifyCommand(subject, policyPath, attestationPath, resultsPath string) []string {
 	return []string{
 		"ampel", "verify",
-		subject,
+		"--subject-hash",
+		"sha256:" + subject,
 		"-p", policyPath,
 		"-a", attestationPath,
+		"--attest-results",
+		"--results-path", resultsPath,
 	}
 }
 
@@ -191,8 +197,8 @@ func ScanRepository(repo targets.TargetRepository, branch string, cfg ScanConfig
 		return nil, fmt.Errorf("snappy failed for %s branch %s: %w (output: %s)", repo.URL, branch, err, string(attestationData))
 	}
 
-	// Save attestation to file
-	attestationFile := filepath.Join(cfg.OutputDir, sanitizeRepoName(repo.URL)+"-"+branch+"-attestation.json")
+	// Save snappy attestation as in-toto file
+	attestationFile := filepath.Join(cfg.OutputDir, sanitizeRepoName(repo.URL)+"-"+branch+"-snappy.intoto.json")
 	if err := os.WriteFile(attestationFile, attestationData, 0600); err != nil {
 		return nil, fmt.Errorf("writing attestation for %s branch %s: %w", repo.URL, branch, err)
 	}
@@ -203,12 +209,25 @@ func ScanRepository(repo targets.TargetRepository, branch string, cfg ScanConfig
 		return nil, fmt.Errorf("extracting subject hash for %s branch %s: %w", repo.URL, branch, err)
 	}
 
-	// Run ampel verify with the subject hash, policy, and attestation
-	ampelArgs := constructAmpelVerifyCommand(subjectHash, cfg.PolicyPath, attestationFile)
+	// Run ampel verify with the subject hash, policy, and attestation.
+	// ampel writes the in-toto attestation with results to resultsPath.
+	// A non-zero exit code means policy checks failed, not a tool error.
+	ampelResultFile := filepath.Join(cfg.OutputDir, sanitizeRepoName(repo.URL)+"-"+branch+"-ampel.intoto.json")
+	ampelArgs := constructAmpelVerifyCommand(subjectHash, cfg.PolicyPath, attestationFile, ampelResultFile)
 	logger.Info("running ampel verify", "repo", repo.URL, "branch", branch, "subject", subjectHash)
-	ampelOut, err := runner.Run(ampelArgs[0], ampelArgs[1:]...)
+	_, err = runner.Run(ampelArgs[0], ampelArgs[1:]...)
 	if err != nil {
-		return nil, fmt.Errorf("ampel verify failed for %s branch %s: %w (output: %s)", repo.URL, branch, err, string(ampelOut))
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			return nil, fmt.Errorf("ampel verify failed for %s branch %s: %w", repo.URL, branch, err)
+		}
+		logger.Info("ampel verify returned non-zero exit", "repo", repo.URL, "branch", branch, "exit_code", exitErr.ExitCode())
+	}
+
+	// Read the in-toto attestation written by ampel
+	ampelOut, err := os.ReadFile(ampelResultFile)
+	if err != nil {
+		return nil, fmt.Errorf("reading ampel results for %s branch %s: %w", repo.URL, branch, err)
 	}
 
 	return &RawScanResult{Output: ampelOut}, nil

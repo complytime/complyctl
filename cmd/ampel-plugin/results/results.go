@@ -14,20 +14,54 @@ import (
 
 const maxFieldSize = 10 * 1024 // 10KB per field
 
-// AmpelVerifyOutput represents the JSON output from ampel verify.
-type AmpelVerifyOutput struct {
-	PolicyID string              `json:"policy_id"`
-	Passed   bool                `json:"passed"`
-	Error    string              `json:"error,omitempty"`
-	Results  []AmpelVerifyResult `json:"results,omitempty"`
+// ampelResultStatement represents the in-toto attestation produced by ampel verify
+// with --attest-results. The predicate contains the evaluation ResultSet.
+type ampelResultStatement struct {
+	Predicate ampelResultSetPred `json:"predicate"`
 }
 
-// AmpelVerifyResult represents a single tenet result from ampel verify.
-type AmpelVerifyResult struct {
-	TenetID string `json:"tenet_id"`
-	Title   string `json:"title"`
-	Passed  bool   `json:"passed"`
-	Reason  string `json:"reason"`
+// ampelResultSetPred represents the ResultSet predicate from ampel verify.
+type ampelResultSetPred struct {
+	Status  string               `json:"status"`
+	Results []ampelPolicyResult  `json:"results"`
+	Error   *ampelError          `json:"error,omitempty"`
+}
+
+// ampelPolicyResult represents a single policy evaluation result.
+type ampelPolicyResult struct {
+	Status      string            `json:"status"`
+	Policy      ampelPolicyRef    `json:"policy"`
+	EvalResults []ampelEvalResult `json:"eval_results"`
+	Meta        ampelResultMeta   `json:"meta"`
+}
+
+// ampelPolicyRef identifies the policy that was evaluated.
+type ampelPolicyRef struct {
+	ID string `json:"id"`
+}
+
+// ampelEvalResult represents a single tenet evaluation result.
+type ampelEvalResult struct {
+	ID         string           `json:"id"`
+	Status     string           `json:"status"`
+	Assessment *ampelAssessment `json:"assessment,omitempty"`
+	Error      *ampelError      `json:"error,omitempty"`
+}
+
+// ampelAssessment holds the message for a passing tenet.
+type ampelAssessment struct {
+	Message string `json:"message"`
+}
+
+// ampelError holds the message and guidance for a failing tenet or result set.
+type ampelError struct {
+	Message  string `json:"message"`
+	Guidance string `json:"guidance"`
+}
+
+// ampelResultMeta holds metadata about a policy evaluation.
+type ampelResultMeta struct {
+	Description string `json:"description"`
 }
 
 // PerRepoResult holds scan findings for a single repository.
@@ -48,16 +82,17 @@ type Finding struct {
 	Reason  string `json:"reason"`
 }
 
-// ParseAmpelOutput parses raw ampel verify JSON output into a PerRepoResult.
-// It validates field sizes and strips control characters per security requirements.
+// ParseAmpelOutput parses the in-toto attestation produced by ampel verify
+// (with --attest-results) into a PerRepoResult. The attestation predicate
+// contains the evaluation ResultSet with per-policy and per-tenet results.
 func ParseAmpelOutput(raw []byte, repo, branch string) (*PerRepoResult, error) {
 	if len(raw) == 0 {
 		return nil, fmt.Errorf("empty ampel verify output")
 	}
 
-	var output AmpelVerifyOutput
-	if err := json.Unmarshal(raw, &output); err != nil {
-		return nil, fmt.Errorf("parsing ampel verify output: %w", err)
+	var stmt ampelResultStatement
+	if err := json.Unmarshal(raw, &stmt); err != nil {
+		return nil, fmt.Errorf("parsing ampel verify attestation: %w", err)
 	}
 
 	result := &PerRepoResult{
@@ -66,39 +101,56 @@ func ParseAmpelOutput(raw []byte, repo, branch string) (*PerRepoResult, error) {
 		ScannedAt:  time.Now(),
 	}
 
-	// Handle error case
-	if output.Error != "" {
-		if len(output.Error) > maxFieldSize {
+	// Handle ResultSet-level error
+	if stmt.Predicate.Error != nil && stmt.Predicate.Error.Message != "" {
+		if len(stmt.Predicate.Error.Message) > maxFieldSize {
 			return nil, fmt.Errorf("ampel output error field exceeds maximum size")
 		}
 		result.Status = "error"
-		result.Error = stripControlChars(output.Error)
+		result.Error = stripControlChars(stmt.Predicate.Error.Message)
 		return result, nil
 	}
 
-	// Map results to findings
-	for _, r := range output.Results {
-		if err := validateFieldSizes(r); err != nil {
-			return nil, err
-		}
-		if !isPrintableASCII(r.TenetID) {
-			return nil, fmt.Errorf("tenet ID %q contains non-printable characters", r.TenetID)
+	// Extract findings from each policy result's tenet evaluations
+	for _, policyResult := range stmt.Predicate.Results {
+		policyID := stripControlChars(policyResult.Policy.ID)
+		if !isPrintableASCII(policyID) {
+			return nil, fmt.Errorf("policy ID %q contains non-printable characters", policyID)
 		}
 
-		finding := Finding{
-			TenetID: stripControlChars(r.TenetID),
-			Title:   stripControlChars(r.Title),
-			Reason:  stripControlChars(r.Reason),
+		description := stripControlChars(policyResult.Meta.Description)
+
+		for _, er := range policyResult.EvalResults {
+			checkID := "check-" + policyID
+			if len(checkID) > maxFieldSize || len(description) > maxFieldSize {
+				return nil, fmt.Errorf("field exceeds maximum size in policy %s", policyID)
+			}
+
+			finding := Finding{
+				TenetID: checkID,
+				Title:   description,
+			}
+
+			status := strings.ToUpper(er.Status)
+			switch status {
+			case "PASS":
+				finding.Result = "pass"
+				if er.Assessment != nil {
+					finding.Reason = stripControlChars(er.Assessment.Message)
+				}
+			default:
+				finding.Result = "fail"
+				if er.Error != nil {
+					finding.Reason = stripControlChars(er.Error.Message)
+				}
+			}
+
+			result.Findings = append(result.Findings, finding)
 		}
-		if r.Passed {
-			finding.Result = "pass"
-		} else {
-			finding.Result = "fail"
-		}
-		result.Findings = append(result.Findings, finding)
 	}
 
-	if output.Passed {
+	overallStatus := strings.ToUpper(stmt.Predicate.Status)
+	if overallStatus == "PASS" {
 		result.Status = "pass"
 	} else {
 		result.Status = "fail"
@@ -212,18 +264,6 @@ func isPrintableASCII(s string) bool {
 	return true
 }
 
-func validateFieldSizes(r AmpelVerifyResult) error {
-	if len(r.TenetID) > maxFieldSize {
-		return fmt.Errorf("tenet_id field exceeds maximum size")
-	}
-	if len(r.Title) > maxFieldSize {
-		return fmt.Errorf("title field exceeds maximum size")
-	}
-	if len(r.Reason) > maxFieldSize {
-		return fmt.Errorf("reason field exceeds maximum size")
-	}
-	return nil
-}
 
 func sanitizeForFilename(repoURL string) string {
 	name := repoURL

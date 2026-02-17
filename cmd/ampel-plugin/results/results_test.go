@@ -27,6 +27,8 @@ func TestParseAmpelOutput_Pass(t *testing.T) {
 	for _, f := range result.Findings {
 		require.Equal(t, "pass", f.Result)
 	}
+	require.Equal(t, "check-SC-CODE-01.01", result.Findings[0].TenetID)
+	require.Equal(t, "check-SC-CODE-03.01", result.Findings[1].TenetID)
 }
 
 func TestParseAmpelOutput_Fail(t *testing.T) {
@@ -66,19 +68,26 @@ func TestParseAmpelOutput_MalformedJSON(t *testing.T) {
 }
 
 func TestParseAmpelOutput_ControlCharsStripped(t *testing.T) {
-	output := AmpelVerifyOutput{
-		PolicyID: "test",
-		Passed:   true,
-		Results: []AmpelVerifyResult{
-			{
-				TenetID: "check-1",
-				Title:   "Test\x00Title\x01With\x02Controls",
-				Passed:  true,
-				Reason:  "OK\x07bell",
+	stmt := ampelResultStatement{
+		Predicate: ampelResultSetPred{
+			Status: "PASS",
+			Results: []ampelPolicyResult{
+				{
+					Status: "PASS",
+					Policy: ampelPolicyRef{ID: "SC-CODE-01.01"},
+					EvalResults: []ampelEvalResult{
+						{
+							ID:         "01",
+							Status:     "PASS",
+							Assessment: &ampelAssessment{Message: "OK\x07bell"},
+						},
+					},
+					Meta: ampelResultMeta{Description: "Test\x00Title\x01With\x02Controls"},
+				},
 			},
 		},
 	}
-	data, err := json.Marshal(output)
+	data, err := json.Marshal(stmt)
 	require.NoError(t, err)
 
 	result, err := ParseAmpelOutput(data, "repo", "main")
@@ -88,19 +97,67 @@ func TestParseAmpelOutput_ControlCharsStripped(t *testing.T) {
 }
 
 func TestParseAmpelOutput_OversizedField(t *testing.T) {
-	output := AmpelVerifyOutput{
-		PolicyID: "test",
-		Passed:   true,
-		Results: []AmpelVerifyResult{
-			{
-				TenetID: "check-1",
-				Title:   strings.Repeat("x", maxFieldSize+1),
-				Passed:  true,
-				Reason:  "OK",
+	stmt := ampelResultStatement{
+		Predicate: ampelResultSetPred{
+			Status: "PASS",
+			Results: []ampelPolicyResult{
+				{
+					Status: "PASS",
+					Policy: ampelPolicyRef{ID: "SC-CODE-01.01"},
+					EvalResults: []ampelEvalResult{
+						{
+							ID:         "01",
+							Status:     "PASS",
+							Assessment: &ampelAssessment{Message: "OK"},
+						},
+					},
+					Meta: ampelResultMeta{Description: strings.Repeat("x", maxFieldSize+1)},
+				},
 			},
 		},
 	}
-	data, err := json.Marshal(output)
+	data, err := json.Marshal(stmt)
+	require.NoError(t, err)
+
+	_, err = ParseAmpelOutput(data, "repo", "main")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "exceeds maximum size")
+}
+
+func TestParseAmpelOutput_NonPrintablePolicyID(t *testing.T) {
+	stmt := ampelResultStatement{
+		Predicate: ampelResultSetPred{
+			Status: "PASS",
+			Results: []ampelPolicyResult{
+				{
+					Status: "PASS",
+					Policy: ampelPolicyRef{ID: "SC-CODE\x80-01"},
+					EvalResults: []ampelEvalResult{
+						{ID: "01", Status: "PASS", Assessment: &ampelAssessment{Message: "OK"}},
+					},
+					Meta: ampelResultMeta{Description: "Test"},
+				},
+			},
+		},
+	}
+	data, err := json.Marshal(stmt)
+	require.NoError(t, err)
+
+	_, err = ParseAmpelOutput(data, "repo", "main")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "non-printable")
+}
+
+func TestParseAmpelOutput_OversizedErrorField(t *testing.T) {
+	stmt := ampelResultStatement{
+		Predicate: ampelResultSetPred{
+			Status: "ERROR",
+			Error: &ampelError{
+				Message: strings.Repeat("x", maxFieldSize+1),
+			},
+		},
+	}
+	data, err := json.Marshal(stmt)
 	require.NoError(t, err)
 
 	_, err = ParseAmpelOutput(data, "repo", "main")

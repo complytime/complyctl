@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -70,10 +71,17 @@ func (m *mockRunner) Run(name string, args ...string) ([]byte, error) {
 		return m.snappyOutput, nil
 	}
 	if name == "ampel" {
+		// Write ampel output to the results path specified by --results-path
+		for i, arg := range args {
+			if arg == "--results-path" && i+1 < len(args) {
+				_ = os.WriteFile(args[i+1], m.ampelOutput, 0600)
+				break
+			}
+		}
 		if m.ampelErr != nil {
 			return nil, m.ampelErr
 		}
-		return m.ampelOutput, nil
+		return nil, nil
 	}
 	return nil, fmt.Errorf("unknown command: %s", name)
 }
@@ -114,16 +122,20 @@ func TestConstructSnappyCommand(t *testing.T) {
 		"--var", "REPO=myrepo",
 		"--var", "BRANCH=main",
 		"/specs/github/branch-rules.yaml",
+		"--attest",
 	}, args)
 }
 
 func TestConstructAmpelVerifyCommand(t *testing.T) {
-	args := constructAmpelVerifyCommand("abc123", "/policy/path.json", "/attestation/data.json")
+	args := constructAmpelVerifyCommand("abc123", "/policy/path.json", "/attestation/data.json", "/results/output.json")
 	require.Equal(t, []string{
 		"ampel", "verify",
-		"abc123",
+		"--subject-hash",
+		"sha256:abc123",
 		"-p", "/policy/path.json",
 		"-a", "/attestation/data.json",
+		"--attest-results",
+		"--results-path", "/results/output.json",
 	}, args)
 }
 
@@ -188,7 +200,7 @@ func TestWriteSpecFiles(t *testing.T) {
 func TestScanRepository_MockSuccess(t *testing.T) {
 	tmpDir := t.TempDir()
 	attestation := makeTestAttestation("abc123def456")
-	ampelOutput := []byte(`{"policy_id":"test","passed":true,"results":[]}`)
+	ampelOutput := []byte(`{"predicate":{"status":"PASS","results":[]}}`)
 
 	runner := &mockRunner{
 		snappyOutput: attestation,
@@ -209,11 +221,17 @@ func TestScanRepository_MockSuccess(t *testing.T) {
 	require.NotNil(t, result)
 	require.Equal(t, ampelOutput, result.Output)
 
-	// Verify attestation was saved
-	attestationFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-attestation.json")
+	// Verify snappy attestation was saved as in-toto file
+	attestationFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-snappy.intoto.json")
 	saved, err := os.ReadFile(attestationFile)
 	require.NoError(t, err)
 	require.Equal(t, attestation, saved)
+
+	// Verify ampel verify result was saved as in-toto attestation
+	ampelResultFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-ampel.intoto.json")
+	savedAmpel, err := os.ReadFile(ampelResultFile)
+	require.NoError(t, err)
+	require.Equal(t, ampelOutput, savedAmpel)
 }
 
 func TestScanRepository_GitLabUnsupported(t *testing.T) {
@@ -249,10 +267,39 @@ func TestScanRepository_SnappyError(t *testing.T) {
 	require.Contains(t, err.Error(), "snappy failed")
 }
 
-func TestScanRepository_AmpelError(t *testing.T) {
+func TestScanRepository_AmpelExitError_SavesResult(t *testing.T) {
+	// ampel verify exits non-zero when policy checks fail, but output is valid
+	tmpDir := t.TempDir()
+	ampelOutput := []byte(`{"predicate":{"status":"FAIL","results":[]}}`)
 	runner := &mockRunner{
 		snappyOutput: makeTestAttestation("abc123"),
-		ampelErr:     fmt.Errorf("exit status 1"),
+		ampelOutput:  ampelOutput,
+		ampelErr:     &exec.ExitError{ProcessState: nil},
+	}
+	repo := targets.TargetRepository{URL: "https://github.com/myorg/myrepo"}
+	cfg := ScanConfig{
+		PolicyPath: "/policy.json",
+		OutputDir:  tmpDir,
+		SpecDir:    t.TempDir(),
+	}
+
+	result, err := ScanRepository(repo, "main", cfg, runner)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, ampelOutput, result.Output)
+
+	// Verify ampel intoto file was saved despite non-zero exit
+	ampelResultFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-ampel.intoto.json")
+	saved, err := os.ReadFile(ampelResultFile)
+	require.NoError(t, err)
+	require.Equal(t, ampelOutput, saved)
+}
+
+func TestScanRepository_AmpelNonExecError(t *testing.T) {
+	// Non-exec errors (e.g., command not found) are fatal
+	runner := &mockRunner{
+		snappyOutput: makeTestAttestation("abc123"),
+		ampelErr:     fmt.Errorf("exec: \"ampel\": executable file not found in $PATH"),
 	}
 	repo := targets.TargetRepository{URL: "https://github.com/myorg/myrepo"}
 	cfg := ScanConfig{
