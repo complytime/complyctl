@@ -366,8 +366,9 @@ func TestGetResults_MultipleSpecs(t *testing.T) {
 
 	pvp, err := s.GetResults(context.Background(), makeTestPolicy())
 	require.NoError(t, err)
-	// 2 specs × 1 branch = 2 observations
-	require.Len(t, pvp.ObservationsByCheck, 2)
+	// 2 specs × 1 branch with same CheckID = 1 observation with 2 subjects
+	require.Len(t, pvp.ObservationsByCheck, 1)
+	require.Len(t, pvp.ObservationsByCheck[0].Subjects, 2)
 
 	// Verify 4 output files (2 snappy + 2 ampel)
 	resultsDir := filepath.Join(dir, "ampel", "results")
