@@ -1,6 +1,7 @@
 package results
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -64,6 +65,12 @@ type ampelResultMeta struct {
 	Description string `json:"description"`
 }
 
+// dsseEnvelope represents a DSSE signed envelope.
+type dsseEnvelope struct {
+	PayloadType string `json:"payloadType"`
+	Payload     string `json:"payload"`
+}
+
 // PerRepoResult holds scan findings for a single repository.
 type PerRepoResult struct {
 	Repository string    `json:"repository"`
@@ -88,6 +95,19 @@ type Finding struct {
 func ParseAmpelOutput(raw []byte, repo, branch string) (*PerRepoResult, error) {
 	if len(raw) == 0 {
 		return nil, fmt.Errorf("empty ampel verify output")
+	}
+
+	// Unwrap DSSE envelope if present (ampel --attest-results produces signed attestations)
+	var envelope dsseEnvelope
+	if err := json.Unmarshal(raw, &envelope); err == nil && envelope.PayloadType != "" && envelope.Payload != "" {
+		decoded, err := base64.RawURLEncoding.DecodeString(envelope.Payload)
+		if err != nil {
+			decoded, err = base64.StdEncoding.DecodeString(envelope.Payload)
+			if err != nil {
+				return nil, fmt.Errorf("decoding DSSE payload in ampel result: %w", err)
+			}
+		}
+		raw = decoded
 	}
 
 	var stmt ampelResultStatement
@@ -181,50 +201,82 @@ func WritePerRepoResult(result *PerRepoResult, dir string) error {
 }
 
 // ToPVPResult maps a slice of PerRepoResults to a policy.PVPResult.
+// Findings with the same CheckID are grouped into a single ObservationByCheck
+// with multiple Subjects (one per repository). This matches the OSCAL pattern
+// and prevents last-write-wins overwrites in the downstream observation manager.
 func ToPVPResult(repoResults []*PerRepoResult) policy.PVPResult {
-	var observations []policy.ObservationByCheck
+	type checkGroup struct {
+		title    string
+		checkID  string
+		subjects []policy.Subject
+		collected time.Time
+	}
+
+	groups := make(map[string]*checkGroup)
+	var order []string // track insertion order for deterministic output
 
 	for _, rr := range repoResults {
 		for _, f := range rr.Findings {
-			obs := policy.ObservationByCheck{
-				Title:   f.Title,
-				CheckID: f.TenetID,
-				Methods: []string{"AUTOMATED"},
-				Subjects: []policy.Subject{
-					{
-						Title:       repoDisplayName(rr.Repository),
-						Type:        "inventory-item",
-						ResourceID:  rr.Repository,
-						Result:      mapResult(f.Result, rr.Status),
-						EvaluatedOn: rr.ScannedAt,
-						Reason:      f.Reason,
-					},
-				},
-				Collected: rr.ScannedAt,
+			g, ok := groups[f.TenetID]
+			if !ok {
+				g = &checkGroup{
+					title:     f.Title,
+					checkID:   f.TenetID,
+					collected: rr.ScannedAt,
+				}
+				groups[f.TenetID] = g
+				order = append(order, f.TenetID)
 			}
-			observations = append(observations, obs)
+			g.subjects = append(g.subjects, policy.Subject{
+				Title:       repoDisplayName(rr.Repository),
+				Type:        "inventory-item",
+				ResourceID:  rr.Repository,
+				Result:      mapResult(f.Result, rr.Status),
+				EvaluatedOn: rr.ScannedAt,
+				Reason:      f.Reason,
+			})
+			if rr.ScannedAt.After(g.collected) {
+				g.collected = rr.ScannedAt
+			}
 		}
 
-		// For error status with no findings, add an error observation
+		// For error status with no findings, add an error subject
 		if rr.Status == "error" && len(rr.Findings) == 0 {
-			obs := policy.ObservationByCheck{
-				Title:   "Scan Error",
-				CheckID: "scan-error",
-				Methods: []string{"AUTOMATED"},
-				Subjects: []policy.Subject{
-					{
-						Title:       repoDisplayName(rr.Repository),
-						Type:        "inventory-item",
-						ResourceID:  rr.Repository,
-						Result:      policy.ResultError,
-						EvaluatedOn: rr.ScannedAt,
-						Reason:      rr.Error,
-					},
-				},
-				Collected: rr.ScannedAt,
+			const errorCheckID = "scan-error"
+			g, ok := groups[errorCheckID]
+			if !ok {
+				g = &checkGroup{
+					title:     "Scan Error",
+					checkID:   errorCheckID,
+					collected: rr.ScannedAt,
+				}
+				groups[errorCheckID] = g
+				order = append(order, errorCheckID)
 			}
-			observations = append(observations, obs)
+			g.subjects = append(g.subjects, policy.Subject{
+				Title:       repoDisplayName(rr.Repository),
+				Type:        "inventory-item",
+				ResourceID:  rr.Repository,
+				Result:      policy.ResultError,
+				EvaluatedOn: rr.ScannedAt,
+				Reason:      rr.Error,
+			})
+			if rr.ScannedAt.After(g.collected) {
+				g.collected = rr.ScannedAt
+			}
 		}
+	}
+
+	observations := make([]policy.ObservationByCheck, 0, len(groups))
+	for _, checkID := range order {
+		g := groups[checkID]
+		observations = append(observations, policy.ObservationByCheck{
+			Title:     g.title,
+			CheckID:   g.checkID,
+			Methods:   []string{"AUTOMATED"},
+			Subjects:  g.subjects,
+			Collected: g.collected,
+		})
 	}
 
 	return policy.PVPResult{

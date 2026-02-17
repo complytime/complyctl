@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -45,6 +46,26 @@ func TestParseAmpelOutput_Fail(t *testing.T) {
 		}
 	}
 	require.Equal(t, 1, failCount)
+}
+
+func TestParseAmpelOutput_DSSEEnvelope(t *testing.T) {
+	data := loadFixture(t, "testdata/ampel-verify-dsse-fail.json")
+	result, err := ParseAmpelOutput(data, "https://github.com/myorg/repo1", "main")
+	require.NoError(t, err)
+	require.Equal(t, "fail", result.Status)
+	require.Len(t, result.Findings, 2)
+
+	var passCount, failCount int
+	for _, f := range result.Findings {
+		switch f.Result {
+		case "pass":
+			passCount++
+		case "fail":
+			failCount++
+		}
+	}
+	require.Equal(t, 1, passCount, "expected 1 passing finding")
+	require.Equal(t, 1, failCount, "expected 1 failing finding")
 }
 
 func TestParseAmpelOutput_Error(t *testing.T) {
@@ -222,15 +243,55 @@ func TestToPVPResult(t *testing.T) {
 	}
 
 	pvp := ToPVPResult(results)
+	// Same CheckID → grouped into one observation with two subjects
+	require.Len(t, pvp.ObservationsByCheck, 1)
+	obs := pvp.ObservationsByCheck[0]
+	require.Equal(t, "check-1", obs.CheckID)
+	require.Len(t, obs.Subjects, 2)
+
+	// Sort by ResourceID for deterministic assertions
+	subjects := obs.Subjects
+	sort.Slice(subjects, func(i, j int) bool {
+		return subjects[i].ResourceID < subjects[j].ResourceID
+	})
+
+	require.Equal(t, "https://github.com/myorg/repo1", subjects[0].ResourceID)
+	require.Equal(t, policy.ResultPass, subjects[0].Result)
+
+	require.Equal(t, "https://gitlab.com/myorg/repo2", subjects[1].ResourceID)
+	require.Equal(t, policy.ResultFail, subjects[1].Result)
+}
+
+func TestToPVPResult_MultipleChecks(t *testing.T) {
+	results := []*PerRepoResult{
+		{
+			Repository: "https://github.com/myorg/repo1",
+			Branch:     "main",
+			Status:     "pass",
+			Findings: []Finding{
+				{TenetID: "check-1", Title: "Check 1", Result: "pass", Reason: "OK"},
+				{TenetID: "check-2", Title: "Check 2", Result: "pass", Reason: "OK"},
+			},
+		},
+		{
+			Repository: "https://github.com/myorg/repo2",
+			Branch:     "main",
+			Status:     "fail",
+			Findings: []Finding{
+				{TenetID: "check-1", Title: "Check 1", Result: "fail", Reason: "Not configured"},
+				{TenetID: "check-2", Title: "Check 2", Result: "pass", Reason: "OK"},
+			},
+		},
+	}
+
+	pvp := ToPVPResult(results)
+	// Two distinct CheckIDs → two observations
 	require.Len(t, pvp.ObservationsByCheck, 2)
 
-	// First observation should be pass
-	require.Equal(t, policy.ResultPass, pvp.ObservationsByCheck[0].Subjects[0].Result)
-	require.Equal(t, "https://github.com/myorg/repo1", pvp.ObservationsByCheck[0].Subjects[0].ResourceID)
-
-	// Second observation should be fail
-	require.Equal(t, policy.ResultFail, pvp.ObservationsByCheck[1].Subjects[0].Result)
-	require.Equal(t, "https://gitlab.com/myorg/repo2", pvp.ObservationsByCheck[1].Subjects[0].ResourceID)
+	// Each observation should have 2 subjects (one per repo)
+	for _, obs := range pvp.ObservationsByCheck {
+		require.Len(t, obs.Subjects, 2, "CheckID %s should have 2 subjects", obs.CheckID)
+	}
 }
 
 func TestToPVPResult_ErrorRepo(t *testing.T) {
