@@ -18,6 +18,7 @@ type TargetConfig struct {
 type TargetRepository struct {
 	URL      string   `yaml:"url"`
 	Branches []string `yaml:"branches"`
+	Specs    []string `yaml:"specs,omitempty"`
 }
 
 // LoadTargets reads and validates the target configuration file.
@@ -73,8 +74,9 @@ func validateRepoURL(rawURL string) error {
 	return nil
 }
 
-// deduplicateTargets removes duplicate URL+branch combinations and returns
-// warnings for each duplicate found.
+// deduplicateTargets removes duplicate URL+branch combinations and
+// deduplicates specs within each repo entry. It returns warnings for
+// each duplicate found.
 func deduplicateTargets(repos []TargetRepository) ([]TargetRepository, []string) {
 	type key struct {
 		url    string
@@ -96,12 +98,34 @@ func deduplicateTargets(repos []TargetRepository) ([]TargetRepository, []string)
 			uniqueBranches = append(uniqueBranches, branch)
 		}
 		if len(uniqueBranches) > 0 {
+			dedupedSpecs := deduplicateSpecs(repo.Specs)
+			if len(dedupedSpecs) != len(repo.Specs) {
+				warnings = append(warnings, fmt.Sprintf("duplicate specs removed for %s", repo.URL))
+			}
 			result = append(result, TargetRepository{
 				URL:      repo.URL,
 				Branches: uniqueBranches,
+				Specs:    dedupedSpecs,
 			})
 		}
 	}
 
 	return result, warnings
+}
+
+// deduplicateSpecs removes duplicate entries from a specs slice while
+// preserving order.
+func deduplicateSpecs(specs []string) []string {
+	if len(specs) == 0 {
+		return specs
+	}
+	seen := make(map[string]bool, len(specs))
+	unique := make([]string, 0, len(specs))
+	for _, s := range specs {
+		if !seen[s] {
+			seen[s] = true
+			unique = append(unique, s)
+		}
+	}
+	return unique
 }

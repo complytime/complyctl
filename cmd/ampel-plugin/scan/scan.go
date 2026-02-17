@@ -64,6 +64,39 @@ func WriteSpecFiles(specDir string) error {
 	return nil
 }
 
+// DefaultSpecs returns the default spec file paths used when a target
+// does not specify any specs.
+func DefaultSpecs() []string {
+	return []string{"github/" + GitHubSpecFile}
+}
+
+// ResolveSpecPath resolves a spec reference to an absolute path.
+// Absolute paths are returned as-is. Relative paths containing a "/"
+// or ending in ".yaml"/".yml" are resolved against specDir. Bare names
+// (snappy built-ins) are passed through unchanged.
+func ResolveSpecPath(specRef, specDir string) string {
+	if filepath.IsAbs(specRef) {
+		return specRef
+	}
+	if strings.Contains(specRef, "/") ||
+		strings.HasSuffix(specRef, ".yaml") ||
+		strings.HasSuffix(specRef, ".yml") {
+		return filepath.Join(specDir, specRef)
+	}
+	return specRef
+}
+
+// sanitizeSpecName extracts a filesystem-safe label from a spec reference.
+// For example, "github/branch-rules.yaml" becomes "branch-rules".
+func sanitizeSpecName(specRef string) string {
+	base := filepath.Base(specRef)
+	ext := filepath.Ext(base)
+	if ext != "" {
+		base = base[:len(base)-len(ext)]
+	}
+	return base
+}
+
 // parseRepoURL extracts the hosting platform, organization, and repository
 // name from a repository URL.
 func parseRepoURL(repoURL string) (platform, org, repo string, err error) {
@@ -174,8 +207,9 @@ func extractHashFromStatement(data []byte) (string, error) {
 	return hash, nil
 }
 
-// ScanRepository runs snappy and ampel verify for a single repository and branch.
-func ScanRepository(repo targets.TargetRepository, branch string, cfg ScanConfig, runner CommandRunner) (*RawScanResult, error) {
+// ScanRepository runs snappy and ampel verify for a single repository, branch,
+// and spec file. The specPath must already be resolved (see ResolveSpecPath).
+func ScanRepository(repo targets.TargetRepository, branch, specPath string, cfg ScanConfig, runner CommandRunner) (*RawScanResult, error) {
 	logger := hclog.Default()
 
 	platform, org, repoName, err := parseRepoURL(repo.URL)
@@ -187,18 +221,19 @@ func ScanRepository(repo targets.TargetRepository, branch string, cfg ScanConfig
 		return nil, fmt.Errorf("snappy specs are currently only available for GitHub repositories; %s is not supported", platform)
 	}
 
-	specPath := filepath.Join(cfg.SpecDir, "github", GitHubSpecFile)
+	specLabel := sanitizeSpecName(specPath)
+	filePrefix := sanitizeRepoName(repo.URL) + "-" + branch + "-" + specLabel
 
 	// Run snappy to collect branch protection data as an in-toto attestation
 	snappyArgs := constructSnappyCommand(org, repoName, branch, specPath)
-	logger.Info("running snappy", "repo", repo.URL, "branch", branch)
+	logger.Info("running snappy", "repo", repo.URL, "branch", branch, "spec", specPath, "command", strings.Join(snappyArgs, " "))
 	attestationData, err := runner.Run(snappyArgs[0], snappyArgs[1:]...)
 	if err != nil {
-		return nil, fmt.Errorf("snappy failed for %s branch %s: %w (output: %s)", repo.URL, branch, err, string(attestationData))
+		return nil, fmt.Errorf("snappy failed for %s branch %s spec %s: %w (output: %s)", repo.URL, branch, specPath, err, string(attestationData))
 	}
 
 	// Save snappy attestation as in-toto file
-	attestationFile := filepath.Join(cfg.OutputDir, sanitizeRepoName(repo.URL)+"-"+branch+"-snappy.intoto.json")
+	attestationFile := filepath.Join(cfg.OutputDir, filePrefix+"-snappy.intoto.json")
 	if err := os.WriteFile(attestationFile, attestationData, 0600); err != nil {
 		return nil, fmt.Errorf("writing attestation for %s branch %s: %w", repo.URL, branch, err)
 	}
@@ -212,9 +247,9 @@ func ScanRepository(repo targets.TargetRepository, branch string, cfg ScanConfig
 	// Run ampel verify with the subject hash, policy, and attestation.
 	// ampel writes the in-toto attestation with results to resultsPath.
 	// A non-zero exit code means policy checks failed, not a tool error.
-	ampelResultFile := filepath.Join(cfg.OutputDir, sanitizeRepoName(repo.URL)+"-"+branch+"-ampel.intoto.json")
+	ampelResultFile := filepath.Join(cfg.OutputDir, filePrefix+"-ampel.intoto.json")
 	ampelArgs := constructAmpelVerifyCommand(subjectHash, cfg.PolicyPath, attestationFile, ampelResultFile)
-	logger.Info("running ampel verify", "repo", repo.URL, "branch", branch, "subject", subjectHash)
+	logger.Info("running ampel verify", "repo", repo.URL, "branch", branch, "spec", specPath, "subject", subjectHash)
 	_, err = runner.Run(ampelArgs[0], ampelArgs[1:]...)
 	if err != nil {
 		var exitErr *exec.ExitError

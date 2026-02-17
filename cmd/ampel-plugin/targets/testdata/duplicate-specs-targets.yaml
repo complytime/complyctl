@@ -1,0 +1,8 @@
+repositories:
+  - url: https://github.com/myorg/repo1
+    branches:
+      - main
+    specs:
+      - github/branch-rules.yaml
+      - github/branch-rules.yaml
+      - /opt/specs/custom-check.yaml

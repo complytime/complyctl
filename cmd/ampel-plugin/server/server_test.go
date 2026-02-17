@@ -291,6 +291,49 @@ func TestGetResults_ValidScan(t *testing.T) {
 	require.Len(t, files, 2) // snappy attestation + ampel intoto result
 }
 
+func TestGetResults_MultipleSpecs(t *testing.T) {
+	s, dir := setupServer(t)
+
+	// Write targets with two specs
+	targetsContent := `repositories:
+  - url: https://github.com/myorg/repo1
+    branches:
+      - main
+    specs:
+      - github/branch-rules.yaml
+      - github/custom-check.yaml
+`
+	targetsDir := filepath.Join(dir, "ampel")
+	require.NoError(t, os.MkdirAll(targetsDir, 0750))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(targetsDir, "ampel-targets.yaml"),
+		[]byte(targetsContent), 0600,
+	))
+
+	// Generate a policy bundle so paths exist
+	require.NoError(t, s.Generate(context.Background(), makeTestPolicy()))
+
+	ampelOutput := makeAmpelResultAttestation()
+
+	origRunner := ScanRunner
+	ScanRunner = &mockScanRunner{
+		snappyOutput: makeTestAttestation(),
+		ampelOutput:  ampelOutput,
+	}
+	defer func() { ScanRunner = origRunner }()
+
+	pvp, err := s.GetResults(context.Background(), makeTestPolicy())
+	require.NoError(t, err)
+	// 2 specs × 1 branch = 2 observations
+	require.Len(t, pvp.ObservationsByCheck, 2)
+
+	// Verify 4 output files (2 snappy + 2 ampel)
+	resultsDir := filepath.Join(dir, "ampel", "results")
+	files, err := os.ReadDir(resultsDir)
+	require.NoError(t, err)
+	require.Len(t, files, 4)
+}
+
 func TestGetResults_ScanError_ContinuesScanning(t *testing.T) {
 	s, dir := setupServerWithTargets(t)
 

@@ -73,6 +73,28 @@ func TestLoadTargets_EmptyBranches(t *testing.T) {
 	require.Contains(t, err.Error(), "branches list must not be empty")
 }
 
+func TestLoadTargets_WithSpecs(t *testing.T) {
+	config, warnings, err := LoadTargets("testdata/valid-targets-with-specs.yaml")
+	require.NoError(t, err)
+	require.Empty(t, warnings)
+	require.Len(t, config.Repositories, 2)
+
+	// First repo has explicit specs
+	require.Equal(t, []string{"github/branch-rules.yaml", "/opt/specs/custom-check.yaml"}, config.Repositories[0].Specs)
+	// Second repo has no specs (nil)
+	require.Nil(t, config.Repositories[1].Specs)
+}
+
+func TestLoadTargets_DuplicateSpecs(t *testing.T) {
+	config, warnings, err := LoadTargets("testdata/duplicate-specs-targets.yaml")
+	require.NoError(t, err)
+	require.Len(t, warnings, 1)
+	require.Contains(t, warnings[0], "duplicate specs")
+
+	// Should have 2 unique specs after dedup
+	require.Equal(t, []string{"github/branch-rules.yaml", "/opt/specs/custom-check.yaml"}, config.Repositories[0].Specs)
+}
+
 func writeTestFile(t *testing.T, path string, data []byte) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(path, data, 0600))

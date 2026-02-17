@@ -197,6 +197,45 @@ func TestWriteSpecFiles(t *testing.T) {
 	require.Contains(t, string(data), "${ORG}")
 }
 
+func TestResolveSpecPath(t *testing.T) {
+	tests := []struct {
+		specRef  string
+		specDir  string
+		expected string
+	}{
+		{"/opt/specs/custom.yaml", "/tmp/specs", "/opt/specs/custom.yaml"},
+		{"github/branch-rules.yaml", "/tmp/specs", "/tmp/specs/github/branch-rules.yaml"},
+		{"custom-check.yaml", "/tmp/specs", "/tmp/specs/custom-check.yaml"},
+		{"custom-check.yml", "/tmp/specs", "/tmp/specs/custom-check.yml"},
+		{"builtin-name", "/tmp/specs", "builtin-name"},
+	}
+	for _, tc := range tests {
+		got := ResolveSpecPath(tc.specRef, tc.specDir)
+		require.Equal(t, tc.expected, got, "specRef=%s specDir=%s", tc.specRef, tc.specDir)
+	}
+}
+
+func TestDefaultSpecs(t *testing.T) {
+	specs := DefaultSpecs()
+	require.Equal(t, []string{"github/branch-rules.yaml"}, specs)
+}
+
+func TestSanitizeSpecName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"github/branch-rules.yaml", "branch-rules"},
+		{"/opt/specs/custom-check.yaml", "custom-check"},
+		{"branch-rules.yml", "branch-rules"},
+		{"builtin-name", "builtin-name"},
+	}
+	for _, tc := range tests {
+		got := sanitizeSpecName(tc.input)
+		require.Equal(t, tc.expected, got, "input: %s", tc.input)
+	}
+}
+
 func TestScanRepository_MockSuccess(t *testing.T) {
 	tmpDir := t.TempDir()
 	attestation := makeTestAttestation("abc123def456")
@@ -216,19 +255,20 @@ func TestScanRepository_MockSuccess(t *testing.T) {
 		SpecDir:    filepath.Join(tmpDir, "specs"),
 	}
 
-	result, err := ScanRepository(repo, "main", cfg, runner)
+	specPath := ResolveSpecPath("github/branch-rules.yaml", cfg.SpecDir)
+	result, err := ScanRepository(repo, "main", specPath, cfg, runner)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Equal(t, ampelOutput, result.Output)
 
-	// Verify snappy attestation was saved as in-toto file
-	attestationFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-snappy.intoto.json")
+	// Verify snappy attestation was saved with spec label in filename
+	attestationFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-branch-rules-snappy.intoto.json")
 	saved, err := os.ReadFile(attestationFile)
 	require.NoError(t, err)
 	require.Equal(t, attestation, saved)
 
-	// Verify ampel verify result was saved as in-toto attestation
-	ampelResultFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-ampel.intoto.json")
+	// Verify ampel verify result was saved with spec label in filename
+	ampelResultFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-branch-rules-ampel.intoto.json")
 	savedAmpel, err := os.ReadFile(ampelResultFile)
 	require.NoError(t, err)
 	require.Equal(t, ampelOutput, savedAmpel)
@@ -246,7 +286,7 @@ func TestScanRepository_GitLabUnsupported(t *testing.T) {
 		SpecDir:    t.TempDir(),
 	}
 
-	_, err := ScanRepository(repo, "main", cfg, runner)
+	_, err := ScanRepository(repo, "main", "/specs/test.yaml", cfg, runner)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not supported")
 }
@@ -262,7 +302,7 @@ func TestScanRepository_SnappyError(t *testing.T) {
 		SpecDir:    t.TempDir(),
 	}
 
-	_, err := ScanRepository(repo, "main", cfg, runner)
+	_, err := ScanRepository(repo, "main", "/specs/test.yaml", cfg, runner)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "snappy failed")
 }
@@ -283,13 +323,14 @@ func TestScanRepository_AmpelExitError_SavesResult(t *testing.T) {
 		SpecDir:    t.TempDir(),
 	}
 
-	result, err := ScanRepository(repo, "main", cfg, runner)
+	specPath := ResolveSpecPath("github/branch-rules.yaml", cfg.SpecDir)
+	result, err := ScanRepository(repo, "main", specPath, cfg, runner)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Equal(t, ampelOutput, result.Output)
 
 	// Verify ampel intoto file was saved despite non-zero exit
-	ampelResultFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-ampel.intoto.json")
+	ampelResultFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-branch-rules-ampel.intoto.json")
 	saved, err := os.ReadFile(ampelResultFile)
 	require.NoError(t, err)
 	require.Equal(t, ampelOutput, saved)
@@ -308,7 +349,7 @@ func TestScanRepository_AmpelNonExecError(t *testing.T) {
 		SpecDir:    t.TempDir(),
 	}
 
-	_, err := ScanRepository(repo, "main", cfg, runner)
+	_, err := ScanRepository(repo, "main", "/specs/test.yaml", cfg, runner)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "ampel verify failed")
 }
@@ -325,7 +366,7 @@ func TestScanRepository_InvalidAttestationHash(t *testing.T) {
 		SpecDir:    t.TempDir(),
 	}
 
-	_, err := ScanRepository(repo, "main", cfg, runner)
+	_, err := ScanRepository(repo, "main", "/specs/test.yaml", cfg, runner)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "extracting subject hash")
 }

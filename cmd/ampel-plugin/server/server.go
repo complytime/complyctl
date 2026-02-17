@@ -117,42 +117,50 @@ func (s PluginServer) GetResults(_ context.Context, p policy.Policy) (policy.PVP
 	var repoResults []*results.PerRepoResult
 
 	for _, repo := range targetConfig.Repositories {
+		specs := repo.Specs
+		if len(specs) == 0 {
+			specs = scan.DefaultSpecs()
+		}
+
 		for _, branch := range repo.Branches {
-			logger.Info("scanning repository", "url", repo.URL, "branch", branch)
+			for _, specRef := range specs {
+				specPath := scan.ResolveSpecPath(specRef, scanCfg.SpecDir)
+				logger.Info("scanning repository", "url", repo.URL, "branch", branch, "spec", specRef)
 
-			rawResult, err := scan.ScanRepository(repo, branch, scanCfg, ScanRunner)
-			if err != nil {
-				logger.Error("scan failed", "repo", repo.URL, "branch", branch, "error", err)
-				errResult := &results.PerRepoResult{
-					Repository: repo.URL,
-					Branch:     branch,
-					Status:     "error",
-					Error:      err.Error(),
+				rawResult, err := scan.ScanRepository(repo, branch, specPath, scanCfg, ScanRunner)
+				if err != nil {
+					logger.Error("scan failed", "repo", repo.URL, "branch", branch, "spec", specRef, "error", err)
+					errResult := &results.PerRepoResult{
+						Repository: repo.URL,
+						Branch:     branch,
+						Status:     "error",
+						Error:      err.Error(),
+					}
+					repoResults = append(repoResults, errResult)
+					if writeErr := results.WritePerRepoResult(errResult, resultsDir); writeErr != nil {
+						logger.Error("failed to write error result", "error", writeErr)
+					}
+					continue
 				}
-				repoResults = append(repoResults, errResult)
-				if writeErr := results.WritePerRepoResult(errResult, resultsDir); writeErr != nil {
-					logger.Error("failed to write error result", "error", writeErr)
+
+				parsed, err := results.ParseAmpelOutput(rawResult.Output, repo.URL, branch)
+				if err != nil {
+					logger.Error("failed to parse scan output", "repo", repo.URL, "error", err)
+					errResult := &results.PerRepoResult{
+						Repository: repo.URL,
+						Branch:     branch,
+						Status:     "error",
+						Error:      err.Error(),
+					}
+					repoResults = append(repoResults, errResult)
+					if writeErr := results.WritePerRepoResult(errResult, resultsDir); writeErr != nil {
+						logger.Error("failed to write error result", "error", writeErr)
+					}
+					continue
 				}
-				continue
+
+				repoResults = append(repoResults, parsed)
 			}
-
-			parsed, err := results.ParseAmpelOutput(rawResult.Output, repo.URL, branch)
-			if err != nil {
-				logger.Error("failed to parse scan output", "repo", repo.URL, "error", err)
-				errResult := &results.PerRepoResult{
-					Repository: repo.URL,
-					Branch:     branch,
-					Status:     "error",
-					Error:      err.Error(),
-				}
-				repoResults = append(repoResults, errResult)
-				if writeErr := results.WritePerRepoResult(errResult, resultsDir); writeErr != nil {
-					logger.Error("failed to write error result", "error", writeErr)
-				}
-				continue
-			}
-
-			repoResults = append(repoResults, parsed)
 		}
 	}
 
