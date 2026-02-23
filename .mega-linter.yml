@@ -1,5 +1,7 @@
 
 # https://megalinter.io/latest/supported-linters/
+ADDITIONAL_EXCLUDED_DIRECTORIES:
+  - vendor
 ENABLE_LINTERS:
   - ACTION_ACTIONLINT
   - ANSIBLE_ANSIBLE_LINT
