@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -98,33 +97,6 @@ func sanitizeSpecName(specRef string) string {
 	return base
 }
 
-// parseRepoURL extracts the hosting platform, organization, and repository
-// name from a repository URL.
-func parseRepoURL(repoURL string) (platform, org, repo string, err error) {
-	parsed, err := url.Parse(repoURL)
-	if err != nil {
-		return "", "", "", fmt.Errorf("invalid URL %q: %w", repoURL, err)
-	}
-
-	host := strings.ToLower(parsed.Hostname())
-	path := strings.Trim(parsed.Path, "/")
-	parts := strings.Split(path, "/")
-
-	if len(parts) < 2 {
-		return "", "", "", fmt.Errorf("URL %q must contain org/repo path", repoURL)
-	}
-
-	if strings.Contains(host, "github.com") {
-		platform = "github"
-	} else if strings.Contains(host, "gitlab.com") {
-		platform = "gitlab"
-	} else {
-		return "", "", "", fmt.Errorf("unsupported host in %q: must be github.com or gitlab.com", repoURL)
-	}
-
-	return platform, parts[0], parts[1], nil
-}
-
 // constructSnappyCommand builds the snappy snap CLI arguments for collecting
 // branch protection data from a repository using a spec file.
 func constructSnappyCommand(org, repo, branch, specPath string) []string {
@@ -197,7 +169,7 @@ func extractHashFromStatement(data []byte) (string, error) {
 func ScanRepository(repo targets.TargetRepository, branch, specPath string, cfg ScanConfig, runner CommandRunner) (*RawScanResult, error) {
 	logger := hclog.Default()
 
-	platform, org, repoName, err := parseRepoURL(repo.URL)
+	platform, org, repoName, err := targets.ParseRepoURL(repo.URL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing repository URL: %w", err)
 	}
@@ -207,7 +179,7 @@ func ScanRepository(repo targets.TargetRepository, branch, specPath string, cfg 
 	}
 
 	specLabel := sanitizeSpecName(specPath)
-	filePrefix := sanitizeRepoName(repo.URL) + "-" + branch + "-" + specLabel
+	filePrefix := targets.SanitizeRepoURL(repo.URL) + "-" + branch + "-" + specLabel
 
 	// Run snappy to collect branch protection data as an in-toto attestation
 	snappyArgs := constructSnappyCommand(org, repoName, branch, specPath)
@@ -256,24 +228,3 @@ func ScanRepository(repo targets.TargetRepository, branch, specPath string, cfg 
 	return &RawScanResult{Output: ampelOut}, nil
 }
 
-// sanitizeRepoName converts a repository URL into a safe filename component.
-func sanitizeRepoName(repoURL string) string {
-	name := repoURL
-	for _, prefix := range []string{"https://", "http://"} {
-		if len(name) > len(prefix) && name[:len(prefix)] == prefix {
-			name = name[len(prefix):]
-			break
-		}
-	}
-	replacer := func(r rune) rune {
-		if r == '/' || r == '.' || r == ':' {
-			return '-'
-		}
-		return r
-	}
-	result := make([]rune, 0, len(name))
-	for _, r := range name {
-		result = append(result, replacer(r))
-	}
-	return string(result)
-}

@@ -87,33 +87,6 @@ func (m *mockRunner) Run(name string, args ...string) ([]byte, error) {
 	return nil, fmt.Errorf("unknown command: %s", name)
 }
 
-func TestParseRepoURL_GitHub(t *testing.T) {
-	platform, org, repo, err := parseRepoURL("https://github.com/myorg/myrepo")
-	require.NoError(t, err)
-	require.Equal(t, "github", platform)
-	require.Equal(t, "myorg", org)
-	require.Equal(t, "myrepo", repo)
-}
-
-func TestParseRepoURL_GitLab(t *testing.T) {
-	platform, org, repo, err := parseRepoURL("https://gitlab.com/myorg/myrepo")
-	require.NoError(t, err)
-	require.Equal(t, "gitlab", platform)
-	require.Equal(t, "myorg", org)
-	require.Equal(t, "myrepo", repo)
-}
-
-func TestParseRepoURL_UnsupportedHost(t *testing.T) {
-	_, _, _, err := parseRepoURL("https://bitbucket.org/myorg/myrepo")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "unsupported host")
-}
-
-func TestParseRepoURL_MissingPath(t *testing.T) {
-	_, _, _, err := parseRepoURL("https://github.com/onlyorg")
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "org/repo path")
-}
 
 func TestConstructSnappyCommand(t *testing.T) {
 	args := constructSnappyCommand("myorg", "myrepo", "main", "/specs/github/branch-rules.yaml")
@@ -260,13 +233,13 @@ func TestScanRepository_MockSuccess(t *testing.T) {
 	require.Equal(t, ampelOutput, result.Output)
 
 	// Verify snappy attestation was saved with spec label in filename
-	attestationFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-branch-rules-snappy.intoto.json")
+	attestationFile := filepath.Join(tmpDir, targets.SanitizeRepoURL(repo.URL)+"-main-branch-rules-snappy.intoto.json")
 	saved, err := os.ReadFile(attestationFile)
 	require.NoError(t, err)
 	require.Equal(t, attestation, saved)
 
 	// Verify ampel verify result was saved with spec label in filename
-	ampelResultFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-branch-rules-ampel.intoto.json")
+	ampelResultFile := filepath.Join(tmpDir, targets.SanitizeRepoURL(repo.URL)+"-main-branch-rules-ampel.intoto.json")
 	savedAmpel, err := os.ReadFile(ampelResultFile)
 	require.NoError(t, err)
 	require.Equal(t, ampelOutput, savedAmpel)
@@ -328,7 +301,7 @@ func TestScanRepository_AmpelExitError_SavesResult(t *testing.T) {
 	require.Equal(t, ampelOutput, result.Output)
 
 	// Verify ampel intoto file was saved despite non-zero exit
-	ampelResultFile := filepath.Join(tmpDir, sanitizeRepoName(repo.URL)+"-main-branch-rules-ampel.intoto.json")
+	ampelResultFile := filepath.Join(tmpDir, targets.SanitizeRepoURL(repo.URL)+"-main-branch-rules-ampel.intoto.json")
 	saved, err := os.ReadFile(ampelResultFile)
 	require.NoError(t, err)
 	require.Equal(t, ampelOutput, saved)
@@ -369,17 +342,3 @@ func TestScanRepository_InvalidAttestationHash(t *testing.T) {
 	require.Contains(t, err.Error(), "extracting subject hash")
 }
 
-func TestSanitizeRepoName(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"https://github.com/myorg/myrepo", "github-com-myorg-myrepo"},
-		{"https://gitlab.com/org/repo", "gitlab-com-org-repo"},
-		{"http://github.com/a/b", "github-com-a-b"},
-	}
-	for _, tc := range tests {
-		got := sanitizeRepoName(tc.input)
-		require.Equal(t, tc.expected, got, "input: %s", tc.input)
-	}
-}

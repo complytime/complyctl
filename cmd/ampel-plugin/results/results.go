@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/complytime/complyctl/cmd/ampel-plugin/intoto"
+	"github.com/complytime/complyctl/cmd/ampel-plugin/targets"
 	"github.com/oscal-compass/compliance-to-policy-go/v2/policy"
 )
 
@@ -172,7 +173,7 @@ func WritePerRepoResult(result *PerRepoResult, dir string) error {
 		return fmt.Errorf("creating results directory: %w", err)
 	}
 
-	filename := sanitizeForFilename(result.Repository) + "-" + result.Branch + ".json"
+	filename := targets.SanitizeRepoURL(result.Repository) + "-" + result.Branch + ".json"
 	path := filepath.Join(dir, filename)
 
 	data, err := json.MarshalIndent(result, "", "  ")
@@ -215,7 +216,7 @@ func ToPVPResult(repoResults []*PerRepoResult) policy.PVPResult {
 				order = append(order, f.TenetID)
 			}
 			g.subjects = append(g.subjects, policy.Subject{
-				Title:       repoDisplayName(rr.Repository),
+				Title:       targets.RepoDisplayName(rr.Repository),
 				Type:        "inventory-item",
 				ResourceID:  rr.Repository,
 				Result:      mapResult(f.Result, rr.Status),
@@ -241,7 +242,7 @@ func ToPVPResult(repoResults []*PerRepoResult) policy.PVPResult {
 				order = append(order, errorCheckID)
 			}
 			g.subjects = append(g.subjects, policy.Subject{
-				Title:       repoDisplayName(rr.Repository),
+				Title:       targets.RepoDisplayName(rr.Repository),
 				Type:        "inventory-item",
 				ResourceID:  rr.Repository,
 				Result:      policy.ResultError,
@@ -303,29 +304,3 @@ func isPrintableASCII(s string) bool {
 	return true
 }
 
-func sanitizeForFilename(repoURL string) string {
-	name := repoURL
-	for _, prefix := range []string{"https://", "http://"} {
-		if strings.HasPrefix(name, prefix) {
-			name = name[len(prefix):]
-			break
-		}
-	}
-	var result []rune
-	for _, r := range name {
-		if r == '/' || r == '.' || r == ':' {
-			result = append(result, '-')
-		} else {
-			result = append(result, r)
-		}
-	}
-	return string(result)
-}
-
-func repoDisplayName(repoURL string) string {
-	parts := strings.Split(repoURL, "/")
-	if len(parts) >= 2 {
-		return parts[len(parts)-2] + "/" + parts[len(parts)-1]
-	}
-	return repoURL
-}

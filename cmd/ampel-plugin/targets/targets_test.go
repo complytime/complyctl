@@ -95,6 +95,70 @@ func TestLoadTargets_DuplicateSpecs(t *testing.T) {
 	require.Equal(t, []string{"github/branch-rules.yaml", "/opt/specs/custom-check.yaml"}, config.Repositories[0].Specs)
 }
 
+func TestParseRepoURL_GitHub(t *testing.T) {
+	platform, org, repo, err := ParseRepoURL("https://github.com/myorg/myrepo")
+	require.NoError(t, err)
+	require.Equal(t, "github", platform)
+	require.Equal(t, "myorg", org)
+	require.Equal(t, "myrepo", repo)
+}
+
+func TestParseRepoURL_GitLab(t *testing.T) {
+	platform, org, repo, err := ParseRepoURL("https://gitlab.com/myorg/myrepo")
+	require.NoError(t, err)
+	require.Equal(t, "gitlab", platform)
+	require.Equal(t, "myorg", org)
+	require.Equal(t, "myrepo", repo)
+}
+
+func TestParseRepoURL_UnsupportedHost(t *testing.T) {
+	_, _, _, err := ParseRepoURL("https://bitbucket.org/myorg/myrepo")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "GitHub or GitLab")
+}
+
+func TestParseRepoURL_MissingPath(t *testing.T) {
+	_, _, _, err := ParseRepoURL("https://github.com/onlyorg")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "org/repo path")
+}
+
+func TestParseRepoURL_NonHTTPS(t *testing.T) {
+	_, _, _, err := ParseRepoURL("http://github.com/myorg/myrepo")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "HTTPS")
+}
+
+func TestSanitizeRepoURL(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"https://github.com/myorg/myrepo", "github-com-myorg-myrepo"},
+		{"https://gitlab.com/org/repo", "gitlab-com-org-repo"},
+		{"http://github.com/a/b", "github-com-a-b"},
+	}
+	for _, tc := range tests {
+		got := SanitizeRepoURL(tc.input)
+		require.Equal(t, tc.expected, got, "input: %s", tc.input)
+	}
+}
+
+func TestRepoDisplayName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"https://github.com/myorg/myrepo", "myorg/myrepo"},
+		{"https://gitlab.com/org/repo", "org/repo"},
+		{"not-a-valid-url", "not-a-valid-url"},
+	}
+	for _, tc := range tests {
+		got := RepoDisplayName(tc.input)
+		require.Equal(t, tc.expected, got, "input: %s", tc.input)
+	}
+}
+
 func writeTestFile(t *testing.T, path string, data []byte) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(path, data, 0600))

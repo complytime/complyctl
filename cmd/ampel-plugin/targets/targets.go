@@ -54,24 +54,74 @@ func LoadTargets(path string) (*TargetConfig, []string, error) {
 	return &config, warnings, nil
 }
 
-// validateRepoURL checks that a repository URL is a valid HTTPS URL
-// pointing to a GitHub or GitLab host.
-func validateRepoURL(rawURL string) error {
-	parsed, err := url.Parse(rawURL)
+// ParseRepoURL extracts the hosting platform, organization, and repository
+// name from a repository URL. The URL must be HTTPS and point to a GitHub
+// or GitLab host.
+func ParseRepoURL(repoURL string) (platform, org, repo string, err error) {
+	parsed, err := url.Parse(repoURL)
 	if err != nil {
-		return fmt.Errorf("invalid URL %q: %w", rawURL, err)
+		return "", "", "", fmt.Errorf("invalid URL %q: %w", repoURL, err)
 	}
 
 	if parsed.Scheme != "https" {
-		return fmt.Errorf("URL %q must use HTTPS scheme", rawURL)
+		return "", "", "", fmt.Errorf("URL %q must use HTTPS scheme", repoURL)
 	}
 
 	host := strings.ToLower(parsed.Hostname())
-	if !strings.Contains(host, "github.com") && !strings.Contains(host, "gitlab.com") {
-		return fmt.Errorf("URL %q must point to a GitHub or GitLab host", rawURL)
+	path := strings.Trim(parsed.Path, "/")
+	parts := strings.Split(path, "/")
+
+	if strings.Contains(host, "github.com") {
+		platform = "github"
+	} else if strings.Contains(host, "gitlab.com") {
+		platform = "gitlab"
+	} else {
+		return "", "", "", fmt.Errorf("URL %q must point to a GitHub or GitLab host", repoURL)
 	}
 
-	return nil
+	if len(parts) < 2 {
+		return "", "", "", fmt.Errorf("URL %q must contain org/repo path", repoURL)
+	}
+
+	return platform, parts[0], parts[1], nil
+}
+
+// SanitizeRepoURL converts a repository URL into a filesystem-safe name
+// by stripping the scheme and replacing special characters with hyphens.
+func SanitizeRepoURL(repoURL string) string {
+	name := repoURL
+	for _, prefix := range []string{"https://", "http://"} {
+		if strings.HasPrefix(name, prefix) {
+			name = name[len(prefix):]
+			break
+		}
+	}
+	var result []rune
+	for _, r := range name {
+		if r == '/' || r == '.' || r == ':' {
+			result = append(result, '-')
+		} else {
+			result = append(result, r)
+		}
+	}
+	return string(result)
+}
+
+// RepoDisplayName extracts the "org/repo" portion from a repository URL
+// for use in human-readable output.
+func RepoDisplayName(repoURL string) string {
+	_, org, repo, err := ParseRepoURL(repoURL)
+	if err != nil {
+		return repoURL
+	}
+	return org + "/" + repo
+}
+
+// validateRepoURL checks that a repository URL is valid by attempting
+// to parse it.
+func validateRepoURL(rawURL string) error {
+	_, _, _, err := ParseRepoURL(rawURL)
+	return err
 }
 
 // deduplicateTargets removes duplicate URL+branch combinations and
