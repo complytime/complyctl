@@ -10,9 +10,14 @@
 #     branches:
 #       - main
 #       - release
-#   - url: https://gitlab.com/myorg/another-repo
+#     specs:
+#       - builtin:github/branch-rules.yaml
+#   - url: https://github.com/myorg/another-repo
 #     branches:
 #       - main
+#     specs:
+#       - builtin:github/branch-rules.yaml
+#       - /opt/specs/custom-check.yaml
 
 # Schema definition (expressed as Go struct tags for reference):
 #
@@ -23,6 +28,7 @@
 # type TargetRepository struct {
 #     URL      string   `yaml:"url"`
 #     Branches []string `yaml:"branches"`
+#     Specs    []string `yaml:"specs"`
 # }
 #
 # Validation rules:
@@ -30,4 +36,8 @@
 # - url: required, valid HTTPS URL, must point to github.com or
 #   gitlab.com (or self-hosted instances)
 # - branches: required, non-empty array of branch name strings
+# - specs: required, non-empty array of spec file references
+#   - "builtin:" prefix for embedded spec files
+#   - Absolute paths for custom spec files
 # - Duplicate url+branch combinations: warned and deduplicated
+# - Duplicate specs within a repository: deduplicated

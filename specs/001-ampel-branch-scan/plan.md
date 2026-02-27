@@ -6,13 +6,14 @@
 
 ## Summary
 
-Build a complyctl plugin that translates OSCAL assessment rules
-into AMPEL policy format (Generate) and invokes the AMPEL
-toolchain (snappy, ampel) to scan branch protection rules on
-GitHub/GitLab repositories (GetResults). The plugin uses only
-existing project dependencies, isolates the OSCAL-to-AMPEL
-conversion layer for future Gemara migration, and provides rich
-mock fixtures for testing policy linkage and accuracy.
+Build a complyctl plugin that matches OSCAL assessment rules
+against granular AMPEL policy files and merges them into a
+combined bundle (Generate), then invokes the AMPEL toolchain
+(snappy, ampel) to scan branch protection rules on GitHub
+repositories (GetResults). The plugin uses only existing project
+dependencies, isolates the OSCAL-to-AMPEL conversion layer for
+future Gemara migration, handles DSSE-wrapped attestation output,
+and groups multi-target results into proper OSCAL observations.
 
 ## Technical Context
 
@@ -79,7 +80,7 @@ cmd/ampel-plugin/
 │   ├── server.go                  # policy.Provider implementation
 │   └── server_test.go
 ├── convert/
-│   ├── convert.go                 # OSCAL → AMPEL policy translation
+│   ├── convert.go                 # Granular policy matching + merging
 │   ├── types.go                   # AMPEL policy data structures
 │   ├── convert_test.go
 │   └── testdata/
@@ -101,18 +102,24 @@ cmd/ampel-plugin/
 │       └── invalid-url-targets.yaml
 ├── scan/
 │   ├── scan.go                    # External tool invocation orchestration
-│   └── scan_test.go
+│   ├── scan_test.go
+│   └── specs/                     # Embedded snappy spec files
+│       └── github/
+│           └── branch-rules.yaml
 ├── results/
 │   ├── results.go                 # AMPEL output → PVPResult + per-repo files
 │   ├── results_test.go
 │   └── testdata/
 │       ├── ampel-verify-pass.json
 │       ├── ampel-verify-fail.json
+│       ├── ampel-verify-dsse-fail.json  # DSSE-wrapped attestation fixture
 │       └── ampel-verify-error.json
-└── docs/
-    └── samples/
-        ├── c2p-ampel-manifest.json
-        └── ampel-targets.yaml
+├── docs/
+│   ├── STRATEGY.md                # Plugin strategy document
+│   └── samples/
+│       ├── c2p-ampel-manifest.json
+│       └── ampel-targets.yaml
+└── README.md                      # Plugin documentation
 ```
 
 **Structure Decision**: Single binary plugin following the
@@ -128,7 +135,7 @@ defined responsibility.
 | `main` | Plugin registration with hashicorp/go-plugin | plugin framework |
 | `config` | Parse manifest config map, validate paths, create dirs | stdlib + hclog |
 | `server` | Implement policy.Provider, orchestrate other packages | policy framework |
-| `convert` | Translate OSCAL rules → AMPEL policy JSON (isolated for Gemara migration) | policy types |
+| `convert` | Match OSCAL rules to granular AMPEL policies, merge into bundle (isolated for Gemara migration) | policy types |
 | `toolcheck` | Validate snappy, ampel are on PATH | os/exec |
 | `targets` | Parse ampel-targets.yaml, validate, deduplicate | goccy/go-yaml |
 | `scan` | Invoke snappy + ampel verify per repo, capture output | os/exec |
@@ -141,12 +148,11 @@ data structures. All other packages work with AMPEL types or
 generic plugin types. When complyctl migrates from OSCAL to
 Gemara:
 
-1. Only `convert/convert.go` and `convert/types.go` change
-2. The function signature evolves from:
-   `PolicyToAmpel(policy.Policy, ConvertConfig) → *AmpelPolicy`
-   to:
-   `GemaraToAmpel(gemara.Requirement, ConvertConfig) → *AmpelPolicy`
-3. All downstream packages (scan, results, targets, config)
+1. Only `convert/convert.go` changes (the matching function)
+2. `MatchPolicies` evolves from accepting `[]extensions.RuleSet`
+   to accepting Gemara policy identifiers
+3. `LoadGranularPolicies` and `MergeToBundle` remain unchanged
+4. All downstream packages (scan, results, targets, config)
    remain untouched
 
 ### Test Architecture

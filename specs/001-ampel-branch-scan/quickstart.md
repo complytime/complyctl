@@ -3,11 +3,17 @@
 ## Prerequisites
 
 1. complyctl installed and configured
-2. AMPEL tools installed and on PATH:
-   - `ampel` - policy verification engine
-   - `snappy` - branch protection data collector
-
-3. Access to target GitHub/GitLab repositories
+2. AMPEL tools installed via `go install` and on PATH:
+   ```bash
+   go install github.com/carabiner-dev/snappy@latest
+   go install github.com/carabiner-dev/ampel/cmd/ampel@latest
+   export PATH=$PATH:$HOME/go/bin
+   ```
+3. A GitHub personal access token with read access to target
+   repositories:
+   ```bash
+   export GITHUB_TOKEN=ghp_your_token_here
+   ```
 
 ## Setup
 
@@ -21,7 +27,18 @@ cp ampel-plugin ~/.local/share/complytime/plugins/
 cp c2p-ampel-manifest.json ~/.local/share/complytime/plugins/
 ```
 
-### 2. Create an assessment plan
+### 2. Prepare granular AMPEL policies
+
+Place granular AMPEL policy files (one JSON file per control)
+in the policy directory. Sample policies are available in the
+[complytime-demos](https://github.com/complytime/complytime-demos)
+repository under `base_ansible_env/files/ampel-policies/`.
+
+```bash
+cp ampel-policies/*.json ~/.local/share/complytime/ampel-policies/
+```
+
+### 3. Create an assessment plan
 
 ```bash
 complyctl plan <framework-id>
@@ -30,7 +47,7 @@ complyctl plan <framework-id>
 This creates `assessment-plan.json` in your workspace with
 branch protection controls.
 
-### 3. Configure target repositories
+### 4. Configure target repositories
 
 Create `ampel-targets.yaml` in your workspace under
 `ampel/ampel-targets.yaml`:
@@ -40,22 +57,30 @@ repositories:
   - url: https://github.com/myorg/myrepo
     branches:
       - main
-  - url: https://gitlab.com/myorg/another-repo
+    specs:
+      - builtin:github/branch-rules.yaml
+  - url: https://github.com/myorg/another-repo
     branches:
       - main
       - develop
+    specs:
+      - builtin:github/branch-rules.yaml
 ```
 
-### 4. Generate AMPEL policies
+Each repository requires a `specs` list. Use `builtin:` prefix
+for embedded spec files or absolute paths for custom specs.
+
+### 5. Generate AMPEL policies
 
 ```bash
 complyctl generate
 ```
 
-This translates the OSCAL assessment plan into AMPEL policy
-files at `{workspace}/ampel/policy/`.
+This matches OSCAL assessment plan rules against the granular
+AMPEL policies and merges the matching policies into a combined
+bundle at `{workspace}/ampel/policy/complytime-ampel-policy.json`.
 
-### 5. Scan repositories
+### 6. Scan repositories
 
 ```bash
 complyctl scan
@@ -66,22 +91,20 @@ compliance and produces:
 - Per-repository result files in `{workspace}/ampel/results/`
 - Consolidated `assessment-results.json` in the workspace
 
-### 6. View results
-
-```bash
-complyctl scan --format markdown
-```
-
 ## Workspace Structure After Scan
 
 ```text
 ~/.local/share/complytime/
 ├── assessment-plan.json
 ├── assessment-results.json
+├── ampel-policies/
+│   ├── SC-CODE-01.01-require-pull-request.json
+│   ├── SC-CODE-02.01-minimum-approvals.json
+│   └── ...
 └── ampel/
     ├── ampel-targets.yaml
     ├── policy/
-    │   └── branch-protection-policy.json
+    │   └── complytime-ampel-policy.json
     └── results/
         ├── myorg-myrepo-main.json
         └── myorg-another-repo-main.json

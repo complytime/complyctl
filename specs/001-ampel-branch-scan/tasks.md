@@ -173,26 +173,17 @@ controls from the assessment plan.
 
 ### Implementation for User Story 1
 
-- [x] T013 [US1] Implement `PolicyToAmpel` function in
-  `cmd/ampel-plugin/convert/convert.go`. Signature:
-  `func PolicyToAmpel(oscalPolicy policy.Policy, cfg ConvertConfig) (*AmpelPolicy, error)`.
-  Define ConvertConfig with Profile string field.
-  Iterate over policy rules, for each rule iterate checks,
-  generate AmpelTenet with: ID from check ID, Title from check
-  description, Code as CEL expression for branch protection
-  verification, Predicates with branch-rules predicate type.
-  Map rule parameters to CEL expression variables. Set AmpelMeta
-  with runtime "cel@v14.0", assert_mode "AND", enforce "ON".
-  Return nil AmpelPolicy (no error) for empty input. See
-  research.md R-003 for mapping details.
+- [x] T013 [US1] ~~(Superseded)~~ Originally: Implement
+  `PolicyToAmpel` with CEL generation. **Replaced by T040-T042**:
+  Implement granular policy matching approach with
+  `LoadGranularPolicies`, `MatchPolicies`, and `MergeToBundle`
+  functions in `cmd/ampel-plugin/convert/convert.go`. See
+  research.md R-003 (updated) for rationale.
 
-- [x] T014 [US1] Implement `WritePolicy` function in
-  `cmd/ampel-plugin/convert/convert.go`. Signature:
-  `func WritePolicy(p *AmpelPolicy, dir string) error`.
-  Marshal AmpelPolicy to indented JSON, write to
-  `{dir}/branch-protection-policy.json`. Create dir if not
-  exists. Overwrite if file exists (per clarification). Return
-  early with nil if policy is nil (no applicable rules case).
+- [x] T014 [US1] ~~(Superseded)~~ Originally: Implement
+  `WritePolicy` with filename `branch-protection-policy.json`.
+  **Updated**: Bundle is now written to
+  `complytime-ampel-policy.json` by `MergeToBundle`.
 
 - [x] T015 [US1] Implement Generate() method body in
   `cmd/ampel-plugin/server/server.go`. Call
@@ -494,6 +485,95 @@ validation.
 - [ ] T039 Run quickstart.md validation: manually walk through
   each step in `specs/001-ampel-branch-scan/quickstart.md` and
   verify the documented workflow produces expected outputs.
+
+---
+
+## Phase 8: Post-Initial Implementation Improvements
+
+**Purpose**: Address gaps discovered during integration testing
+and real-world usage.
+
+### Granular Policy Matching (replaces CEL generation)
+
+- [x] T040 [US1] Implement `LoadGranularPolicies` in
+  `cmd/ampel-plugin/convert/convert.go`. Loads all `*.json`
+  files from the policy directory, parses each as an AmpelPolicy,
+  returns the full set. Replaces the CEL generation approach
+  from T013.
+
+- [x] T041 [US1] Implement `MatchPolicies` in
+  `cmd/ampel-plugin/convert/convert.go`. Matches OSCAL rule IDs
+  against granular policy IDs. Returns only the policies that
+  correspond to rules in the assessment plan.
+
+- [x] T042 [US1] Implement `MergeToBundle` in
+  `cmd/ampel-plugin/convert/convert.go`. Merges matched
+  policies into a single AmpelPolicyBundle and writes to
+  `complytime-ampel-policy.json`. Bundle ID is always
+  "complytime-ampel-policy".
+
+### Per-Repository Spec Configuration
+
+- [x] T043 [US2] Add `specs` field to TargetRepository in
+  `cmd/ampel-plugin/targets/targets.go`. Each repository MUST
+  specify one or more snappy spec file references. Support
+  `builtin:` prefix for embedded specs and absolute paths for
+  custom specs. Validate that specs is non-empty. Deduplicate
+  specs within a repository.
+
+- [x] T044 [US2] Update scan orchestration in
+  `cmd/ampel-plugin/scan/scan.go` to iterate over each
+  repo/branch/spec combination. Embed spec files under
+  `scan/specs/` using `//go:embed`. Resolve `builtin:` prefix
+  to embedded files written to workspace.
+
+- [x] T045 [US2] Add test fixtures and tests for per-repo spec
+  configuration in targets and server packages.
+
+### DSSE Envelope Handling
+
+- [x] T046 [US2] Add DSSE envelope unwrapping to
+  `ParseAmpelOutput` in `cmd/ampel-plugin/results/results.go`.
+  Before parsing the in-toto statement, check if the raw JSON
+  is a DSSE envelope (has payloadType and payload fields). If
+  so, base64-decode the payload (try RawURL then StdEncoding)
+  and parse the decoded content. Add `encoding/base64` import.
+
+- [x] T047 [US2] Create DSSE test fixture at
+  `cmd/ampel-plugin/results/testdata/ampel-verify-dsse-fail.json`
+  and add `TestParseAmpelOutput_DSSEEnvelope` test case.
+
+### Multi-Target Observation Grouping
+
+- [x] T048 [US2] Update `ToPVPResult` in
+  `cmd/ampel-plugin/results/results.go` to group findings by
+  CheckID. Each unique CheckID produces one ObservationByCheck
+  with multiple Subjects (one per repository). Use insertion-
+  order tracking for deterministic output. This prevents
+  last-write-wins overwrites in the downstream oscal-sdk-go
+  observation manager.
+
+- [x] T049 [US2] Update tests: `TestToPVPResult` to verify
+  CheckID grouping produces 1 observation with 2 subjects.
+  Add `TestToPVPResult_MultipleChecks` for 2 repos with 2
+  distinct checks. Update `TestGetResults_MultipleSpecs` in
+  server tests.
+
+### Documentation
+
+- [x] T050 Create `cmd/ampel-plugin/README.md` covering plugin
+  structure, configuration, target format, installation of
+  snappy and ampel via `go install`, GITHUB_TOKEN requirement,
+  plugin registration, and complytime-demos VM setup.
+
+- [x] T051 Create `cmd/ampel-plugin/docs/STRATEGY.md` covering
+  granular policy approach, multi-target scanning, value of
+  complyctl integration, and next actions (Gemara2Ampel update,
+  plugin API update, Gemara results).
+
+- [x] T052 Update speckit files (spec.md, plan.md, tasks.md,
+  data-model.md, quickstart.md, research.md, contracts/) to
+  reflect all post-initial implementation changes.
 
 ---
 

@@ -70,25 +70,34 @@ Branch protection rules use predicate type:
 - PolicySet format: Not needed for single-policy generation.
   Can be added later if multiple policy files are required.
 
-## R-003: OSCAL to AMPEL Rule Mapping
+## R-003: OSCAL to AMPEL Policy Matching (Updated 2026-02-17)
 
-**Decision**: Map OSCAL `RuleSet.Checks` to AMPEL `tenets` with
-CEL expressions derived from check identifiers.
+**Decision**: Match OSCAL rule IDs against granular AMPEL policy
+file IDs and merge the matching policies into a combined bundle.
+This replaces the earlier approach of generating CEL expressions
+from OSCAL rules.
 
-**Rationale**: Each OSCAL rule contains checks with IDs. These
-check IDs map to specific branch protection verification logic.
-The conversion layer translates each check into an AMPEL tenet
-with the appropriate CEL expression for branch protection
-evaluation.
+**Rationale**: Granular AMPEL policies are authored independently
+(one JSON file per control) with hand-crafted CEL expressions,
+attestation type references, and remediation guidance. The plugin
+matches OSCAL rule IDs to policy file IDs, selecting only the
+policies relevant to the current assessment plan. This approach:
+- Preserves expert-authored CEL logic (no auto-generation)
+- Supports independent policy authoring and testing
+- Aligns with Gemara2Ampel workspace mode output
+- Keeps the generate phase simple (match + merge)
 
-**Mapping**:
-- `Rule.Name` → Tenet context (used in tenet ID generation)
-- `Rule.Checks[].ID` → Tenet ID
-- `Rule.Checks[].Description` → Tenet title
-- `Rule.Parameters[].SelectedValue` → CEL expression parameters
-- Implicit: Branch protection predicate type is set per tenet
+**Matching flow**:
+1. `LoadGranularPolicies(dir)` → loads all `*.json` from policy_dir
+2. `MatchPolicies(oscalRules, granularPolicies)` → matches by
+   rule ID ↔ policy ID
+3. `MergeToBundle(matched)` → produces single policy bundle
 
 **Alternatives considered**:
+- CEL expression generation from OSCAL rules: Initially
+  implemented but replaced. Auto-generated CEL was fragile,
+  hard to maintain, and did not capture domain-specific
+  verification logic that policy authors need to express.
 - Direct OSCAL-to-CLI-args mapping: Rejected because AMPEL
   requires policy files as input to `ampel verify`.
 
@@ -195,16 +204,20 @@ repositories:
 **Decision**: Isolate the OSCAL-to-AMPEL conversion in a
 dedicated `convert` package with a clean interface boundary.
 
-**Rationale**: The user explicitly stated the communication API
-will change when complyctl moves from OSCAL to Gemara. By
-isolating conversion behind:
+**Rationale**: The communication API will change when complyctl
+moves from OSCAL to Gemara. The convert package encapsulates
+all policy-source-specific logic behind:
 
 ```go
-func PolicyToAmpel(oscalPolicy policy.Policy, config ConvertConfig) (*AmpelPolicy, error)
+func LoadGranularPolicies(dir string) ([]AmpelPolicy, error)
+func MatchPolicies(rules []extensions.RuleSet, policies []AmpelPolicy) []AmpelPolicy
+func MergeToBundle(policies []AmpelPolicy) *AmpelPolicyBundle
 ```
 
-...the future migration requires changing only this package. The
-server, config, scan, and results packages remain untouched.
+When Gemara replaces OSCAL, only `MatchPolicies` changes to
+accept Gemara policy identifiers. The load and merge functions,
+and all downstream packages (scan, results, targets, config),
+remain untouched.
 
 **Alternatives considered**:
 - Interface-based abstraction with multiple implementations:
@@ -227,7 +240,50 @@ returned to complyctl aggregates all per-repo observations.
 - Timestamped filenames: Rejected per clarification that re-runs
   overwrite.
 
-## R-010: Test Strategy with Mock Fixtures
+## R-010: DSSE Envelope Handling (Added 2026-02-17)
+
+**Decision**: Unwrap DSSE-signed envelopes in ParseAmpelOutput
+before parsing the in-toto result predicate.
+
+**Rationale**: `ampel verify --attest-results` produces
+DSSE-wrapped attestations (the standard signed attestation
+format). The DSSE envelope has `payloadType`, `payload` (base64),
+and `signatures` fields. When unmarshaled directly into the
+result statement type, the predicate is empty because DSSE
+wraps the actual statement in its `payload` field. The fix
+tries base64 RawURL decoding first, then StdEncoding as fallback.
+
+**Structure**:
+```json
+{
+  "payloadType": "application/vnd.in-toto+json",
+  "payload": "<base64url-encoded in-toto statement>",
+  "signatures": [{"keyid": "...", "sig": "..."}]
+}
+```
+
+**Impact**: Without DSSE unwrapping, all controls silently
+appear as "fail" because the predicate field is empty.
+
+## R-011: Multi-Target Observation Grouping (Added 2026-02-17)
+
+**Decision**: Group findings with the same CheckID into a single
+ObservationByCheck with multiple Subjects (one per repository).
+
+**Rationale**: The oscal-sdk-go library's observation manager
+(`observations.go:112`) stores observations in a map keyed by
+`observation.Title`. When multiple observations share the same
+Title (CheckID), only the last one survives (last-write-wins).
+The fix groups all repo subjects under one ObservationByCheck
+per CheckID, which matches the OSCAL pattern and produces
+correct multi-target assessment results.
+
+**OSCAL conformance**: The `observation.subjects` array in OSCAL
+Assessment Results is designed for multiple inventory items per
+observation. The C2P library's `toOscalObservation` function
+already handles multiple subjects correctly.
+
+## R-012: Test Strategy with Mock Fixtures
 
 **Decision**: Provide mock OSCAL assessment plan and AMPEL policy
 fixtures in `convert/testdata/` for unit testing the conversion

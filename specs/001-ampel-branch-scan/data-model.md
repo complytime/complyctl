@@ -4,50 +4,66 @@
 
 ## Entity Definitions
 
-### 1. AmpelPolicy
+### 1. Granular AmpelPolicy
 
-Represents a complete AMPEL verification policy generated from
-OSCAL rules. Serialized as JSON.
+Represents a single AMPEL verification policy for one control.
+Authored independently as a standalone JSON file in the policy
+directory. Multiple granular policies are matched against OSCAL
+rules and merged into a combined bundle during generate.
 
 **Fields**:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| ID | string | Policy identifier, derived from assessment plan context |
-| Meta | AmpelMeta | Policy metadata |
-| Tenets | []AmpelTenet | Verification checks |
+| ID | string | Policy identifier matching OSCAL rule ID (e.g., "SC-CODE-01.01") |
+| Meta | AmpelMeta | Policy metadata including description and control references |
+| Tenets | []AmpelTenet | CEL-based verification checks |
 
 **AmpelMeta fields**:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| Runtime | string | CEL runtime version (always "cel@v14.0") |
 | Description | string | Human-readable policy description |
-| AssertMode | string | "AND" (all tenets must pass) |
-| Version | int64 | Integer version, incremented on re-generate |
-| Controls | []Control | OSCAL control references |
-| Enforce | string | "ON" for active enforcement |
+| Controls | []Control | OSCAL control references (framework, class, id) |
 
 **AmpelTenet fields**:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| ID | string | Unique tenet identifier |
-| Title | string | Human-readable tenet name |
-| Predicates | PredicateSpec | Attestation types to evaluate |
+| ID | string | Unique tenet identifier within the policy |
 | Code | string | CEL expression for verification |
-| Outputs | map[string]Output | Named output extractors |
+| Predicates | PredicateSpec | Attestation types to evaluate |
+| Assessment | Assessment | Message for passing tenets |
+| Error | TenetError | Message and guidance for failing tenets |
 
 **Relationships**:
-- Generated from: OSCAL `policy.Policy` ([]RuleSet)
-- Each OSCAL Rule.Check maps to one AmpelTenet
-- OSCAL Rule.Parameters feed into CEL expression construction
+- Matched to OSCAL rules by policy ID ↔ rule ID
+- Merged into AmpelPolicyBundle during generate
+- Each granular file is independently authored and testable
 
 **Validation**:
 - ID MUST be non-empty
 - At least one tenet MUST exist
 - Each tenet MUST have non-empty Code (CEL expression)
-- Each tenet MUST reference exactly one predicate type
+
+### 1b. AmpelPolicyBundle
+
+The combined policy produced by merging matched granular policies.
+Written to `{workspace}/ampel/policy/complytime-ampel-policy.json`.
+
+**Fields**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| ID | string | Always "complytime-ampel-policy" |
+| Meta | BundleMeta | Bundle metadata with framework reference |
+| Policies | []AmpelPolicy | Array of matched granular policies |
+
+**BundleMeta fields**:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| Frameworks | []Framework | Single entry: ComplyTime-AMPEL-Policy |
 
 ### 2. TargetRepository
 
@@ -60,13 +76,18 @@ the workspace configuration file.
 |-------|------|-------------|
 | URL | string | Repository URL (https://github.com/org/repo) |
 | Branches | []string | Branch names to evaluate protection rules on |
+| Specs | []string | Snappy spec file references (e.g., "builtin:github/branch-rules.yaml") |
 
 **Validation**:
 - URL MUST be a valid HTTPS URL
 - URL MUST point to a GitHub or GitLab host
 - Branches MUST contain at least one entry
+- Specs MUST contain at least one entry
+- Specs support `builtin:` prefix for embedded files and absolute
+  paths for custom specs
 - Duplicate URL+branch combinations trigger a warning and are
   deduplicated
+- Duplicate specs within a repository are deduplicated
 
 **Source**: Parsed from `{workspace}/ampel/ampel-targets.yaml`
 
@@ -110,7 +131,7 @@ a JSON file in the workspace.
 | Reason | string | Explanation of the result |
 
 **Relationships**:
-- One PerRepoResult per TargetRepository+branch combination
+- One PerRepoResult per TargetRepository+branch+spec combination
 - Findings map back to AmpelPolicy.Tenets via TenetID
 - Aggregated into policy.PVPResult for complyctl
 
@@ -134,24 +155,31 @@ Plugin configuration received from complyctl via Configure().
 ## Entity Relationships
 
 ```text
+Granular AMPEL Policies (policy_dir/*.json)
+    │
+    ▼ [convert package: LoadGranularPolicies]
+    │
 OSCAL Policy ([]RuleSet)
     │
-    ▼ [convert package]
-AmpelPolicy
+    ▼ [convert package: MatchPolicies + MergeToBundle]
+AmpelPolicyBundle
     │
-    ├── written to → PolicyDir/{policy-file}.json
+    ├── written to → PolicyDir/complytime-ampel-policy.json
     │
     ▼ [scan package]
 TargetConfig
     │
     ├── parsed from → TargetsFile
     │
-    ▼ [for each TargetRepository + branch]
+    ▼ [for each TargetRepository + branch + spec]
 PerRepoResult
     │
     ├── written to → ResultsDir/{repo-name}-{branch}.json
     │
-    ▼ [results package]
+    ▼ [results package: ToPVPResult]
+    │   Groups findings by CheckID → one ObservationByCheck
+    │   per check with multiple Subjects (one per repo)
+    │
 policy.PVPResult (returned to complyctl)
 ```
 
