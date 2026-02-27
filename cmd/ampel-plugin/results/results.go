@@ -1,7 +1,6 @@
 package results
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/complytime/complyctl/cmd/ampel-plugin/intoto"
 	"github.com/oscal-compass/compliance-to-policy-go/v2/policy"
 )
 
@@ -65,12 +65,6 @@ type ampelResultMeta struct {
 	Description string `json:"description"`
 }
 
-// dsseEnvelope represents a DSSE signed envelope.
-type dsseEnvelope struct {
-	PayloadType string `json:"payloadType"`
-	Payload     string `json:"payload"`
-}
-
 // PerRepoResult holds scan findings for a single repository.
 type PerRepoResult struct {
 	Repository string    `json:"repository"`
@@ -98,16 +92,9 @@ func ParseAmpelOutput(raw []byte, repo, branch string) (*PerRepoResult, error) {
 	}
 
 	// Unwrap DSSE envelope if present (ampel --attest-results produces signed attestations)
-	var envelope dsseEnvelope
-	if err := json.Unmarshal(raw, &envelope); err == nil && envelope.PayloadType != "" && envelope.Payload != "" {
-		decoded, err := base64.RawURLEncoding.DecodeString(envelope.Payload)
-		if err != nil {
-			decoded, err = base64.StdEncoding.DecodeString(envelope.Payload)
-			if err != nil {
-				return nil, fmt.Errorf("decoding DSSE payload in ampel result: %w", err)
-			}
-		}
-		raw = decoded
+	raw, err := intoto.UnwrapDSSE(raw)
+	if err != nil {
+		return nil, fmt.Errorf("unwrapping DSSE envelope in ampel result: %w", err)
 	}
 
 	var stmt ampelResultStatement

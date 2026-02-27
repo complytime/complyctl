@@ -2,7 +2,6 @@ package scan
 
 import (
 	_ "embed"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 
+	"github.com/complytime/complyctl/cmd/ampel-plugin/intoto"
 	"github.com/complytime/complyctl/cmd/ampel-plugin/targets"
 )
 
@@ -153,12 +153,6 @@ func constructAmpelVerifyCommand(subject, policyPath, attestationPath, resultsPa
 	}
 }
 
-// dsseEnvelope represents a DSSE signed envelope.
-type dsseEnvelope struct {
-	PayloadType string `json:"payloadType"`
-	Payload     string `json:"payload"`
-}
-
 // inTotoStatement represents an in-toto attestation statement.
 type inTotoStatement struct {
 	Subject []attestationSubject `json:"subject"`
@@ -173,21 +167,11 @@ type attestationSubject struct {
 // extractSubjectHash extracts the sha256 hash from an in-toto attestation.
 // It supports both raw in-toto statements and DSSE-wrapped attestations.
 func extractSubjectHash(attestationData []byte) (string, error) {
-	var envelope dsseEnvelope
-	if err := json.Unmarshal(attestationData, &envelope); err == nil && envelope.PayloadType != "" && envelope.Payload != "" {
-		// DSSE uses base64url encoding without padding
-		decoded, err := base64.RawURLEncoding.DecodeString(envelope.Payload)
-		if err != nil {
-			// Fall back to standard base64
-			decoded, err = base64.StdEncoding.DecodeString(envelope.Payload)
-			if err != nil {
-				return "", fmt.Errorf("decoding DSSE payload: %w", err)
-			}
-		}
-		return extractHashFromStatement(decoded)
+	unwrapped, err := intoto.UnwrapDSSE(attestationData)
+	if err != nil {
+		return "", fmt.Errorf("unwrapping DSSE envelope: %w", err)
 	}
-
-	return extractHashFromStatement(attestationData)
+	return extractHashFromStatement(unwrapped)
 }
 
 func extractHashFromStatement(data []byte) (string, error) {

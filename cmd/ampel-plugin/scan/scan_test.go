@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/complytime/complyctl/cmd/ampel-plugin/intoto"
 	"github.com/complytime/complyctl/cmd/ampel-plugin/targets"
 )
 
@@ -47,7 +48,7 @@ func makeDSSEAttestation(hash string) []byte {
 		"predicate":     map[string]interface{}{},
 	}
 	payload, _ := json.Marshal(stmt)
-	envelope := dsseEnvelope{
+	envelope := intoto.Envelope{
 		PayloadType: "application/vnd.in-toto+json",
 		Payload:     base64.RawURLEncoding.EncodeToString(payload),
 	}
