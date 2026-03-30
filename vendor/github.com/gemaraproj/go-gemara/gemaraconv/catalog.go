@@ -34,7 +34,7 @@ func CatalogToOSCAL(catalog *gemara.ControlCatalog, opts ...GenerateOption) (osc
 		Metadata: metadata,
 	}
 
-	familyMap := make(map[string]gemara.Family)
+	familyMap := make(map[string]gemara.Group)
 	for _, family := range catalog.Families {
 		familyMap[family.Id] = family
 	}

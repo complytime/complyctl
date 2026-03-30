@@ -10,7 +10,7 @@ GOFLAGS :=
 COVERFILE := coverage.out
 TESTCOVERAGE_THRESHOLD := 71
 GOLANGCI_LINT := golangci-lint
-SPECVERSION := v0.19.1
+SPECVERSION := v0.20.0
 
 .PHONY: all tidy fmtcheck fmt vet lint test testcov race coverage-check build install generate ci-local clean help
 
@@ -66,11 +66,11 @@ test:
 	@echo " > Running go test (monorepo-aware; will skip if module not present)"
 	@sh -c '\
 	if [ -d "$(REPO_ROOT)/go-gemara" ]; then \
-	  cd $(REPO_ROOT)/go-gemara && go list ./... >/dev/null 2>&1 && go test $(GOFLAGS) ./... || echo "Skipping tests: no module in go-gemara"; \
+	  cd $(REPO_ROOT)/go-gemara && if go list ./... >/dev/null 2>&1; then go test $(GOFLAGS) ./...; else echo "Skipping tests: no module in go-gemara"; fi; \
 	elif [ -f "$(REPO_ROOT)/go.mod" ]; then \
-	  cd $(REPO_ROOT) && go list ./... >/dev/null 2>&1 && go test $(GOFLAGS) ./... || echo "Skipping tests: module not available"; \
+	  cd $(REPO_ROOT) && if go list ./... >/dev/null 2>&1; then go test $(GOFLAGS) ./...; else echo "Skipping tests: module not available"; fi; \
 	else \
-	  cd $(REPO_ROOT) && go list ./go-gemara/... >/dev/null 2>&1 && go test $(GOFLAGS) ./go-gemara/... || echo "Skipping tests: package not available"; \
+	  cd $(REPO_ROOT) && if go list ./go-gemara/... >/dev/null 2>&1; then go test $(GOFLAGS) ./go-gemara/...; else echo "Skipping tests: package not available"; fi; \
 	fi'
 
 
@@ -81,11 +81,11 @@ testcov:
 	@echo " > Running tests with coverage (monorepo-aware; will skip if module not present)"
 	@sh -c '\
 	if [ -d "$(REPO_ROOT)/go-gemara" ]; then \
-	  cd $(REPO_ROOT)/go-gemara && go list ./... >/dev/null 2>&1 && go test $(GOFLAGS) ./... -coverprofile=$(abspath $(COVERFILE)) -covermode=count || echo "Skipping testcov: no module in go-gemara"; \
+	  cd $(REPO_ROOT)/go-gemara && if go list ./... >/dev/null 2>&1; then go test $(GOFLAGS) ./... -coverprofile=$(abspath $(COVERFILE)) -covermode=count; else echo "Skipping testcov: no module in go-gemara"; fi; \
 	elif [ -f "$(REPO_ROOT)/go.mod" ]; then \
-	  cd $(REPO_ROOT) && go list ./... >/dev/null 2>&1 && go test $(GOFLAGS) ./... -coverprofile=$(abspath $(COVERFILE)) -covermode=count || echo "Skipping testcov: module not available"; \
+	  cd $(REPO_ROOT) && if go list ./... >/dev/null 2>&1; then go test $(GOFLAGS) ./... -coverprofile=$(abspath $(COVERFILE)) -covermode=count; else echo "Skipping testcov: module not available"; fi; \
 	else \
-	  cd $(REPO_ROOT) && go list ./go-gemara/... >/dev/null 2>&1 && go test $(GOFLAGS) ./go-gemara/... -coverprofile=$(abspath $(COVERFILE)) -covermode=count || echo "Skipping testcov: package not available"; \
+	  cd $(REPO_ROOT) && if go list ./go-gemara/... >/dev/null 2>&1; then go test $(GOFLAGS) ./go-gemara/... -coverprofile=$(abspath $(COVERFILE)) -covermode=count; else echo "Skipping testcov: package not available"; fi; \
 	fi'
 	@echo " > Coverage summary:"
 	@sh -c 'if [ -f "$(abspath $(COVERFILE))" ]; then go tool cover -func=$(abspath $(COVERFILE)) | grep total || true; else echo "No coverage file generated"; fi'
@@ -96,11 +96,11 @@ race:
 	@echo " > Running tests with race detector (monorepo-aware; will skip if module not present)"
 	@sh -c '\
 	if [ -d "$(REPO_ROOT)/go-gemara" ]; then \
-	  cd $(REPO_ROOT)/go-gemara && go list ./... >/dev/null 2>&1 && go test -race ./... || echo "Skipping race: no module in go-gemara"; \
+	  cd $(REPO_ROOT)/go-gemara && if go list ./... >/dev/null 2>&1; then go test -race ./...; else echo "Skipping race: no module in go-gemara"; fi; \
 	elif [ -f "$(REPO_ROOT)/go.mod" ]; then \
-	  cd $(REPO_ROOT) && go list ./... >/dev/null 2>&1 && go test -race ./... || echo "Skipping race: module not available"; \
+	  cd $(REPO_ROOT) && if go list ./... >/dev/null 2>&1; then go test -race ./...; else echo "Skipping race: module not available"; fi; \
 	else \
-	  cd $(REPO_ROOT) && go list ./go-gemara/... >/dev/null 2>&1 && go test -race ./go-gemara/... || echo "Skipping race: package not available"; \
+	  cd $(REPO_ROOT) && if go list ./go-gemara/... >/dev/null 2>&1; then go test -race ./go-gemara/...; else echo "Skipping race: package not available"; fi; \
 	fi'
 
 
@@ -137,18 +137,25 @@ install:
 
 # Generate files from CUE schemas
 # Generates Go types from the Gemara CUE package with stable and experimental variants
-generate:
+old-nonfunctional-generate:
 	@echo " > Generating types from Gemara CUE package"
 	@cue def github.com/gemaraproj/gemara@$(SPECVERSION) --outfile schema.cue
 
     # Required after using CUE Def to find the properly defined control types
-	@sed -i 's/let control_9 = control/let control_9 = #ControlEvaluation.control/' schema.cue
+    # If running from darwin OS, add '' after -i
+	sed -i 's/let control_9 = control/let control_9 = #ControlEvaluation.control/' schema.cue
 
 	@cue exp gengotypes schema.cue
 	@mv cue_types_gen.go generated_types.go
 	@go run ./cmd/typestagger generated_types.go
 	@rm schema.cue
 
+genlocal:
+	@echo " > Generating types from 'gemara' package"
+	@cue exp gengotypes ../gemara:gemara
+	@mv ../gemara/cue_types_gemara_gen.go generated_types.go
+	@go run ./cmd/typestagger generated_types.go
+	@rm schema.cue
 
 # Runs the small subset used by CI for a quick local check
 ci-local: fmtcheck vet lint testcov coverage-check

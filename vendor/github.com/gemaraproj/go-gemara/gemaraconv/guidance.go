@@ -116,11 +116,11 @@ func GuidanceToOSCAL(g *gemara.GuidanceCatalog, guidanceDocHref string, opts ...
 	return catalog, profile, nil
 }
 
-func createControlGroup(g *gemara.GuidanceCatalog, family gemara.Family, guidelines []gemara.Guideline, resourcesMap map[string]string) oscal.Group {
-	group := oscal.Group{
+func createControlGroup(g *gemara.GuidanceCatalog, group gemara.Group, guidelines []gemara.Guideline, resourcesMap map[string]string) oscal.Group {
+	oscalGroup := oscal.Group{
 		Class: "family",
-		ID:    family.Id,
-		Title: family.Title,
+		ID:    group.Id,
+		Title: group.Title,
 	}
 
 	controlMap := make(map[string]oscal.Control)
@@ -199,8 +199,8 @@ func createControlGroup(g *gemara.GuidanceCatalog, family gemara.Family, guideli
 		}
 	}
 
-	group.Controls = oscalUtils.NilIfEmpty(controls)
-	return group
+	oscalGroup.Controls = oscalUtils.NilIfEmpty(controls)
+	return oscalGroup
 }
 
 // guidelineToParts converts a guideline to OSCAL parts that can be added to an existing control.
@@ -309,8 +309,8 @@ func guidelineToControl(g *gemara.GuidanceCatalog, guideline gemara.Guideline, r
 		links = append(links, relatedLink)
 	}
 
-	guidanceLinks := mappingToLinks(guideline.GuidelineMappings, resourcesMap)
-	principleLinks := mappingToLinks(guideline.PrincipleMappings, resourcesMap)
+	guidanceLinks := mappingToLinks(guideline.Vectors, resourcesMap)
+	principleLinks := mappingToLinks(guideline.Principles, resourcesMap)
 	links = append(links, guidanceLinks...)
 	links = append(links, principleLinks...)
 	control.Links = oscalUtils.NilIfEmpty(links)
