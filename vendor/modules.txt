@@ -13,8 +13,8 @@ github.com/charmbracelet/colorprofile
 # github.com/charmbracelet/lipgloss v1.1.0
 ## explicit; go 1.18
 github.com/charmbracelet/lipgloss
-# github.com/charmbracelet/log v0.4.2
-## explicit; go 1.19
+# github.com/charmbracelet/log v1.0.0
+## explicit; go 1.21
 github.com/charmbracelet/log
 # github.com/charmbracelet/x/ansi v0.11.6
 ## explicit; go 1.24.2
@@ -59,8 +59,8 @@ github.com/gemaraproj/go-gemara
 github.com/gemaraproj/go-gemara/gemaraconv
 github.com/gemaraproj/go-gemara/internal/loaders
 github.com/gemaraproj/go-gemara/internal/oscal
-# github.com/go-logfmt/logfmt v0.6.0
-## explicit; go 1.17
+# github.com/go-logfmt/logfmt v0.6.1
+## explicit; go 1.21
 github.com/go-logfmt/logfmt
 # github.com/goccy/go-yaml v1.19.2
 ## explicit; go 1.21.0
