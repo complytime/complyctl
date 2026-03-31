@@ -12,7 +12,7 @@ require (
 )
 
 require (
-	github.com/antchfx/xpath v1.3.5 // indirect
+	github.com/antchfx/xpath v1.3.6 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
