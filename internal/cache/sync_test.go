@@ -116,6 +116,40 @@ func TestSync_EmptyPolicyID(t *testing.T) {
 	assert.Contains(t, err.Error(), "policy ID cannot be empty")
 }
 
+func TestSync_RedownloadAfterDeletion(t *testing.T) {
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+
+	mock := cachetest.NewMockPolicySource()
+	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
+
+	cacheMgr := cache.NewCache(cacheDir)
+	state, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+
+	sync := cache.NewSync(cacheMgr, state, mock)
+
+	err = sync.SyncPolicy(context.Background(), "test-policy", "latest")
+	require.NoError(t, err)
+
+	storePath := cacheMgr.PolicyStorePath("test-policy")
+	assert.FileExists(t, filepath.Join(storePath, "oci-layout"))
+
+	require.NoError(t, os.RemoveAll(storePath))
+	assert.NoDirExists(t, storePath)
+
+	state2, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	sync2 := cache.NewSync(cacheMgr, state2, mock)
+
+	err = sync2.SyncPolicy(context.Background(), "test-policy", "latest")
+	require.NoError(t, err)
+
+	assert.FileExists(t, filepath.Join(storePath, "oci-layout"))
+	assert.DirExists(t, filepath.Join(storePath, "blobs", "sha256"))
+}
+
 // TestSync_StressConcurrentFailures performs 100 sync iterations with alternating
 // success and failure scenarios, verifying zero cache corruption (SC-008/FR-006).
 func TestSync_StressConcurrentFailures(t *testing.T) {

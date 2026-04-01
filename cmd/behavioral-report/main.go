@@ -13,7 +13,7 @@ import (
 	"github.com/complytime/complyctl/tests/behavioral"
 	"github.com/gemaraproj/go-gemara"
 	"github.com/gemaraproj/go-gemara/gemaraconv"
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 const (

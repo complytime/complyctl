@@ -41,7 +41,17 @@ func ParseRepoURL(repoURL, platformHint string) (platform, org, repo string, err
 		}
 	}
 
-	return platform, parts[0], parts[1], nil
+	// For GitLab, support nested groups: all segments except the last form the group path.
+	// For GitHub, use the first two segments (org/repo).
+	if platform == "gitlab" && len(parts) > 2 {
+		org = strings.Join(parts[:len(parts)-1], "/")
+		repo = parts[len(parts)-1]
+	} else {
+		org = parts[0]
+		repo = parts[1]
+	}
+
+	return platform, org, repo, nil
 }
 
 // SanitizeRepoURL converts a repository URL into a filesystem-safe name

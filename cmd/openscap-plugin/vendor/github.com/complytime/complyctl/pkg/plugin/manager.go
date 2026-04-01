@@ -5,7 +5,6 @@ package plugin
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 	goplugin "github.com/hashicorp/go-plugin"
 )
 
-const pluginRPCTimeout = 5 * time.Minute
+const describeTimeout = 30 * time.Second
 
 // Plugin is the interface that plugin authors implement for evaluation RPCs.
 type Plugin interface {
@@ -27,7 +26,6 @@ type Manager struct {
 	discovery *Discovery
 	plugins   map[string]*LoadedPlugin
 	logger    hclog.Logger
-	logOutput io.Writer
 }
 
 // LoadedPlugin pairs discovery metadata with a live gRPC client.
@@ -36,21 +34,15 @@ type LoadedPlugin struct {
 	Client *Client
 }
 
-func NewManager(pluginDir string, logOutput io.Writer) (*Manager, error) {
-	if logOutput == nil {
-		logOutput = os.Stderr
+func NewManager(pluginDir string, logger hclog.Logger) (*Manager, error) {
+	if logger == nil {
+		logger = hclog.NewNullLogger()
 	}
-	logger := hclog.New(&hclog.LoggerOptions{
-		Name:   "plugin",
-		Level:  hclog.Info,
-		Output: logOutput,
-	})
 	discovery := NewDiscovery(pluginDir)
 	return &Manager{
 		discovery: discovery,
 		plugins:   make(map[string]*LoadedPlugin),
 		logger:    logger,
-		logOutput: logOutput,
 	}, nil
 }
 
@@ -62,11 +54,7 @@ func (m *Manager) LoadPlugins() error {
 		return fmt.Errorf("failed to discover plugins: %w", err)
 	}
 
-	goPluginLogger := hclog.New(&hclog.LoggerOptions{
-		Name:   "go-plugin",
-		Level:  hclog.Warn,
-		Output: m.logOutput,
-	})
+	goPluginLogger := m.logger.Named("go-plugin")
 
 	for _, info := range pluginInfos {
 		client, err := NewClient(info.ExecutablePath, goPluginLogger)
@@ -74,7 +62,7 @@ func (m *Manager) LoadPlugins() error {
 			return fmt.Errorf("failed to create client for plugin %s: %w", info.PluginID, err)
 		}
 
-		descCtx, descCancel := context.WithTimeout(context.Background(), pluginRPCTimeout)
+		descCtx, descCancel := context.WithTimeout(context.Background(), describeTimeout)
 		descResp, descErr := client.Describe(descCtx, &DescribeRequest{})
 		descCancel()
 		if descErr != nil {
@@ -144,16 +132,13 @@ func (m *Manager) RouteGenerate(ctx context.Context, evaluatorID string, globalV
 		TargetVariables: targetVars,
 	}
 
-	rpcCtx, rpcCancel := context.WithTimeout(ctx, pluginRPCTimeout)
-	defer rpcCancel()
-
 	if evaluatorID != "" {
 		p, err := m.GetPlugin(evaluatorID)
 		if err != nil {
 			return fmt.Errorf("no plugin registered for evaluator %q: %w", evaluatorID, err)
 		}
 		m.logger.Info("Invoking plugin Generate", "plugin_id", p.Info.PluginID, "evaluator_id", evaluatorID)
-		resp, genErr := p.GetClient().Generate(rpcCtx, req)
+		resp, genErr := p.GetClient().Generate(ctx, req)
 		if genErr != nil {
 			return fmt.Errorf("plugin %s generate failed: %w", p.Info.PluginID, genErr)
 		}
@@ -165,7 +150,7 @@ func (m *Manager) RouteGenerate(ctx context.Context, evaluatorID string, globalV
 
 	for _, p := range m.ListPlugins() {
 		m.logger.Info("Invoking plugin Generate (broadcast)", "plugin_id", p.Info.PluginID)
-		resp, genErr := p.GetClient().Generate(rpcCtx, req)
+		resp, genErr := p.GetClient().Generate(ctx, req)
 		if genErr != nil {
 			return fmt.Errorf("plugin %s generate failed: %w", p.Info.PluginID, genErr)
 		}
@@ -185,20 +170,18 @@ func (m *Manager) RouteScan(ctx context.Context, evaluatorID string, targets []T
 		Targets: targets,
 	}
 
-	rpcCtx, rpcCancel := context.WithTimeout(ctx, pluginRPCTimeout)
-	defer rpcCancel()
-
 	if evaluatorID != "" {
 		p, err := m.GetPlugin(evaluatorID)
 		if err != nil {
 			return nil, fmt.Errorf("no plugin registered for evaluator %q: %w", evaluatorID, err)
 		}
 		m.logger.Info("Scanning via plugin", "plugin_id", p.Info.PluginID, "evaluator_id", evaluatorID)
-		resp, scanErr := p.GetClient().Scan(rpcCtx, req)
+		resp, scanErr := p.GetClient().Scan(ctx, req)
 		if scanErr != nil {
+			msg := m.scanErrorMessage(p.Info.PluginID, scanErr, ctx)
 			m.logger.Error("Plugin Scan failed",
 				"plugin_id", p.Info.PluginID, "error", scanErr)
-			return errorAssessments(evaluatorID, fmt.Sprintf("plugin %s failed: %v", p.Info.PluginID, scanErr)), nil
+			return errorAssessments(evaluatorID, msg), nil
 		}
 		return resp.Assessments, nil
 	}
@@ -206,16 +189,30 @@ func (m *Manager) RouteScan(ctx context.Context, evaluatorID string, targets []T
 	var all []AssessmentLog
 	for _, p := range m.ListPlugins() {
 		m.logger.Info("Scanning via plugin (broadcast)", "plugin_id", p.Info.PluginID)
-		resp, scanErr := p.GetClient().Scan(rpcCtx, req)
+		resp, scanErr := p.GetClient().Scan(ctx, req)
 		if scanErr != nil {
+			msg := m.scanErrorMessage(p.Info.PluginID, scanErr, ctx)
 			m.logger.Error("Plugin Scan failed",
 				"plugin_id", p.Info.PluginID, "error", scanErr)
-			all = append(all, errorAssessments(p.Info.EvaluatorID, fmt.Sprintf("plugin %s failed: %v", p.Info.PluginID, scanErr))...)
+			all = append(all, errorAssessments(p.Info.EvaluatorID, msg)...)
 			continue
 		}
 		all = append(all, resp.Assessments...)
 	}
 	return all, nil
+}
+
+// scanErrorMessage builds an error string for a failed Scan RPC. When the
+// failure is a deadline timeout, extra guidance is appended so the operator
+// can increase the timeout and find the exact command in the log file.
+func (m *Manager) scanErrorMessage(pluginID string, scanErr error, ctx context.Context) string {
+	msg := fmt.Sprintf("plugin %s failed: %v", pluginID, scanErr)
+	if ctx.Err() == context.DeadlineExceeded {
+		msg += "\n\nThe scan exceeded the deadline." +
+			"\n  - Increase the timeout: complyctl scan --timeout 15m ..." +
+			"\n  - Check .complytime/complyctl.log"
+	}
+	return msg
 }
 
 func errorAssessments(evaluatorID string, message string) []AssessmentLog {

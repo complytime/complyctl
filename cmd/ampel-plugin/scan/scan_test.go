@@ -98,7 +98,8 @@ func (m *mockRunner) run(name string, args ...string) ([]byte, error) {
 }
 
 func TestConstructSnappyCommand(t *testing.T) {
-	args := constructSnappyCommand("myorg", "myrepo", "main", "/specs/github/branch-rules.yaml")
+	// Test GitHub branch-rules spec
+	args := constructSnappyCommand("github", "github.com", "myorg", "myrepo", "main", "/specs/github/branch-rules.yaml")
 	require.Equal(t, []string{
 		"snappy", "snap",
 		"--var", "ORG=myorg",
@@ -107,6 +108,18 @@ func TestConstructSnappyCommand(t *testing.T) {
 		"/specs/github/branch-rules.yaml",
 		"--attest",
 	}, args)
+
+	// Test GitLab branch-protection spec
+	argsGitLab := constructSnappyCommand("gitlab", "gitlab.com", "mygroup", "myproject", "main", "builtin:gitlab/branch-protection.yaml")
+	require.Equal(t, []string{
+		"snappy", "snap",
+		"--var", "HOST=gitlab.com",
+		"--var", "GROUP=mygroup",
+		"--var", "PROJECT=myproject",
+		"--var", "BRANCH=main",
+		"builtin:gitlab/branch-protection.yaml",
+		"--attest",
+	}, argsGitLab)
 }
 
 func TestConstructAmpelVerifyCommand(t *testing.T) {
@@ -173,11 +186,27 @@ func TestWriteSpecFiles(t *testing.T) {
 	err := WriteSpecFiles(dir)
 	require.NoError(t, err)
 
-	specPath := filepath.Join(dir, "github", GitHubSpecFile)
-	data, err := os.ReadFile(specPath)
+	// Test GitHub branch-rules spec file
+	githubSpecPath := filepath.Join(dir, "github", "branch-rules.yaml")
+	githubData, err := os.ReadFile(githubSpecPath)
 	require.NoError(t, err)
-	require.Contains(t, string(data), "branch-rules.yaml")
-	require.Contains(t, string(data), "${ORG}")
+	require.Contains(t, string(githubData), "branch-rules.yaml")
+	require.Contains(t, string(githubData), "${ORG}")
+
+	// Test GitLab branch-protection spec files
+	gitlabBranchPath := filepath.Join(dir, "gitlab", "branch-protection.yaml")
+	gitlabBranchData, err := os.ReadFile(gitlabBranchPath)
+	require.NoError(t, err)
+	require.Contains(t, string(gitlabBranchData), "branch-protection.yaml")
+	require.Contains(t, string(gitlabBranchData), "${HOST}")
+	require.Contains(t, string(gitlabBranchData), "${GROUP}")
+	require.Contains(t, string(gitlabBranchData), "${PROJECT}")
+
+	// Test GitLab project-approvals spec file
+	gitlabApprovalsPath := filepath.Join(dir, "gitlab", "project-approvals.yaml")
+	gitlabApprovalsData, err := os.ReadFile(gitlabApprovalsPath)
+	require.NoError(t, err)
+	require.Contains(t, string(gitlabApprovalsData), "project-approvals.yaml")
 }
 
 func TestResolveSpecPath(t *testing.T) {

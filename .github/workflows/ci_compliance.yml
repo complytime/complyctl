@@ -1,0 +1,32 @@
+name: Compliance Checks
+
+on:
+  workflow_dispatch:
+    inputs:
+      complytime_config_path:
+        description: 'Relative path of the complytime.yaml file in this repository'
+        required: false
+        type: string
+        default: 'complytime.yaml'
+      policy_id:
+        description: 'Policy ID to use for complyctl generate and scan commands'
+        required: false
+        type: string
+        default: 'ampel-bp'
+  schedule:
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: none
+
+jobs:
+  call_reusable_compliance:
+    name: Compliance Evaluation
+    permissions:
+      contents: read
+    uses: complytime/org-infra/.github/workflows/reusable_compliance.yml@main
+    with:
+      complytime_config_path: ${{ inputs.complytime_config_path || 'complytime.yaml' }}
+      policy_id: ${{ inputs.policy_id || 'ampel-bp' }}
+    secrets:
+      source_token: ${{ secrets.GITHUB_TOKEN }}

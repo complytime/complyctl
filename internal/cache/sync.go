@@ -43,7 +43,7 @@ func (s *Sync) SyncPolicy(ctx context.Context, policyID, version string) error {
 	}
 
 	localState, exists := s.state.GetPolicyState(policyID)
-	if exists && localState.Digest == remoteDigest {
+	if exists && localState.Digest == remoteDigest && s.cache.PolicyStoreExists(policyID) {
 		return nil
 	}
 

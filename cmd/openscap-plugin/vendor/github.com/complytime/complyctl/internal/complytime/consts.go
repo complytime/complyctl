@@ -19,15 +19,8 @@ const WorkspaceDir = ".complytime"
 const StateFileName = "state.json"
 const PoliciesSubdir = "policies"
 const WorkspaceConfigFile = "complytime.yaml"
-const PackManifestFile = "complypack.yaml"
 
 const CurrentWorkspaceVersion = 1
-const CurrentPackSchemaVersion = 1
-
-const (
-	APIMethodGetDefinitions    = "GetDefinitions"
-	APIMethodDefinitionVersion = "DefinitionVersion"
-)
 
 const (
 	OutputFormatOSCAL  = "oscal"
@@ -37,11 +30,20 @@ const (
 
 const ScanOutputDir = "scan"
 
+// LogFileName is the log file name written to {WorkspaceDir}/{LogFileName}.
+// See FR-038, R57: specs/001-gemara-native-workflow/research.md
+const LogFileName = "complyctl.log"
+
 // DefaultCommandTimeout is the default deadline for scan and generate operations.
-// Individual plugin RPCs may use a shorter per-call timeout as a safety net.
+// This flows through gRPC to the plugin subprocess without additional capping.
 const DefaultCommandTimeout = 5 * time.Minute
 
 const PluginExecutablePrefix = "complyctl-provider-"
+
+// SystemProviderDir is the system-wide provider directory where
+// package managers (e.g., RPM) install provider binaries.
+// Discovery checks this path as a fallback after the user directory.
+const SystemProviderDir = "/usr/libexec/complytime/providers"
 
 // Gemara OCI layer media types for identifying layer content within multi-layer OCI manifests.
 const (

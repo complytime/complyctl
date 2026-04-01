@@ -230,6 +230,7 @@ func (o *scanOptions) run(ctx context.Context) error {
 	scanSpin.Start()
 
 	var allAssessments []plugin.AssessmentLog
+	var assessmentTargets []string
 
 	for _, target := range targets {
 		if !slices.Contains(target.Policies, eid) {
@@ -254,6 +255,9 @@ func (o *scanOptions) run(ctx context.Context) error {
 
 		eval.AddTarget(assessments)
 		allAssessments = append(allAssessments, assessments...)
+		for range assessments {
+			assessmentTargets = append(assessmentTargets, target.ID)
+		}
 	}
 
 	scanSpin.Stop()
@@ -289,7 +293,7 @@ func (o *scanOptions) run(ctx context.Context) error {
 		fmt.Printf("OSCAL report written: %s\n\n", oscalPath)
 	}
 
-	fmt.Println(output.FormatScanSummary(allAssessments, reqToControl, eid, targetIDs))
+	fmt.Println(output.FormatScanSummary(allAssessments, assessmentTargets, reqToControl, eid, targetIDs))
 	return nil
 }
 

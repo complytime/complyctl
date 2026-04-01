@@ -4,7 +4,7 @@
 id: github.com/${ORG}/${REPO}@${BRANCH}
 name: github.com/${ORG}/${REPO}@${BRANCH}
 url: git+https://github.com/${ORG}/${REPO}/@${BRANCH}
-type: http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml
+type: http://github.com/carabiner-dev/snappy/specs/github/branch-rules.yaml
 endpoint: repos/${ORG}/${REPO}/rules/branches/${BRANCH}
 method: GET
 payload: "array"

@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: Copyright 2025 Carabiner Systems, Inc
+# SPDX-License-Identifier: Apache-2.0
+---
+id: ${HOST}/${GROUP}/${PROJECT}/approvals
+name: ${HOST}/${GROUP}/${PROJECT}/approvals
+url: git+https://${HOST}/${GROUP}/${PROJECT}
+type: http://github.com/carabiner-dev/snappy/specs/gitlab/project-approvals.yaml
+endpoint: projects/${GROUP}/${PROJECT}/approvals
+method: GET
+mask:
+  - approvals_before_merge
+  - reset_approvals_on_push
+  - selective_code_owner_removals
+  - disable_overriding_approvers_per_merge_request
+  - merge_requests_author_approval
+  - merge_requests_disable_committers_approval
+  - require_password_to_approve

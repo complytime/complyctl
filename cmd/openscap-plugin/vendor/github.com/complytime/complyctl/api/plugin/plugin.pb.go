@@ -809,7 +809,7 @@ const file_plugin_proto_rawDesc = "" +
 	"\x06Plugin\x12W\n" +
 	"\bGenerate\x12$.complyctl.plugin.v1.GenerateRequest\x1a%.complyctl.plugin.v1.GenerateResponse\x12K\n" +
 	"\x04Scan\x12 .complyctl.plugin.v1.ScanRequest\x1a!.complyctl.plugin.v1.ScanResponse\x12W\n" +
-	"\bDescribe\x12$.complyctl.plugin.v1.DescribeRequest\x1a%.complyctl.plugin.v1.DescribeResponseBDZBgithub.com/complytime/complytime/internal/proto/plugin/v1;pluginv1b\x06proto3"
+	"\bDescribe\x12$.complyctl.plugin.v1.DescribeRequest\x1a%.complyctl.plugin.v1.DescribeResponseBCZAgithub.com/complytime/complyctl/internal/proto/plugin/v1;pluginv1b\x06proto3"
 
 var (
 	file_plugin_proto_rawDescOnce sync.Once

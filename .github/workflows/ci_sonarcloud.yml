@@ -1,0 +1,43 @@
+name: SonarQube Analysis
+
+on:
+  push:
+    branches:
+        - main
+
+permissions:
+  contents: none
+  issues: none
+  pull-requests: none
+
+jobs:
+  generate-coverage:
+      name: Generate Coverage Report
+      runs-on: ubuntu-latest
+      steps:
+          - name: Check out
+            uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+          - name: Run test
+            run: make test-unit
+          - name: Upload artifact
+            uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+            with:
+                name: coverage
+                path: coverage.out
+
+  sonarqube:
+    name: SonarCloud Analysis
+    permissions:
+      contents: read
+      pull-requests: read
+    needs: generate-coverage
+    uses: complytime/org-infra/.github/workflows/reusable_sonarqube.yml@main
+    with:
+      sonar_organization: ${{ vars.SONAR_ORGANIZATION }}
+      sonar_project_key: ${{ vars.SONAR_PROJECT_KEY }}
+      coverage_artifact_name: coverage
+      coverage_file_path: coverage.out
+      language_scanner_property: sonar.go.coverage.reportPaths
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      source_token: ${{ secrets.GITHUB_TOKEN }}

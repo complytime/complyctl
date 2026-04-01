@@ -22,6 +22,22 @@ func TestParseRepoURL_GitLab(t *testing.T) {
 	require.Equal(t, "myrepo", repo)
 }
 
+func TestParseRepoURL_GitLabNestedGroups(t *testing.T) {
+	platform, group, repo, err := ParseRepoURL("https://gitlab.com/mygroup/subgroup/myproject", "")
+	require.NoError(t, err)
+	require.Equal(t, "gitlab", platform)
+	require.Equal(t, "mygroup/subgroup", group)
+	require.Equal(t, "myproject", repo)
+}
+
+func TestParseRepoURL_GitLabDeeplyNestedGroups(t *testing.T) {
+	platform, group, repo, err := ParseRepoURL("https://gitlab.com/a/b/c/d/project", "")
+	require.NoError(t, err)
+	require.Equal(t, "gitlab", platform)
+	require.Equal(t, "a/b/c/d", group)
+	require.Equal(t, "project", repo)
+}
+
 func TestParseRepoURL_UnsupportedHost(t *testing.T) {
 	_, _, _, err := ParseRepoURL("https://bitbucket.org/myorg/myrepo", "")
 	require.Error(t, err)

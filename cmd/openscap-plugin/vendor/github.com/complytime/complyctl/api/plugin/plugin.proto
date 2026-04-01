@@ -7,7 +7,7 @@ syntax = "proto3";
 
 package complyctl.plugin.v1;
 
-option go_package = "github.com/complytime/complytime/internal/proto/plugin/v1;pluginv1";
+option go_package = "github.com/complytime/complyctl/internal/proto/plugin/v1;pluginv1";
 
 // Plugin service for compliance evaluation
 service Plugin {

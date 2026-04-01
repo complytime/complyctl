@@ -2,3 +2,4 @@
 * text eol=lf
 # Tells Git to treat the file as a binary file, which prevents any line ending conversions.
 vendor/github.com/go-logfmt/logfmt/README.md -text
+vendor/oras.land/oras-go/v2/MIGRATION_GUIDE.md -text

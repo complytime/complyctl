@@ -26,7 +26,8 @@ builds:
           - "-X github.com/complytime/complyctl/internal/version.buildDate={{ .Date }}"
     - id: openscap-plugin
       binary: openscap-plugin
-      main: ./cmd/openscap-plugin/
+      dir: ./cmd/openscap-plugin
+      main: .
       goos:
           - linux
 

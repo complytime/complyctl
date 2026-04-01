@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: Copyright 2025 Carabiner Systems, Inc
+# SPDX-License-Identifier: Apache-2.0
+---
+id: ${HOST}/${GROUP}/${PROJECT}@${BRANCH}
+name: ${HOST}/${GROUP}/${PROJECT}@${BRANCH}
+url: git+https://${HOST}/${GROUP}/${PROJECT}/@${BRANCH}
+type: http://github.com/carabiner-dev/snappy/specs/gitlab/branch-protection.yaml
+endpoint: projects/${GROUP}/${PROJECT}/protected_branches/${BRANCH}
+method: GET
+mask:
+  - id
+  - name
+  - push_access_levels
+  - merge_access_levels
+  - unprotect_access_levels
+  - allow_force_push
+  - code_owner_approval_required
+  - inherited

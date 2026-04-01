@@ -15,6 +15,7 @@ import (
 )
 
 type nonPassingEntry struct {
+	targetID      string
 	requirementID string
 	controlID     string
 	result        gemara.Result
@@ -55,7 +56,7 @@ func matchingStepMessage(steps []plugin.Step, target gemara.Result) string {
 // FormatScanSummary builds a report-style post-scan output per FR-037.
 // Intro text, plain aligned text table of non-passing results, compact totals.
 // See spec.md Session 2026-02-26e.
-func FormatScanSummary(assessments []plugin.AssessmentLog, reqToControl map[string]string, policyID string, targetIDs []string) string {
+func FormatScanSummary(assessments []plugin.AssessmentLog, assessmentTargets []string, reqToControl map[string]string, policyID string, targetIDs []string) string {
 	var passCount, failCount, skipCount, errCount int
 	var entries []nonPassingEntry
 
@@ -68,12 +69,18 @@ func FormatScanSummary(assessments []plugin.AssessmentLog, reqToControl map[stri
 			ctrlID = "-"
 		}
 
+		targetID := "-"
+		if i < len(assessmentTargets) {
+			targetID = assessmentTargets[i]
+		}
+
 		switch result {
 		case gemara.Passed:
 			passCount++
 		case gemara.Failed:
 			failCount++
 			entries = append(entries, nonPassingEntry{
+				targetID:      targetID,
 				requirementID: a.RequirementID,
 				controlID:     ctrlID,
 				result:        result,
@@ -83,6 +90,7 @@ func FormatScanSummary(assessments []plugin.AssessmentLog, reqToControl map[stri
 		case gemara.NotApplicable, gemara.NotRun:
 			skipCount++
 			entries = append(entries, nonPassingEntry{
+				targetID:      targetID,
 				requirementID: a.RequirementID,
 				controlID:     ctrlID,
 				result:        result,
@@ -92,6 +100,7 @@ func FormatScanSummary(assessments []plugin.AssessmentLog, reqToControl map[stri
 		default:
 			errCount++
 			entries = append(entries, nonPassingEntry{
+				targetID:      targetID,
 				requirementID: a.RequirementID,
 				controlID:     ctrlID,
 				result:        result,
@@ -109,10 +118,10 @@ func FormatScanSummary(assessments []plugin.AssessmentLog, reqToControl map[stri
 	intro := fmt.Sprintf("Scan: %s | Target: %s | %d requirements",
 		policyID, strings.Join(targetIDs, ", "), total)
 
-	headers := []string{"REQUIREMENT ID", "CONTROL ID", "STATUS", "MESSAGE"}
+	headers := []string{"TARGET ID", "REQUIREMENT ID", "CONTROL ID", "STATUS", "MESSAGE"}
 	var rows [][]string
 	for _, e := range entries {
-		rows = append(rows, []string{e.requirementID, e.controlID, e.emoji, e.message})
+		rows = append(rows, []string{e.targetID, e.requirementID, e.controlID, e.emoji, e.message})
 	}
 
 	conclusion := fmt.Sprintf("%d requirements: %d passed, %d failed, %d skipped, %d error",

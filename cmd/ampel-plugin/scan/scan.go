@@ -1,10 +1,12 @@
 package scan
 
 import (
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,11 +25,8 @@ type RepoTarget struct {
 	Platform    string // "github" or "gitlab"
 }
 
-//go:embed specs/github/branch-rules.yaml
-var githubBranchRulesSpec []byte
-
-// GitHubSpecFile is the filename for the GitHub branch rules spec.
-const GitHubSpecFile = "branch-rules.yaml"
+//go:embed specs
+var embeddedSpecs embed.FS
 
 // ScanConfig holds configuration for scanning a repository.
 type ScanConfig struct {
@@ -84,19 +83,45 @@ func buildTokenEnv(repo RepoTarget) []string {
 	return filtered
 }
 
-// WriteSpecFiles writes the embedded spec files to the given directory.
+// WriteSpecFiles writes all embedded spec files to the given directory.
+// It automatically discovers and writes all spec files from the embedded FS,
+// preserving the directory structure (e.g., specs/github/*.yaml, specs/gitlab/*.yaml).
 func WriteSpecFiles(specDir string) error {
-	githubDir := filepath.Join(specDir, "github")
-	if err := os.MkdirAll(githubDir, 0750); err != nil {
-		return fmt.Errorf("creating spec directory %s: %w", githubDir, err)
-	}
+	return fs.WalkDir(embeddedSpecs, "specs", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
 
-	specPath := filepath.Join(githubDir, GitHubSpecFile)
-	if err := os.WriteFile(specPath, githubBranchRulesSpec, 0600); err != nil {
-		return fmt.Errorf("writing spec file %s: %w", specPath, err)
-	}
+		// Skip the root "specs" directory itself
+		if path == "specs" {
+			return nil
+		}
 
-	return nil
+		// Get relative path from "specs/" (e.g., "github/branch-rules.yaml")
+		relPath := strings.TrimPrefix(path, "specs/")
+		targetPath := filepath.Join(specDir, relPath)
+
+		if d.IsDir() {
+			// Create directory
+			if err := os.MkdirAll(targetPath, 0750); err != nil {
+				return fmt.Errorf("creating spec directory %s: %w", targetPath, err)
+			}
+			return nil
+		}
+
+		// Read embedded file content
+		content, err := embeddedSpecs.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("reading embedded spec %s: %w", path, err)
+		}
+
+		// Write to target location
+		if err := os.WriteFile(targetPath, content, 0600); err != nil {
+			return fmt.Errorf("writing spec file %s: %w", targetPath, err)
+		}
+
+		return nil
+	})
 }
 
 // ResolveSpecPath resolves a spec reference to an absolute path.
@@ -135,15 +160,28 @@ func sanitizeSpecName(specRef string) string {
 
 // constructSnappyCommand builds the snappy snap CLI arguments for collecting
 // branch protection data from a repository using a spec file.
-func constructSnappyCommand(org, repo, branch, specPath string) []string {
-	return []string{
-		"snappy", "snap",
-		"--var", fmt.Sprintf("ORG=%s", org),
-		"--var", fmt.Sprintf("REPO=%s", repo),
-		"--var", fmt.Sprintf("BRANCH=%s", branch),
-		specPath,
-		"--attest",
+// For GitLab specs, it uses HOST, GROUP, PROJECT variables.
+// For GitHub specs, it uses ORG, REPO variables.
+func constructSnappyCommand(platform, host, org, repo, branch, specPath string) []string {
+	args := []string{"snappy", "snap"}
+
+	if platform == "gitlab" {
+		args = append(args,
+			"--var", fmt.Sprintf("HOST=%s", host),
+			"--var", fmt.Sprintf("GROUP=%s", org),
+			"--var", fmt.Sprintf("PROJECT=%s", repo),
+			"--var", fmt.Sprintf("BRANCH=%s", branch),
+		)
+	} else {
+		args = append(args,
+			"--var", fmt.Sprintf("ORG=%s", org),
+			"--var", fmt.Sprintf("REPO=%s", repo),
+			"--var", fmt.Sprintf("BRANCH=%s", branch),
+		)
 	}
+
+	args = append(args, specPath, "--attest")
+	return args
 }
 
 // constructAmpelVerifyCommand builds the ampel verify CLI arguments.
@@ -205,16 +243,22 @@ func extractHashFromStatement(data []byte) (string, error) {
 func ScanRepository(repo RepoTarget, branch, specPath string, cfg ScanConfig, runner CommandRunner) (*RawScanResult, error) {
 	logger := hclog.Default()
 
-	_, org, repoName, err := targets.ParseRepoURL(repo.URL, repo.Platform)
+	platform, org, repoName, err := targets.ParseRepoURL(repo.URL, repo.Platform)
 	if err != nil {
 		return nil, fmt.Errorf("parsing repository URL: %w", err)
+	}
+
+	// Extract host from URL for GitLab specs
+	host := ""
+	if parsedURL, err := url.Parse(repo.URL); err == nil {
+		host = parsedURL.Hostname()
 	}
 
 	specLabel := sanitizeSpecName(specPath)
 	filePrefix := targets.SanitizeRepoURL(repo.URL) + "-" + branch + "-" + specLabel
 
 	// Run snappy to collect branch protection data as an in-toto attestation
-	snappyArgs := constructSnappyCommand(org, repoName, branch, specPath)
+	snappyArgs := constructSnappyCommand(platform, host, org, repoName, branch, specPath)
 	logger.Info("running snappy", "repo", repo.URL, "branch", branch, "spec", specPath, "command", strings.Join(snappyArgs, " "))
 
 	var attestationData []byte
@@ -230,7 +274,7 @@ func ScanRepository(repo RepoTarget, branch, specPath string, cfg ScanConfig, ru
 
 	// Save snappy attestation as in-toto file
 	attestationFile := filepath.Join(cfg.OutputDir, filePrefix+"-snappy.intoto.json")
-	if err := os.WriteFile(attestationFile, attestationData, 0600); err != nil {
+	if err := os.WriteFile(attestationFile, attestationData, 0600); err != nil { // #nosec G703 -- attestationFile path is constructed from validated inputs
 		return nil, fmt.Errorf("writing attestation for %s branch %s: %w", repo.URL, branch, err)
 	}
 

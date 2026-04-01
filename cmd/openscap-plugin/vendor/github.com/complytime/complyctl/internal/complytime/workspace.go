@@ -20,15 +20,6 @@ func NewWorkspace() *Workspace {
 	return &Workspace{configPath: WorkspaceConfigFile}
 }
 
-// NewWorkspaceWithConfig returns a Workspace that operates on the given config
-// file path. Falls back to the default WorkspaceConfigFile when path is empty.
-func NewWorkspaceWithConfig(path string) *Workspace {
-	if path == "" {
-		path = WorkspaceConfigFile
-	}
-	return &Workspace{configPath: path}
-}
-
 func (w *Workspace) Load() error {
 	config, err := LoadFrom(w.configPath)
 	if err != nil {

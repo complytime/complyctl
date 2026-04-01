@@ -1,0 +1,11 @@
+policies:
+  - url: http://localhost:8765/policies/ampel-branch-protection
+    id: ampel-bp
+
+targets:
+  - id: complytime-complyctl
+    policies:
+      - ampel-bp
+    variables:
+      url: https://github.com/complytime/complyctl
+      specs: builtin:github/branch-rules.yaml

@@ -29,20 +29,45 @@ func NewDiscovery(pluginDir string) *Discovery {
 	}
 }
 
-// DiscoverPlugins scans the plugin directory for executables matching the
-// naming convention and derives evaluator IDs from filenames.
+// DiscoverPlugins scans the user plugin directory and the system-wide
+// provider directory for executables matching the naming convention.
+// User-directory providers take precedence over system-installed ones.
 func (d *Discovery) DiscoverPlugins() ([]PluginInfo, error) {
-	expandedDir := expandPath(d.pluginDir)
+	seen := make(map[string]bool)
+	var plugins []PluginInfo
 
-	entries, err := os.ReadDir(expandedDir)
+	userPlugins, err := scanDir(expandPath(d.pluginDir))
 	if err != nil {
-		if os.IsNotExist(err) {
-			return []PluginInfo{}, nil
-		}
-		return nil, fmt.Errorf("failed to read plugin directory: %w", err)
+		return nil, err
+	}
+	for _, p := range userPlugins {
+		seen[p.EvaluatorID] = true
+		plugins = append(plugins, p)
 	}
 
-	plugins := []PluginInfo{}
+	sysPlugins, err := scanDir(complytime.SystemProviderDir)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range sysPlugins {
+		if !seen[p.EvaluatorID] {
+			plugins = append(plugins, p)
+		}
+	}
+
+	return plugins, nil
+}
+
+func scanDir(dir string) ([]PluginInfo, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read plugin directory %s: %w", dir, err)
+	}
+
+	var plugins []PluginInfo
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -51,8 +76,6 @@ func (d *Discovery) DiscoverPlugins() ([]PluginInfo, error) {
 		if !strings.HasPrefix(entry.Name(), complytime.PluginExecutablePrefix) {
 			continue
 		}
-
-		executablePath := filepath.Join(expandedDir, entry.Name())
 
 		info, err := entry.Info()
 		if err != nil {
@@ -64,11 +87,10 @@ func (d *Discovery) DiscoverPlugins() ([]PluginInfo, error) {
 		}
 
 		pluginID := strings.TrimPrefix(entry.Name(), complytime.PluginExecutablePrefix)
-
 		plugins = append(plugins, PluginInfo{
 			PluginID:       pluginID,
 			EvaluatorID:    pluginID,
-			ExecutablePath: executablePath,
+			ExecutablePath: filepath.Join(dir, entry.Name()),
 		})
 	}
 

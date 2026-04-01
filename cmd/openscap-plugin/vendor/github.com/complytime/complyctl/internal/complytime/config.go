@@ -13,6 +13,35 @@ import (
 
 var envVarPattern = regexp.MustCompile(`\$\{([^}]+)\}`)
 
+// unsafeRefChars matches characters that should never appear in an OCI reference
+// and are commonly used for shell injection.
+var unsafeRefChars = regexp.MustCompile("[;|&$`!><(){}\\[\\]\\\\]")
+
+// ValidateOCIRef checks that raw looks like a valid OCI reference
+// (registry/repository with optional :tag or @version). It rejects empty
+// strings, shell metacharacters, and bare names without a registry component.
+func ValidateOCIRef(raw string) error {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return fmt.Errorf("policy URL cannot be empty")
+	}
+	if unsafeRefChars.MatchString(s) {
+		return fmt.Errorf("policy URL contains invalid characters: %s", s)
+	}
+
+	stripped := strings.TrimPrefix(strings.TrimPrefix(s, "https://"), "http://")
+	if !strings.Contains(stripped, "/") {
+		return fmt.Errorf("policy URL must include a registry and repository (e.g. registry.com/repo:tag): %s", s)
+	}
+
+	host := strings.SplitN(stripped, "/", 2)[0]
+	if !strings.Contains(host, ".") && !strings.Contains(host, ":") {
+		return fmt.Errorf("policy URL must include a registry host (e.g. registry.com/repo:tag): %s", s)
+	}
+
+	return nil
+}
+
 // WorkspaceConfig is the top-level YAML configuration for a complytime workspace.
 // See R48, R49: three-tier variable model.
 //
@@ -94,27 +123,12 @@ func ParsePolicyRef(raw string) PolicyRef {
 	return ref
 }
 
-// FindPolicy matches a policy identifier against the policies list.
-// Tries: effective ID, full URL, repository path.
-// Returns the matching entry and true if found.
+// FindPolicy matches a policy identifier against the policies list by effective ID.
 func FindPolicy(policies []PolicyEntry, policyID string) (*PolicyEntry, bool) {
 	policyID = strings.TrimSpace(policyID)
 
 	for i, p := range policies {
 		if p.EffectiveID() == policyID {
-			return &policies[i], true
-		}
-	}
-
-	for i, p := range policies {
-		if p.URL == policyID {
-			return &policies[i], true
-		}
-	}
-
-	for i, p := range policies {
-		ref := ParsePolicyRef(p.URL)
-		if ref.Repository == policyID {
 			return &policies[i], true
 		}
 	}
@@ -129,12 +143,6 @@ func PolicyIDs(policies []PolicyEntry) map[string]*PolicyEntry {
 		m[policies[i].EffectiveID()] = &policies[i]
 	}
 	return m
-}
-
-// Load reads, parses, and validates the complytime configuration from the
-// default complytime.yaml path.
-func Load() (*WorkspaceConfig, error) {
-	return LoadFrom(WorkspaceConfigFile)
 }
 
 // LoadFrom reads, parses, and validates the complytime configuration from the
@@ -166,8 +174,9 @@ func LoadFrom(configPath string) (*WorkspaceConfig, error) {
 	return &config, nil
 }
 
-// resolveEnvVars expands ${VAR} references in target variable values from the
-// process environment. Returns an error if a referenced variable is not set.
+// resolveEnvVars expands ${VAR} references in target variable values
+// from the process environment. Returns an error if a referenced
+// variable is not set.
 func resolveEnvVars(config *WorkspaceConfig) error {
 	for i, target := range config.Targets {
 		for key, val := range target.Variables {
@@ -197,11 +206,6 @@ func expandEnvRef(s string) (string, error) {
 		return "", fmt.Errorf("unset environment variable(s): %s", strings.Join(missing, ", "))
 	}
 	return result, nil
-}
-
-// Save writes complytime configuration to the default complytime.yaml path.
-func Save(config *WorkspaceConfig) error {
-	return SaveTo(config, WorkspaceConfigFile)
 }
 
 // SaveTo writes complytime configuration to the given path.
@@ -234,8 +238,8 @@ func Validate(config *WorkspaceConfig) error {
 	seenURL := make(map[string]bool)
 	seenID := make(map[string]bool)
 	for _, p := range config.Policies {
-		if strings.TrimSpace(p.URL) == "" {
-			return fmt.Errorf("policies[].url cannot be empty")
+		if err := ValidateOCIRef(p.URL); err != nil {
+			return fmt.Errorf("policies[]: %w", err)
 		}
 		if seenURL[p.URL] {
 			return fmt.Errorf("policies: duplicate url %s", p.URL)
@@ -263,54 +267,16 @@ func Validate(config *WorkspaceConfig) error {
 		if len(target.Policies) == 0 {
 			return fmt.Errorf("targets[%s].policies: at least one required", target.ID)
 		}
+		seenTargetPolicies := make(map[string]bool)
 		for _, pid := range target.Policies {
 			if _, ok := policyLookup[pid]; !ok {
 				return fmt.Errorf("targets[%s]: policy %q not in policies list", target.ID, pid)
 			}
+			if seenTargetPolicies[pid] {
+				return fmt.Errorf("targets[%s]: duplicate policy %s", target.ID, pid)
+			}
+			seenTargetPolicies[pid] = true
 		}
 	}
 	return nil
-}
-
-// UniqueRegistries extracts the distinct registry URLs from all policy entries.
-func UniqueRegistries(policies []PolicyEntry) []string {
-	seen := make(map[string]bool)
-	var registries []string
-	for _, p := range policies {
-		ref := ParsePolicyRef(p.URL)
-		if ref.Registry != "" && !seen[ref.Registry] {
-			seen[ref.Registry] = true
-			registries = append(registries, ref.Registry)
-		}
-	}
-	return registries
-}
-
-// ValidateTargetPolicyVersions ensures every target references policies that
-// exist in the workspace policies list (by effective ID) with no duplicates.
-func ValidateTargetPolicyVersions(config *WorkspaceConfig) error {
-	lookup := PolicyIDs(config.Policies)
-	for _, target := range config.Targets {
-		seen := make(map[string]bool)
-		for _, pid := range target.Policies {
-			if _, ok := lookup[pid]; !ok {
-				return fmt.Errorf("target %s: policy %q not in policies list", target.ID, pid)
-			}
-			if seen[pid] {
-				return fmt.Errorf("target %s: duplicate policy %s", target.ID, pid)
-			}
-			seen[pid] = true
-		}
-	}
-	return nil
-}
-
-// ResolvePolicyForTarget looks up a target's policy reference against the
-// workspace policies and returns the parsed OCI reference.
-func ResolvePolicyForTarget(policies []PolicyEntry, targetPolicyID string) (*PolicyEntry, PolicyRef, bool) {
-	entry, found := FindPolicy(policies, targetPolicyID)
-	if !found {
-		return nil, PolicyRef{}, false
-	}
-	return entry, ParsePolicyRef(entry.URL), true
 }
