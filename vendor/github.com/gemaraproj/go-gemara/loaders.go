@@ -40,7 +40,7 @@ func (g *GuidanceCatalog) LoadFiles(sourcePaths []string) error {
 		if g.Metadata.Id == "" {
 			g.Metadata = doc.Metadata
 		}
-		g.Families = append(g.Families, doc.Families...)
+		g.Groups = append(g.Groups, doc.Groups...)
 		g.Guidelines = append(g.Guidelines, doc.Guidelines...)
 	}
 	return nil
@@ -81,9 +81,15 @@ func (c *ControlCatalog) LoadFiles(sourcePaths []string) error {
 		if c.Metadata.Id == "" {
 			c.Metadata = catalog.Metadata
 		}
-		c.Families = append(c.Families, catalog.Families...)
+		c.Groups = append(c.Groups, catalog.Groups...)
 		c.Controls = append(c.Controls, catalog.Controls...)
-		c.ImportedControls = append(c.ImportedControls, catalog.ImportedControls...)
+		if catalog.Imports != nil {
+			if c.Imports == nil {
+				c.Imports = []MultiEntryMapping{}
+			}
+			c.Imports = append(c.Imports, catalog.Imports...)
+		}
+
 	}
 	return nil
 }

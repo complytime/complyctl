@@ -35,6 +35,11 @@ func (c *ControlCatalogConverter) ToOSCAL(opts ...GenerateOption) (oscal.Catalog
 	return CatalogToOSCAL(c.catalog, opts...)
 }
 
+// ToMarkdown converts the ControlCatalog to Markdown format.
+func (c *ControlCatalogConverter) ToMarkdown(opts ...MarkdownOption) ([]byte, error) {
+	return CatalogToMarkdown(c.catalog, opts...)
+}
+
 // GuidanceCatalogConverter defines a converter for converting GuidanceCatalog.
 type GuidanceCatalogConverter struct {
 	guidance *gemara.GuidanceCatalog

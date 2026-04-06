@@ -2,16 +2,19 @@
 // into various standard formats.
 //
 // Primary API (strconv-style):
-//   - Direct functions: ToSARIF(), CatalogToOSCAL(), GuidanceToOSCAL()
+//   - Direct functions: ToSARIF(), CatalogToOSCAL(), CatalogToMarkdown(), GuidanceToOSCAL()
 //
 // Fluent Wrappers (for IDE discoverability):
-//   - EvaluationLog(), Catalog(), GuidanceDocument()
+//   - EvaluationLog(), ControlCatalog(), GuidanceCatalog()
 //   - Thin wrappers that delegate to the primary functions
 //
 // Examples:
 //
 //	sarifBytes, err := gemaraconv.ToSARIF(&log, "file.md", catalog)
 //	oscalCatalog, err := gemaraconv.CatalogToOSCAL(catalog, gemaraconv.WithVersion("1.0"))
+//	md, err := gemaraconv.CatalogToMarkdown(catalog, gemaraconv.WithTOC(true), gemaraconv.WithLexiconAutolink(true))
+//	// Or pass list-shaped entries: WithInlineLexicon([]gemaraconv.InlineLexiconTerm{...})
 //	converter := gemaraconv.EvaluationLog(&log)
 //	sarifBytes, err := converter.ToSARIF("file.md", catalog)
+//	md, err := gemaraconv.ControlCatalog(catalog).ToMarkdown()
 package gemaraconv

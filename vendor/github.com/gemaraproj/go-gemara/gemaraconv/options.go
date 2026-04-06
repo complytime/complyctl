@@ -64,3 +64,76 @@ func WithControlHref(controlHref string) GenerateOption {
 		opts.controlHREF = controlHref
 	}
 }
+
+type markdownOpts struct {
+	toc                 bool
+	lineEnding          string
+	metadata            bool
+	applicabilityMatrix bool
+	lexiconAutolink     bool
+	inlineLexicon       []InlineLexiconTerm
+}
+
+func defaultMarkdownOpts() markdownOpts {
+	return markdownOpts{toc: true, lineEnding: "\n", metadata: true, applicabilityMatrix: false}
+}
+
+func (o *markdownOpts) apply(opts ...MarkdownOption) {
+	for _, opt := range opts {
+		opt(o)
+	}
+	if o.lineEnding == "" {
+		o.lineEnding = "\n"
+	}
+}
+
+// MarkdownOption configures ControlCatalog Markdown export.
+type MarkdownOption func(*markdownOpts)
+
+// WithTOC sets whether a table of contents is emitted (default true).
+func WithTOC(toc bool) MarkdownOption {
+	return func(o *markdownOpts) {
+		o.toc = toc
+	}
+}
+
+// WithLineEnding sets the line ending sequence (default "\n"). Use "\r\n" for Windows-style output.
+func WithLineEnding(s string) MarkdownOption {
+	return func(o *markdownOpts) {
+		if s != "" {
+			o.lineEnding = s
+		}
+	}
+}
+
+// WithMetadata sets whether the metadata section is emitted (default true).
+func WithMetadata(enabled bool) MarkdownOption {
+	return func(o *markdownOpts) {
+		o.metadata = enabled
+	}
+}
+
+// WithApplicabilityMatrix sets whether an assessment-requirement × applicability matrix is emitted (default false).
+func WithApplicabilityMatrix(enabled bool) MarkdownOption {
+	return func(o *markdownOpts) {
+		o.applicabilityMatrix = enabled
+	}
+}
+
+// WithLexiconAutolink enables loading metadata.lexicon from mapping-references (or remarks URL),
+// strict Gemara Lexicon YAML, term autolinking in prose, and a trailing glossary (default false).
+// When enabled and metadata.lexicon is set, this takes precedence over WithInlineLexicon.
+func WithLexiconAutolink(enabled bool) MarkdownOption {
+	return func(o *markdownOpts) {
+		o.lexiconAutolink = enabled
+	}
+}
+
+// WithInlineLexicon supplies list-shaped lexicon entries (term / definition / synonyms / string references)
+// for autolinking and the trailing glossary without network I/O. Used when the catalog does not
+// reference a remote Gemara Lexicon document.
+func WithInlineLexicon(terms []InlineLexiconTerm) MarkdownOption {
+	return func(o *markdownOpts) {
+		o.inlineLexicon = terms
+	}
+}
