@@ -1,7 +1,7 @@
-title: AMPEL Branch Protection Policy
+title: AMPEL Approval Requirements Policy
 metadata:
-    id: ampel-branch-protection-policy
-    description: Automated evaluation policy for branch protection controls using AMPEL
+    id: ampel-approval-requirements-policy
+    description: Automated evaluation policy for approval requirements controls using AMPEL
     author:
         id: complytime
         name: ComplyTime
@@ -29,35 +29,14 @@ imports:
 adherence:
     evaluation-methods:
         - type: automated
-          description: AMPEL automated branch protection evaluation
+          description: AMPEL automated approval requirements evaluation
           executor:
               id: ampel
               name: AMPEL
               type: Software
     assessment-plans:
-        - id: BP-1.01
-          requirement-id: BP-1.01
-          frequency: on-demand
-          evaluation-methods:
-              - type: automated
-                executor:
-                    id: ampel
-        - id: BP-3.01
-          requirement-id: BP-3.01
-          frequency: on-demand
-          evaluation-methods:
-              - type: automated
-                executor:
-                    id: ampel
-        - id: BP-4.01
-          requirement-id: BP-4.01
-          frequency: on-demand
-          evaluation-methods:
-              - type: automated
-                executor:
-                    id: ampel
-        - id: BP-5.01
-          requirement-id: BP-5.01
+        - id: BP-2.01
+          requirement-id: BP-2.01
           frequency: on-demand
           evaluation-methods:
               - type: automated

@@ -630,6 +630,16 @@ guidelines:
 		{mediaType: gemaraPolicyType, data: ampelPolicy},
 	})
 
+	// policies/ampel-approval-requirements — AMPEL approval requirements controls
+	ampelApprovalPolicy, err := seedData.ReadFile("testdata/ampel-approval-requirements-policy.yaml")
+	if err != nil {
+		log.Fatalf("failed to load AMPEL approval requirements policy seed data: %v", err)
+	}
+	s.addArtifact("policies/ampel-approval-requirements", []string{"v1.0.0", "latest"}, []layerDef{
+		{mediaType: gemaraCatalogType, data: ampelCatalog},
+		{mediaType: gemaraPolicyType, data: ampelApprovalPolicy},
+	})
+
 	// Enrichment mappings
 	s.enrichments["OPA:deny-root-user"] = &enrichmentMapping{
 		control: enrichmentControl{
