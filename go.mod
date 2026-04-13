@@ -1,6 +1,6 @@
 module github.com/complytime/complyctl
 
-go 1.24.13
+go 1.25.0
 
 require (
 	github.com/charmbracelet/bubbles v1.0.0
@@ -9,7 +9,7 @@ require (
 	github.com/charmbracelet/log v1.0.0
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/defenseunicorns/go-oscal v0.7.0
-	github.com/gemaraproj/go-gemara v0.0.1
+	github.com/gemaraproj/go-gemara v0.3.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.7.0

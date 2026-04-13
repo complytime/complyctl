@@ -53,11 +53,13 @@ github.com/erikgeiser/coninput
 # github.com/fatih/color v1.18.0
 ## explicit; go 1.17
 github.com/fatih/color
-# github.com/gemaraproj/go-gemara v0.0.1
-## explicit; go 1.23.0
+# github.com/gemaraproj/go-gemara v0.3.0
+## explicit; go 1.25.0
 github.com/gemaraproj/go-gemara
+github.com/gemaraproj/go-gemara/fetcher
 github.com/gemaraproj/go-gemara/gemaraconv
-github.com/gemaraproj/go-gemara/internal/loaders
+github.com/gemaraproj/go-gemara/gemaraconv/markdown
+github.com/gemaraproj/go-gemara/internal/codec
 github.com/gemaraproj/go-gemara/internal/oscal
 # github.com/go-logfmt/logfmt v0.6.1
 ## explicit; go 1.21

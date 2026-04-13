@@ -141,7 +141,7 @@ func buildChecklistItems(plan *AssessmentPlan) ([]ChecklistItem, error) {
 		item := ChecklistItem{
 			PlanId:               plan.Id,
 			MethodDescription:    method.Description,
-			MethodType:           method.Type,
+			MethodType:           method.Type.String(),
 			Frequency:            plan.Frequency,
 			EvidenceRequirements: plan.EvidenceRequirements,
 		}

@@ -1,0 +1,89 @@
+---
+header:
+  schema-version: 2.0.0
+  last-updated: '2026-04-06'
+  last-reviewed: '2026-04-06'
+  url: https://github.com/gemaraproj/go-gemara
+  project-si-source: https://raw.githubusercontent.com/gemaraproj/.github/refs/heads/main/.github/security-insights.yml
+
+repository:
+  url: https://github.com/gemaraproj/go-gemara
+  status: active
+  accepts-change-request: true
+  accepts-automated-change-request: true
+  core-team:
+    - name: Eddie Knight
+      affiliation: Sonatype
+      email: knight@linux.com
+    - name: Jenn Power
+      affiliation: Red Hat
+      email: barnabei.jennifer@gmail.com
+      primary: true
+  documentation:
+    contributing-guide: https://github.com/gemaraproj/gemara/blob/main/CONTRIBUTING.md
+  license:
+    url: https://github.com/gemaraproj/go-gemara?tab=Apache-2.0-1-ov-file#readme
+    expression: Apache-2.0
+  security:
+    assessments:
+      self:
+        comment: |
+          Self assessment has not yet been completed.
+    tools:
+      - name: Dependabot
+        type: SCA
+        version: "2"
+        rulesets:
+          - built-in
+        results:
+          adhoc:
+            name: Scheduled SCA Scan Results
+            predicate-uri: https://docs.github.com/en/graphql/reference/objects#repositoryvulnerabilityalert
+            location: https://github.com/gemaraproj/go-gemara/security/dependabot
+            comment: |
+              Dependabot runs every Monday. 
+              The configuration can be found here: https://github.com/gemaraproj/go-gemara/blob/main/.github/dependabot.yaml
+        integration:
+          adhoc: true
+          ci: false
+          release: false
+      - name: CodeQL
+        type: SAST
+        version: "2.y.z"
+        rulesets:
+          - go
+          - actions
+        results:
+          adhoc:
+            name: Scheduled SAST Results
+            predicate-uri: https://docs.oasis-open.org/sarif/sarif/v2.1.0/cs01/schemas/sarif-schema-2.1.0.json
+            location: https://github.com/gemaraproj/go-gemara/security/code-scanning
+            comment: |
+              The results of the scheduled SAST scan are available in the Code Scanning tab of the Security Insights page and as an artifact on the scheduled job.
+          ci:
+            name: CI SAST Results
+            predicate-uri: https://docs.oasis-open.org/sarif/sarif/v2.1.0/cs01/schemas/sarif-schema-2.1.0.json
+            location: https://github.com/gemaraproj/go-gemara/security/code-scanning
+            comment: |
+              The results of the CI SAST scan are available in the Code Scanning tab of the Security Insights page.
+        integration:
+          adhoc: true
+          ci: true
+          release: false
+      - name: Kusari Inspector
+        type: other
+        rulesets:
+          - default
+        comment: |
+          Kusari Inspector is set up to scan on pull request submissions.
+          It analyzes dependency changes, licenses, vulnerabilities, code security,
+          and workflow risks, posting results as PR comments via the GitHub App.
+        results:
+          ci:
+            name: CI Scan Results
+            predicate-uri: https://docs.kusari.cloud/Inspector/integrations/github
+            location: https://github.com/gemaraproj/go-gemara/pulls
+        integration:
+          adhoc: false
+          ci: true
+          release: false

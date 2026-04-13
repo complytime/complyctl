@@ -56,20 +56,26 @@ package main
 
 import (
     "github.com/gemaraproj/go-gemara"
+    "github.com/gemaraproj/go-gemara/fetcher"
 )
 
 func main() {
+    f := &fetcher.File{}
+
     // Load a Guidance Catalog
-    var guidance gemara.GuidanceCatalog
-    if err := guidance.LoadFile("file:///path/to/guidance.yaml"); err != nil {
+    guidance, err := gemara.Load[gemara.GuidanceCatalog](f, "path/to/guidance.yaml")
+    if err != nil {
         panic(err)
     }
-    
+
     // Load a Control Catalog
-    catalog := &gemara.ControlCatalog{}
-    if err := catalog.LoadFile("file:///path/to/catalog.yaml"); err != nil {
+    catalog, err := gemara.Load[gemara.ControlCatalog](f, "path/to/catalog.yaml")
+    if err != nil {
         panic(err)
     }
+
+    _ = guidance
+    _ = catalog
 }
 ```
 
@@ -80,31 +86,37 @@ package main
 
 import (
     "github.com/gemaraproj/go-gemara"
+    "github.com/gemaraproj/go-gemara/fetcher"
     "github.com/gemaraproj/go-gemara/gemaraconv"
 )
 
 func main() {
+    f := &fetcher.File{}
+
     // Convert Control Catalog to OSCAL
-    catalog := &gemara.ControlCatalog{}
-    if err := catalog.LoadFile("file:///path/to/catalog.yaml"); err != nil {
+    catalog, err := gemara.Load[gemara.ControlCatalog](f, "path/to/catalog.yaml")
+    if err != nil {
         panic(err)
     }
-    
+
     oscalCatalog, err := gemaraconv.ControlCatalog(catalog).ToOSCAL()
     if err != nil {
         panic(err)
     }
-    
+
     // Convert Guidance Catalog to OSCAL
-    var guidance gemara.GuidanceCatalog
-    if err := guidance.LoadFile("file:///path/to/guidance.yaml"); err != nil {
-        panic(err)
-    }
-    
-    oscalCatalog, oscalProfile, err := gemaraconv.GuidanceCatalog(&guidance).ToOSCAL("relative/path/to/catalog.json")
+    guidance, err := gemara.Load[gemara.GuidanceCatalog](f, "path/to/guidance.yaml")
     if err != nil {
         panic(err)
     }
+
+    _, oscalProfile, err := gemaraconv.GuidanceCatalog(guidance).ToOSCAL("relative/path/to/catalog.json")
+    if err != nil {
+        panic(err)
+    }
+
+    _ = oscalCatalog
+    _ = oscalProfile
 }
 ```
 
@@ -115,25 +127,30 @@ package main
 
 import (
     "github.com/gemaraproj/go-gemara"
+    "github.com/gemaraproj/go-gemara/fetcher"
     "github.com/gemaraproj/go-gemara/gemaraconv"
 )
 
 func main() {
+    f := &fetcher.File{}
+
     // Load Control Catalog (required for SARIF conversion)
-    catalog := &gemara.ControlCatalog{}
-    if err := catalog.LoadFile("file:///path/to/catalog.yaml"); err != nil {
+    catalog, err := gemara.Load[gemara.ControlCatalog](f, "path/to/catalog.yaml")
+    if err != nil {
         panic(err)
     }
-    
+
     // Convert EvaluationLog to SARIF
     evaluationLog := &gemara.EvaluationLog{
         // ... populate evaluation log ...
     }
-    
+
     sarifBytes, err := gemaraconv.EvaluationLog(evaluationLog).ToSARIF("file:///path/to/artifact.md", catalog)
     if err != nil {
         panic(err)
     }
+
+    _ = sarifBytes
 }
 ```
 

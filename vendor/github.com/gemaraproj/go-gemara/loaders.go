@@ -1,141 +1,122 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package gemara
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"net/url"
 	"path"
 
-	"github.com/gemaraproj/go-gemara/internal/loaders"
+	"github.com/gemaraproj/go-gemara/internal/codec"
 )
 
-// LoadFile loads data from a YAML or JSON file at the provided path.
-// If run multiple times for the same data type, this method will override previous data.
-func (p *Policy) LoadFile(sourcePath string) error {
-	ext := path.Ext(sourcePath)
-	switch ext {
-	case ".yaml", ".yml":
-		err := loaders.LoadYAML(sourcePath, p)
-		if err != nil {
-			return err
-		}
-	case ".json":
-		err := loaders.LoadJSON(sourcePath, p)
-		if err != nil {
-			return fmt.Errorf("error loading json: %w", err)
-		}
-	default:
-		return fmt.Errorf("unsupported file extension: %s", ext)
-	}
-	return nil
+// Fetcher retrieves content from a source location.
+//
+// Network-capable implementations (e.g. [fetcher.HTTP], [fetcher.URI])
+// will follow any URL without filtering; see their documentation for
+// details.
+type Fetcher interface {
+	Fetch(ctx context.Context, source string) (io.ReadCloser, error)
 }
 
-// LoadFiles loads data from any number of YAML or JSON files at the provided paths.
-// sourcePath are expected to be file or https URIs in the form file:///path/to/file.yaml or https://example.com/file.yaml.
-// If run multiple times, this method will append new data to previous data.
-func (g *GuidanceCatalog) LoadFiles(sourcePaths []string) error {
-	for _, sourcePath := range sourcePaths {
-		doc := &GuidanceCatalog{}
-		if err := doc.LoadFile(sourcePath); err != nil {
+// Load fetches and decodes a single artifact from the given source.
+// Format (YAML or JSON) is detected from the file extension.
+func Load[T any](ctx context.Context, f Fetcher, source string) (*T, error) {
+	u, err := url.Parse(source)
+	if err != nil {
+		return nil, fmt.Errorf("invalid source %q: %w", source, err)
+	}
+	ext := path.Ext(u.Path)
+	switch ext {
+	case ".yaml", ".yml", ".json":
+	default:
+		return nil, fmt.Errorf("unsupported file extension: %s", ext)
+	}
+
+	reader, err := f.Fetch(ctx, source)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close() //nolint:errcheck
+
+	var target T
+	switch ext {
+	case ".yaml", ".yml":
+		if err := codec.DecodeYAML(reader, &target); err != nil {
+			return nil, err
+		}
+	case ".json":
+		if err := codec.DecodeJSON(reader, &target); err != nil {
+			return nil, fmt.Errorf("error loading json: %w", err)
+		}
+	}
+	return &target, nil
+}
+
+// LoadFiles loads and merges data from multiple sources into the GuidanceCatalog.
+func (g *GuidanceCatalog) LoadFiles(ctx context.Context, f Fetcher, sources []string) error {
+	for _, source := range sources {
+		doc, err := Load[GuidanceCatalog](ctx, f, source)
+		if err != nil {
 			return err
 		}
 		if g.Metadata.Id == "" {
 			g.Metadata = doc.Metadata
 		}
-		g.Families = append(g.Families, doc.Families...)
+		g.Groups = append(g.Groups, doc.Groups...)
 		g.Guidelines = append(g.Guidelines, doc.Guidelines...)
 	}
 	return nil
 }
 
-// LoadFile loads data from a YAML or JSON file at the provided path into the GuidanceCatalog.
-// sourcePath is expected to be a file or https URI in the form file:///path/to/file.yaml or https://example.com/file.yaml.
-// If run multiple times for the same data type, this method will override previous data.
-func (g *GuidanceCatalog) LoadFile(sourcePath string) error {
-	ext := path.Ext(sourcePath)
-	switch ext {
-	case ".yaml", ".yml":
-		err := loaders.LoadYAML(sourcePath, g)
-		if err != nil {
-			return err
-		}
-	case ".json":
-		err := loaders.LoadJSON(sourcePath, g)
-		if err != nil {
-			return fmt.Errorf("error loading json: %w", err)
-		}
-	default:
-		return fmt.Errorf("unsupported file extension: %s", ext)
-	}
-	return nil
-}
-
-// LoadFiles loads data from any number of YAML or JSON files at the provided paths.
-// sourcePath are expected to be file or https URIs in the form file:///path/to/file.yaml or https://example.com/file.yaml.
-// If run multiple times, this method will append new data to previous data.
-func (c *ControlCatalog) LoadFiles(sourcePaths []string) error {
-	for _, sourcePath := range sourcePaths {
-		catalog := &ControlCatalog{}
-		err := catalog.LoadFile(sourcePath)
+// LoadFiles loads and merges data from multiple sources into the ControlCatalog.
+func (c *ControlCatalog) LoadFiles(ctx context.Context, f Fetcher, sources []string) error {
+	for _, source := range sources {
+		catalog, err := Load[ControlCatalog](ctx, f, source)
 		if err != nil {
 			return err
 		}
 		if c.Metadata.Id == "" {
 			c.Metadata = catalog.Metadata
 		}
-		c.Families = append(c.Families, catalog.Families...)
+		c.Groups = append(c.Groups, catalog.Groups...)
 		c.Controls = append(c.Controls, catalog.Controls...)
-		c.ImportedControls = append(c.ImportedControls, catalog.ImportedControls...)
+		if catalog.Imports != nil {
+			if c.Imports == nil {
+				c.Imports = []MultiEntryMapping{}
+			}
+			c.Imports = append(c.Imports, catalog.Imports...)
+		}
 	}
 	return nil
 }
 
-// LoadFile loads data from a single YAML or JSON file at the provided path.
-// sourcePath is expected to be a file or https URI in the form file:///path/to/file.yaml or https://example.com/file.yaml.
-// If run multiple times for the same data type, this method will override previous data.
-func (c *ControlCatalog) LoadFile(sourcePath string) error {
-	ext := path.Ext(sourcePath)
-	switch ext {
-	case ".yaml", ".yml":
-		err := loaders.LoadYAML(sourcePath, c)
-		if err != nil {
-			return err
-		}
-	case ".json":
-		err := loaders.LoadJSON(sourcePath, c)
-		if err != nil {
-			return fmt.Errorf("error loading json: %w", err)
-		}
-	default:
-		return fmt.Errorf("unsupported file extension: %s", ext)
-	}
-	return nil
-}
-
-// LoadNestedCatalog loads a YAML file containing a nested catalog.
-// Only supports a single layer of nesting.
-// Accepts file URIs with the 'file:///' prefix.
-// Throws an error if the URL is not https.
-// TODO: Consider validating/sanitizing inputs to reduce injection risks.
-func (c *ControlCatalog) LoadNestedCatalog(sourcePath, fieldName string) error {
+// LoadNestedCatalog loads a YAML file where the ControlCatalog is nested
+// under a single wrapper key (e.g. "catalog:"). Only supports one layer
+// of nesting.
+func (c *ControlCatalog) LoadNestedCatalog(ctx context.Context, f Fetcher, source, fieldName string) error {
 	if fieldName == "" {
 		return fmt.Errorf("fieldName cannot be empty")
 	}
-	var yamlData map[string]interface{}
-	err := loaders.LoadYAML(sourcePath, &yamlData)
+
+	data, err := Load[map[string]interface{}](ctx, f, source)
 	if err != nil {
-		return fmt.Errorf("error decoding YAML: %w (%s)", err, sourcePath)
+		return fmt.Errorf("error decoding source: %w (%s)", err, source)
 	}
-	fieldData, exists := yamlData[fieldName]
+
+	fieldData, exists := (*data)[fieldName]
 	if !exists {
-		return fmt.Errorf("field '%s' not found in YAML file", fieldName)
+		return fmt.Errorf("field %q not found in %s", fieldName, source)
 	}
-	// Marshal and unmarshal the nested field into ControlCatalog
-	fieldYamlBytes, err := loaders.MarshalYAML(fieldData)
+
+	fieldBytes, err := codec.MarshalYAML(fieldData)
 	if err != nil {
-		return fmt.Errorf("error marshaling field data to YAML: %w", err)
+		return fmt.Errorf("error marshaling nested field: %w", err)
 	}
-	err = loaders.UnmarshalYAML(fieldYamlBytes, c)
-	if err != nil {
-		return fmt.Errorf("error decoding field '%s' into ControlCatalog: %w", fieldName, err)
+	if err := codec.UnmarshalYAML(fieldBytes, c); err != nil {
+		return fmt.Errorf("error decoding field %q into ControlCatalog: %w", fieldName, err)
 	}
 	return nil
 }

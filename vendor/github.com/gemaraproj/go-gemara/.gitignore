@@ -34,3 +34,5 @@ go.work.sum
 
 # Generated test files
 artifacts/
+# Local schema copy
+schema.cue

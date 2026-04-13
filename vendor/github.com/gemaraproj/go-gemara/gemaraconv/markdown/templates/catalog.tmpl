@@ -1,0 +1,145 @@
+{{ define "catalog"}}# {{.Title}}
+
+Version: {{.Metadata.Version}}
+
+{{if .ShowMetadata}}{{ template "metadata" .}}{{end}}
+
+{{if .TOC}}{{template "toc_section" .}}{{end}}
+{{if .ShowApplicabilityMatrix}}{{template "applicability_matrix_section" .}}{{end}}
+{{ template "extends_imports" .}}
+{{ range .Groups}}{{template "group_section" .}}{{end}}
+{{if and .ShowMetadata .Metadata.MappingReferences}}{{ template "mapping_references_section" .}}{{end}}
+{{if .LexiconGlossary}}{{template "lexicon_section" .}}{{end}}
+{{end}}
+
+{{define "metadata"}}
+_{{.Title}}_ is a Gemara{{if .Metadata.GemaraVersion}} {{.Metadata.GemaraVersion}}{{end}} {{artifactType .Metadata.Type}}{{if .Metadata.Date}}, published **{{.Metadata.Date}}**{{end}} by {{.Metadata.Author.Name}} ({{entityType .Metadata.Author.Type}}{{if .Metadata.Author.Id}}, `{{.Metadata.Author.Id}}`{{end}}).
+
+{{if .Metadata.Draft}}**Warning**: This is a draft, and should only be used as a preview of the upcoming artifact publication.{{end}}
+
+{{if .Metadata.Lexicon}}The terms used in this document are defined in **{{.Metadata.Lexicon.ReferenceId}}**{{if .Metadata.Lexicon.Remarks}} — {{.Metadata.Lexicon.Remarks}}{{end}}.{{end}}
+
+### Description
+
+{{.Metadata.Description}}
+
+{{if .Metadata.ApplicabilityGroups}}### Requirement Applicability Groups
+
+The following groups are used to specify the circumstance within which an assessment requirement is mandated.
+
+{{range .Metadata.ApplicabilityGroups}}- **{{.Id}}** — {{.Title}}: {{.Description}}
+{{end}}
+{{end}}
+
+_Summary: {{.NumControls}} control(s), {{.NumARs}} assessment requirement(s)._
+
+{{end}}
+
+{{define "toc_section"}}## Table of contents
+
+{{range .TOCItems}}{{if eq .Indent 0}}- [{{.Label}}](#{{.Anchor}})
+{{else}}  - [{{.Label}}](#{{.Anchor}})
+{{end}}{{end}}
+
+{{end}}
+
+{{define "applicability_matrix_section"}}## Requirements and Applicability
+
+| Requirement |{{range .ApplicabilityMatrixColumns}} {{.Label}} |{{end}}
+| :--- |{{range .ApplicabilityMatrixColumns}} :---: |{{end}}
+{{range .ApplicabilityMatrixRows}}| [**{{.RequirementID}}**](#{{anchor .RequirementID}}) |{{range .Cells}}{{.}}|{{end}}
+{{end}}
+
+{{end}}
+
+{{define "extends_imports"}}
+{{if .Extends}}## Extends
+
+This document builds upon all of the requirements and applicability groups detailed in:
+
+{{range .Extends}}- {{artifactMapping .}}
+{{end}}
+
+{{end}}
+{{if .Imports}}## Imports
+
+{{template "multi_entry_mapping_table_start"}}
+{{range .Imports}}{{template "multi_entry_mapping_table_row" .}}{{end}}
+
+{{end}}
+{{end}}
+
+{{define "multi_entry_mapping_table_start"}}| Source | References |
+| :--- | :--- |{{end}}
+
+{{define "multi_entry_mapping_table_row"}}| **{{lexiconLink .ReferenceId}}**{{if .Remarks}} — {{.Remarks}}{{end}} | {{if .Entries}}{{joinArtifactEntries .Entries " · "}}{{else}}—{{end}} |
+{{end}}
+
+{{define "group_section"}}
+## {{if .ID}}{{.ID}}{{if .Title}}: {{.Title}}{{end}}{{else}}{{if .Title}}{{.Title}}{{end}}{{end}}
+
+{{if .Description}}{{.Description}}{{end}}
+{{range .Controls}}{{template "control_section" .}}{{end}}
+{{end}}
+
+{{define "control_section"}}### {{.Id}}: {{lexiconLink .Title}}
+
+{{if .ReplacedBy}} · **Replaced by:** `{{.ReplacedBy.EntryId}}`{{if .ReplacedBy.Remarks}} ({{.ReplacedBy.Remarks}}){{end}}{{end}}
+
+**Objective**
+
+{{lexiconLink .Objective}}
+
+{{if .Guidelines}}#### Guidelines
+
+This control aids in the application of the following guidelines:
+
+{{template "multi_entry_mapping_table_start"}}
+{{range .Guidelines}}{{template "multi_entry_mapping_table_row" .}}{{end}}
+{{end}}
+{{if .Threats}}#### Threats
+
+This control aids in the mitigation of the following threats:
+
+{{template "multi_entry_mapping_table_start"}}
+{{range .Threats}}{{template "multi_entry_mapping_table_row" .}}{{end}}
+{{end}}
+{{range .AssessmentRequirements}}{{template "ar_section" .}}{{end}}
+{{end}}
+
+{{define "ar_section"}}#### {{.Id}}
+
+{{if .ReplacedBy}} · **Replaced by:** `{{.ReplacedBy.EntryId}}`{{if .ReplacedBy.Remarks}} ({{.ReplacedBy.Remarks}}){{end}}{{end}}
+
+{{if isRetired .State}}{{lexiconLink .Text}}
+{{else}}{{lexiconLink .Text}}
+
+{{if .Applicability}}**Applicability:** {{joinStrings .Applicability ", "}}{{end}}
+
+{{if .Recommendation}}**Recommendation**: {{lexiconLink .Recommendation}}
+{{end}}{{end}}{{end}}
+
+{{define "mapping_references_section"}}### Mapping References
+
+{{range .Metadata.MappingReferences}}- **{{.Id}}** — {{.Title}} (v{{.Version}}){{if .Url}} — [link]({{.Url}}){{end}}{{if .Description}}
+
+  {{.Description}}{{end}}
+{{end}}
+{{end}}
+
+{{define "lexicon_section"}}## Lexicon
+
+{{range .LexiconGlossary}}### {{.Canonical}}
+
+{{.Definition}}
+{{if .Refs}}**References:**
+{{range .Refs}}{{if .URL}}- [{{.Citation}}]({{.URL}})
+{{else}}- {{.Citation}}
+{{end}}{{end}}
+{{end}}
+{{end}}
+
+{{range .LexiconGlossary}}[{{.Canonical}}]: {{.RefTarget}}
+{{end}}
+
+{{end}}

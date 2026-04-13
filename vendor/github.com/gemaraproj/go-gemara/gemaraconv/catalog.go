@@ -34,20 +34,20 @@ func CatalogToOSCAL(catalog *gemara.ControlCatalog, opts ...GenerateOption) (osc
 		Metadata: metadata,
 	}
 
-	familyMap := make(map[string]gemara.Family)
-	for _, family := range catalog.Families {
+	familyMap := make(map[string]gemara.Group)
+	for _, family := range catalog.Groups {
 		familyMap[family.Id] = family
 	}
 
-	controlsByFamily := make(map[string][]gemara.Control)
+	controlsByGroup := make(map[string][]gemara.Control)
 	for _, control := range catalog.Controls {
-		controlsByFamily[control.Family] = append(controlsByFamily[control.Family], control)
+		controlsByGroup[control.Group] = append(controlsByGroup[control.Group], control)
 	}
 
 	catalogGroups := []oscal.Group{}
 
-	for _, family := range catalog.Families {
-		controls := controlsByFamily[family.Id]
+	for _, family := range catalog.Groups {
+		controls := controlsByGroup[family.Id]
 		if len(controls) == 0 {
 			continue
 		}
