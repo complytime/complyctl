@@ -1,35 +1,38 @@
 name: Security Checks
 
 on:
-    push:
-        branches:
-            - main
-    pull_request:
-        branches:
-            - main
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
-    contents: read
-    actions: none
-    id-token: none
-    security-events: none
-    packages: none
+  contents: read
+  actions: none
+  id-token: none
+  security-events: none
+  packages: none
 
 jobs:
-    call_reusable_vuln_scan:
-        name: OSV-Scanner
-        permissions:
-            contents: read
-            actions: read           # Needed to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
-            security-events: write  # Needed to upload the results to code-scanning dashboard.
-            id-token: write         # Required for OIDC token generation (trivy_image job)
-            packages: write         # Required for reusable workflow validation (trivy_image job)
-        uses: complytime/org-infra/.github/workflows/reusable_vuln_scan.yml@main
+  call_reusable_vuln_scan:
+    name: OSV-Scanner
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+      packages: write
+      id-token: write
+    uses: complytime/org-infra/.github/workflows/reusable_vuln_scan.yml@main
+    with:
+      # OSV focuses on known CVEs in dependencies; Trivy adds broader coverage
+      enable_trivy_source: true
 
-    call_reusable_security:
-        name: OpenSSF Scorecards
-        permissions:
-            contents: read
-            id-token: write         # Needed to access GitHub's OIDC token which verifies the authenticity of the result when publishing it.
-            security-events: write  # Needed to upload the results to code-scanning dashboard.
-        uses: complytime/org-infra/.github/workflows/reusable_security.yml@main
+  call_reusable_security:
+    name: OpenSSF Scorecards
+    permissions:
+      contents: read
+      id-token: write
+      security-events: write
+    uses: complytime/org-infra/.github/workflows/reusable_security.yml@main

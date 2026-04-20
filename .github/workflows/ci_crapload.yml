@@ -26,11 +26,14 @@ jobs:
   post-comment:
     name: Post PR Comment
     needs: crapload
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
     steps:
       - name: Download comment body
+        id: download
+        continue-on-error: true
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: crapload-analysis
@@ -42,19 +45,44 @@ jobs:
         with:
           script: |
             const fs = require('fs');
+            const marker = '<!-- crapload-analysis-marker -->';
             const bodyPath = 'artifact/crapload-comment-body.md';
-            if (!fs.existsSync(bodyPath)) {
-              console.log('No comment body found. Skipping.');
-              return;
+            const runUrl = [
+              context.serverUrl,
+              context.repo.owner,
+              context.repo.repo,
+              'actions/runs',
+              context.runId,
+            ].join('/');
+            const MAX_COMMENT_LENGTH = 60000;
+
+            let body;
+            if (fs.existsSync(bodyPath)) {
+              body = fs.readFileSync(bodyPath, 'utf8');
+              if (body.length > MAX_COMMENT_LENGTH) {
+                const lastNewline = body.lastIndexOf('\n', MAX_COMMENT_LENGTH);
+                body = body.substring(0, lastNewline > 0 ? lastNewline : MAX_COMMENT_LENGTH);
+                body += '\n\n---\n';
+                body += '> **Note:** This report was truncated due to size.';
+                body += ` [View the full analysis in the Job Summary](${runUrl}).`;
+              }
+            } else {
+              body = [
+                marker,
+                '## &#x274C; CRAP Load Analysis',
+                '',
+                'The CRAP Load analysis could not generate a detailed report.',
+                '',
+                `[View the full analysis in the Job Summary](${runUrl}).`,
+              ].join('\n');
             }
-            const body = fs.readFileSync(bodyPath, 'utf8');
+
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
 
-            const marker = '<!-- crapload-analysis-marker -->';
             const existing = comments.find(c => c.body.includes(marker));
 
             if (existing) {

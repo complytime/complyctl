@@ -3,10 +3,12 @@ extends: default
 
 # https://yamllint.readthedocs.io/en/stable/rules.html
 rules:
-    comments: disable
-    document-start: disable
-    empty-lines:
-        level: warning
-    indentation:
-        spaces: 4
-    line-length: disable
+  comments: disable
+  document-start: disable
+  empty-lines:
+    level: warning
+  indentation:
+    spaces: consistent
+  line-length: disable
+  truthy:
+    allowed-values: ["true", "false", "on"]

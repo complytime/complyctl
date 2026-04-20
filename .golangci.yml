@@ -1,20 +1,20 @@
 version: "2"
 run:
-    skip-dirs:
-        - vendor
+  skip-dirs:
+    - vendor
 linters:
-    default: standard   # https://golangci-lint.run/usage/linters/#enabled-by-default
-    enable:
-        - gosec           # Security checks for Go code
-    exclusions:
-        generated: lax
-        presets:
-            - comments
-            - common-false-positives
-            - legacy
-            - std-error-handling
+  default: standard   # https://golangci-lint.run/usage/linters/#enabled-by-default
+  enable:
+    - gosec           # Security checks for Go code
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
 formatters:
-    enable:
-        - goimports       # Checks import statements are formatted
-    exclusions:
-        generated: lax
+  enable:
+    - goimports       # Checks import statements are formatted
+  exclusions:
+    generated: lax

@@ -1,86 +1,106 @@
 name: Dependencies
 
+# --------------------------------------------------------------------------
+# Orchestrates dependency review for all PRs and dependabot-specific
+# processing: structured PR comments with review data and auto-approval
+# for safe dependency updates (non-major, 24h+ release age, no vulnerabilities).
+# --------------------------------------------------------------------------
+
 on:
-    push:
-        branches:
-            - main
-    pull_request:
-        branches:
-            - main
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
-    contents: read
-    issues: none
-    pull-requests: none
+  contents: read
+  issues: none
+  pull-requests: none
+
+env:
+  MIN_RELEASE_AGE_HOURS: 24
 
 jobs:
-    call_deps_reviewer:
-        name: General
-        uses: complytime/org-infra/.github/workflows/reusable_deps_reviewer.yml@main
+  call_deps_reviewer:
+    name: General
+    uses: complytime/org-infra/.github/workflows/reusable_deps_reviewer.yml@main
 
-    call_dependabot_reviewer:
-        name: Dependabot
-        uses: complytime/org-infra/.github/workflows/reusable_dependabot_reviewer.yml@main
+  call_dependabot_reviewer:
+    name: Dependabot
+    uses: complytime/org-infra/.github/workflows/reusable_dependabot_reviewer.yml@main
 
-    comment_on_dependabot_prs:
-        name: Dependabot Comment
-        if: github.actor == 'dependabot[bot]'
-        runs-on: ubuntu-latest
-        needs: [call_deps_reviewer, call_dependabot_reviewer]
-        permissions:
-            issues: read
-            pull-requests: write  # Necessary to write a comment
-        steps:
-            - name: Comment from Dependabot Reviewer
-              uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
-              env:
-                  REVIEW_CONCLUSION: ${{ needs.call_deps_reviewer.outputs.review_conclusion }}
-                  RISK_LEVEL: ${{ needs.call_dependabot_reviewer.outputs.risk_level }}
-                  UPDATES_COUNT: ${{ needs.call_dependabot_reviewer.outputs.updates_count }}
-              with:
-                  issue-number: ${{ github.event.pull_request.number }}
-                  edit-mode: replace
-                  body: |
-                      🤖 **Standardized Dependabot Review Summary** 🤖
+  comment_on_dependabot_prs:
+    name: Dependabot Comment
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    needs: [call_deps_reviewer, call_dependabot_reviewer]
+    permissions:
+      issues: read
+      pull-requests: write  # Necessary to write a comment
+    steps:
+      - name: Comment from Dependabot Reviewer
+        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
+        env:
+          REVIEW_CONCLUSION: ${{ needs.call_deps_reviewer.outputs.review_conclusion }}
+          RISK_LEVEL: ${{ needs.call_dependabot_reviewer.outputs.risk_level }}
+          UPDATES_COUNT: ${{ needs.call_dependabot_reviewer.outputs.updates_count }}
+          DEP_NAME: ${{ needs.call_dependabot_reviewer.outputs.dep_name }}
+          DEP_VERSION: ${{ needs.call_dependabot_reviewer.outputs.dep_version }}
+          RELEASE_AGE_HOURS: ${{ needs.call_dependabot_reviewer.outputs.release_age_hours }}
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body: |
+            🤖 **Standardized Dependabot Review Summary** 🤖
 
-                      This PR was processed by the organization's reusable CI pipeline.
+            This PR was processed by the organization's reusable CI pipeline.
 
-                      - **Dependencies Review:** **${{ env.REVIEW_CONCLUSION }}**
-                        - [View detailed logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
-                      - **Calculated Risk:** **${{ env.RISK_LEVEL }}**
-                      - **Dependency Usage:** At least **${{ env.UPDATES_COUNT }}** repositories are using this dependency version
+            | Criterion | Status | Detail |
+            |-----------|--------|--------|
+            | **Dependencies Review** | **${{ env.REVIEW_CONCLUSION }}** | [View logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+            | **Calculated Risk** | **${{ env.RISK_LEVEL }}** | `${{ env.DEP_NAME }}` v${{ env.DEP_VERSION }} |
+            | **Release Age** | **${{ (env.RELEASE_AGE_HOURS == '-1' || env.RELEASE_AGE_HOURS == '') && 'unknown' || format('{0}h', env.RELEASE_AGE_HOURS) }}** | ${{ (env.RELEASE_AGE_HOURS == '-1' || env.RELEASE_AGE_HOURS == '') && 'Release date unavailable — manual review required' || format('Released {0} hours ago', env.RELEASE_AGE_HOURS) }} |
+            | **Dependency Usage** | ${{ env.UPDATES_COUNT == '0' && 'unavailable' || format('{0} repos', env.UPDATES_COUNT) }} | Informational only — does not affect approval |
 
-                      ---
+            **Auto-approval:** ${{ env.RISK_LEVEL != 'high' && env.REVIEW_CONCLUSION == 'success' && env.RELEASE_AGE_HOURS != '-1' && fromJSON(env.RELEASE_AGE_HOURS) >= fromJSON(env.MIN_RELEASE_AGE_HOURS) && '✅ Approved' || '⏳ Manual review required' }}
 
-                      Maintainer check list:
-                      1. Ensure the PR passed all CI tests (required status checks).
-                      2. Investigate failures for Major updates or any manual review requirement.
-                      3. Don't overlook breaking changes and changelog information.
-                      4. If the scorecard value is low, consider to contribute to make it higher. Everybody wins!
-                      5. Be diligent. When in doubt, ask another maintainer for additional review.
+            ---
 
-    approve_dependabot_prs:
-        name: Dependabot Auto-approve
-        if: github.actor == 'dependabot[bot]'
-        runs-on: ubuntu-latest
-        needs: [call_deps_reviewer, call_dependabot_reviewer]
-        permissions:
-            pull-requests: write  # Necessary to approve a PR
-        steps:
-            - name: Auto-approve if Confident
-              if: ${{ env.RISK_LEVEL != 'high' && env.REVIEW_CONCLUSION == 'success' && env.UPDATES_COUNT > 10 }}
-              env:
-                  REVIEW_CONCLUSION: ${{ needs.call_deps_reviewer.outputs.review_conclusion }}
-                  RISK_LEVEL: ${{ needs.call_dependabot_reviewer.outputs.risk_level }}
-                  UPDATES_COUNT: ${{ needs.call_dependabot_reviewer.outputs.updates_count }}
-              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-              with:
-                  script: |
-                      github.rest.pulls.createReview({
-                          owner: context.repo.owner,
-                          repo: context.repo.repo,
-                          pull_number: context.issue.number,
-                          event: 'APPROVE',
-                          body: 'Automatically approved by GitHub Action for Dependabot PRs.'
-                      });
-                      console.log('Dependabot PR approved successfully.');
+            Maintainer check list:
+            1. Ensure the PR passed all CI tests (required status checks).
+            2. Investigate failures for Major updates or any manual review requirement.
+            3. Don't overlook breaking changes and changelog information.
+            4. If the scorecard value is low, consider to contribute to make it higher. Everybody wins!
+            5. Be diligent. When in doubt, ask another maintainer for additional review.
+
+  approve_dependabot_prs:
+    name: Dependabot Auto-approve
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    needs: [call_deps_reviewer, call_dependabot_reviewer]
+    permissions:
+      pull-requests: write  # Necessary to approve a PR
+    steps:
+      - name: Auto-approve if Confident
+        if: >-
+          needs.call_dependabot_reviewer.outputs.risk_level != 'high' &&
+          needs.call_deps_reviewer.outputs.review_conclusion == 'success' &&
+          needs.call_dependabot_reviewer.outputs.release_age_hours != '-1' &&
+          fromJSON(needs.call_dependabot_reviewer.outputs.release_age_hours) >= fromJSON(env.MIN_RELEASE_AGE_HOURS)
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const risk = '${{ needs.call_dependabot_reviewer.outputs.risk_level }}';
+            const review = '${{ needs.call_deps_reviewer.outputs.review_conclusion }}';
+            const releaseAge = '${{ needs.call_dependabot_reviewer.outputs.release_age_hours }}';
+
+            github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              event: 'APPROVE',
+              body: `Automatically approved: risk=${risk}, review=${review}, release_age=${releaseAge}h.`
+            });
+            console.log(`Dependabot PR approved: risk=${risk}, review=${review}, release_age=${releaseAge}h`);

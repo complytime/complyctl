@@ -1,6 +1,6 @@
 <!--
 Sync Impact Report:
-Version: 1.0.2 → 1.1.0 (Agent-optimized wording, repo-agnostic refactor, RFC 2119 normalization)
+Version: 1.0.2 → 1.1.0 → 1.2.0 (Agent-optimized wording, repo-agnostic refactor, RFC 2119 normalization, org-infra alignment)
 Modified Principles:
   - III. Incremental Improvement: Reframed from human-motivational to agent-enforceable MUST rules
   - IV. Code is Written for Humans First → IV. Readability First: Retitled and tightened intro
@@ -21,7 +21,6 @@ Templates requiring updates:
   ✅ tasks-template.md - No changes needed (generic template)
   ✅ checklist-template.md - No changes needed (generic template)
 Follow-up TODOs:
-  - Containers section: Referenced in style guide but content not yet provided - pending addition
   - plan-template.md: Verify Constitution Check references updated Principle IV title
 -->
 
@@ -116,9 +115,14 @@ These files MUST link to org-wide definitions whenever available and MAY be incr
 
 All commit messages MUST follow the **Conventional Commits** [specification](https://www.conventionalcommits.org/).
 
+### Commit Trailers
+
+- **Signed-off-by**: All commits MUST include a `Signed-off-by` trailer with the author's name and email (use `git commit -s`). This certifies the contributor's right to submit the code under the project's license ([Developer Certificate of Origin](https://developercertificate.org/)).
+- **Assisted-by**: Commits that were authored or substantially assisted by an AI tool MUST include an `Assisted-by` trailer identifying the tool and model (e.g., `Assisted-by: OpenCode (claude-opus-4-6)`). This ensures transparency and traceability of AI-assisted contributions.
+
 ## Infrastructure Standards Centralization
 
-We SHOULD centralize workflows, configurations, and templates as much as possible. Refer to [org-infra](https://github.com/complytime/org-infra).
+Workflows, configurations, and templates SHOULD be centralized in the [org-infra](https://github.com/complytime/org-infra) repository, which serves as the canonical source for organization-wide CI/CD standards. Repository-specific overrides MAY exist but MUST NOT conflict with centralized definitions. Changes to shared infrastructure MUST be proposed in org-infra first.
 
 ## Coding Standards
 
@@ -128,7 +132,7 @@ We SHOULD centralize workflows, configurations, and templates as much as possibl
 - **Pre-commit Hooks**: Repositories SHOULD configure pre-commit and pre-push hooks via [pre-commit](https://pre-commit.com/).
 - **Makefile**: Repositories MUST use a Makefile to centralize code-specific commands.
 - **Testing**: All code MUST have tests. Test functions MUST use descriptive names and include edge cases. Inputs from external sources MUST be tested. Each test scenario MUST include at least one positive and one negative test case to verify that errors and exceptions are properly handled.
-- **Line Length**: Lines MUST be limited to 99 characters unless exceeding the limit demonstrably improves readability.
+- **Line Length**: Lines in source code MUST be limited to 99 characters unless exceeding the limit demonstrably improves readability. YAML files are exempt and follow the `.yamllint.yml` configuration instead.
 - **Lint**: Code MUST have zero lint issues according to the lint configuration defined in the repository. No trailing spaces.
 - **Lint Configuration Awareness**: Before making code changes, agents MUST read the repository's lint and formatter configuration files to understand the enforced rules. All generated or modified code MUST conform to these configurations. If no lint configuration is present, agents SHOULD follow the language-specific defaults defined in this constitution. The ComplyTime organization standardizes on the following configuration files:
   - `.golangci.yml` -- Go linting rules
@@ -136,6 +140,8 @@ We SHOULD centralize workflows, configurations, and templates as much as possibl
   - `.mega-linter.yml` -- Multi-language linting in CI
   - `.pre-commit-config.yaml` -- Pre-commit and pre-push hook definitions
   - `.yamllint.yml` -- YAML linting rules
+
+**Note**: The following language-specific sections apply to repositories containing source code in the respective language. Repositories that host configuration files as sync templates (e.g., `.golangci.yml` in org-infra) are not subject to these sections for their own code.
 
 ### Go
 
@@ -173,14 +179,59 @@ Repositories SHOULD define Go-specific lint rules (e.g., via `.golangci.yml`) an
 
 #### Code Formatting
 
-- **Style**: Code MUST be formatted with `black` and `isort`.
+- **Style**: Code MUST be formatted with `black` and `isort`, or equivalently with `ruff format` and `ruff check --select I`.
 - **Lint**: Code MUST pass `ruff` linting.
-- **Static type check**: Code MUST pass `mypy` static type checking.
+- **Static type check**: Code SHOULD pass `mypy` static type checking. Repositories with minimal scripting (e.g., a single utility script) MAY omit `mypy` if type hints are present.
 - **Non-Python files**: SHOULD use [Megalinter](https://github.com/oxsecurity/megalinter) or equivalent to lint non-Python files in a CI task. Repository-specific configuration details belong in each repository's own constitution increment.
+
+### YAML / GitHub Actions Workflows
+
+#### Naming Conventions
+
+- **Reusable workflows**: MUST be prefixed with `reusable_` and have a clear, descriptive name reflecting their function (e.g., `reusable_vuln_scan.yml`).
+- **Consumer workflows**: Workflows that call reusable workflows MUST be prefixed with `ci_` (e.g., `ci_security.yml`).
+
+#### Security
+
+- Workflows MUST follow the **Principle of Least Privilege**. Write permissions MUST be avoided; when necessary, they MUST be defined in the minimal possible scope.
+- Prefer defining explicit `permissions` per Job over workflow-level permissions.
+- Secrets MUST NOT be hardcoded in workflow files. Use GitHub Secrets or environment-based injection.
+
+#### Design
+
+- Reusable workflows MUST be generic enough to be consumed by any repository within the organization.
+- Workflow inputs MUST have descriptive `description` fields.
+- Required inputs MUST be marked with `required: true`.
+- Optional inputs SHOULD provide sensible `default` values.
+
+#### Formatting
+
+- YAML files MUST be linted with `yamllint` using the repository's `.yamllint.yml` configuration.
+- YAML line length is governed by the `.yamllint.yml` configuration and is exempt from the 99-character general rule.
+- Workflow files MUST include a header comment block describing the workflow's purpose.
 
 ### Containers
 
-<!-- TODO(CONTAINERS_GUIDE): Containers guide referenced in style guide but content not yet provided. Add containerization standards when available. -->
+#### Image Building
+
+- Container images MUST be built using the org-infra reusable workflow (`reusable_publish_ghcr.yml`) or an equivalent workflow that produces the same supply chain artifacts.
+- Containerfiles MUST use a specific base image tag or digest. MUST NOT use `latest` or floating tags.
+- Multi-stage builds SHOULD be used to minimize final image size and attack surface.
+
+#### Supply Chain Security
+
+- All container images MUST include the following attestations:
+  - **SLSA provenance**: Generated during the build process.
+  - **SBOM**: Software Bill of Materials attached to the image.
+  - **Vulnerability scan**: Scan results attested to the image.
+- All attestations MUST be signed using Sigstore keyless signing with Rekor transparency log entries.
+- Signature verification MUST validate certificate identity and OIDC issuer.
+
+#### Registry Standards
+
+- Primary registry: GitHub Container Registry (`ghcr.io`).
+- Promotion to secondary registries (e.g., Quay.io) MUST verify source image signatures before copying.
+- OCI labels (`org.opencontainers.image.*`) SHOULD be applied for description, vendor, source, and version metadata.
 
 ## Governance
 
@@ -203,7 +254,11 @@ This constitution supersedes all other practices and serves as the central sourc
 
 ### Incrementing This Constitution
 
-This constitution is the org-wide shared reference for all ComplyTime repositories. Individual repositories MUST NOT modify this file. Instead, each repository SHOULD create its own `.specify/memory/constitution.md` that:
+This constitution is the org-wide shared reference for all ComplyTime repositories, maintained canonically in the `org-infra` repository.
+
+**For org-infra maintainers**: Changes to this file follow the Amendment Procedure above.
+
+**For all other repositories**: Individual repositories MUST NOT modify the org-wide constitution file. Instead, each repository SHOULD create its own `.specify/memory/constitution.md` that:
 
 1. References this org-wide constitution as its base authority.
 2. Adds repository-specific standards (e.g., additional lint rules, architecture constraints, technology-specific conventions) that do not conflict with the principles defined here.
@@ -211,4 +266,4 @@ This constitution is the org-wide shared reference for all ComplyTime repositori
 
 Repository-level constitutions are incremental -- they extend, not replace, this document. In case of conflict, this org-wide constitution takes precedence.
 
-**Version**: 1.1.0 | **Ratified**: 2026-02-25 | **Last Amended**: 2026-02-25
+**Version**: 1.2.0 | **Ratified**: 2026-02-25 | **Last Amended**: 2026-03-18

@@ -1,29 +1,32 @@
+# Dependabot configuration managed by org-infra.
+# Entries for managed ecosystems are overwritten on sync.
+# Additional ecosystem entries not managed by org-infra are preserved.
 # See: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 
 version: 2
 updates:
-    - package-ecosystem: "github-actions"
-      directories:
-          - "/"
-          - "/.github/actions/e2e-testing"      # used in complyscribe
-          - "/.github/actions/publish-image"    # used in complyscribe
-          - "/.github/actions/setup-poetry"     # used in complyscribe
-          - "/.github/actions/setup-complyctl"  # used in complyctl
-      schedule:
-          interval: "daily"
-      commit-message:
-          prefix: "ci"
-          include: "scope"
-
-    - package-ecosystem: "gomod"
-      directories:
-          - "/"
-          - "/compass"      # used in complybeacon
-          - "/proofwatch"   # used in complybeacon
-          - "/truthbeam"    # used in complybeacon
-      schedule:
-          interval: "weekly"
-      open-pull-requests-limit: 10
-      commit-message:
-          prefix: "chore"
-          include: "scope"
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/setup-complyctl
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: ci
+      include: scope
+  - package-ecosystem: pre-commit
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+  - package-ecosystem: gomod
+    directories:
+      - /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
