@@ -3,7 +3,7 @@ name: SonarQube Analysis
 on:
   push:
     branches:
-        - main
+      - main
 
 permissions:
   contents: none
@@ -12,18 +12,18 @@ permissions:
 
 jobs:
   generate-coverage:
-      name: Generate Coverage Report
-      runs-on: ubuntu-latest
-      steps:
-          - name: Check out
-            uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-          - name: Run test
-            run: make test-unit
-          - name: Upload artifact
-            uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-            with:
-                name: coverage
-                path: coverage.out
+    name: Generate Coverage Report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Run test
+        run: make test-unit
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: coverage.out
 
   sonarqube:
     name: SonarCloud Analysis
