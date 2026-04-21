@@ -18,19 +18,19 @@ This is the blocking prerequisite for every other task — the published SDK pat
 **⚠️ CRITICAL**: No provider migration or CI updates can be finalized until this phase
 produces a tagged complyctl SDK release.
 
-- [ ] T001 [US2] Rename directory `pkg/plugin/` → `pkg/provider/` in complyctl
-- [ ] T002 [US2] Update package declaration in all files under `pkg/provider/` from `package plugin` to `package provider`
-- [ ] T003 [US2] Rename `pkg/provider/manager.go`: `type Plugin interface` → `type Provider interface`; `LoadedPlugin` → `LoadedProvider`; `GetPlugin` → `GetProvider`; `ListPlugins` → `ListProviders`; `LoadPlugins` → `LoadProviders`; update all internal references
-- [ ] T004 [US2] Rename `pkg/provider/discovery.go`: `type PluginInfo struct` → `type ProviderInfo struct`; `PluginID` field → `ProviderID`; `pluginDir` field → `providerDir`; `DiscoverPlugins` → `DiscoverProviders`
-- [ ] T005 [US2] Rename `pkg/provider/plugin.go`: `SupportedPlugins` → `SupportedProviders` (SHOULD); `GRPCEvaluatorPlugin.Impl` field type from `Plugin` → `Provider`; update `Serve(impl Plugin)` → `Serve(impl Provider)`
-- [ ] T006 [US2] Update all complyctl import paths from `github.com/complytime/complyctl/pkg/plugin` → `github.com/complytime/complyctl/pkg/provider` across the entire complyctl module (grep for `pkg/plugin`)
-- [ ] T007 [US4] Rename `internal/complytime/consts.go`: `PluginExecutablePrefix` → `ProviderExecutablePrefix` (value `"complyctl-provider-"` unchanged); update all references inside `pkg/provider/discovery.go` and any other callers
-- [ ] T008 [US4] Update `cmd/complyctl/cli/providers.go`: rename all user-visible strings, help text, and log messages from "plugin" → "provider"
-- [ ] T009 [US4] Update `cmd/complyctl/cli/scan.go`: rename all user-visible strings from "plugin" → "provider"
-- [ ] T010 [US4] Update `cmd/complyctl/cli/generate.go`: rename all user-visible strings from "plugin" → "provider"
-- [ ] T011 [US4] Update `cmd/complyctl/cli/doctor.go`: rename all user-visible strings from "plugin" → "provider"
-- [ ] T012 [US1] Run `go build ./...` from the complyctl root to verify the rename compiles cleanly
-- [ ] T013 [US1] Run `go test ./...` from the complyctl root to verify all unit tests pass after the rename
+- [x] T001 [US2] Rename directory `pkg/plugin/` → `pkg/provider/` in complyctl
+- [x] T002 [US2] Update package declaration in all files under `pkg/provider/` from `package plugin` to `package provider`
+- [x] T003 [US2] Rename `pkg/provider/manager.go`: `type Plugin interface` → `type Provider interface`; `LoadedPlugin` → `LoadedProvider`; `GetPlugin` → `GetProvider`; `ListPlugins` → `ListProviders`; `LoadPlugins` → `LoadProviders`; update all internal references
+- [x] T004 [US2] Rename `pkg/provider/discovery.go`: `type PluginInfo struct` → `type ProviderInfo struct`; `PluginID` field → `ProviderID`; `pluginDir` field → `providerDir`; `DiscoverPlugins` → `DiscoverProviders`
+- [x] T005 [US2] Rename `pkg/provider/plugin.go`: `SupportedPlugins` → `SupportedProviders` (SHOULD); `GRPCEvaluatorPlugin.Impl` field type from `Plugin` → `Provider`; update `Serve(impl Plugin)` → `Serve(impl Provider)`
+- [x] T006 [US2] Update all complyctl import paths from `github.com/complytime/complyctl/pkg/plugin` → `github.com/complytime/complyctl/pkg/provider` across the entire complyctl module (grep for `pkg/plugin`)
+- [x] T007 [US4] Rename `internal/complytime/consts.go`: `PluginExecutablePrefix` → `ProviderExecutablePrefix` (value `"complyctl-provider-"` unchanged); update all references inside `pkg/provider/discovery.go` and any other callers
+- [x] T008 [US4] Update `cmd/complyctl/cli/providers.go`: rename all user-visible strings, help text, and log messages from "plugin" → "provider"
+- [x] T009 [US4] Update `cmd/complyctl/cli/scan.go`: rename all user-visible strings from "plugin" → "provider"
+- [x] T010 [US4] Update `cmd/complyctl/cli/generate.go`: rename all user-visible strings from "plugin" → "provider"
+- [x] T011 [US4] Update `cmd/complyctl/cli/doctor.go`: rename all user-visible strings from "plugin" → "provider"
+- [x] T012 [US1] Run `go build ./...` from the complyctl root to verify the rename compiles cleanly
+- [x] T013 [US1] Run `go test ./...` from the complyctl root to verify all unit tests pass after the rename
 
 **Checkpoint**: complyctl SDK renames complete and tests pass. Tag a release (`vX.Y.Z`) and
 publish to GitHub. The tag is required before `complytime-providers` can remove its `replace`
@@ -42,9 +42,9 @@ directive.
 
 **Purpose**: Rename the test provider reference implementation (stays in complyctl).
 
-- [ ] T014 [US1][US4] Rename directory `cmd/test-plugin/` → `cmd/test-provider/` in complyctl; update any internal imports inside the package
-- [ ] T015 [US4] Update `Makefile`: rename target `build-test-plugin` → `build-test-provider`; update binary output path accordingly
-- [ ] T016 [US1] Verify `make build-test-provider` builds successfully
+- [x] T014 [US1][US4] Rename directory `cmd/test-plugin/` → `cmd/test-provider/` in complyctl; update any internal imports inside the package
+- [x] T015 [US4] Update `Makefile`: rename target `build-test-plugin` → `build-test-provider`; update binary output path accordingly
+- [x] T016 [US1] Verify `make build-test-provider` builds successfully
 
 ---
 
@@ -52,9 +52,9 @@ directive.
 
 **Purpose**: Remove provider-specific docs from complyctl; update remaining docs to use "provider" terminology.
 
-- [ ] T017 [US4] Delete `docs/PLUGIN_GUIDE.md` from complyctl (content migrated to `complytime-providers` in Phase 4)
-- [ ] T018 [US4] Delete `docs/man/complyctl-openscap-plugin.md` from complyctl (or confirm it doesn't exist at this path); update Makefile variable `MAN_OPENSCAP_PLUGIN` → `MAN_OPENSCAP_PROVIDER` and remove the man page build step for the removed provider
-- [ ] T019 [P] [US4] Search complyctl for any remaining "plugin" references (excluding `hashicorp/go-plugin` library refs, proto package `complyctl.plugin.v1`, and `api/plugin/`) and update them to "provider"
+- [x] T017 [US4] Delete `docs/PLUGIN_GUIDE.md` from complyctl (content migrated to `complytime-providers` in Phase 4)
+- [x] T018 [US4] Delete `docs/man/complyctl-openscap-plugin.md` from complyctl (or confirm it doesn't exist at this path); update Makefile variable `MAN_OPENSCAP_PLUGIN` → `MAN_OPENSCAP_PROVIDER` and remove the man page build step for the removed provider
+- [x] T019 [P] [US4] Search complyctl for any remaining "plugin" references (excluding `hashicorp/go-plugin` library refs, proto package `complyctl.plugin.v1`, and `api/plugin/`) and update them to "provider"
 
 ---
 

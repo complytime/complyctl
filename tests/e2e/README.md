@@ -19,7 +19,7 @@ Build tag: `e2e`.
 | `InvalidFormat` | `--format pdf` rejected |
 | `MissingPolicy` | Uncached policy fails with clear message |
 | `MockRegistryOCICompliance` | v2 endpoint, catalog, tags, manifests, 404s |
-| `MockPluginDescribe` | Plugin discovery + Describe + Generate RPC |
+| `MockPluginDescribe` | Provider discovery + Describe + Generate RPC |
 | `NestedPolicyID` | Slashed policy IDs (`policies/nist-800-53-r5`) handled correctly |
 | `Help` | CLI help output structure |
 | `Version` | Version command output |
@@ -42,7 +42,7 @@ The policy layer uses evaluator ID `test`, which routes to the `complyctl-provid
 ### Prerequisites
 
 ```bash
-make build build-test-plugin
+make build build-test-provider
 ```
 
 ### Step 1: Start mock OCI registry
@@ -51,14 +51,14 @@ make build build-test-plugin
 make mock-registry
 ```
 
-### Step 2: Install test plugin
+### Step 2: Install test provider
 
 ```bash
 mkdir -p ~/.complytime/providers
 cp bin/complyctl-provider-test ~/.complytime/providers/
 ```
 
-The test plugin responds to all RPCs (Describe, Generate, Scan) with predefined pass results. Evaluator ID: `test`.
+The test provider responds to all RPCs (Describe, Generate, Scan) with predefined pass results. Evaluator ID: `test`.
 
 ### Step 3: Create workspace config
 
@@ -107,7 +107,7 @@ Expected: `nist-800-53-r5` appears with cached version.
 bin/complyctl generate --policy-id nist-800-53-r5
 ```
 
-Expected: `Generation completed.` output. Plugin receives Generate RPC with assessment configurations extracted from the policy layer.
+Expected: `Generation completed.` output. Provider receives Generate RPC with assessment configurations extracted from the policy layer.
 
 ### Step 7: Scan — EvaluationLog only (default)
 
@@ -194,6 +194,6 @@ rm ~/.complytime/providers/complyctl-provider-test
 
 1. Add a `TestE2E_*` function in `e2e_test.go` using helpers from `helpers_test.go`.
 2. Use `startMockRegistry(t)` for an isolated in-process registry per test.
-3. Use `installTestPlugin(t, homeDir)` to deploy the test plugin.
+3. Use `installTestPlugin(t, homeDir)` to deploy the test provider.
 4. Use `runComplytime(t, binary, workDir, env, args...)` to execute commands.
 5. Run: `make test-e2e`

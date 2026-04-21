@@ -11,6 +11,7 @@ import (
 // Plans maps each assessment requirement ID to its ordered step sequence.
 // Reusable precondition steps (WriteConfig, SyncPolicy, InstallTestPlugin)
 // prepare the shared BehavioralContext before the family-specific evaluator.
+// InstallTestPlugin installs the test provider binary (see reusable_steps.go).
 var Plans = map[string][]gemara.AssessmentStep{
 	// CTRL01: Policy Content Signature Validation
 	"CT.COMPLYCTL.CTRL01.AR01": {
@@ -39,7 +40,7 @@ var Plans = map[string][]gemara.AssessmentStep{
 		EnvVarResolution,
 	},
 
-	// CTRL04: Plugin Routing Isolation
+	// CTRL04: Provider Routing Isolation
 	"CT.COMPLYCTL.CTRL04.AR01": {
 		WriteConfig,
 		InstallTestPlugin,
@@ -61,7 +62,7 @@ var Plans = map[string][]gemara.AssessmentStep{
 		HTTPSSchemeNoPlainHTTP,
 	},
 
-	// CTRL07: Plugin Binary Integrity Verification (expected fail — not implemented)
+	// CTRL07: Provider Binary Integrity Verification (expected fail — not implemented)
 	"CT.COMPLYCTL.CTRL07.AR01": {
 		WriteConfig,
 		InstallTestPlugin,
@@ -69,7 +70,7 @@ var Plans = map[string][]gemara.AssessmentStep{
 		PluginBinaryIntegrityCheck,
 	},
 
-	// CTRL08: Plugin Subprocess Isolation (expected fail — not implemented)
+	// CTRL08: Provider Subprocess Isolation (expected fail — not implemented)
 	"CT.COMPLYCTL.CTRL08.AR01": {
 		WriteConfig,
 		InstallTestPlugin,

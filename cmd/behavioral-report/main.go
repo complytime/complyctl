@@ -27,7 +27,7 @@ const (
 
 func main() {
 	binary := flag.String("binary", "bin/complyctl", "Path to the complyctl binary")
-	testPlugin := flag.String("test-plugin", "bin/complyctl-provider-test", "Path to the test plugin binary")
+	testProvider := flag.String("test-provider", "bin/complyctl-provider-test", "Path to the test provider binary")
 	catalogPath := flag.String("catalog", "governance/controls/complytime-controls.yaml", "Path to the Gemara control catalog YAML")
 	outDir := flag.String("out", "governance/reports", "Output directory for generated artifacts")
 	artifactURI := flag.String("artifact-uri", "governance/controls/complytime-controls.yaml", "SARIF artifact URI")
@@ -39,9 +39,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to resolve binary path: %v\n", err)
 		os.Exit(1)
 	}
-	testPluginAbs, err := filepath.Abs(*testPlugin)
+	testProviderAbs, err := filepath.Abs(*testProvider)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to resolve test plugin path: %v\n", err)
+		fmt.Fprintf(os.Stderr, "failed to resolve test provider path: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -65,7 +65,7 @@ func main() {
 	defer srv.Close()
 	fmt.Fprintf(os.Stderr, "mock registry started at %s\n", srv.URL)
 
-	controlEvals := runEvaluations(binaryAbs, testPluginAbs, srv.URL, *targetPolicyID)
+	controlEvals := runEvaluations(binaryAbs, testProviderAbs, srv.URL, *targetPolicyID)
 
 	evalLog := gemara.EvaluationLog{
 		Evaluations: controlEvals,
@@ -100,7 +100,7 @@ func main() {
 	printSummary(controlEvals)
 }
 
-func runEvaluations(binary, testPlugin, registryURL, targetPolicyID string) []*gemara.ControlEvaluation {
+func runEvaluations(binary, testProvider, registryURL, targetPolicyID string) []*gemara.ControlEvaluation {
 	requirementIDs := sortedKeys(behavioral.Plans)
 	evals := make([]*gemara.ControlEvaluation, 0, len(requirementIDs))
 
@@ -120,13 +120,13 @@ func runEvaluations(binary, testPlugin, registryURL, targetPolicyID string) []*g
 		}
 
 		ctx := &behavioral.BehavioralContext{
-			Binary:           binary,
-			TestPluginBinary: testPlugin,
-			HomeDir:          homeDir,
-			WorkDir:          workDir,
-			Env:              behavioral.BuildEnv(homeDir),
-			PolicyID:         targetPolicyID,
-			RegistryURL:      registryURL,
+			Binary:             binary,
+			TestProviderBinary: testProvider,
+			HomeDir:            homeDir,
+			WorkDir:            workDir,
+			Env:                behavioral.BuildEnv(homeDir),
+			PolicyID:           targetPolicyID,
+			RegistryURL:        registryURL,
 		}
 
 		eval := &gemara.ControlEvaluation{

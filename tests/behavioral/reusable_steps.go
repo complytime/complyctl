@@ -53,35 +53,35 @@ func SyncPolicy(payload any) (gemara.Result, string, gemara.ConfidenceLevel) {
 	return gemara.Passed, "get succeeded: " + output, gemara.High
 }
 
-// InstallTestPlugin copies the test plugin binary into the plugin directory.
+// InstallTestPlugin copies the test provider binary into the provider directory.
 func InstallTestPlugin(payload any) (gemara.Result, string, gemara.ConfidenceLevel) {
 	ctx, result, msg, conf := verifyContext(payload)
 	if ctx == nil {
 		return result, msg, conf
 	}
 
-	if ctx.TestPluginBinary == "" {
-		return gemara.Unknown, "test plugin binary path not set", gemara.Undetermined
+	if ctx.TestProviderBinary == "" {
+		return gemara.Unknown, "test provider binary path not set", gemara.Undetermined
 	}
-	if _, err := os.Stat(ctx.TestPluginBinary); err != nil {
+	if _, err := os.Stat(ctx.TestProviderBinary); err != nil {
 		return gemara.Unknown,
-			fmt.Sprintf("test plugin not found at %s — run 'make build-test-plugin' first", ctx.TestPluginBinary),
+			fmt.Sprintf("test provider not found at %s — run 'make build-test-provider' first", ctx.TestProviderBinary),
 			gemara.Undetermined
 	}
 
-	pluginDir := filepath.Join(ctx.HomeDir, ".complytime", "providers")
-	if err := os.MkdirAll(pluginDir, 0755); err != nil {
-		return gemara.Unknown, "failed to create plugin dir: " + err.Error(), gemara.Undetermined
+	providerDir := filepath.Join(ctx.HomeDir, ".complytime", "providers")
+	if err := os.MkdirAll(providerDir, 0755); err != nil {
+		return gemara.Unknown, "failed to create provider dir: " + err.Error(), gemara.Undetermined
 	}
 
-	data, err := os.ReadFile(ctx.TestPluginBinary)
+	data, err := os.ReadFile(ctx.TestProviderBinary)
 	if err != nil {
-		return gemara.Unknown, "failed to read test plugin: " + err.Error(), gemara.Undetermined
+		return gemara.Unknown, "failed to read test provider: " + err.Error(), gemara.Undetermined
 	}
 
-	dst := filepath.Join(pluginDir, "complyctl-provider-test")
-	if err := os.WriteFile(dst, data, 0700); err != nil { //nolint:gosec // G306 - plugin binary needs execute permission
-		return gemara.Unknown, "failed to install test plugin: " + err.Error(), gemara.Undetermined
+	dst := filepath.Join(providerDir, "complyctl-provider-test")
+	if err := os.WriteFile(dst, data, 0700); err != nil { //nolint:gosec // G306 - provider binary needs execute permission
+		return gemara.Unknown, "failed to install test provider: " + err.Error(), gemara.Undetermined
 	}
-	return gemara.Passed, "test plugin installed", gemara.High
+	return gemara.Passed, "test provider installed", gemara.High
 }

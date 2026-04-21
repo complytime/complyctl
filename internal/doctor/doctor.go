@@ -62,18 +62,18 @@ const registryTimeout = 5 * time.Second
 // Run orchestrates all diagnostic checks and returns a slice of results.
 // The resolver parameter enables policy → evaluator → target mapping for
 // variable validation (R51, R52). Pass nil if the policy cache is not
-// available — CheckCache will report the failure. pluginLogger is the
+// available — CheckCache will report the failure. providerLogger is the
 // hclog.Logger used for provider manager and go-plugin client logging.
 // When verbose is true, CheckVariables expands per-provider variable detail
 // to show individual key status (R55).
 // cacheBaseDir is the root cache directory (~/.complytime) where state.json
 // resides. policiesCacheDir is the policies subdirectory used by CheckCache.
 // See FR-039, R44, R51, R52, R55: specs/001-gemara-native-workflow/spec.md
-func Run(cfg *complytime.WorkspaceConfig, configPath, providerDir, cacheDir string, resolver PolicyGraphResolver, versionResolver VersionResolver, verbose bool, pluginLogger hclog.Logger) []CheckResult {
+func Run(cfg *complytime.WorkspaceConfig, configPath, providerDir, cacheDir string, resolver PolicyGraphResolver, versionResolver VersionResolver, verbose bool, providerLogger hclog.Logger) []CheckResult {
 	policiesCacheDir := filepath.Join(cacheDir, complytime.PoliciesSubdir)
 	var results []CheckResult
 	results = append(results, CheckConfig(configPath))
-	providerResults, healthData := CheckProviders(providerDir, pluginLogger)
+	providerResults, healthData := CheckProviders(providerDir, providerLogger)
 	results = append(results, providerResults...)
 	results = append(results, CheckCache(policiesCacheDir))
 	results = append(results, CheckPolicyVersions(cfg, cacheDir, versionResolver)...)
@@ -125,7 +125,7 @@ func CheckConfig(configPath string) CheckResult {
 // CheckProviders discovers providers and runs Describe on each.
 // Returns both diagnostic results and Describe data for variable validation (R51).
 // providerLogger is passed to the provider Manager for go-plugin client logging.
-func CheckProviders(providerDir string, pluginLogger hclog.Logger) ([]CheckResult, []ProviderHealth) {
+func CheckProviders(providerDir string, providerLogger hclog.Logger) ([]CheckResult, []ProviderHealth) {
 	if _, err := os.Stat(providerDir); os.IsNotExist(err) {
 		return []CheckResult{{
 			Name:     "providers",
@@ -135,7 +135,7 @@ func CheckProviders(providerDir string, pluginLogger hclog.Logger) ([]CheckResul
 		}}, nil
 	}
 
-	mgr, err := provider.NewManager(providerDir, pluginLogger)
+	mgr, err := provider.NewManager(providerDir, providerLogger)
 	if err != nil {
 		return []CheckResult{{
 			Name:     "providers",

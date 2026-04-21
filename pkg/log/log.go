@@ -59,8 +59,8 @@ func defaultStyles() *charmlog.Styles {
 	styles.Keys["err"] = lipgloss.NewStyle().Foreground(lipgloss.Color("203"))
 	styles.Values["err"] = lipgloss.NewStyle().Bold(true)
 
-	styles.Keys["plugin"] = lipgloss.NewStyle().Foreground(DebugColor)
-	styles.Values["plugin"] = lipgloss.NewStyle()
+	styles.Keys["provider"] = lipgloss.NewStyle().Foreground(DebugColor)
+	styles.Values["provider"] = lipgloss.NewStyle()
 
 	return styles
 }

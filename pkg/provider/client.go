@@ -15,7 +15,7 @@ var (
 	_ Exporter = (*Client)(nil)
 )
 
-// GenerateRequest carries assessment plan configuration to a plugin.
+// GenerateRequest carries assessment plan configuration to a provider.
 // See R48: three-tier variable model.
 type GenerateRequest struct {
 	GlobalVariables map[string]string
@@ -52,7 +52,7 @@ type Target struct {
 	Variables map[string]string
 }
 
-// ScanResponse carries assessment results from a plugin scan.
+// ScanResponse carries assessment results from a provider scan.
 type ScanResponse struct {
 	Assessments []AssessmentLog
 }
@@ -95,10 +95,10 @@ const (
 	ConfidenceLevelHigh         ConfidenceLevel = 4
 )
 
-// DescribeRequest is sent to discover plugin identity and requirements.
+// DescribeRequest is sent to discover provider identity and requirements.
 type DescribeRequest struct{}
 
-// DescribeResponse reports plugin identity, health, version, and declared
+// DescribeResponse reports provider identity, health, version, and declared
 // variable requirements used by doctor diagnostics (R51).
 type DescribeResponse struct {
 	Healthy                 bool
@@ -132,13 +132,13 @@ type ExportResponse struct {
 // hashicorp/go-plugin.
 type Client struct {
 	executablePath string
-	pluginClient   *goplugin.Client
+	gopluginClient *goplugin.Client
 	grpcClient     pluginv2.PluginClient
 }
 
 func (c *Client) Close() {
-	if c.pluginClient != nil {
-		c.pluginClient.Kill()
+	if c.gopluginClient != nil {
+		c.gopluginClient.Kill()
 	}
 }
 

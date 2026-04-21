@@ -1,27 +1,27 @@
-% C2P-OPENSCAP-MANIFEST.JSON(5) complyctl OpenSCAP Plugin Configuration
+% C2P-OPENSCAP-MANIFEST.JSON(5) complyctl OpenSCAP Provider Configuration
 % Marcus Burghardt <maburgha@redhat.com>
 % June 2025
 
 # NAME
 
-c2p-openscap-manifest.json - Configuration file for the OpenSCAP plugin used by complyctl
+c2p-openscap-manifest.json - Configuration file for the OpenSCAP provider used by complyctl
 
 # DESCRIPTION
 
-This file defines the metadata and runtime configuration options for the `openscap-plugin`, a plugin to be used with `complyctl`.
+This file defines the metadata and runtime configuration options for the `openscap-provider`, a provider to be used with `complyctl`.
 
 It is a JSON-formatted file typically installed at:
 
-**/usr/share/complyctl/plugins/c2p-openscap-manifest.json**
+**/usr/share/complyctl/providers/c2p-openscap-manifest.json**
 
-Some configuration options used by `openscap-plugin` can be overridden by using a drop-in file with the same name in "`/etc/complyctl/config.d/`":
+Some configuration options used by `openscap-provider` can be overridden by using a drop-in file with the same name in "`/etc/complyctl/config.d/`":
 
 **/etc/complyctl/config.d/c2p-openscap-manifest.json**
 
-The easiest way to create a drop-in file is copying **/usr/share/complyctl/plugins/c2p-openscap-manifest.json** and defining the `default` values. Any other content can be removed to keep the drop-in file clean. See **CONFIGURATION OPTIONS** and **EXAMPLES** sections for more details.
+The easiest way to create a drop-in file is copying **/usr/share/complyctl/providers/c2p-openscap-manifest.json** and defining the `default` values. Any other content can be removed to keep the drop-in file clean. See **CONFIGURATION OPTIONS** and **EXAMPLES** sections for more details.
 
 For some specific cases, it is also possible to inform a custom configuration directory to override `/etc/complyctl/config.d`.
-For example, the following command will try to locate and read custom settings from manifest files hosted in `/tmp/plugins-conf` instead of `/etc/complyctl/config.d`:
+For example, the following command will try to locate and read custom settings from manifest files hosted in `/tmp/providers-conf` instead of `/etc/complyctl/config.d`:
 
 `complyctl generate --provider-config /tmp/providers-conf`
 

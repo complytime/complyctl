@@ -1,5 +1,5 @@
 name: "Setup complyctl environment"
-description: "Build complyctl, test plugin, and mock OCI registry for integration testing"
+description: "Build complyctl, test provider, and mock OCI registry for integration testing"
 
 runs:
     using: composite
@@ -18,10 +18,10 @@ runs:
               go-version-file: './go.mod'
 
         - name: Build binaries
-          run: make build build-test-plugin
+          run: make build build-test-provider
           shell: bash
 
-        - name: Install test plugin
+        - name: Install test provider
           run: |
               mkdir -p ~/.complytime/providers
               cp bin/complytime-providers-test ~/.complytime/providers/

@@ -44,7 +44,7 @@ func NewClient(executablePath string, logger hclog.Logger) (*Client, error) {
 
 	return &Client{
 		executablePath: executablePath,
-		pluginClient:   client,
+		gopluginClient: client,
 		grpcClient:     grpcClient,
 	}, nil
 }

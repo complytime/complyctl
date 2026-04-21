@@ -11,7 +11,7 @@
 //
 // Or manually:
 //
-//	make build build-test-plugin
+//	make build build-test-provider
 //	go test -tags=e2e -mod=vendor ./tests/e2e/... -v -count=1 -timeout 120s
 package e2e
 
@@ -35,7 +35,7 @@ const testPolicyID = "nist-800-53-r5"
 // TestE2E_FullWorkflow exercises the entire Gemara workflow:
 //  1. complytime get    — fetch policies from mock OCI registry into cache
 //  2. complytime list   — verify cached policies appear
-//  3. complytime generate — resolve policy graph, invoke test plugin
+//  3. complytime generate — resolve policy graph, invoke test provider
 //  4. complytime scan --format oscal  — produce OSCAL assessment-results
 //  5. complytime scan --format pretty — produce Markdown report
 //  6. complytime scan --format sarif  — produce SARIF report
@@ -381,7 +381,7 @@ func TestE2E_MockRegistryOCICompliance(t *testing.T) {
 	})
 }
 
-// TestE2E_MockPluginDescribe verifies the test plugin binary responds to Describe.
+// TestE2E_MockPluginDescribe verifies the test provider binary responds to Describe.
 func TestE2E_MockPluginDescribe(t *testing.T) {
 	binary := locateBinary(t)
 	srv := startMockRegistry(t)
@@ -396,13 +396,13 @@ func TestE2E_MockPluginDescribe(t *testing.T) {
 	// Fetch policy first so generate has content
 	runComplytime(t, binary, workDir, env, "get")
 
-	// Generate dispatches to the test plugin via Describe + Generate RPCs
+	// Generate dispatches to the test provider via Describe + Generate RPCs
 	out := runComplytime(t, binary, workDir, env,
 		"generate", "--policy-id", testPolicyID)
 	t.Log(out)
 	assert.Contains(t, out, "Generation completed.")
 	assert.NotContains(t, out, "Describe failed",
-		"test plugin must pass describe")
+		"test provider must pass describe")
 }
 
 // TestE2E_Help verifies basic help output structure.
@@ -434,7 +434,7 @@ func TestE2E_Version(t *testing.T) {
 
 // TestE2E_NestedPolicyID exercises the full workflow with a slashed policy ID
 // (e.g., "policies/nist-800-53-r5") matching the standalone mock-oci-registry format.
-// Validates that cache listing, output filenames, and plugin routing all handle
+// Validates that cache listing, output filenames, and provider routing all handle
 // the "/" correctly.
 func TestE2E_NestedPolicyID(t *testing.T) {
 	nestedID := "policies/nist-800-53-r5"

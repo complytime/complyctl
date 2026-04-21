@@ -13,7 +13,7 @@ import (
 	"github.com/gemaraproj/go-gemara"
 )
 
-// MatchedEvaluatorRouting verifies generate routes to the matched plugin
+// MatchedEvaluatorRouting verifies generate routes to the matched provider
 // when the policy graph specifies an evaluator ID (CTRL04.AR01).
 func MatchedEvaluatorRouting(payload any) (gemara.Result, string, gemara.ConfidenceLevel) {
 	ctx, result, msg, conf := verifyContext(payload)
@@ -26,12 +26,12 @@ func MatchedEvaluatorRouting(payload any) (gemara.Result, string, gemara.Confide
 		return gemara.Failed, "generate failed: " + output, gemara.High
 	}
 	if strings.Contains(output, "Generation completed.") {
-		return gemara.Passed, "generate routed to matched plugin", gemara.High
+		return gemara.Passed, "generate routed to matched provider", gemara.High
 	}
 	return gemara.Failed, "generate did not complete successfully: " + output, gemara.High
 }
 
-// EvaluatorMismatchRejected renames the installed test plugin so the
+// EvaluatorMismatchRejected renames the installed test provider so the
 // evaluator ID no longer matches, then verifies generate fails (CTRL04.AR02).
 func EvaluatorMismatchRejected(payload any) (gemara.Result, string, gemara.ConfidenceLevel) {
 	ctx, result, msg, conf := verifyContext(payload)
@@ -39,11 +39,11 @@ func EvaluatorMismatchRejected(payload any) (gemara.Result, string, gemara.Confi
 		return result, msg, conf
 	}
 
-	pluginDir := filepath.Join(ctx.HomeDir, ".complytime", "providers")
-	oldPath := filepath.Join(pluginDir, "complyctl-provider-test")
-	newPath := filepath.Join(pluginDir, "complyctl-plugin-other")
+	providerDir := filepath.Join(ctx.HomeDir, ".complytime", "providers")
+	oldPath := filepath.Join(providerDir, "complyctl-provider-test")
+	newPath := filepath.Join(providerDir, "complyctl-provider-other")
 	if err := os.Rename(oldPath, newPath); err != nil {
-		return gemara.Unknown, "failed to rename plugin: " + err.Error(), gemara.Undetermined
+		return gemara.Unknown, "failed to rename provider: " + err.Error(), gemara.Undetermined
 	}
 
 	cmd := exec.Command(ctx.Binary, "generate", "--policy-id", ctx.PolicyID) //nolint:gosec // G204 - binary/args from controlled test context
@@ -54,13 +54,13 @@ func EvaluatorMismatchRejected(payload any) (gemara.Result, string, gemara.Confi
 	if err == nil {
 		return gemara.Failed, "generate succeeded with mismatched evaluator; expected failure", gemara.High
 	}
-	if strings.Contains(string(output), "no plugin registered for evaluator") {
+	if strings.Contains(string(output), "no provider registered for evaluator") {
 		return gemara.Passed, "evaluator mismatch correctly rejected", gemara.High
 	}
 	return gemara.Failed, "generate failed but error unclear: " + string(output), gemara.High
 }
 
-// PluginBinaryIntegrityCheck tests whether the plugin discovery process
+// PluginBinaryIntegrityCheck tests whether the provider discovery process
 // verifies binary integrity before launching a subprocess (CTRL07.AR01).
 // NOT IMPLEMENTED: discovery matches only on filename prefix and executable bit.
 // This test documents the gap and is expected to fail.
@@ -70,11 +70,11 @@ func PluginBinaryIntegrityCheck(payload any) (gemara.Result, string, gemara.Conf
 		return result, msg, conf
 	}
 
-	pluginDir := filepath.Join(ctx.HomeDir, ".complytime", "providers")
-	pluginPath := filepath.Join(pluginDir, "complyctl-provider-test")
-	data, err := os.ReadFile(pluginPath)
+	providerDir := filepath.Join(ctx.HomeDir, ".complytime", "providers")
+	providerPath := filepath.Join(providerDir, "complyctl-provider-test")
+	data, err := os.ReadFile(providerPath)
 	if err != nil {
-		return gemara.Unknown, "could not read plugin binary: " + err.Error(), gemara.Undetermined
+		return gemara.Unknown, "could not read provider binary: " + err.Error(), gemara.Undetermined
 	}
 
 	hash := sha256.Sum256(data)
@@ -85,7 +85,7 @@ func PluginBinaryIntegrityCheck(payload any) (gemara.Result, string, gemara.Conf
 	if len(tampered) > 0 {
 		tampered[len(tampered)-1] ^= 0xFF
 	}
-	if err := os.WriteFile(pluginPath, tampered, 0700); err != nil { //nolint:gosec // G306 - test needs execute permission
+	if err := os.WriteFile(providerPath, tampered, 0700); err != nil { //nolint:gosec // G306 - test needs execute permission
 		return gemara.Unknown, "could not write tampered binary: " + err.Error(), gemara.Undetermined
 	}
 
@@ -98,12 +98,12 @@ func PluginBinaryIntegrityCheck(payload any) (gemara.Result, string, gemara.Conf
 		return gemara.Passed, "tampered binary rejected with integrity error", gemara.High
 	}
 
-	return gemara.Failed, "no binary integrity verification — tampered plugin was not detected", gemara.High
+	return gemara.Failed, "no binary integrity verification — tampered provider was not detected", gemara.High
 }
 
-// PluginSubprocessIsolation tests whether plugin subprocesses run with
+// PluginSubprocessIsolation tests whether provider subprocesses run with
 // restricted privileges (CTRL08.AR01).
-// NOT IMPLEMENTED: plugins run with same OS privileges as parent process.
+// NOT IMPLEMENTED: providers run with same OS privileges as parent process.
 // This test documents the gap and is expected to fail.
 func PluginSubprocessIsolation(payload any) (gemara.Result, string, gemara.ConfidenceLevel) {
 	_, result, msg, conf := verifyContext(payload)
@@ -111,5 +111,5 @@ func PluginSubprocessIsolation(payload any) (gemara.Result, string, gemara.Confi
 		return result, msg, conf
 	}
 
-	return gemara.Failed, "no subprocess isolation — plugins run with parent process privileges", gemara.High
+	return gemara.Failed, "no subprocess isolation — providers run with parent process privileges", gemara.High
 }

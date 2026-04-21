@@ -13,13 +13,13 @@ import (
 // assessment steps. Each step receives this as its payload via the
 // gemara.AssessmentStep interface.
 type BehavioralContext struct {
-	Binary           string
-	TestPluginBinary string
-	HomeDir          string
-	WorkDir          string
-	Env              []string
-	PolicyID         string
-	RegistryURL      string
+	Binary             string
+	TestProviderBinary string
+	HomeDir            string
+	WorkDir            string
+	Env                []string
+	PolicyID           string
+	RegistryURL        string
 }
 
 // RunBinary executes the complyctl binary with the given args in the

@@ -4,7 +4,7 @@
 
 # NAME
 
-complyctl - Complyctl CLI perform compliance assessment activities using plugins for different underlying technologies.
+complyctl - Complyctl CLI perform compliance assessment activities using providers for different underlying technologies.
 
 # SYNOPSIS
 
@@ -12,16 +12,16 @@ complyctl - Complyctl CLI perform compliance assessment activities using plugins
 
 # DESCRIPTION
 
-Complyctl CLI leverages OSCAL to perform compliance assessment activities, using plugins for each stage of the lifecycle.
+Complyctl CLI leverages OSCAL to perform compliance assessment activities, using providers for each stage of the lifecycle.
 
-Complyctl can be extended to support desired policy engines (PVPs) by the use of plugins.
+Complyctl can be extended to support desired policy engines (PVPs) by the use of providers.
 The provider acts as the integration between complyctl and the PVPs native interface.
 Each provider is responsible for converting the policy content described in OSCAL into the input format expected by the PVP.
 In addition, the provider converts the raw results provided by the PVP into the schema used by complyctl to generate OSCAL output.
 
 Providers communicate with complyctl via gRPC and can be authored using any preferred language. The provider acts as the gRPC server while the complyctl CLI acts as the client. When a complyctl command is run, it invokes the appropriate method served by the provider.
 
-See more about authoring plugins at https://github.com/complytime/complyctl/blob/main/docs/PLUGIN_GUIDE.md.
+See more about authoring providers at https://github.com/complytime/complytime-providers/blob/main/docs/provider-guide.md.
 
 Review the `openscap-provider that is shipped with complytime-providers at https://github.com/complytime/complytime/complytime-providers/tree/main/cmd/openscap-provider/README.md.
 

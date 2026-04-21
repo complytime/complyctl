@@ -371,20 +371,20 @@ func findRepoRoot(t *testing.T) string {
 	return ""
 }
 
-// installTestPlugin copies the test plugin binary into the plugin directory
+// installTestPlugin copies the test provider binary into the provider directory
 // for the given home directory, matching the complyctl-provider-* naming convention.
 func installTestPlugin(t *testing.T, homeDir string) {
 	t.Helper()
 	root := findRepoRoot(t)
 	srcBinary := filepath.Join(root, "bin", "complyctl-provider-test")
 	if _, err := os.Stat(srcBinary); err != nil {
-		t.Fatalf("test plugin binary not found at %s — run 'make build-test-plugin' first", srcBinary)
+		t.Fatalf("test provider binary not found at %s — run 'make build-test-provider' first", srcBinary)
 	}
 
-	pluginDir := filepath.Join(homeDir, ".complytime", "providers")
-	require.NoError(t, os.MkdirAll(pluginDir, 0755))
+	providerDir := filepath.Join(homeDir, ".complytime", "providers")
+	require.NoError(t, os.MkdirAll(providerDir, 0755))
 
-	dstBinary := filepath.Join(pluginDir, "complyctl-provider-test")
+	dstBinary := filepath.Join(providerDir, "complyctl-provider-test")
 	data, err := os.ReadFile(srcBinary)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(dstBinary, data, 0755))
