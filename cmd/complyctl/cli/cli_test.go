@@ -16,7 +16,7 @@ import (
 
 	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/internal/policy"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 func chdirTemp(t *testing.T) {
@@ -167,17 +167,17 @@ func TestCountExportFailures_TransportError(t *testing.T) {
 
 func TestCountExportFailures_ResponseFailure(t *testing.T) {
 	results := []exportResult{
-		{response: &plugin.ExportResponse{Success: false}},
-		{response: &plugin.ExportResponse{Success: true, FailedCount: 3}},
-		{response: &plugin.ExportResponse{Success: true, FailedCount: 0}},
+		{response: &provider.ExportResponse{Success: false}},
+		{response: &provider.ExportResponse{Success: true, FailedCount: 3}},
+		{response: &provider.ExportResponse{Success: true, FailedCount: 0}},
 	}
 	assert.Equal(t, 2, countExportFailures(results))
 }
 
 func TestExportResponseStatus_Success(t *testing.T) {
 	r := exportResult{
-		pluginID: "openscap",
-		response: &plugin.ExportResponse{Success: true, ExportedCount: 5},
+		providerID: "openscap",
+		response:   &provider.ExportResponse{Success: true, ExportedCount: 5},
 	}
 	status, errMsg := exportResponseStatus(r)
 	assert.Equal(t, complytime.StatusPassed, status)
@@ -186,8 +186,8 @@ func TestExportResponseStatus_Success(t *testing.T) {
 
 func TestExportResponseStatus_FailedCount(t *testing.T) {
 	r := exportResult{
-		pluginID: "openscap",
-		response: &plugin.ExportResponse{Success: true, FailedCount: 2, ErrorMessage: "timeout"},
+		providerID: "openscap",
+		response:   &provider.ExportResponse{Success: true, FailedCount: 2, ErrorMessage: "timeout"},
 	}
 	status, errMsg := exportResponseStatus(r)
 	assert.Equal(t, complytime.StatusFailed, status)
@@ -197,8 +197,8 @@ func TestExportResponseStatus_FailedCount(t *testing.T) {
 
 func TestExportResponseStatus_SuccessFalse(t *testing.T) {
 	r := exportResult{
-		pluginID: "openscap",
-		response: &plugin.ExportResponse{Success: false, ErrorMessage: "not yet supported"},
+		providerID: "openscap",
+		response:   &provider.ExportResponse{Success: false, ErrorMessage: "not yet supported"},
 	}
 	status, errMsg := exportResponseStatus(r)
 	assert.Equal(t, complytime.StatusFailed, status)
@@ -207,10 +207,10 @@ func TestExportResponseStatus_SuccessFalse(t *testing.T) {
 
 func TestFormatExportSummary_MixedResults(t *testing.T) {
 	results := []exportResult{
-		{pluginID: "plugin-a", skipped: true},
-		{pluginID: "plugin-b", err: fmt.Errorf("dial error")},
-		{pluginID: "plugin-c", response: &plugin.ExportResponse{Success: true, ExportedCount: 10}},
-		{pluginID: "plugin-d", response: &plugin.ExportResponse{Success: false, FailedCount: 2, ErrorMessage: "partial failure"}},
+		{providerID: "plugin-a", skipped: true},
+		{providerID: "plugin-b", err: fmt.Errorf("dial error")},
+		{providerID: "plugin-c", response: &provider.ExportResponse{Success: true, ExportedCount: 10}},
+		{providerID: "plugin-d", response: &provider.ExportResponse{Success: false, FailedCount: 2, ErrorMessage: "partial failure"}},
 	}
 	out := formatExportSummary(results)
 	assert.Contains(t, out, "plugin-a")
