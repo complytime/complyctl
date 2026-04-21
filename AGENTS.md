@@ -4,7 +4,7 @@ Auto-generated from all feature plans. Last updated: 2026-04-21
 
 ## Active Technologies
 
-- Go 1.25 (complyctl root `go.mod`); Go 1.24 (current `cmd/openscap-plugin/go.mod` — will be updated to match root in `complytime-providers`) (004-providers-repository-split)
+- Go 1.25 (complyctl root `go.mod`) (004-providers-repository-split)
 
 ## Project Structure
 
@@ -15,15 +15,15 @@ tests/
 
 ## Commands
 
-# Add commands for Go 1.25 (complyctl root `go.mod`); Go 1.24 (current `cmd/openscap-plugin/go.mod` — will be updated to match root in `complytime-providers`)
+# Add commands for Go 1.25 (complyctl root `go.mod`)
 
 ## Code Style
 
-Go 1.25 (complyctl root `go.mod`); Go 1.24 (current `cmd/openscap-plugin/go.mod` — will be updated to match root in `complytime-providers`): Follow standard conventions
+Go 1.25 (complyctl root `go.mod`): Follow standard conventions
 
 ## Recent Changes
 
-- 004-providers-repository-split: Added Go 1.25 (complyctl root `go.mod`); Go 1.24 (current `cmd/openscap-plugin/go.mod` — will be updated to match root in `complytime-providers`)
+- 004-providers-repository-split: Providers (openscap, ampel) migrated to `complytime-providers`; `pkg/plugin/` renamed to `pkg/provider/`; all "plugin" terminology updated to "provider"
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

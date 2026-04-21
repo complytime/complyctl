@@ -1,7 +1,0 @@
-[
-  {"PlanID": "test-plan", "RequirementID": "BP-1.01"},
-  {"PlanID": "test-plan", "RequirementID": "BP-2.01"},
-  {"PlanID": "test-plan", "RequirementID": "BP-3.01"},
-  {"PlanID": "test-plan", "RequirementID": "BP-4.01"},
-  {"PlanID": "test-plan", "RequirementID": "BP-5.01"}
-]

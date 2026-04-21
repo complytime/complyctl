@@ -62,9 +62,9 @@ directive.
 
 **Purpose**: Initialize the providers monorepo with a single root `go.mod` and scaffold both provider directories.
 
-- [ ] T020 [US2] Create root `go.mod` in `complytime-providers/` with module `github.com/complytime/complytime-providers`; set Go version to match complyctl root (currently `go 1.25`); add `require github.com/complytime/complyctl vX.Y.Z` (use `replace` directive pointing to local complyctl during development — MUST be removed before merge)
-- [ ] T021 [US2] Create `Makefile` in `complytime-providers/` with targets: `build` (builds both providers), `build-openscap-provider`, `build-ampel-provider`, `test`, `vendor`, `lint`
-- [ ] T022 [US2] Create `docs/` directory in `complytime-providers/`; copy and update `docs/PLUGIN_GUIDE.md` from complyctl → `docs/provider-guide.md`; rename all "plugin" terminology to "provider" throughout
+- [x] T020 [US2] Create root `go.mod` in `complytime-providers/` with module `github.com/complytime/complytime-providers`; set Go version to match complyctl root (currently `go 1.25`); add `require github.com/complytime/complyctl vX.Y.Z` (use `replace` directive pointing to local complyctl during development — MUST be removed before merge)
+- [x] T021 [US2] Create `Makefile` in `complytime-providers/` with targets: `build` (builds both providers), `build-openscap-provider`, `build-ampel-provider`, `test`, `vendor`, `lint`
+- [x] T022 [US2] Create `docs/` directory in `complytime-providers/`; copy and update `docs/PLUGIN_GUIDE.md` from complyctl → `docs/provider-guide.md`; rename all "plugin" terminology to "provider" throughout
 
 ---
 
@@ -72,13 +72,13 @@ directive.
 
 **Purpose**: Migrate `cmd/openscap-plugin/` from complyctl to `cmd/openscap-provider/` in `complytime-providers`.
 
-- [ ] T023 [US2] Copy `cmd/openscap-plugin/` source tree (excluding `vendor/` and `go.mod`) to `cmd/openscap-provider/` in `complytime-providers`
-- [ ] T024 [US2] Update all `import` paths in `cmd/openscap-provider/` that referenced `github.com/complytime/complyctl/pkg/plugin` → `github.com/complytime/complyctl/pkg/provider`
-- [ ] T025 [US2] Rename all "plugin" identifiers/strings in `cmd/openscap-provider/` source to "provider" terminology; verify no provider-concept "plugin" references remain
-- [ ] T026 [US2] Ensure `cmd/openscap-provider/server/server.go` includes the `Export` stub (from PR #463); verify struct implements `provider.Provider` interface
-- [ ] T027 [US2] Delete `cmd/openscap-plugin/` directory from complyctl (`FR-007`)
-- [ ] T028 [US1] Run `go build ./cmd/openscap-provider/...` in `complytime-providers` to verify the provider compiles
-- [ ] T029 [US2][US3] Run unit tests for the openscap provider: `go test ./cmd/openscap-provider/...`
+- [x] T023 [US2] Copy `cmd/openscap-plugin/` source tree (excluding `vendor/` and `go.mod`) to `cmd/openscap-provider/` in `complytime-providers`
+- [x] T024 [US2] Update all `import` paths in `cmd/openscap-provider/` that referenced `github.com/complytime/complyctl/pkg/plugin` → `github.com/complytime/complyctl/pkg/provider`
+- [x] T025 [US2] Rename all "plugin" identifiers/strings in `cmd/openscap-provider/` source to "provider" terminology; verify no provider-concept "plugin" references remain
+- [x] T026 [US2] Ensure `cmd/openscap-provider/server/server.go` includes the `Export` stub (from PR #463); verify struct implements `provider.Provider` interface
+- [x] T027 [US2] Delete `cmd/openscap-plugin/` directory from complyctl (`FR-007`)
+- [x] T028 [US1] Run `go build ./cmd/openscap-provider/...` in `complytime-providers` to verify the provider compiles
+- [x] T029 [US2][US3] Run unit tests for the openscap provider: `go test ./cmd/openscap-provider/...`
 
 ---
 
@@ -86,13 +86,13 @@ directive.
 
 **Purpose**: Migrate `cmd/ampel-plugin/` from complyctl to `cmd/ampel-provider/` in `complytime-providers`.
 
-- [ ] T030 [US2] Copy `cmd/ampel-plugin/` source tree to `cmd/ampel-provider/` in `complytime-providers` (no separate `go.mod` exists; it already uses the root module)
-- [ ] T031 [US2] Update all `import` paths in `cmd/ampel-provider/` that referenced `github.com/complytime/complyctl/pkg/plugin` → `github.com/complytime/complyctl/pkg/provider`
-- [ ] T032 [US2] Rename all "plugin" identifiers/strings in `cmd/ampel-provider/` source to "provider" terminology
-- [ ] T033 [US2] Ensure `cmd/ampel-provider/server/server.go` includes the `Export` stub (from PR #463); verify struct implements `provider.Provider` interface
-- [ ] T034 [US2] Delete `cmd/ampel-plugin/` directory from complyctl (`FR-008`)
-- [ ] T035 [US1] Run `go build ./cmd/ampel-provider/...` in `complytime-providers` to verify the provider compiles
-- [ ] T036 [US2][US3] Run unit tests for the ampel provider: `go test ./cmd/ampel-provider/...`
+- [x] T030 [US2] Copy `cmd/ampel-plugin/` source tree to `cmd/ampel-provider/` in `complytime-providers` (no separate `go.mod` exists; it already uses the root module)
+- [x] T031 [US2] Update all `import` paths in `cmd/ampel-provider/` that referenced `github.com/complytime/complyctl/pkg/plugin` → `github.com/complytime/complyctl/pkg/provider`
+- [x] T032 [US2] Rename all "plugin" identifiers/strings in `cmd/ampel-provider/` source to "provider" terminology
+- [x] T033 [US2] Ensure `cmd/ampel-provider/server/server.go` includes the `Export` stub (from PR #463); verify struct implements `provider.Provider` interface
+- [x] T034 [US2] Delete `cmd/ampel-plugin/` directory from complyctl (`FR-008`)
+- [x] T035 [US1] Run `go build ./cmd/ampel-provider/...` in `complytime-providers` to verify the provider compiles
+- [x] T036 [US2][US3] Run unit tests for the ampel provider: `go test ./cmd/ampel-provider/...`
 
 ---
 
@@ -100,10 +100,10 @@ directive.
 
 **Purpose**: Vendor dependencies in `complytime-providers` and prepare CI for publishing release artifacts.
 
-- [ ] T037 [US2] Run `go mod vendor` in `complytime-providers/` to create the `vendor/` tree
+- [x] T037 [US2] Run `go mod vendor` in `complytime-providers/` to create the `vendor/` tree
 - [ ] T038 [US2] Remove `replace` directive from `complytime-providers/go.mod`; update `require github.com/complytime/complyctl` to the tagged release version from Phase 1 checkpoint; re-run `go mod vendor`
-- [ ] T039 [US2] Create `.github/workflows/ci.yml` in `complytime-providers/` with jobs: build both providers, run tests, and publish release artifacts (`complyctl-provider-openscap` and `complyctl-provider-ampel`) on tag push
-- [ ] T040 [US1][US3] Verify `make build` in `complytime-providers/` produces both `complyctl-provider-openscap` and `complyctl-provider-ampel` binaries with no local complyctl source tree present
+- [x] T039 [US2] Create `.github/workflows/ci.yml` in `complytime-providers/` with jobs: build both providers, run tests, and publish release artifacts (`complyctl-provider-openscap` and `complyctl-provider-ampel`) on tag push
+- [x] T040 [US1][US3] Verify `make build` in `complytime-providers/` produces both `complyctl-provider-openscap` and `complyctl-provider-ampel` binaries with no local complyctl source tree present
 
 ---
 
@@ -112,12 +112,12 @@ directive.
 **Purpose**: Remove provider build steps from complyctl Makefile and CI; update `ci_compliance.yml`
 to download provider binary from `complytime-providers` release artifact.
 
-- [ ] T041 [US1] Update complyctl `Makefile`: remove `cd cmd/openscap-plugin` build step from the `build` target; remove `cd cmd/openscap-plugin` vendor step from the `vendor` target; remove `MAN_OPENSCAP_PLUGIN` variable and associated man page build step
-- [ ] T042 [US1] Verify `make build` in complyctl produces only the `complyctl` CLI binary and completes without errors (`SC-007`)
-- [ ] T043 [US4] Update `.github/workflows/behavioral_assessment.yml`: rename `build-test-plugin` step → `build-test-provider`
-- [ ] T044 [US4] Update `.github/workflows/e2e_test.yml`: rename `build-test-plugin` step → `build-test-provider`; update E2E tests to use a provider binary obtained from `complytime-providers` rather than built from complyctl source
-- [ ] T045 [US1] Update `.github/workflows/ci_compliance.yml`: add step to download `complyctl-provider-ampel` from a published `complytime-providers` GitHub release artifact (note: this step may need to go through `complytime/org-infra` reusable workflow — flag for org-infra maintainers if so)
-- [ ] T046 [US4] Search `.github/workflows/` for any remaining "plugin" references (excluding library names) and update to "provider"
+- [x] T041 [US1] Update complyctl `Makefile`: remove `cd cmd/openscap-plugin` build step from the `build` target; remove `cd cmd/openscap-plugin` vendor step from the `vendor` target; remove `MAN_OPENSCAP_PLUGIN` variable and associated man page build step
+- [x] T042 [US1] Verify `make build` in complyctl produces only the `complyctl` CLI binary and completes without errors (`SC-007`)
+- [x] T043 [US4] Update `.github/workflows/behavioral_assessment.yml`: rename `build-test-plugin` step → `build-test-provider`
+- [x] T044 [US4] Update `.github/workflows/e2e_test.yml`: rename `build-test-plugin` step → `build-test-provider`; update E2E tests to use a provider binary obtained from `complytime-providers` rather than built from complyctl source
+- [x] T045 [US1] Update `.github/workflows/ci_compliance.yml`: add step to download `complyctl-provider-ampel` from a published `complytime-providers` GitHub release artifact (note: this step may need to go through `complytime/org-infra` reusable workflow — flag for org-infra maintainers if so)
+- [x] T046 [US4] Search `.github/workflows/` for any remaining "plugin" references (excluding library names) and update to "provider"
 
 ---
 
@@ -125,13 +125,13 @@ to download provider binary from `complytime-providers` release artifact.
 
 **Purpose**: Verify all success criteria from spec.md are met before PR submission.
 
-- [ ] T047 [US1] Confirm `SC-001`: complyctl repository has zero source files under `cmd/openscap-plugin/` or `cmd/ampel-plugin/`
-- [ ] T048 [US4] Confirm `SC-002`: full-text search of complyctl for "plugin" (case-insensitive) in Go sources, Makefile, CI workflows, and docs returns zero provider-concept matches (library name `hashicorp/go-plugin` and proto package `complyctl.plugin.v1` are exempt)
-- [ ] T049 [US2] Confirm `SC-003`: both providers build from `complytime-providers` without a local complyctl source tree
-- [ ] T050 [US1] Confirm `SC-004`: all complyctl unit tests pass (`go test ./...`)
+- [x] T047 [US1] Confirm `SC-001`: complyctl repository has zero source files under `cmd/openscap-plugin/` or `cmd/ampel-plugin/`
+- [x] T048 [US4] Confirm `SC-002`: full-text search of complyctl for "plugin" (case-insensitive) in Go sources, Makefile, CI workflows, and docs returns zero provider-concept matches (library name `hashicorp/go-plugin` and proto package `complyctl.plugin.v1` are exempt)
+- [x] T049 [US2] Confirm `SC-003`: both providers build from `complytime-providers` without a local complyctl source tree
+- [x] T050 [US1] Confirm `SC-004`: all complyctl unit tests pass (`go test ./...`)
 - [ ] T051 [US3] Confirm `SC-005`: complyctl E2E tests pass using a provider binary built from `complytime-providers`
 - [ ] T052 [US3] Confirm `SC-006`: a binary built from `complytime-providers` is discovered and invoked by `complyctl scan` correctly (binary name and discovery paths unchanged)
-- [ ] T053 [US1] Confirm `SC-007`: `make build` in complyctl produces only the `complyctl` CLI binary
+- [x] T053 [US1] Confirm `SC-007`: `make build` in complyctl produces only the `complyctl` CLI binary
 - [ ] T054 [US1] Confirm `SC-008`: complyctl CI pipeline passes without modification to any step that previously built or tested provider source directories
 
 ---
