@@ -3,24 +3,24 @@
 package policy
 
 import (
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 // EvaluatorGroup bundles per-requirement configs for a single evaluator.
 type EvaluatorGroup struct {
 	EvaluatorID string
-	Configs     []plugin.AssessmentConfiguration
+	Configs     []provider.AssessmentConfiguration
 }
 
-// ExtractAssessmentConfigs converts a DependencyGraph into plugin-ready
+// ExtractAssessmentConfigs converts a DependencyGraph into provider-ready
 // AssessmentConfiguration entries. EvaluatorID is set as a routing field
 // on the struct — it is not injected into Parameters. Parameters should
-// only carry per-requirement variable overrides for the plugin.
-func ExtractAssessmentConfigs(policyID string, graph *DependencyGraph) []plugin.AssessmentConfiguration {
-	configs := make([]plugin.AssessmentConfiguration, 0, len(graph.Assessments))
+// only carry per-requirement variable overrides for the provider.
+func ExtractAssessmentConfigs(policyID string, graph *DependencyGraph) []provider.AssessmentConfiguration {
+	configs := make([]provider.AssessmentConfiguration, 0, len(graph.Assessments))
 
 	for _, a := range graph.Assessments {
-		configs = append(configs, plugin.AssessmentConfiguration{
+		configs = append(configs, provider.AssessmentConfiguration{
 			PlanID:        policyID,
 			RequirementID: a.ID,
 			Parameters:    a.Parameters,
@@ -33,7 +33,7 @@ func ExtractAssessmentConfigs(policyID string, graph *DependencyGraph) []plugin.
 
 // GroupByEvaluator groups assessment configs by EvaluatorID.
 // See R32: specs/001-gemara-native-workflow/research.md
-func GroupByEvaluator(configs []plugin.AssessmentConfiguration, graph *DependencyGraph) map[string]EvaluatorGroup {
+func GroupByEvaluator(configs []provider.AssessmentConfiguration, graph *DependencyGraph) map[string]EvaluatorGroup {
 	groups := make(map[string]EvaluatorGroup)
 
 	if graph.EvaluatorID != "" {

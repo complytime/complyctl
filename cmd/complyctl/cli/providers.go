@@ -12,12 +12,12 @@ import (
 
 	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/internal/terminal"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 type providersOptions struct {
 	*Common
-	pluginDir string
+	providerDir string
 }
 
 func providersCmd(common *Common) *cobra.Command {
@@ -41,41 +41,41 @@ func providersCmd(common *Common) *cobra.Command {
 
 func (o *providersOptions) complete() error {
 	var err error
-	o.pluginDir, err = complytime.ResolvePluginDir()
+	o.providerDir, err = complytime.ResolveProviderDir()
 	if err != nil {
-		return fmt.Errorf("failed to resolve plugin directory: %w", err)
+		return fmt.Errorf("failed to resolve provider directory: %w", err)
 	}
 	return nil
 }
 
 func (o *providersOptions) run(ctx context.Context) error {
-	mgr, err := plugin.NewManager(o.pluginDir, logger)
+	mgr, err := provider.NewManager(o.providerDir, logger)
 	if err != nil {
-		return fmt.Errorf("plugin manager init failed: %w", err)
+		return fmt.Errorf("provider manager init failed: %w", err)
 	}
 	defer mgr.Cleanup()
 
-	if err := mgr.LoadPlugins(); err != nil {
-		return fmt.Errorf("plugin discovery failed: %w", err)
+	if err := mgr.LoadProviders(); err != nil {
+		return fmt.Errorf("provider discovery failed: %w", err)
 	}
 
-	plugins := mgr.ListPlugins()
-	if len(plugins) == 0 {
-		fmt.Fprintf(os.Stderr, "No scanning providers found in %s\n", o.pluginDir)
+	providers := mgr.ListProviders()
+	if len(providers) == 0 {
+		fmt.Fprintf(os.Stderr, "No scanning providers found in %s\n", o.providerDir)
 		return nil
 	}
 
-	rows := buildProviderRows(ctx, plugins, o.pluginDir)
+	rows := buildProviderRows(ctx, providers, o.providerDir)
 	headers := []string{"PROVIDER ID", "PATH", "STATUS", "VERSION"}
 	terminal.ShowPlainTable(os.Stdout, headers, rows)
 	return nil
 }
 
-func buildProviderRows(ctx context.Context, plugins []*plugin.LoadedPlugin, pluginDir string) [][]string {
-	rows := make([][]string, 0, len(plugins))
-	for _, lp := range plugins {
-		status, version := describePlugin(ctx, lp)
-		relPath, relErr := filepath.Rel(pluginDir, lp.Info.ExecutablePath)
+func buildProviderRows(ctx context.Context, providers []*provider.LoadedProvider, providerDir string) [][]string {
+	rows := make([][]string, 0, len(providers))
+	for _, lp := range providers {
+		status, version := describeProvider(ctx, lp)
+		relPath, relErr := filepath.Rel(providerDir, lp.Info.ExecutablePath)
 		if relErr != nil {
 			relPath = lp.Info.ExecutablePath
 		}
@@ -84,8 +84,8 @@ func buildProviderRows(ctx context.Context, plugins []*plugin.LoadedPlugin, plug
 	return rows
 }
 
-func describePlugin(ctx context.Context, lp *plugin.LoadedPlugin) (string, string) {
-	resp, err := lp.Client.Describe(ctx, &plugin.DescribeRequest{})
+func describeProvider(ctx context.Context, lp *provider.LoadedProvider) (string, string) {
+	resp, err := lp.Client.Describe(ctx, &provider.DescribeRequest{})
 	if err != nil {
 		return "ERROR", ""
 	}

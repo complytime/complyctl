@@ -55,9 +55,9 @@ func (r *registryVersionResolver) ResolveLatestVersion(registryURL, repository s
 
 // See FR-039, R44, R51, R52, R55: specs/001-gemara-native-workflow/spec.md
 func runDoctor(verbose bool) error {
-	pluginDir, err := complytime.ResolvePluginDir()
+	providerDir, err := complytime.ResolveProviderDir()
 	if err != nil {
-		return fmt.Errorf("failed to resolve plugin directory: %w", err)
+		return fmt.Errorf("failed to resolve provider directory: %w", err)
 	}
 
 	cacheDir, err := complytime.ResolveCacheDir()
@@ -80,7 +80,7 @@ func runDoctor(verbose bool) error {
 
 	versionResolver := &registryVersionResolver{timeout: 5 * time.Second}
 
-	results := doctor.Run(cfg, configPath, pluginDir, cacheDir, resolver, versionResolver, verbose, logger)
+	results := doctor.Run(cfg, configPath, providerDir, cacheDir, resolver, versionResolver, verbose, logger)
 
 	fmt.Println("Running workspace diagnostics...")
 	fmt.Println()

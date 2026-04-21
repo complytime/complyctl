@@ -12,7 +12,7 @@ import (
 	"github.com/gemaraproj/go-gemara/gemaraconv"
 
 	"github.com/complytime/complyctl/internal/complytime"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 // ToSARIF converts a gemara.EvaluationLog to SARIF using go-gemara gemaraconv.
@@ -39,25 +39,25 @@ func ToSARIF(log *gemara.EvaluationLog, artifactURI, outDir string) (string, err
 	return path, nil
 }
 
-func pluginResultToGemara(r plugin.Result) gemara.Result {
+func providerResultToGemara(r provider.Result) gemara.Result {
 	switch r {
-	case plugin.ResultPassed:
+	case provider.ResultPassed:
 		return gemara.Passed
-	case plugin.ResultFailed:
+	case provider.ResultFailed:
 		return gemara.Failed
-	case plugin.ResultSkipped:
+	case provider.ResultSkipped:
 		return gemara.NotApplicable
-	case plugin.ResultError:
+	case provider.ResultError:
 		return gemara.Unknown
 	default:
 		return gemara.NotRun
 	}
 }
 
-func aggregateResultFromSteps(steps []plugin.Step) gemara.Result {
+func aggregateResultFromSteps(steps []provider.Step) gemara.Result {
 	agg := gemara.NotRun
 	for _, s := range steps {
-		g := pluginResultToGemara(s.Result)
+		g := providerResultToGemara(s.Result)
 		agg = gemara.UpdateAggregateResult(agg, g)
 	}
 	return agg

@@ -10,7 +10,7 @@ import (
 )
 
 const stateSubdir = ".complytime"
-const pluginSubdir = "providers"
+const providerSubdir = "providers"
 
 // WorkspaceDir is the workspace-local directory for all complyctl artifacts
 // (generation state, scan output). Separate from the global ~/.complytime/ cache.
@@ -36,10 +36,10 @@ const ScanOutputDir = "scan"
 const LogFileName = "complyctl.log"
 
 // DefaultCommandTimeout is the default deadline for scan and generate operations.
-// This flows through gRPC to the plugin subprocess without additional capping.
+// This flows through gRPC to the provider subprocess without additional capping.
 const DefaultCommandTimeout = 5 * time.Minute
 
-const PluginExecutablePrefix = "complyctl-provider-"
+const ProviderExecutablePrefix = "complyctl-provider-"
 
 // SystemProviderDir is the system-wide provider directory where
 // package managers (e.g., RPM) install provider binaries.
@@ -90,11 +90,11 @@ func ResolveCacheDir() (string, error) {
 	return filepath.Join(homeDir, stateSubdir), nil
 }
 
-// ResolvePluginDir returns the absolute path to the provider directory.
-func ResolvePluginDir() (string, error) {
+// ResolveProviderDir returns the absolute path to the provider directory.
+func ResolveProviderDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(homeDir, stateSubdir, pluginSubdir), nil
+	return filepath.Join(homeDir, stateSubdir, providerSubdir), nil
 }

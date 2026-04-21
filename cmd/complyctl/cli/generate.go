@@ -15,15 +15,15 @@ import (
 	"github.com/complytime/complyctl/internal/output"
 	"github.com/complytime/complyctl/internal/policy"
 	"github.com/complytime/complyctl/internal/terminal"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 type generateOptions struct {
 	*Common
-	policyID  string
-	timeout   time.Duration
-	cacheDir  string
-	pluginDir string
+	policyID    string
+	timeout     time.Duration
+	cacheDir    string
+	providerDir string
 }
 
 func generateCmd(common *Common) *cobra.Command {
@@ -32,7 +32,7 @@ func generateCmd(common *Common) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:               "generate [flags]",
-		Short:             "Generate policy graph and invoke plugins",
+		Short:             "Generate policy graph and invoke providers",
 		Example:           `complyctl generate --policy-id nist-800-53-r5`,
 		SilenceUsage:      true,
 		Args:              cobra.NoArgs,
@@ -63,9 +63,9 @@ func (o *generateOptions) complete() error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve cache directory: %w", err)
 	}
-	o.pluginDir, err = complytime.ResolvePluginDir()
+	o.providerDir, err = complytime.ResolveProviderDir()
 	if err != nil {
-		return fmt.Errorf("failed to resolve plugin directory: %w", err)
+		return fmt.Errorf("failed to resolve provider directory: %w", err)
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func (o *generateOptions) generatePolicy(ctx context.Context, cfg *complytime.Wo
 	}
 	fmt.Fprintf(os.Stderr, "Resolved %s version: %s\n", ref.Repository, version)
 
-	mgr, err := loadPlugins(o.pluginDir)
+	mgr, err := loadProviders(o.providerDir)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (o *generateOptions) generatePolicy(ctx context.Context, cfg *complytime.Wo
 	return saveGenerationAndPrint(o.cacheDir, ref.Repository, eid, evaluatorIDs, planRows)
 }
 
-func invokeGenerate(ctx context.Context, mgr *plugin.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string) ([]string, []output.ExecutionPlanRow, error) {
+func invokeGenerate(ctx context.Context, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string) ([]string, []output.ExecutionPlanRow, error) {
 	spin := terminal.NewSpinner("Generating policy artifacts...")
 	spin.Start()
 	defer spin.Stop()
@@ -128,12 +128,12 @@ func invokeGenerate(ctx context.Context, mgr *plugin.Manager, groups map[string]
 	return evaluatorIDs, planRows, nil
 }
 
-func buildExecutionPlan(mgr *plugin.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig) ([]string, []output.ExecutionPlanRow) {
+func buildExecutionPlan(mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig) ([]string, []output.ExecutionPlanRow) {
 	var evaluatorIDs []string
 	var planRows []output.ExecutionPlanRow
 	for evalID, group := range groups {
 		evaluatorIDs = append(evaluatorIDs, evalID)
-		status := pluginStatus(mgr, evalID)
+		status := providerStatus(mgr, evalID)
 		for _, target := range policyTargets {
 			planRows = append(planRows, output.ExecutionPlanRow{
 				TargetID:         target.ID,
@@ -146,8 +146,8 @@ func buildExecutionPlan(mgr *plugin.Manager, groups map[string]policy.EvaluatorG
 	return evaluatorIDs, planRows
 }
 
-func pluginStatus(mgr *plugin.Manager, evalID string) string {
-	if _, err := mgr.GetPlugin(evalID); err != nil {
+func providerStatus(mgr *provider.Manager, evalID string) string {
+	if _, err := mgr.GetProvider(evalID); err != nil {
 		return "ERROR"
 	}
 	return "healthy"

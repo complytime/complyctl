@@ -6,23 +6,23 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFormatScanSummary_SingleTarget(t *testing.T) {
-	assessments := []plugin.AssessmentLog{
+	assessments := []provider.AssessmentLog{
 		{
 			RequirementID: "REQ-1",
-			Steps: []plugin.Step{
-				{Result: plugin.ResultPassed, Message: "Test passed"},
+			Steps: []provider.Step{
+				{Result: provider.ResultPassed, Message: "Test passed"},
 			},
 		},
 		{
 			RequirementID: "REQ-2",
-			Steps: []plugin.Step{
-				{Result: plugin.ResultFailed, Message: "Test failed"},
+			Steps: []provider.Step{
+				{Result: provider.ResultFailed, Message: "Test failed"},
 			},
 		},
 	}
@@ -47,17 +47,17 @@ func TestFormatScanSummary_SingleTarget(t *testing.T) {
 }
 
 func TestFormatScanSummary_MultipleTargets(t *testing.T) {
-	assessments := []plugin.AssessmentLog{
+	assessments := []provider.AssessmentLog{
 		{
 			RequirementID: "REQ-1",
-			Steps: []plugin.Step{
-				{Result: plugin.ResultFailed, Message: "Target A failed"},
+			Steps: []provider.Step{
+				{Result: provider.ResultFailed, Message: "Target A failed"},
 			},
 		},
 		{
 			RequirementID: "REQ-1",
-			Steps: []plugin.Step{
-				{Result: plugin.ResultFailed, Message: "Target B failed"},
+			Steps: []provider.Step{
+				{Result: provider.ResultFailed, Message: "Target B failed"},
 			},
 		},
 	}
@@ -85,14 +85,14 @@ func TestFormatScanSummary_MultipleTargets(t *testing.T) {
 }
 
 func TestFormatScanSummary_AllPassed(t *testing.T) {
-	assessments := []plugin.AssessmentLog{
+	assessments := []provider.AssessmentLog{
 		{
 			RequirementID: "REQ-1",
-			Steps:         []plugin.Step{{Result: plugin.ResultPassed, Message: "OK"}},
+			Steps:         []provider.Step{{Result: provider.ResultPassed, Message: "OK"}},
 		},
 		{
 			RequirementID: "REQ-2",
-			Steps:         []plugin.Step{{Result: plugin.ResultPassed, Message: "OK"}},
+			Steps:         []provider.Step{{Result: provider.ResultPassed, Message: "OK"}},
 		},
 	}
 	assessmentTargets := []string{"target1", "target1"}
@@ -107,10 +107,10 @@ func TestFormatScanSummary_AllPassed(t *testing.T) {
 }
 
 func TestFormatScanSummary_MissingTargetID(t *testing.T) {
-	assessments := []plugin.AssessmentLog{
+	assessments := []provider.AssessmentLog{
 		{
 			RequirementID: "REQ-1",
-			Steps:         []plugin.Step{{Result: plugin.ResultFailed, Message: "Failed"}},
+			Steps:         []provider.Step{{Result: provider.ResultFailed, Message: "Failed"}},
 		},
 	}
 	assessmentTargets := []string{}
@@ -125,10 +125,10 @@ func TestFormatScanSummary_MissingTargetID(t *testing.T) {
 }
 
 func TestFormatScanSummary_ControlIDMissing(t *testing.T) {
-	assessments := []plugin.AssessmentLog{
+	assessments := []provider.AssessmentLog{
 		{
 			RequirementID: "REQ-UNKNOWN",
-			Steps:         []plugin.Step{{Result: plugin.ResultFailed, Message: "No control"}},
+			Steps:         []provider.Step{{Result: provider.ResultFailed, Message: "No control"}},
 		},
 	}
 	assessmentTargets := []string{"target1"}

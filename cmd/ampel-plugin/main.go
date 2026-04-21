@@ -2,10 +2,10 @@ package main
 
 import (
 	"github.com/complytime/complyctl/cmd/ampel-plugin/server"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 func main() {
 	ampelPlugin := server.New()
-	plugin.Serve(ampelPlugin)
+	provider.Serve(ampelPlugin)
 }

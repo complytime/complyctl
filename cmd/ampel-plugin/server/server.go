@@ -16,7 +16,7 @@ import (
 	"github.com/complytime/complyctl/cmd/ampel-plugin/scan"
 	"github.com/complytime/complyctl/cmd/ampel-plugin/targets"
 	"github.com/complytime/complyctl/cmd/ampel-plugin/toolcheck"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 // ScanRunner is used by Scan to execute scan commands.
@@ -29,9 +29,9 @@ var SkipToolCheck bool
 // safeBranchPattern matches valid git branch names.
 var safeBranchPattern = regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
 
-var _ plugin.Plugin = (*PluginServer)(nil)
+var _ provider.Provider = (*PluginServer)(nil)
 
-// PluginServer implements the plugin.Plugin interface for the AMPEL plugin.
+// PluginServer implements the provider.Plugin interface for the AMPEL plugin.
 type PluginServer struct{}
 
 // New returns a new PluginServer.
@@ -40,8 +40,8 @@ func New() *PluginServer {
 }
 
 // Describe returns the plugin metadata and health status.
-func (s *PluginServer) Describe(_ context.Context, _ *plugin.DescribeRequest) (*plugin.DescribeResponse, error) {
-	return &plugin.DescribeResponse{
+func (s *PluginServer) Describe(_ context.Context, _ *provider.DescribeRequest) (*provider.DescribeResponse, error) {
+	return &provider.DescribeResponse{
 		Healthy:                 true,
 		Version:                 "0.1.0",
 		RequiredTargetVariables: []string{"url", "specs"},
@@ -51,25 +51,25 @@ func (s *PluginServer) Describe(_ context.Context, _ *plugin.DescribeRequest) (*
 // Generate matches requirement IDs from the assessment configurations against
 // granular AMPEL policy files and merges the matched policies into a single
 // bundle for scan.
-func (s *PluginServer) Generate(_ context.Context, req *plugin.GenerateRequest) (*plugin.GenerateResponse, error) {
+func (s *PluginServer) Generate(_ context.Context, req *provider.GenerateRequest) (*provider.GenerateResponse, error) {
 	logger := hclog.Default()
 
 	if len(req.Configuration) == 0 {
-		return &plugin.GenerateResponse{
+		return &provider.GenerateResponse{
 			Success:      false,
 			ErrorMessage: "no assessment configurations provided",
 		}, nil
 	}
 
 	if err := checkRequiredTools(logger); err != nil {
-		return &plugin.GenerateResponse{
+		return &provider.GenerateResponse{
 			Success:      false,
 			ErrorMessage: err.Error(),
 		}, nil
 	}
 
 	if err := config.EnsureDirectories(); err != nil {
-		return &plugin.GenerateResponse{
+		return &provider.GenerateResponse{
 			Success:      false,
 			ErrorMessage: fmt.Sprintf("directory setup failed: %v", err),
 		}, nil
@@ -85,7 +85,7 @@ func (s *PluginServer) Generate(_ context.Context, req *plugin.GenerateRequest) 
 
 	granular, err := convert.LoadGranularPolicies(sourceDir)
 	if err != nil {
-		return &plugin.GenerateResponse{
+		return &provider.GenerateResponse{
 			Success:      false,
 			ErrorMessage: fmt.Sprintf("loading granular policies: %v", err),
 		}, nil
@@ -98,24 +98,24 @@ func (s *PluginServer) Generate(_ context.Context, req *plugin.GenerateRequest) 
 
 	if len(matched) == 0 {
 		logger.Info("no matching policies found, skipping policy generation")
-		return &plugin.GenerateResponse{Success: true}, nil
+		return &provider.GenerateResponse{Success: true}, nil
 	}
 
 	bundle := convert.MergeToBundle(matched)
 	if err := convert.WritePolicy(bundle, outputDir); err != nil {
-		return &plugin.GenerateResponse{
+		return &provider.GenerateResponse{
 			Success:      false,
 			ErrorMessage: fmt.Sprintf("writing AMPEL policy bundle: %v", err),
 		}, nil
 	}
 
 	logger.Info("AMPEL policy bundle written", "path", outputDir, "policies", len(matched))
-	return &plugin.GenerateResponse{Success: true}, nil
+	return &provider.GenerateResponse{Success: true}, nil
 }
 
 // Scan invokes the AMPEL toolchain to scan target repositories and returns
 // standardized assessment results.
-func (s *PluginServer) Scan(_ context.Context, req *plugin.ScanRequest) (*plugin.ScanResponse, error) {
+func (s *PluginServer) Scan(_ context.Context, req *provider.ScanRequest) (*provider.ScanResponse, error) {
 	logger := hclog.Default()
 
 	if len(req.Targets) == 0 {

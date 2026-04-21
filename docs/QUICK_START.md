@@ -4,7 +4,7 @@
 
 See [INSTALLATION.md](INSTALLATION.md).
 
-## Step 2: Install a plugin
+## Step 2: Install a provider
 
 Scanning providers are standalone executables placed in `~/.complytime/providers/`. The filename determines the evaluator ID.
 
@@ -15,11 +15,11 @@ cp bin/complyctl-provider-openscap ~/.complytime/providers/
 
 Naming convention: `complyctl-provider-<evaluator-id>`. The CLI strips the prefix to derive the evaluator ID used for routing.
 
-For the openscap plugin, install prerequisites:
+For the openscap provider, install prerequisites:
 - `openscap-scanner` package
 - `scap-security-guide` package
 
-See the [Plugin Guide](PLUGIN_GUIDE.md) for authoring details.
+See the [Provider Guide](https://github.com/complytime/complytime-providers/blob/main/docs/provider-guide.md) for authoring details.
 
 ## Step 3: Create workspace config
 
@@ -70,7 +70,7 @@ Displays cached policies and their versions.
 complyctl generate --policy-id nist-800-53-r5
 ```
 
-Resolves the policy dependency graph, extracts assessment configurations, and dispatches to the matching plugin via Generate RPC.
+Resolves the policy dependency graph, extracts assessment configurations, and dispatches to the matching provider via Generate RPC.
 
 ## Step 7: Scan
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package plugin
+package provider
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	_ Plugin   = (*Client)(nil)
+	_ Provider = (*Client)(nil)
 	_ Exporter = (*Client)(nil)
 )
 
@@ -28,8 +28,8 @@ type AssessmentConfiguration struct {
 	PlanID        string
 	RequirementID string
 	Parameters    map[string]string
-	// EvaluatorID is used for routing to the correct plugin. It is not
-	// serialized over gRPC — routing is handled by the plugin manager.
+	// EvaluatorID is used for routing to the correct provider. It is not
+	// serialized over gRPC — routing is handled by the provider manager.
 	EvaluatorID string
 }
 
@@ -46,7 +46,7 @@ type ScanRequest struct {
 	Targets []Target
 }
 
-// Target identifies a system or environment to scan, with plugin-specific variables.
+// Target identifies a system or environment to scan, with provider-specific variables.
 type Target struct {
 	TargetID  string
 	Variables map[string]string
@@ -128,7 +128,7 @@ type ExportResponse struct {
 	ErrorMessage  string
 }
 
-// Client provides gRPC communication with a plugin subprocess managed by
+// Client provides gRPC communication with a provider subprocess managed by
 // hashicorp/go-plugin.
 type Client struct {
 	executablePath string

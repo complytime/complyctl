@@ -14,7 +14,7 @@ import (
 	"github.com/complytime/complyctl/internal/cache"
 	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/internal/policy"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 // CheckStatus is the result state of a single diagnostic check.
@@ -63,7 +63,7 @@ const registryTimeout = 5 * time.Second
 // The resolver parameter enables policy → evaluator → target mapping for
 // variable validation (R51, R52). Pass nil if the policy cache is not
 // available — CheckCache will report the failure. pluginLogger is the
-// hclog.Logger used for plugin manager and go-plugin client logging.
+// hclog.Logger used for provider manager and go-plugin client logging.
 // When verbose is true, CheckVariables expands per-provider variable detail
 // to show individual key status (R55).
 // cacheBaseDir is the root cache directory (~/.complytime) where state.json
@@ -124,7 +124,7 @@ func CheckConfig(configPath string) CheckResult {
 
 // CheckProviders discovers providers and runs Describe on each.
 // Returns both diagnostic results and Describe data for variable validation (R51).
-// pluginLogger is passed to the plugin Manager for go-plugin client logging.
+// providerLogger is passed to the provider Manager for go-plugin client logging.
 func CheckProviders(providerDir string, pluginLogger hclog.Logger) ([]CheckResult, []ProviderHealth) {
 	if _, err := os.Stat(providerDir); os.IsNotExist(err) {
 		return []CheckResult{{
@@ -135,7 +135,7 @@ func CheckProviders(providerDir string, pluginLogger hclog.Logger) ([]CheckResul
 		}}, nil
 	}
 
-	mgr, err := plugin.NewManager(providerDir, pluginLogger)
+	mgr, err := provider.NewManager(providerDir, pluginLogger)
 	if err != nil {
 		return []CheckResult{{
 			Name:     "providers",
@@ -146,7 +146,7 @@ func CheckProviders(providerDir string, pluginLogger hclog.Logger) ([]CheckResul
 	}
 	defer mgr.Cleanup()
 
-	if err := mgr.LoadPlugins(); err != nil {
+	if err := mgr.LoadProviders(); err != nil {
 		return []CheckResult{{
 			Name:     "providers",
 			Status:   StatusFail,
@@ -155,8 +155,8 @@ func CheckProviders(providerDir string, pluginLogger hclog.Logger) ([]CheckResul
 		}}, nil
 	}
 
-	plugins := mgr.ListPlugins()
-	if len(plugins) == 0 {
+	providers := mgr.ListProviders()
+	if len(providers) == 0 {
 		return []CheckResult{{
 			Name:     "providers",
 			Status:   StatusWarn,
@@ -170,8 +170,8 @@ func CheckProviders(providerDir string, pluginLogger hclog.Logger) ([]CheckResul
 
 	var results []CheckResult
 	var healthData []ProviderHealth
-	for _, lp := range plugins {
-		resp, descErr := lp.Client.Describe(ctx, &plugin.DescribeRequest{})
+	for _, lp := range providers {
+		resp, descErr := lp.Client.Describe(ctx, &provider.DescribeRequest{})
 		if descErr != nil {
 			results = append(results, CheckResult{
 				Name:     fmt.Sprintf("provider/%s", lp.Info.EvaluatorID),

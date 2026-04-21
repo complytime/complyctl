@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 func loadFixture(t *testing.T, path string) []byte {
@@ -249,7 +249,7 @@ func TestToScanResponse(t *testing.T) {
 	assessment := resp.Assessments[0]
 	require.Equal(t, "BP-1.01", assessment.RequirementID)
 	require.Len(t, assessment.Steps, 2)
-	require.Equal(t, plugin.ConfidenceLevelHigh, assessment.Confidence)
+	require.Equal(t, provider.ConfidenceLevelHigh, assessment.Confidence)
 
 	// Sort by Name for deterministic assertions
 	steps := assessment.Steps
@@ -258,10 +258,10 @@ func TestToScanResponse(t *testing.T) {
 	})
 
 	require.Equal(t, "myorg/repo1@main", steps[0].Name)
-	require.Equal(t, plugin.ResultPassed, steps[0].Result)
+	require.Equal(t, provider.ResultPassed, steps[0].Result)
 
 	require.Equal(t, "myorg/repo2@main", steps[1].Name)
-	require.Equal(t, plugin.ResultFailed, steps[1].Result)
+	require.Equal(t, provider.ResultFailed, steps[1].Result)
 }
 
 func TestToScanResponse_MultipleChecks(t *testing.T) {
@@ -308,14 +308,14 @@ func TestToScanResponse_ErrorRepo(t *testing.T) {
 
 	resp := ToScanResponse(repoResults)
 	require.Len(t, resp.Assessments, 1)
-	require.Equal(t, plugin.ResultError, resp.Assessments[0].Steps[0].Result)
+	require.Equal(t, provider.ResultError, resp.Assessments[0].Steps[0].Result)
 	require.Equal(t, "connection refused", resp.Assessments[0].Steps[0].Message)
 }
 
 func TestMapResult(t *testing.T) {
-	require.Equal(t, plugin.ResultPassed, mapResult("pass", "pass"))
-	require.Equal(t, plugin.ResultFailed, mapResult("fail", "fail"))
-	require.Equal(t, plugin.ResultError, mapResult("pass", "error"))
-	require.Equal(t, plugin.ResultError, mapResult("unknown", "pass"))
-	require.Equal(t, plugin.ResultSkipped, mapResult("skip", "pass"))
+	require.Equal(t, provider.ResultPassed, mapResult("pass", "pass"))
+	require.Equal(t, provider.ResultFailed, mapResult("fail", "fail"))
+	require.Equal(t, provider.ResultError, mapResult("pass", "error"))
+	require.Equal(t, provider.ResultError, mapResult("unknown", "pass"))
+	require.Equal(t, provider.ResultSkipped, mapResult("skip", "pass"))
 }

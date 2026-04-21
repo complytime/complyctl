@@ -15,7 +15,7 @@ import (
 	"github.com/complytime/complyctl/cmd/ampel-plugin/scan"
 	"github.com/complytime/complyctl/cmd/ampel-plugin/toolcheck"
 	"github.com/complytime/complyctl/internal/complytime"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 func TestMain(m *testing.M) {
@@ -24,8 +24,8 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func makeTestConfigurations() []plugin.AssessmentConfiguration {
-	return []plugin.AssessmentConfiguration{
+func makeTestConfigurations() []provider.AssessmentConfiguration {
+	return []provider.AssessmentConfiguration{
 		{RequirementID: "BP-1.01"},
 	}
 }
@@ -138,7 +138,7 @@ func setupServerWithGenerate(t *testing.T) (*PluginServer, string) {
 	s, dir := setupServer(t)
 
 	// Generate a policy bundle so paths exist
-	resp, err := s.Generate(context.Background(), &plugin.GenerateRequest{
+	resp, err := s.Generate(context.Background(), &provider.GenerateRequest{
 		Configuration: makeTestConfigurations(),
 	})
 	require.NoError(t, err)
@@ -151,7 +151,7 @@ func setupServerWithGenerate(t *testing.T) (*PluginServer, string) {
 
 func TestDescribe_Healthy(t *testing.T) {
 	s := New()
-	resp, err := s.Describe(context.Background(), &plugin.DescribeRequest{})
+	resp, err := s.Describe(context.Background(), &provider.DescribeRequest{})
 	require.NoError(t, err)
 	require.True(t, resp.Healthy)
 	require.Equal(t, "0.1.0", resp.Version)
@@ -162,7 +162,7 @@ func TestDescribe_Healthy(t *testing.T) {
 
 func TestGenerate_ValidConfiguration(t *testing.T) {
 	s, dir := setupServer(t)
-	resp, err := s.Generate(context.Background(), &plugin.GenerateRequest{
+	resp, err := s.Generate(context.Background(), &provider.GenerateRequest{
 		Configuration: makeTestConfigurations(),
 	})
 	require.NoError(t, err)
@@ -178,8 +178,8 @@ func TestGenerate_ValidConfiguration(t *testing.T) {
 
 func TestGenerate_EmptyConfiguration(t *testing.T) {
 	s, _ := setupServer(t)
-	resp, err := s.Generate(context.Background(), &plugin.GenerateRequest{
-		Configuration: []plugin.AssessmentConfiguration{},
+	resp, err := s.Generate(context.Background(), &provider.GenerateRequest{
+		Configuration: []provider.AssessmentConfiguration{},
 	})
 	require.NoError(t, err)
 	require.False(t, resp.Success)
@@ -189,8 +189,8 @@ func TestGenerate_EmptyConfiguration(t *testing.T) {
 func TestGenerate_NoMatchingPolicies(t *testing.T) {
 	s, dir := setupServer(t)
 
-	resp, err := s.Generate(context.Background(), &plugin.GenerateRequest{
-		Configuration: []plugin.AssessmentConfiguration{
+	resp, err := s.Generate(context.Background(), &provider.GenerateRequest{
+		Configuration: []provider.AssessmentConfiguration{
 			{RequirementID: "nonexistent-rule"},
 		},
 	})
@@ -210,15 +210,15 @@ func TestGenerate_OverwritesExistingPolicy(t *testing.T) {
 	writeGranularPolicies(t, policyDir, "BP-3.01")
 
 	configs1 := makeTestConfigurations()
-	configs2 := []plugin.AssessmentConfiguration{
+	configs2 := []provider.AssessmentConfiguration{
 		{RequirementID: "BP-3.01"},
 	}
 
-	resp1, err := s.Generate(context.Background(), &plugin.GenerateRequest{Configuration: configs1})
+	resp1, err := s.Generate(context.Background(), &provider.GenerateRequest{Configuration: configs1})
 	require.NoError(t, err)
 	require.True(t, resp1.Success)
 
-	resp2, err := s.Generate(context.Background(), &plugin.GenerateRequest{Configuration: configs2})
+	resp2, err := s.Generate(context.Background(), &provider.GenerateRequest{Configuration: configs2})
 	require.NoError(t, err)
 	require.True(t, resp2.Success)
 
@@ -235,7 +235,7 @@ func TestGenerate_CustomPolicyDir(t *testing.T) {
 	customDir := filepath.Join(dir, "custom-policies")
 	writeGranularPolicies(t, customDir, "BP-1.01")
 
-	resp, err := s.Generate(context.Background(), &plugin.GenerateRequest{
+	resp, err := s.Generate(context.Background(), &provider.GenerateRequest{
 		Configuration:   makeTestConfigurations(),
 		GlobalVariables: map[string]string{"ampel_policy_dir": customDir},
 	})
@@ -261,7 +261,7 @@ func TestGenerate_MissingToolReturnsError(t *testing.T) {
 		toolcheck.RequiredTools = origTools
 	}()
 
-	resp, err := s.Generate(context.Background(), &plugin.GenerateRequest{
+	resp, err := s.Generate(context.Background(), &provider.GenerateRequest{
 		Configuration: makeTestConfigurations(),
 	})
 	require.NoError(t, err)
@@ -315,8 +315,8 @@ func TestScan_ValidTargets(t *testing.T) {
 	}
 	defer func() { ScanRunner = origRunner }()
 
-	resp, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{
+	resp, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{
 			{TargetID: "myorg-repo1", Variables: map[string]string{
 				"url":   "https://github.com/myorg/repo1",
 				"specs": "builtin:github/branch-rules.yaml",
@@ -325,7 +325,7 @@ func TestScan_ValidTargets(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, resp.Assessments, 1)
-	require.Equal(t, plugin.ResultPassed, resp.Assessments[0].Steps[0].Result)
+	require.Equal(t, provider.ResultPassed, resp.Assessments[0].Steps[0].Result)
 
 	// Verify snappy attestation and ampel intoto result files were created
 	resultsDir := filepath.Join(dir, complytime.WorkspaceDir, config.PluginDir, config.DefaultResultsDir)
@@ -344,8 +344,8 @@ func TestScan_EmptySpecs_ReturnsError(t *testing.T) {
 	}
 	defer func() { ScanRunner = origRunner }()
 
-	_, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{
+	_, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{
 			{TargetID: "myorg-repo1", Variables: map[string]string{
 				"url": "https://github.com/myorg/repo1",
 			}},
@@ -367,8 +367,8 @@ func TestScan_MultipleSpecs(t *testing.T) {
 	}
 	defer func() { ScanRunner = origRunner }()
 
-	scanResp, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{
+	scanResp, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{
 			{TargetID: "myorg-repo1", Variables: map[string]string{
 				"url":   "https://github.com/myorg/repo1",
 				"specs": "github/branch-rules.yaml,github/custom-check.yaml",
@@ -403,8 +403,8 @@ func TestScan_ScanError_ContinuesScanning(t *testing.T) {
 	}
 	defer func() { ScanRunner = origRunner }()
 
-	scanResp, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{
+	scanResp, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{
 			{TargetID: "myorg-repo1", Variables: map[string]string{
 				"url":   "https://github.com/myorg/repo1",
 				"specs": "builtin:github/branch-rules.yaml",
@@ -464,8 +464,8 @@ func TestScan_MissingURLVariable(t *testing.T) {
 	}
 	defer func() { ScanRunner = origRunner }()
 
-	_, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{
+	_, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{
 			{TargetID: "test", Variables: map[string]string{
 				"specs": "builtin:github/branch-rules.yaml",
 			}},
@@ -485,8 +485,8 @@ func TestScan_MissingSpecsVariable(t *testing.T) {
 	}
 	defer func() { ScanRunner = origRunner }()
 
-	_, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{
+	_, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{
 			{TargetID: "test", Variables: map[string]string{
 				"url": "https://github.com/myorg/repo1",
 			}},
@@ -508,8 +508,8 @@ func TestScan_BranchesDefault(t *testing.T) {
 	}
 	defer func() { ScanRunner = origRunner }()
 
-	resp, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{
+	resp, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{
 			{TargetID: "myorg-repo1", Variables: map[string]string{
 				"url":   "https://github.com/myorg/repo1",
 				"specs": "builtin:github/branch-rules.yaml",
@@ -533,8 +533,8 @@ func TestScan_CommaSeparatedBranches(t *testing.T) {
 	}
 	defer func() { ScanRunner = origRunner }()
 
-	resp, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{
+	resp, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{
 			{TargetID: "myorg-repo1", Variables: map[string]string{
 				"url":      "https://github.com/myorg/repo1",
 				"specs":    "builtin:github/branch-rules.yaml",
@@ -559,8 +559,8 @@ func TestScan_PlatformHintVariable(t *testing.T) {
 	}
 	defer func() { ScanRunner = origRunner }()
 
-	resp, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{
+	resp, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{
 			{TargetID: "corp-repo", Variables: map[string]string{
 				"url":      "https://git.corp.com/myorg/repo1",
 				"specs":    "builtin:github/branch-rules.yaml",
@@ -582,8 +582,8 @@ func TestScan_BranchValidation(t *testing.T) {
 	}
 	defer func() { ScanRunner = origRunner }()
 
-	_, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{
+	_, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{
 			{TargetID: "test", Variables: map[string]string{
 				"url":      "https://github.com/myorg/repo1",
 				"specs":    "builtin:github/branch-rules.yaml",
@@ -597,8 +597,8 @@ func TestScan_BranchValidation(t *testing.T) {
 
 func TestScan_EmptyTargets(t *testing.T) {
 	s := New()
-	_, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{},
+	_, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{},
 	})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no targets")
@@ -618,7 +618,7 @@ func TestGenerate_ToolCheckError_IncludesToolName(t *testing.T) {
 		toolcheck.RequiredTools = origTools
 	}()
 
-	resp, err := s.Generate(context.Background(), &plugin.GenerateRequest{
+	resp, err := s.Generate(context.Background(), &provider.GenerateRequest{
 		Configuration: makeTestConfigurations(),
 	})
 	require.NoError(t, err)
@@ -640,8 +640,8 @@ func TestScan_MissingToolReturnsError(t *testing.T) {
 		toolcheck.RequiredTools = origTools
 	}()
 
-	_, err := s.Scan(context.Background(), &plugin.ScanRequest{
-		Targets: []plugin.Target{
+	_, err := s.Scan(context.Background(), &provider.ScanRequest{
+		Targets: []provider.Target{
 			{TargetID: "test", Variables: map[string]string{"github_token": "ghp_test"}},
 		},
 	})

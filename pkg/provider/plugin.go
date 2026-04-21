@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package plugin
+package provider
 
 import (
 	"context"
@@ -12,7 +12,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-// Handshake is the shared complytime that plugins must match to connect.
+// Handshake is the shared config that providers must match to connect.
+// Wire values are frozen — do not change MagicCookieKey, MagicCookieValue, or ProtocolVersion.
 var Handshake = goplugin.HandshakeConfig{
 	ProtocolVersion: 1,
 	MagicCookieKey:  "COMPLYCTL_PLUGIN",
@@ -20,8 +21,8 @@ var Handshake = goplugin.HandshakeConfig{
 	MagicCookieValue: "ddff478d-578e-4d9d-8253-35e8ebf548d2",
 }
 
-// SupportedPlugins is the plugin type map used when creating go-plugin clients.
-var SupportedPlugins = map[string]goplugin.Plugin{
+// SupportedProviders is the provider type map used when creating go-plugin clients.
+var SupportedProviders = map[string]goplugin.Plugin{
 	"evaluator": &GRPCEvaluatorPlugin{},
 }
 
@@ -29,7 +30,7 @@ var SupportedPlugins = map[string]goplugin.Plugin{
 // evaluator service.
 type GRPCEvaluatorPlugin struct {
 	goplugin.Plugin
-	Impl Plugin
+	Impl Provider
 }
 
 func (p *GRPCEvaluatorPlugin) GRPCServer(_ *goplugin.GRPCBroker, s *grpc.Server) error {
@@ -41,10 +42,10 @@ func (p *GRPCEvaluatorPlugin) GRPCClient(_ context.Context, _ *goplugin.GRPCBrok
 	return proto.NewPluginClient(c), nil
 }
 
-// Serve starts the plugin process. Plugin authors call this from main().
+// Serve starts the provider process. Provider authors call this from main().
 // A JSON logger is created at Trace level so every message reaches the
 // client; the client-side logger level controls what is actually written.
-func Serve(impl Plugin) {
+func Serve(impl Provider) {
 	logger := hclog.New(&hclog.LoggerOptions{
 		Level:      hclog.Trace,
 		Output:     os.Stderr,

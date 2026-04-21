@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 
 	xccdf "github.com/complytime/complyctl/cmd/openscap-plugin/xccdftype"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 const (
@@ -75,7 +75,7 @@ func validateVariableExistence(policyVariableID string, dsVariables []DsVariable
 	return false
 }
 
-func unselectAbsentRules(tailoringSelections, dsProfileSelections []xccdf.SelectElement, configuration []plugin.AssessmentConfiguration) []xccdf.SelectElement {
+func unselectAbsentRules(tailoringSelections, dsProfileSelections []xccdf.SelectElement, configuration []provider.AssessmentConfiguration) []xccdf.SelectElement {
 	for _, dsRule := range dsProfileSelections {
 		dsRuleAlsoInPolicy := false
 		ruleID := removePrefix(dsRule.IDRef, ruleIDPrefix)
@@ -95,7 +95,7 @@ func unselectAbsentRules(tailoringSelections, dsProfileSelections []xccdf.Select
 	return tailoringSelections
 }
 
-func selectAdditionalRules(tailoringSelections, dsProfileSelections []xccdf.SelectElement, configuration []plugin.AssessmentConfiguration) []xccdf.SelectElement {
+func selectAdditionalRules(tailoringSelections, dsProfileSelections []xccdf.SelectElement, configuration []provider.AssessmentConfiguration) []xccdf.SelectElement {
 	rulesMap := make(map[string]bool)
 
 	for _, cfg := range configuration {
@@ -121,13 +121,13 @@ func selectAdditionalRules(tailoringSelections, dsProfileSelections []xccdf.Sele
 	return tailoringSelections
 }
 
-func filterValidRules(configuration []plugin.AssessmentConfiguration, dsPath string) ([]plugin.AssessmentConfiguration, []string, error) {
+func filterValidRules(configuration []provider.AssessmentConfiguration, dsPath string) ([]provider.AssessmentConfiguration, []string, error) {
 	dsRules, err := GetDsRules(dsPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get rules from datastream: %w", err)
 	}
 
-	var validConfigs []plugin.AssessmentConfiguration
+	var validConfigs []provider.AssessmentConfiguration
 	var skippedRules []string
 	for _, cfg := range configuration {
 		if validateRuleExistence(cfg.RequirementID, dsRules) {
@@ -146,7 +146,7 @@ func filterValidRules(configuration []plugin.AssessmentConfiguration, dsPath str
 	return validConfigs, skippedRules, nil
 }
 
-func getTailoringSelections(configuration []plugin.AssessmentConfiguration, dsProfile *xccdf.ProfileElement) []xccdf.SelectElement {
+func getTailoringSelections(configuration []provider.AssessmentConfiguration, dsProfile *xccdf.ProfileElement) []xccdf.SelectElement {
 	var tailoringSelections []xccdf.SelectElement
 	tailoringSelections = unselectAbsentRules(tailoringSelections, dsProfile.Selections, configuration)
 	tailoringSelections = selectAdditionalRules(tailoringSelections, dsProfile.Selections, configuration)
@@ -154,7 +154,7 @@ func getTailoringSelections(configuration []plugin.AssessmentConfiguration, dsPr
 	return tailoringSelections
 }
 
-func updateTailoringValues(tailoringValues, dsProfileValues []xccdf.SetValueElement, configuration []plugin.AssessmentConfiguration) []xccdf.SetValueElement {
+func updateTailoringValues(tailoringValues, dsProfileValues []xccdf.SetValueElement, configuration []provider.AssessmentConfiguration) []xccdf.SetValueElement {
 	varsMap := make(map[string]bool)
 
 	for _, cfg := range configuration {
@@ -182,7 +182,7 @@ func updateTailoringValues(tailoringValues, dsProfileValues []xccdf.SetValueElem
 	return tailoringValues
 }
 
-func getTailoringValues(configuration []plugin.AssessmentConfiguration, dsProfile *xccdf.ProfileElement, dsPath string) ([]xccdf.SetValueElement, error) {
+func getTailoringValues(configuration []provider.AssessmentConfiguration, dsProfile *xccdf.ProfileElement, dsPath string) ([]xccdf.SetValueElement, error) {
 	dsVariables, err := GetDsVariablesValues(dsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get variables from datastream: %w", err)
@@ -207,7 +207,7 @@ func getTailoringValues(configuration []plugin.AssessmentConfiguration, dsProfil
 	return tailoringValues, nil
 }
 
-func getTailoringProfile(profileId string, dsPath string, configuration []plugin.AssessmentConfiguration) (*xccdf.ProfileElement, error) {
+func getTailoringProfile(profileId string, dsPath string, configuration []provider.AssessmentConfiguration) (*xccdf.ProfileElement, error) {
 	tailoringProfile := new(xccdf.ProfileElement)
 	tailoringProfile.ID = getTailoringProfileID(profileId)
 
@@ -241,7 +241,7 @@ func getTailoringProfile(profileId string, dsPath string, configuration []plugin
 	return tailoringProfile, nil
 }
 
-func PolicyToXML(configuration []plugin.AssessmentConfiguration, datastreamPath, profileId string) (string, error) {
+func PolicyToXML(configuration []provider.AssessmentConfiguration, datastreamPath, profileId string) (string, error) {
 
 	if len(configuration) == 0 {
 		return "", fmt.Errorf("assessment configuration is empty")

@@ -25,7 +25,7 @@ jobs:
                   go-version-file: './go.mod'
 
             - name: Build binaries
-              run: make build build-test-plugin
+              run: make build build-test-provider
 
             - name: Run e2e tests
               run: go test -tags=e2e -mod=vendor ./tests/e2e/... -v -count=1 -timeout 120s

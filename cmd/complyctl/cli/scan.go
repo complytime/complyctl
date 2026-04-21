@@ -19,16 +19,16 @@ import (
 	"github.com/complytime/complyctl/internal/output"
 	"github.com/complytime/complyctl/internal/policy"
 	"github.com/complytime/complyctl/internal/terminal"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 type scanOptions struct {
 	*Common
-	policyID  string
-	format    string
-	timeout   time.Duration
-	cacheDir  string
-	pluginDir string
+	policyID    string
+	format      string
+	timeout     time.Duration
+	cacheDir    string
+	providerDir string
 }
 
 func scanCmd(common *Common) *cobra.Command {
@@ -93,9 +93,9 @@ func (o *scanOptions) complete() error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve cache directory: %w", err)
 	}
-	o.pluginDir, err = complytime.ResolvePluginDir()
+	o.providerDir, err = complytime.ResolveProviderDir()
 	if err != nil {
-		return fmt.Errorf("failed to resolve plugin directory: %w", err)
+		return fmt.Errorf("failed to resolve provider directory: %w", err)
 	}
 	return nil
 }
@@ -148,7 +148,7 @@ func (o *scanOptions) scanPolicy(ctx context.Context, cfg *complytime.WorkspaceC
 	assessmentConfigs := policy.ExtractAssessmentConfigs(ref.Repository, graph)
 	groups := policy.GroupByEvaluator(assessmentConfigs, graph)
 
-	mgr, err := loadPlugins(o.pluginDir)
+	mgr, err := loadProviders(o.providerDir)
 	if err != nil {
 		return err
 	}
@@ -198,18 +198,18 @@ func resolveVersionAndGraph(cacheDir string, ref complytime.PolicyRef) (string, 
 	return version, graph, nil
 }
 
-func loadPlugins(pluginDir string) (*plugin.Manager, error) {
-	mgr, err := plugin.NewManager(pluginDir, logger)
+func loadProviders(providerDir string) (*provider.Manager, error) {
+	mgr, err := provider.NewManager(providerDir, logger)
 	if err != nil {
-		return nil, fmt.Errorf("plugin manager init failed: %w", err)
+		return nil, fmt.Errorf("provider manager init failed: %w", err)
 	}
-	if err := mgr.LoadPlugins(); err != nil {
+	if err := mgr.LoadProviders(); err != nil {
 		mgr.Cleanup()
-		return nil, fmt.Errorf("plugin discovery failed: %w", err)
+		return nil, fmt.Errorf("provider discovery failed: %w", err)
 	}
-	if len(mgr.ListPlugins()) == 0 {
+	if len(mgr.ListProviders()) == 0 {
 		mgr.Cleanup()
-		return nil, fmt.Errorf("no plugins found in %s (Describe may have failed)", pluginDir)
+		return nil, fmt.Errorf("no providers found in %s (Describe may have failed)", providerDir)
 	}
 	return mgr, nil
 }
@@ -230,7 +230,7 @@ func targetIDList(targets []complytime.TargetConfig) []string {
 	return ids
 }
 
-func ensureGenerated(ctx context.Context, cacheDir string, mgr *plugin.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string, repository, eid string, evaluatorIDs []string) error {
+func ensureGenerated(ctx context.Context, cacheDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string, repository, eid string, evaluatorIDs []string) error {
 	needsGenerate, policyDigest, err := checkGenerationFreshness(cacheDir, repository, eid)
 	if err != nil {
 		return err
@@ -241,7 +241,7 @@ func ensureGenerated(ctx context.Context, cacheDir string, mgr *plugin.Manager, 
 	return runGeneration(ctx, mgr, groups, policyTargets, globalVars, repository, policyDigest, evaluatorIDs)
 }
 
-func runScanAndReport(ctx context.Context, format string, mgr *plugin.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, repository, eid string, graph *policy.DependencyGraph, targetIDs []string) error {
+func runScanAndReport(ctx context.Context, format string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, repository, eid string, graph *policy.DependencyGraph, targetIDs []string) error {
 	reqToControl := extractReqToControlMap(graph)
 	allAssessments, assessmentTargets, err := executeScan(ctx, mgr, groups, policyTargets)
 	if err != nil {
@@ -254,10 +254,10 @@ func runScanAndReport(ctx context.Context, format string, mgr *plugin.Manager, g
 	return writeScanReports(format, eval, outDir, ".", repository, allAssessments, assessmentTargets, reqToControl, eid, targetIDs)
 }
 
-func buildEvaluator(repository string, reqToControl map[string]string, policyTargets []complytime.TargetConfig, allAssessments []plugin.AssessmentLog, assessmentTargets []string) *output.Evaluator {
+func buildEvaluator(repository string, reqToControl map[string]string, policyTargets []complytime.TargetConfig, allAssessments []provider.AssessmentLog, assessmentTargets []string) *output.Evaluator {
 	eval := output.NewEvaluator(repository, reqToControl)
 	for _, target := range policyTargets {
-		var targetAssessments []plugin.AssessmentLog
+		var targetAssessments []provider.AssessmentLog
 		for j, a := range allAssessments {
 			if assessmentTargets[j] == target.ID {
 				targetAssessments = append(targetAssessments, a)
@@ -306,7 +306,7 @@ func needsRegeneration(genState *policy.GenerationState, digest, eid string) boo
 	return false
 }
 
-func runGeneration(ctx context.Context, mgr *plugin.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string, repository, policyDigest string, evaluatorIDs []string) error {
+func runGeneration(ctx context.Context, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string, repository, policyDigest string, evaluatorIDs []string) error {
 	genSpin := terminal.NewSpinner("Generating policy artifacts...")
 	genSpin.Start()
 	defer genSpin.Stop()
@@ -322,7 +322,7 @@ func runGeneration(ctx context.Context, mgr *plugin.Manager, groups map[string]p
 	return nil
 }
 
-func generateForAllTargets(ctx context.Context, mgr *plugin.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string) error {
+func generateForAllTargets(ctx context.Context, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string) error {
 	for evalID, group := range groups {
 		for _, target := range policyTargets {
 			if err := mgr.RouteGenerate(ctx, evalID, globalVars, target.Variables, group.Configs); err != nil {
@@ -333,7 +333,7 @@ func generateForAllTargets(ctx context.Context, mgr *plugin.Manager, groups map[
 	return nil
 }
 
-func executeScan(ctx context.Context, mgr *plugin.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig) ([]plugin.AssessmentLog, []string, error) {
+func executeScan(ctx context.Context, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig) ([]provider.AssessmentLog, []string, error) {
 	scanSpin := terminal.NewSpinner("Scanning targets...")
 	scanSpin.Start()
 	defer scanSpin.Stop()
@@ -341,8 +341,8 @@ func executeScan(ctx context.Context, mgr *plugin.Manager, groups map[string]pol
 	return scanAllTargets(ctx, mgr, groups, policyTargets)
 }
 
-func scanAllTargets(ctx context.Context, mgr *plugin.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig) ([]plugin.AssessmentLog, []string, error) {
-	var allAssessments []plugin.AssessmentLog
+func scanAllTargets(ctx context.Context, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig) ([]provider.AssessmentLog, []string, error) {
+	var allAssessments []provider.AssessmentLog
 	var assessmentTargets []string
 
 	for _, target := range policyTargets {
@@ -359,15 +359,15 @@ func scanAllTargets(ctx context.Context, mgr *plugin.Manager, groups map[string]
 	return allAssessments, assessmentTargets, nil
 }
 
-func scanSingleTarget(ctx context.Context, mgr *plugin.Manager, groups map[string]policy.EvaluatorGroup, target complytime.TargetConfig) ([]plugin.AssessmentLog, error) {
-	pluginTargets := []plugin.Target{{
+func scanSingleTarget(ctx context.Context, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, target complytime.TargetConfig) ([]provider.AssessmentLog, error) {
+	providerTargets := []provider.Target{{
 		TargetID:  target.ID,
 		Variables: target.Variables,
 	}}
 
-	var results []plugin.AssessmentLog
+	var results []provider.AssessmentLog
 	for evalID := range groups {
-		evalResults, routeErr := mgr.RouteScan(ctx, evalID, pluginTargets)
+		evalResults, routeErr := mgr.RouteScan(ctx, evalID, providerTargets)
 		if routeErr != nil {
 			return nil, routeErr
 		}
@@ -376,7 +376,7 @@ func scanSingleTarget(ctx context.Context, mgr *plugin.Manager, groups map[strin
 	return results, nil
 }
 
-func writeScanReports(format string, eval *output.Evaluator, outDir, reportDir, repository string, allAssessments []plugin.AssessmentLog, assessmentTargets []string, reqToControl map[string]string, eid string, targetIDs []string) error {
+func writeScanReports(format string, eval *output.Evaluator, outDir, reportDir, repository string, allAssessments []provider.AssessmentLog, assessmentTargets []string, reqToControl map[string]string, eid string, targetIDs []string) error {
 	logPath, err := eval.Write(outDir)
 	if err != nil {
 		return fmt.Errorf("failed to write evaluation log: %w", err)

@@ -12,8 +12,8 @@ GO_LD_EXTRAFLAGS := -X github.com/complytime/complyctl/internal/version.version=
 
 MAN_COMPLYCTL = docs/man/complyctl.md
 MAN_COMPLYCTL_OUTPUT = docs/man/complyctl.1
-MAN_OPENSCAP_PLUGIN = docs/man/complyctl-openscap-plugin.md
-MAN_OPENSCAP_PLUGIN_OUTPUT = docs/man/complyctl-openscap-plugin.7
+MAN_OPENSCAP_PROVIDER = docs/man/complyctl-openscap-provider.md
+MAN_OPENSCAP_PROVIDER_OUTPUT = docs/man/complyctl-openscap-provider.7
 MAN_OPENSCAP_CONF = docs/man/c2p-openscap-manifest.md
 MAN_OPENSCAP_CONF_OUTPUT = docs/man/c2p-openscap-manifest.5
 
@@ -38,19 +38,19 @@ mock-registry-background: ## start mock OCI registry in background
 	echo "Mock registry PID: $$!"; \
 	echo "Stop with: kill $$!"
 
-test-e2e: build build-test-plugin ## run full E2E tests (in-process mock registry + test plugin)
+test-e2e: build build-test-provider ## run full E2E tests (in-process mock registry + test provider)
 	go test -tags=e2e -mod=vendor ./tests/e2e/... -v -count=1 -timeout 120s
 
-test-behavioral: build build-test-plugin build-behavioral-report ## run behavioral assessment and generate EvaluationLog + SARIF
+test-behavioral: build build-test-provider build-behavioral-report ## run behavioral assessment and generate EvaluationLog + SARIF
 	$(GO_BUILD_BINDIR)/behavioral-report \
 		-binary $(GO_BUILD_BINDIR)/complyctl \
-		-test-plugin $(GO_BUILD_BINDIR)/complytime-provider-test \
+		-test-provider $(GO_BUILD_BINDIR)/complytime-provider-test \
 		-catalog governance/controls/complytime-controls.yaml \
 		-artifact-uri governance/controls/complytime-controls.yaml \
 		-out governance/reports
 .PHONY: test-behavioral
 
-test-integration: build build-test-plugin ## run integration test (mock registry + test plugin, shell-based)
+test-integration: build build-test-provider ## run integration test (mock registry + test provider, shell-based)
 	./tests/integration_test.sh
 .PHONY: test-integration
 
@@ -61,12 +61,11 @@ all: clean vendor test-unit build ## compile from scratch
 
 build: prep-build-dir ## compile
 	go build -mod=vendor -o $(GO_BUILD_BINDIR)/ -ldflags="$(GO_LD_EXTRAFLAGS)" $(GO_BUILD_PACKAGES)
-	cd cmd/openscap-plugin && go build -mod=vendor -o ../../$(GO_BUILD_BINDIR)/openscap-plugin .
 .PHONY: build
 
-build-test-plugin: prep-build-dir ## build test plugin for E2E tests
-	go build -mod=vendor -o $(GO_BUILD_BINDIR)/complyctl-provider-test ./cmd/test-plugin
-.PHONY: build-test-plugin
+build-test-provider: prep-build-dir ## build test provider for E2E tests
+	go build -mod=vendor -o $(GO_BUILD_BINDIR)/complyctl-provider-test ./cmd/test-provider
+.PHONY: build-test-provider
 
 build-behavioral-report: prep-build-dir ## build behavioral report tool (go test -json -> EvaluationLog + SARIF)
 	go build -mod=vendor -o $(GO_BUILD_BINDIR)/behavioral-report ./cmd/behavioral-report
@@ -75,9 +74,8 @@ build-behavioral-report: prep-build-dir ## build behavioral report tool (go test
 ##@ Packaging
 
 man: ## generate man pages
-	mkdir -p $(dir $(MAN_COMPLYCTL_OUTPUT)) $(dir $(MAN_OPENSCAP_PLUGIN_OUTPUT)) $(dir $(MAN_OPENSCAP_CONF_OUTPUT))
+	mkdir -p $(dir $(MAN_COMPLYCTL_OUTPUT)) $(dir $(MAN_OPENSCAP_CONF_OUTPUT))
 	pandoc -s -t man $(MAN_COMPLYCTL) -o $(MAN_COMPLYCTL_OUTPUT)
-	pandoc -s -t man $(MAN_OPENSCAP_PLUGIN) -o $(MAN_OPENSCAP_PLUGIN_OUTPUT)
 	pandoc -s -t man $(MAN_OPENSCAP_CONF) -o $(MAN_OPENSCAP_CONF_OUTPUT)
 
 ##@ Environment
@@ -97,12 +95,11 @@ vendor: ## go mod sync
 	go mod tidy
 	go mod verify
 	go mod vendor
-	cd cmd/openscap-plugin && go mod tidy && go mod verify && go mod vendor
 .PHONY: vendor
 
 clean:
 	@rm -rf ./$(GO_BUILD_BINDIR)/*
-	rm -f $(MAN_COMPLYCTL_OUTPUT) $(MAN_OPENSCAP_PLUGIN_OUTPUT) $(MAN_OPENSCAP_CONF_OUTPUT)
+	rm -f $(MAN_COMPLYCTL_OUTPUT) $(MAN_OPENSCAP_CONF_OUTPUT)
 .PHONY: clean
 
 ##@ Testing

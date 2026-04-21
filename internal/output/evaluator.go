@@ -12,10 +12,10 @@ import (
 	"github.com/goccy/go-yaml"
 
 	"github.com/complytime/complyctl/internal/complytime"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
-// Evaluator accumulates per-target plugin assessments and produces a
+// Evaluator accumulates per-target provider assessments and produces a
 // gemara.EvaluationLog grouped by control.
 type Evaluator struct {
 	policyID     string
@@ -37,14 +37,14 @@ func NewEvaluator(policyID string, reqToControl map[string]string) *Evaluator {
 	}
 }
 
-// AddTarget converts plugin assessment results for one target into
+// AddTarget converts provider assessment results for one target into
 // gemara ControlEvaluations, grouping assessments by control.
-func (e *Evaluator) AddTarget(assessments []plugin.AssessmentLog) {
+func (e *Evaluator) AddTarget(assessments []provider.AssessmentLog) {
 	for i := range assessments {
 		a := &assessments[i]
 		controlID := e.resolveControl(a.RequirementID)
 
-		gemaraAssessment := e.pluginToGemaraAssessment(a)
+		gemaraAssessment := e.providerToGemaraAssessment(a)
 
 		ce, exists := e.controlEvals[controlID]
 		if !exists {
@@ -118,7 +118,7 @@ func (e *Evaluator) resolveControl(requirementID string) string {
 	return requirementID
 }
 
-func (e *Evaluator) pluginToGemaraAssessment(a *plugin.AssessmentLog) *gemara.AssessmentLog {
+func (e *Evaluator) providerToGemaraAssessment(a *provider.AssessmentLog) *gemara.AssessmentLog {
 	result := aggregateResultFromSteps(a.Steps)
 	desc := a.Message
 	if desc == "" && len(a.Steps) > 0 {
@@ -139,22 +139,22 @@ func (e *Evaluator) pluginToGemaraAssessment(a *plugin.AssessmentLog) *gemara.As
 		Applicability:   []string{"default"},
 		Start:           gemara.Datetime(time.Now().Format(time.RFC3339)),
 		StepsExecuted:   int64(len(a.Steps)),
-		ConfidenceLevel: pluginConfidenceToGemara(a.Confidence),
+		ConfidenceLevel: providerConfidenceToGemara(a.Confidence),
 	}
 }
 
-func pluginConfidenceToGemara(c plugin.ConfidenceLevel) gemara.ConfidenceLevel {
+func providerConfidenceToGemara(c provider.ConfidenceLevel) gemara.ConfidenceLevel {
 	switch c {
-	case plugin.ConfidenceLevelHigh:
+	case provider.ConfidenceLevelHigh:
 		return gemara.High
-	case plugin.ConfidenceLevelMedium:
+	case provider.ConfidenceLevelMedium:
 		return gemara.Medium
-	case plugin.ConfidenceLevelLow:
+	case provider.ConfidenceLevelLow:
 		return gemara.Low
-	case plugin.ConfidenceLevelUndetermined:
+	case provider.ConfidenceLevelUndetermined:
 		return gemara.Undetermined
 	default:
-		// Unknown plugin values map to Undetermined as the most conservative confidence level.
+		// Unknown provider values map to Undetermined as the most conservative confidence level.
 		return gemara.Undetermined
 	}
 }

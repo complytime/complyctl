@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 const (
@@ -58,7 +58,7 @@ func LoadGranularPolicies(dir string) (map[string]*AmpelPolicy, error) {
 // MatchPolicies looks up each requirement ID from the assessment configurations
 // in the granular policy map. It returns the matched policies and warning
 // strings for unmatched requirements.
-func MatchPolicies(configs []plugin.AssessmentConfiguration, granular map[string]*AmpelPolicy) ([]*AmpelPolicy, []string) {
+func MatchPolicies(configs []provider.AssessmentConfiguration, granular map[string]*AmpelPolicy) ([]*AmpelPolicy, []string) {
 	var matched []*AmpelPolicy
 	var warnings []string
 	seen := make(map[string]bool)

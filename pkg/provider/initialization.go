@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package plugin
+package provider
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ func NewClient(executablePath string, logger hclog.Logger) (*Client, error) {
 		AutoMTLS:         true,
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
 		Cmd:              exec.Command(executablePath), /* #nosec G204 — path validated by discovery */
-		Plugins:          SupportedPlugins,
+		Plugins:          SupportedProviders,
 	}
 
 	client := goplugin.NewClient(config)
@@ -27,19 +27,19 @@ func NewClient(executablePath string, logger hclog.Logger) (*Client, error) {
 	rpcClient, err := client.Client()
 	if err != nil {
 		client.Kill()
-		return nil, fmt.Errorf("failed to connect to plugin %s: %w", executablePath, err)
+		return nil, fmt.Errorf("failed to connect to provider %s: %w", executablePath, err)
 	}
 
 	raw, err := rpcClient.Dispense("evaluator")
 	if err != nil {
 		client.Kill()
-		return nil, fmt.Errorf("failed to dispense evaluator from plugin %s: %w", executablePath, err)
+		return nil, fmt.Errorf("failed to dispense evaluator from provider %s: %w", executablePath, err)
 	}
 
 	grpcClient, ok := raw.(pluginv2.PluginClient)
 	if !ok {
 		client.Kill()
-		return nil, fmt.Errorf("plugin %s does not implement evaluator interface", executablePath)
+		return nil, fmt.Errorf("provider %s does not implement evaluator interface", executablePath)
 	}
 
 	return &Client{

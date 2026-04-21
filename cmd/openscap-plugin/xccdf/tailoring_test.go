@@ -9,7 +9,7 @@ import (
 	"time"
 
 	xccdf "github.com/complytime/complyctl/cmd/openscap-plugin/xccdftype"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 // This is a supporting function to get the profile element from the testing Datastream.
@@ -187,7 +187,7 @@ func TestUnselectAbsentRules(t *testing.T) {
 		name                string
 		tailoringSelections []xccdf.SelectElement
 		dsProfileSelections []xccdf.SelectElement
-		configuration       []plugin.AssessmentConfiguration
+		configuration       []provider.AssessmentConfiguration
 		expectedSelections  []xccdf.SelectElement
 	}{
 		{
@@ -197,7 +197,7 @@ func TestUnselectAbsentRules(t *testing.T) {
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule1", Selected: true},
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule2", Selected: true},
 			},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "rule1"},
 				{RequirementID: "rule2"},
 			},
@@ -210,7 +210,7 @@ func TestUnselectAbsentRules(t *testing.T) {
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule1", Selected: true},
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule2", Selected: true},
 			},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "rule1"},
 			},
 			expectedSelections: []xccdf.SelectElement{
@@ -224,7 +224,7 @@ func TestUnselectAbsentRules(t *testing.T) {
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule1", Selected: true},
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule2", Selected: true},
 			},
-			configuration: []plugin.AssessmentConfiguration{},
+			configuration: []provider.AssessmentConfiguration{},
 			expectedSelections: []xccdf.SelectElement{
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule1", Selected: false},
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule2", Selected: false},
@@ -234,7 +234,7 @@ func TestUnselectAbsentRules(t *testing.T) {
 			name:                "No dsProfileSelections",
 			tailoringSelections: []xccdf.SelectElement{},
 			dsProfileSelections: []xccdf.SelectElement{},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "rule1"},
 			},
 			expectedSelections: []xccdf.SelectElement{},
@@ -262,7 +262,7 @@ func TestSelectAdditionalRules(t *testing.T) {
 		name                string
 		tailoringSelections []xccdf.SelectElement
 		dsProfileSelections []xccdf.SelectElement
-		configuration       []plugin.AssessmentConfiguration
+		configuration       []provider.AssessmentConfiguration
 		expectedSelections  []xccdf.SelectElement
 	}{
 		{
@@ -272,7 +272,7 @@ func TestSelectAdditionalRules(t *testing.T) {
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule1", Selected: true},
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule2", Selected: true},
 			},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "rule1"},
 				{RequirementID: "rule2"},
 			},
@@ -284,7 +284,7 @@ func TestSelectAdditionalRules(t *testing.T) {
 			dsProfileSelections: []xccdf.SelectElement{
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule1", Selected: true},
 			},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "rule1"},
 				{RequirementID: "rule2"},
 			},
@@ -296,7 +296,7 @@ func TestSelectAdditionalRules(t *testing.T) {
 			name:                "All additional rules",
 			tailoringSelections: []xccdf.SelectElement{},
 			dsProfileSelections: []xccdf.SelectElement{},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "rule1"},
 				{RequirementID: "rule2"},
 			},
@@ -311,7 +311,7 @@ func TestSelectAdditionalRules(t *testing.T) {
 			dsProfileSelections: []xccdf.SelectElement{
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule1", Selected: false},
 			},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "rule1"},
 			},
 			expectedSelections: []xccdf.SelectElement{
@@ -324,7 +324,7 @@ func TestSelectAdditionalRules(t *testing.T) {
 			dsProfileSelections: []xccdf.SelectElement{
 				{IDRef: "xccdf_org.ssgproject.content_rule_rule1", Selected: true},
 			},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "rule1"},
 				{RequirementID: "rule2"},
 				{RequirementID: "rule2"},
@@ -356,7 +356,7 @@ func TestFilterValidRules(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		configuration        []plugin.AssessmentConfiguration
+		configuration        []provider.AssessmentConfiguration
 		expectedError        bool
 		expectedValidCount   int
 		expectedSkippedCount int
@@ -364,7 +364,7 @@ func TestFilterValidRules(t *testing.T) {
 	}{
 		{
 			name: "All rules present",
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "package_telnet-server_removed"},
 				{RequirementID: "package_telnet_removed"},
 			},
@@ -373,7 +373,7 @@ func TestFilterValidRules(t *testing.T) {
 		},
 		{
 			name: "One rule missing in datastream",
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "package_telnet-server_removed"},
 				{RequirementID: "this_rule_is_not_in_datastream"},
 			},
@@ -383,7 +383,7 @@ func TestFilterValidRules(t *testing.T) {
 		},
 		{
 			name: "All rules missing",
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "bogus_rule_a"},
 				{RequirementID: "bogus_rule_b"},
 			},
@@ -392,7 +392,7 @@ func TestFilterValidRules(t *testing.T) {
 		},
 		{
 			name:                 "Empty configuration",
-			configuration:        []plugin.AssessmentConfiguration{},
+			configuration:        []provider.AssessmentConfiguration{},
 			expectedValidCount:   0,
 			expectedSkippedCount: 0,
 		},
@@ -425,12 +425,12 @@ func TestGetTailoringSelections(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		configuration  []plugin.AssessmentConfiguration
+		configuration  []provider.AssessmentConfiguration
 		expectedResult []xccdf.SelectElement
 	}{
 		{
 			name: "All rules present",
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "package_telnet-server_removed"},
 				{RequirementID: "package_telnet_removed"},
 				{RequirementID: "set_password_hashing_algorithm_logindefs"},
@@ -440,7 +440,7 @@ func TestGetTailoringSelections(t *testing.T) {
 		},
 		{
 			name:          "No rules in configuration",
-			configuration: []plugin.AssessmentConfiguration{},
+			configuration: []provider.AssessmentConfiguration{},
 			expectedResult: []xccdf.SelectElement{
 				{IDRef: "xccdf_org.ssgproject.content_rule_package_telnet-server_removed", Selected: false},
 				{IDRef: "xccdf_org.ssgproject.content_rule_package_telnet_removed", Selected: false},
@@ -450,7 +450,7 @@ func TestGetTailoringSelections(t *testing.T) {
 		},
 		{
 			name: "Additional rule in configuration",
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{RequirementID: "package_telnet-server_removed"},
 				{RequirementID: "package_telnet_removed"},
 				{RequirementID: "set_password_hashing_algorithm_logindefs"},
@@ -484,7 +484,7 @@ func TestUpdateTailoringValues(t *testing.T) {
 		name            string
 		tailoringValues []xccdf.SetValueElement
 		dsProfileValues []xccdf.SetValueElement
-		configuration   []plugin.AssessmentConfiguration
+		configuration   []provider.AssessmentConfiguration
 		expectedValues  []xccdf.SetValueElement
 	}{
 		{
@@ -494,7 +494,7 @@ func TestUpdateTailoringValues(t *testing.T) {
 				{IDRef: "xccdf_org.ssgproject.content_value_var1", Value: "value1"},
 				{IDRef: "xccdf_org.ssgproject.content_value_var2", Value: "value2"},
 			},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{Parameters: map[string]string{"var1": "value1"}},
 				{Parameters: map[string]string{"var2": "value2"}},
 			},
@@ -506,7 +506,7 @@ func TestUpdateTailoringValues(t *testing.T) {
 			dsProfileValues: []xccdf.SetValueElement{
 				{IDRef: "xccdf_org.ssgproject.content_value_var1", Value: "value1"},
 			},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{Parameters: map[string]string{"var1": "value1"}},
 				{Parameters: map[string]string{"var2": "value2"}},
 			},
@@ -518,7 +518,7 @@ func TestUpdateTailoringValues(t *testing.T) {
 			name:            "All additional values",
 			tailoringValues: []xccdf.SetValueElement{},
 			dsProfileValues: []xccdf.SetValueElement{},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{Parameters: map[string]string{"var1": "value1"}},
 				{Parameters: map[string]string{"var2": "value2"}},
 			},
@@ -533,7 +533,7 @@ func TestUpdateTailoringValues(t *testing.T) {
 			dsProfileValues: []xccdf.SetValueElement{
 				{IDRef: "xccdf_org.ssgproject.content_value_var1", Value: "old_value"},
 			},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{Parameters: map[string]string{"var1": "new_value"}},
 			},
 			expectedValues: []xccdf.SetValueElement{
@@ -546,7 +546,7 @@ func TestUpdateTailoringValues(t *testing.T) {
 			dsProfileValues: []xccdf.SetValueElement{
 				{IDRef: "xccdf_org.ssgproject.content_value_var1", Value: "value1"},
 			},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{Parameters: nil},
 			},
 			expectedValues: []xccdf.SetValueElement{},
@@ -557,7 +557,7 @@ func TestUpdateTailoringValues(t *testing.T) {
 			dsProfileValues: []xccdf.SetValueElement{
 				{IDRef: "xccdf_org.ssgproject.content_value_var1", Value: "value1"},
 			},
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{Parameters: map[string]string{"var1": "value1"}},
 				{Parameters: map[string]string{"var2": "value2"}},
 				{Parameters: map[string]string{"var2": "value2"}},
@@ -589,13 +589,13 @@ func TestGetTailoringValues(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		configuration  []plugin.AssessmentConfiguration
+		configuration  []provider.AssessmentConfiguration
 		expectedError  bool
 		expectedResult []xccdf.SetValueElement
 	}{
 		{
 			name: "All variables present",
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{Parameters: map[string]string{"var_password_hashing_algorithm": "SHA512"}},
 				{Parameters: map[string]string{"var_password_hashing_algorithm_pam": "sha512"}},
 				{Parameters: map[string]string{"var_accounts_tmout": "900"}},
@@ -608,7 +608,7 @@ func TestGetTailoringValues(t *testing.T) {
 		},
 		{
 			name: "One variable missing in datastream",
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{Parameters: map[string]string{"var_password_hashing_algorithm": "SHA512"}},
 				{Parameters: map[string]string{"var_password_hashing_algorithm_pam": "sha512"}},
 				{Parameters: map[string]string{"var_accounts_tmout": "900"}},
@@ -621,7 +621,7 @@ func TestGetTailoringValues(t *testing.T) {
 		},
 		{
 			name: "Additional variable in configuration",
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{Parameters: map[string]string{"var_password_hashing_algorithm": "SHA512"}},
 				{Parameters: map[string]string{"var_password_hashing_algorithm_pam": "sha512"}},
 				{Parameters: map[string]string{"var_accounts_tmout": "900"}},
@@ -637,7 +637,7 @@ func TestGetTailoringValues(t *testing.T) {
 		},
 		{
 			name: "Configuration without variables",
-			configuration: []plugin.AssessmentConfiguration{
+			configuration: []provider.AssessmentConfiguration{
 				{Parameters: nil},
 			},
 			expectedError:  false,
@@ -670,7 +670,7 @@ func TestGetTailoringProfile(t *testing.T) {
 	dsPath := filepath.Join(testDataDir, "ssg-rhel-ds.xml")
 	profileId := "test_profile"
 
-	tailoringConfig := []plugin.AssessmentConfiguration{
+	tailoringConfig := []provider.AssessmentConfiguration{
 		{
 			RequirementID: "set_password_hashing_algorithm_logindefs",
 			Parameters:    map[string]string{"var_password_hashing_algorithm": "YESCRYPT"},
@@ -721,7 +721,7 @@ func TestPolicyToXML(t *testing.T) {
 	dsPath := filepath.Join(testDataDir, "ssg-rhel-ds.xml")
 	profileId := "test_profile"
 
-	tailoringConfig := []plugin.AssessmentConfiguration{
+	tailoringConfig := []provider.AssessmentConfiguration{
 		{
 			RequirementID: "account_unique_id",
 			Parameters:    map[string]string{"var_password_hashing_algorithm": "YESCRYPT"},

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package plugin
+package provider
 
 import (
 	"os"
@@ -13,44 +13,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// --- T157: DiscoverPlugins tests ---
+// --- T157: DiscoverProviders tests ---
 
-func TestDiscoverPlugins_EmptyDir(t *testing.T) {
+func TestDiscoverProviders_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
 	d := NewDiscovery(dir)
-	plugins, err := d.DiscoverPlugins()
+	providers, err := d.DiscoverProviders()
 	require.NoError(t, err)
-	assert.Empty(t, plugins)
+	assert.Empty(t, providers)
 }
 
-func TestDiscoverPlugins_NonPrefixedExecutables(t *testing.T) {
+func TestDiscoverProviders_NonPrefixedExecutables(t *testing.T) {
 	dir := t.TempDir()
 	createExecutable(t, dir, "some-other-tool")
 
 	d := NewDiscovery(dir)
-	plugins, err := d.DiscoverPlugins()
+	providers, err := d.DiscoverProviders()
 	require.NoError(t, err)
-	assert.Empty(t, plugins)
+	assert.Empty(t, providers)
 }
 
-func TestDiscoverPlugins_ValidPlugin(t *testing.T) {
+func TestDiscoverProviders_ValidProvider(t *testing.T) {
 	dir := t.TempDir()
-	createExecutable(t, dir, complytime.PluginExecutablePrefix+"mock")
+	createExecutable(t, dir, complytime.ProviderExecutablePrefix+"mock")
 
 	d := NewDiscovery(dir)
-	plugins, err := d.DiscoverPlugins()
+	providers, err := d.DiscoverProviders()
 	require.NoError(t, err)
-	require.Len(t, plugins, 1)
-	assert.Equal(t, "mock", plugins[0].EvaluatorID)
-	assert.Equal(t, filepath.Join(dir, complytime.PluginExecutablePrefix+"mock"), plugins[0].ExecutablePath)
+	require.Len(t, providers, 1)
+	assert.Equal(t, "mock", providers[0].EvaluatorID)
+	assert.Equal(t, filepath.Join(dir, complytime.ProviderExecutablePrefix+"mock"), providers[0].ExecutablePath)
 }
 
 // --- T158: scanDir tests ---
 
 func TestScanDir_NonexistentDirectory(t *testing.T) {
-	plugins, err := scanDir("/nonexistent/path/that/does/not/exist")
+	providers, err := scanDir("/nonexistent/path/that/does/not/exist")
 	assert.NoError(t, err)
-	assert.Nil(t, plugins)
+	assert.Nil(t, providers)
 }
 
 func TestScanDir_NonExecutableFile(t *testing.T) {
@@ -58,36 +58,36 @@ func TestScanDir_NonExecutableFile(t *testing.T) {
 		t.Skip("permission bits not meaningful on Windows")
 	}
 	dir := t.TempDir()
-	path := filepath.Join(dir, complytime.PluginExecutablePrefix+"noexec")
+	path := filepath.Join(dir, complytime.ProviderExecutablePrefix+"noexec")
 	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh"), 0644)) // #nosec
 
-	plugins, err := scanDir(dir)
+	providers, err := scanDir(dir)
 	require.NoError(t, err)
-	assert.Empty(t, plugins)
+	assert.Empty(t, providers)
 }
 
 func TestScanDir_DirectoryEntriesSkipped(t *testing.T) {
 	dir := t.TempDir()
-	subdir := filepath.Join(dir, complytime.PluginExecutablePrefix+"subdir")
+	subdir := filepath.Join(dir, complytime.ProviderExecutablePrefix+"subdir")
 	require.NoError(t, os.Mkdir(subdir, 0755)) // #nosec
 
-	plugins, err := scanDir(dir)
+	providers, err := scanDir(dir)
 	require.NoError(t, err)
-	assert.Empty(t, plugins)
+	assert.Empty(t, providers)
 }
 
 func TestScanDir_MultipleValidExecutables(t *testing.T) {
 	dir := t.TempDir()
-	createExecutable(t, dir, complytime.PluginExecutablePrefix+"openscap")
-	createExecutable(t, dir, complytime.PluginExecutablePrefix+"kube-eval")
-	createExecutable(t, dir, complytime.PluginExecutablePrefix+"trivy")
+	createExecutable(t, dir, complytime.ProviderExecutablePrefix+"openscap")
+	createExecutable(t, dir, complytime.ProviderExecutablePrefix+"kube-eval")
+	createExecutable(t, dir, complytime.ProviderExecutablePrefix+"trivy")
 
-	plugins, err := scanDir(dir)
+	providers, err := scanDir(dir)
 	require.NoError(t, err)
-	require.Len(t, plugins, 3)
+	require.Len(t, providers, 3)
 
 	ids := make(map[string]bool)
-	for _, p := range plugins {
+	for _, p := range providers {
 		ids[p.EvaluatorID] = true
 	}
 	assert.True(t, ids["openscap"])
@@ -118,38 +118,38 @@ func TestExpandPath_RelativePath(t *testing.T) {
 func TestScanDir_UserDirPrecedence(t *testing.T) {
 	userDir := t.TempDir()
 	sysDir := t.TempDir()
-	createExecutable(t, userDir, complytime.PluginExecutablePrefix+"openscap")
-	createExecutable(t, sysDir, complytime.PluginExecutablePrefix+"openscap")
-	createExecutable(t, sysDir, complytime.PluginExecutablePrefix+"sys-only")
+	createExecutable(t, userDir, complytime.ProviderExecutablePrefix+"openscap")
+	createExecutable(t, sysDir, complytime.ProviderExecutablePrefix+"openscap")
+	createExecutable(t, sysDir, complytime.ProviderExecutablePrefix+"sys-only")
 
 	seen := make(map[string]bool)
-	var plugins []PluginInfo
+	var providers []ProviderInfo
 
-	userPlugins, err := scanDir(userDir)
+	userProviders, err := scanDir(userDir)
 	require.NoError(t, err)
-	for _, p := range userPlugins {
+	for _, p := range userProviders {
 		seen[p.EvaluatorID] = true
-		plugins = append(plugins, p)
+		providers = append(providers, p)
 	}
 
-	sysPlugins, err := scanDir(sysDir)
+	sysProviders, err := scanDir(sysDir)
 	require.NoError(t, err)
-	for _, p := range sysPlugins {
+	for _, p := range sysProviders {
 		if !seen[p.EvaluatorID] {
-			plugins = append(plugins, p)
+			providers = append(providers, p)
 		}
 	}
 
-	require.Len(t, plugins, 2)
+	require.Len(t, providers, 2)
 
 	idPaths := make(map[string]string)
-	for _, p := range plugins {
+	for _, p := range providers {
 		idPaths[p.EvaluatorID] = p.ExecutablePath
 	}
 
-	assert.Equal(t, filepath.Join(userDir, complytime.PluginExecutablePrefix+"openscap"), idPaths["openscap"],
+	assert.Equal(t, filepath.Join(userDir, complytime.ProviderExecutablePrefix+"openscap"), idPaths["openscap"],
 		"user-dir openscap should take precedence over system-dir")
-	assert.Equal(t, filepath.Join(sysDir, complytime.PluginExecutablePrefix+"sys-only"), idPaths["sys-only"])
+	assert.Equal(t, filepath.Join(sysDir, complytime.ProviderExecutablePrefix+"sys-only"), idPaths["sys-only"])
 }
 
 func createExecutable(t *testing.T, dir, name string) {

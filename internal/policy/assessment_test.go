@@ -5,7 +5,7 @@ package policy
 import (
 	"testing"
 
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,7 +46,7 @@ func TestExtractAssessmentConfigs_ThreeAssessments(t *testing.T) {
 
 func TestGroupByEvaluator_SingleEvaluatorShortcut(t *testing.T) {
 	graph := &DependencyGraph{EvaluatorID: "openscap"}
-	configs := []plugin.AssessmentConfiguration{
+	configs := []provider.AssessmentConfiguration{
 		{PlanID: "p1", RequirementID: "r1", EvaluatorID: "openscap"},
 		{PlanID: "p1", RequirementID: "r2", EvaluatorID: "openscap"},
 	}
@@ -59,7 +59,7 @@ func TestGroupByEvaluator_SingleEvaluatorShortcut(t *testing.T) {
 
 func TestGroupByEvaluator_MultiEvaluator(t *testing.T) {
 	graph := &DependencyGraph{EvaluatorID: ""}
-	configs := []plugin.AssessmentConfiguration{
+	configs := []provider.AssessmentConfiguration{
 		{PlanID: "p1", RequirementID: "r1", EvaluatorID: "openscap"},
 		{PlanID: "p1", RequirementID: "r2", EvaluatorID: "kube-eval"},
 		{PlanID: "p1", RequirementID: "r3", EvaluatorID: "openscap"},

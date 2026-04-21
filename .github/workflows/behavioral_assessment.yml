@@ -25,7 +25,7 @@ jobs:
                   go-version-file: './go.mod'
 
             - name: Build binaries
-              run: make build build-test-plugin build-behavioral-report
+              run: make build build-test-provider build-behavioral-report
 
             - name: Run behavioral assessment
               run: make test-behavioral

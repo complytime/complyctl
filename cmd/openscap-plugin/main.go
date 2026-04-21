@@ -4,10 +4,10 @@ package main
 
 import (
 	"github.com/complytime/complyctl/cmd/openscap-plugin/server"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 func main() {
 	openSCAPPlugin := server.New()
-	plugin.Serve(openSCAPPlugin)
+	provider.Serve(openSCAPPlugin)
 }

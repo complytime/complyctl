@@ -20,11 +20,11 @@ import (
 	"github.com/complytime/complyctl/cmd/openscap-plugin/scan"
 	"github.com/complytime/complyctl/cmd/openscap-plugin/xccdf"
 	"github.com/complytime/complyctl/internal/complytime"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 var (
-	_         plugin.Plugin = (*PluginServer)(nil)
+	_         provider.Provider = (*PluginServer)(nil)
 	ovalRegex               = regexp.MustCompile(`^[^:]*?:[^-]*?-(.*?):.*?$`)
 )
 
@@ -36,25 +36,25 @@ func New() *PluginServer {
 	return &PluginServer{}
 }
 
-func (s *PluginServer) Describe(_ context.Context, _ *plugin.DescribeRequest) (*plugin.DescribeResponse, error) {
-	return &plugin.DescribeResponse{
+func (s *PluginServer) Describe(_ context.Context, _ *provider.DescribeRequest) (*provider.DescribeResponse, error) {
+	return &provider.DescribeResponse{
 		Healthy:                 true,
 		Version:                 "0.1.0",
 		RequiredTargetVariables: []string{"profile"},
 	}, nil
 }
 
-func (s *PluginServer) Generate(ctx context.Context, req *plugin.GenerateRequest) (*plugin.GenerateResponse, error) {
+func (s *PluginServer) Generate(ctx context.Context, req *provider.GenerateRequest) (*provider.GenerateResponse, error) {
 	if err := generateArtifacts(ctx, req); err != nil {
-		return &plugin.GenerateResponse{
+		return &provider.GenerateResponse{
 			Success:      false,
 			ErrorMessage: err.Error(),
 		}, nil
 	}
-	return &plugin.GenerateResponse{Success: true}, nil
+	return &provider.GenerateResponse{Success: true}, nil
 }
 
-func generateArtifacts(ctx context.Context, req *plugin.GenerateRequest) error {
+func generateArtifacts(ctx context.Context, req *provider.GenerateRequest) error {
 	if len(req.Configuration) == 0 {
 		return fmt.Errorf("no assessment configurations provided")
 	}
@@ -67,7 +67,7 @@ func generateArtifacts(ctx context.Context, req *plugin.GenerateRequest) error {
 	return executeGeneration(ctx, req.Configuration, datastream, profile)
 }
 
-func resolveProfileAndDatastream(req *plugin.GenerateRequest) (string, string, error) {
+func resolveProfileAndDatastream(req *provider.GenerateRequest) (string, string, error) {
 	vars := mergeVariables(req.GlobalVariables, req.TargetVariables)
 
 	profile, err := config.SanitizeInput(vars["profile"])
@@ -82,7 +82,7 @@ func resolveProfileAndDatastream(req *plugin.GenerateRequest) (string, string, e
 	return profile, datastream, nil
 }
 
-func executeGeneration(ctx context.Context, configurations []plugin.AssessmentConfiguration, datastream, profile string) error {
+func executeGeneration(ctx context.Context, configurations []provider.AssessmentConfiguration, datastream, profile string) error {
 	if err := config.EnsureDirectories(); err != nil {
 		return fmt.Errorf("directory setup failed: %w", err)
 	}
@@ -99,7 +99,7 @@ func executeGeneration(ctx context.Context, configurations []plugin.AssessmentCo
 	return nil
 }
 
-func writeTailoringFile(configurations []plugin.AssessmentConfiguration, datastream, profile string) error {
+func writeTailoringFile(configurations []provider.AssessmentConfiguration, datastream, profile string) error {
 	hclog.Default().Info("Generating a tailoring file")
 	tailoringXML, err := xccdf.PolicyToXML(configurations, datastream, profile)
 	if err != nil {
@@ -117,7 +117,7 @@ func writeTailoringFile(configurations []plugin.AssessmentConfiguration, datastr
 	return nil
 }
 
-func (s *PluginServer) Scan(ctx context.Context, req *plugin.ScanRequest) (*plugin.ScanResponse, error) {
+func (s *PluginServer) Scan(ctx context.Context, req *provider.ScanRequest) (*provider.ScanResponse, error) {
 	if len(req.Targets) == 0 {
 		return nil, fmt.Errorf("no targets provided")
 	}
@@ -131,7 +131,7 @@ func (s *PluginServer) Scan(ctx context.Context, req *plugin.ScanRequest) (*plug
 	if err != nil {
 		return nil, err
 	}
-	return &plugin.ScanResponse{Assessments: assessments}, nil
+	return &provider.ScanResponse{Assessments: assessments}, nil
 }
 
 func runScanAndParseARF(ctx context.Context, vars map[string]string) (*xmlquery.Node, error) {
@@ -168,7 +168,7 @@ func parseARFFile(arfPath string) (*xmlquery.Node, error) {
 	return xmlnode, nil
 }
 
-func buildAssessmentsFromARF(xmlnode *xmlquery.Node) ([]plugin.AssessmentLog, error) {
+func buildAssessmentsFromARF(xmlnode *xmlquery.Node) ([]provider.AssessmentLog, error) {
 	targetEl := xmlnode.SelectElement("//target")
 	if targetEl == nil {
 		return nil, errors.New("result has no 'target' attribute")
@@ -178,7 +178,7 @@ func buildAssessmentsFromARF(xmlnode *xmlquery.Node) ([]plugin.AssessmentLog, er
 	ruleTable := xccdf.NewRuleHashTable(xmlnode)
 	results := xmlnode.SelectElements("//rule-result")
 
-	var assessments []plugin.AssessmentLog
+	var assessments []provider.AssessmentLog
 	for i := range results {
 		assessment, skip, err := assessmentFromRuleResult(results[i], ruleTable, target)
 		if err != nil {
@@ -191,10 +191,10 @@ func buildAssessmentsFromARF(xmlnode *xmlquery.Node) ([]plugin.AssessmentLog, er
 	return assessments, nil
 }
 
-func assessmentFromRuleResult(result *xmlquery.Node, ruleTable map[string]*xmlquery.Node, target string) (plugin.AssessmentLog, bool, error) {
+func assessmentFromRuleResult(result *xmlquery.Node, ruleTable map[string]*xmlquery.Node, target string) (provider.AssessmentLog, bool, error) {
 	ruleIDRef, rule, resultText, skip := resolveRuleResult(result, ruleTable)
 	if skip {
-		return plugin.AssessmentLog{}, true, nil
+		return provider.AssessmentLog{}, true, nil
 	}
 
 	return buildAssessmentLog(rule, result, ruleIDRef, resultText, target)
@@ -222,25 +222,25 @@ func isSkippableResult(resultText string) bool {
 	return resultText == "notselected" || resultText == "notapplicable"
 }
 
-func buildAssessmentLog(rule, result *xmlquery.Node, ruleIDRef, resultText, target string) (plugin.AssessmentLog, bool, error) {
+func buildAssessmentLog(rule, result *xmlquery.Node, ruleIDRef, resultText, target string) (provider.AssessmentLog, bool, error) {
 	ovalRefEl := findOVALCheckContentRef(rule)
 	if ovalRefEl == nil {
-		return plugin.AssessmentLog{}, true, nil
+		return provider.AssessmentLog{}, true, nil
 	}
 
 	requirementID, err := parseCheck(ovalRefEl)
 	if err != nil {
-		return plugin.AssessmentLog{}, false, err
+		return provider.AssessmentLog{}, false, err
 	}
 
 	mappedResult, err := mapResultStatus(resultText)
 	if err != nil {
-		return plugin.AssessmentLog{}, false, err
+		return provider.AssessmentLog{}, false, err
 	}
 
-	return plugin.AssessmentLog{
+	return provider.AssessmentLog{
 		RequirementID: requirementID,
-		Steps: []plugin.Step{
+		Steps: []provider.Step{
 			{
 				Name:    ruleIDRef,
 				Result:  mappedResult,
@@ -248,7 +248,7 @@ func buildAssessmentLog(rule, result *xmlquery.Node, ruleIDRef, resultText, targ
 			},
 		},
 		Message:    fmt.Sprintf("Host %s evaluated", target),
-		Confidence: plugin.ConfidenceLevelHigh,
+		Confidence: provider.ConfidenceLevelHigh,
 	}, false, nil
 }
 
@@ -317,14 +317,14 @@ func ruleResultMessage(rule *xmlquery.Node, result *xmlquery.Node, resultText st
 	return fmt.Sprintf("openscap rule-result is %s", resultText)
 }
 
-func mapResultStatus(resultText string) (plugin.Result, error) {
+func mapResultStatus(resultText string) (provider.Result, error) {
 	switch resultText {
 	case "pass", "fixed":
-		return plugin.ResultPassed, nil
+		return provider.ResultPassed, nil
 	case "fail":
-		return plugin.ResultFailed, nil
+		return provider.ResultFailed, nil
 	case "error", "unknown":
-		return plugin.ResultError, nil
+		return provider.ResultError, nil
 	}
-	return plugin.ResultError, fmt.Errorf("couldn't match %s", resultText)
+	return provider.ResultError, fmt.Errorf("couldn't match %s", resultText)
 }

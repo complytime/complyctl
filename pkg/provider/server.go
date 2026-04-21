@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-package plugin
+package provider
 
 import (
 	"context"
@@ -10,11 +10,11 @@ import (
 
 var _ proto.PluginServer = (*grpcServer)(nil)
 
-// grpcServer adapts the Plugin domain interface to the proto-generated
-// PluginServer for registration on the plugin process side.
+// grpcServer adapts the Provider domain interface to the proto-generated
+// PluginServer for registration on the provider process side.
 type grpcServer struct {
 	proto.UnimplementedPluginServer
-	impl Plugin
+	impl Provider
 }
 
 func (s *grpcServer) Describe(ctx context.Context, _ *proto.DescribeRequest) (*proto.DescribeResponse, error) {

@@ -8,14 +8,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
-func loadConfigurations(t *testing.T, path string) []plugin.AssessmentConfiguration {
+func loadConfigurations(t *testing.T, path string) []provider.AssessmentConfiguration {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	require.NoError(t, err, "reading fixture %s", path)
-	var configs []plugin.AssessmentConfiguration
+	var configs []provider.AssessmentConfiguration
 	require.NoError(t, json.Unmarshal(data, &configs), "unmarshaling fixture %s", path)
 	return configs
 }
@@ -151,7 +151,7 @@ func TestMatchPolicies_UnmatchedRule(t *testing.T) {
 	granular, err := LoadGranularPolicies("testdata/policies")
 	require.NoError(t, err)
 
-	input := []plugin.AssessmentConfiguration{
+	input := []provider.AssessmentConfiguration{
 		{RequirementID: "BP-1.01"},
 		{RequirementID: "nonexistent-rule"},
 	}
@@ -167,7 +167,7 @@ func TestMatchPolicies_AllUnmatched(t *testing.T) {
 	granular, err := LoadGranularPolicies("testdata/policies")
 	require.NoError(t, err)
 
-	input := []plugin.AssessmentConfiguration{
+	input := []provider.AssessmentConfiguration{
 		{RequirementID: "no-such-rule-1"},
 		{RequirementID: "no-such-rule-2"},
 	}
@@ -181,7 +181,7 @@ func TestMatchPolicies_EmptyInput(t *testing.T) {
 	granular, err := LoadGranularPolicies("testdata/policies")
 	require.NoError(t, err)
 
-	matched, warnings := MatchPolicies([]plugin.AssessmentConfiguration{}, granular)
+	matched, warnings := MatchPolicies([]provider.AssessmentConfiguration{}, granular)
 	require.Empty(t, matched)
 	require.Empty(t, warnings)
 }
@@ -190,7 +190,7 @@ func TestMatchPolicies_DuplicateRequirements(t *testing.T) {
 	granular, err := LoadGranularPolicies("testdata/policies")
 	require.NoError(t, err)
 
-	input := []plugin.AssessmentConfiguration{
+	input := []provider.AssessmentConfiguration{
 		{RequirementID: "BP-1.01"},
 		{RequirementID: "BP-1.01"},
 	}

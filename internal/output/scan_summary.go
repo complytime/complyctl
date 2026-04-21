@@ -11,7 +11,7 @@ import (
 
 	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/internal/terminal"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 type nonPassingEntry struct {
@@ -41,9 +41,9 @@ func nonPassingSortPriority(r gemara.Result) int {
 // matchingStepMessage returns the message from the first step whose result
 // matches the aggregated outcome. Falls back to the first step's message.
 // See R45: scanning provider authors control the failure text.
-func matchingStepMessage(steps []plugin.Step, target gemara.Result) string {
+func matchingStepMessage(steps []provider.Step, target gemara.Result) string {
 	for _, s := range steps {
-		if pluginResultToGemara(s.Result) == target {
+		if providerResultToGemara(s.Result) == target {
 			return s.Message
 		}
 	}
@@ -56,7 +56,7 @@ func matchingStepMessage(steps []plugin.Step, target gemara.Result) string {
 // FormatScanSummary builds a report-style post-scan output per FR-037.
 // Intro text, plain aligned text table of non-passing results, compact totals.
 // See spec.md Session 2026-02-26e.
-func FormatScanSummary(assessments []plugin.AssessmentLog, assessmentTargets []string, reqToControl map[string]string, policyID string, targetIDs []string) string {
+func FormatScanSummary(assessments []provider.AssessmentLog, assessmentTargets []string, reqToControl map[string]string, policyID string, targetIDs []string) string {
 	var passCount, failCount, skipCount, errCount int
 	var entries []nonPassingEntry
 

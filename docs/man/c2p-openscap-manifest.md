@@ -23,7 +23,7 @@ The easiest way to create a drop-in file is copying **/usr/share/complyctl/plugi
 For some specific cases, it is also possible to inform a custom configuration directory to override `/etc/complyctl/config.d`.
 For example, the following command will try to locate and read custom settings from manifest files hosted in `/tmp/plugins-conf` instead of `/etc/complyctl/config.d`:
 
-`complyctl generate --plugin-config /tmp/plugins-conf`
+`complyctl generate --provider-config /tmp/providers-conf`
 
 See complyctl(1) for more details about the available options.
 
@@ -31,8 +31,8 @@ See complyctl(1) for more details about the available options.
 
 The configuration is a single JSON object with the following top-level keys:
 
-- `metadata`: General plugin information
-- `executablePath`: Name or path of the plugin binary
+- `metadata`: General provider information
+- `executablePath`: Name or path of the provider binary
 - `sha256`: The checksum of the binary (used for integrity checks)
 - `configuration`: An array of runtime configuration options
 
@@ -43,7 +43,7 @@ The configuration is a single JSON object with the following top-level keys:
 ```json
 {
   "id": "openscap",
-  "description": "My openscap plugin",
+  "description": "My openscap provider",
   "version": "0.0.1",
   "types": [ "pvp" ]
 }
@@ -51,17 +51,17 @@ The configuration is a single JSON object with the following top-level keys:
 
 ## executablePath
 
-Path or name of the plugin binary to execute. Typically just:
+Path or name of the provider binary to execute. Typically just:
 
 ```json
-"executablePath": "openscap-plugin"
+"executablePath": "openscap-provider"
 ```
 
 ## sha256
-SHA256 checksum of the plugin binary, used for runtime verification.
+SHA256 checksum of the provider binary, used for runtime verification.
 
 ## configuration
-A list of supported configuration parameters for the plugin.
+A list of supported configuration parameters for the provider.
 
 Each entry includes:
 
@@ -73,13 +73,13 @@ Each entry includes:
 # CONFIGURATION OPTIONS
 
 ## workspace (required)
-Directory for writing plugin artifacts. The value is inherited from complyctl and cannot be modified.
+Directory for writing provider artifacts. The value is inherited from complyctl and cannot be modified.
 
 ## profile (required)
 The OpenSCAP profile to run for assessment. The value is inherited from complyctl and cannot be modified.
 
 ## datastream (optional)
-The OpenSCAP datastream to use. If not set, the plugin will try to determine it based on system information.
+The OpenSCAP datastream to use. If not set, the provider will try to determine it based on system information.
 
 ## results (optional, default: results.xml)
 The name of the generated results file.
@@ -98,18 +98,18 @@ This is an example of a manifest including all information.
 {
   "metadata": {
     "id": "openscap",
-    "description": "My openscap plugin",
+    "description": "My openscap provider",
     "version": "0.0.1",
     "types": [
       "pvp"
     ]
   },
-  "executablePath": "openscap-plugin",
+  "executablePath": "openscap-provider",
   "sha256": "17e8d0b82c9bfbe7c195505090954488175005898fc0e8da0812c112c582426c",
   "configuration": [
     {
       "name": "workspace",
-      "description": "Directory for writing plugin artifacts",
+      "description": "Directory for writing provider artifacts",
       "required": true
     },
     {
@@ -119,7 +119,7 @@ This is an example of a manifest including all information.
     },
     {
       "name": "datastream",
-      "description": "The OpenSCAP datastream to use. If not set, the plugin will try to determine it based on system information",
+      "description": "The OpenSCAP datastream to use. If not set, the provider will try to determine it based on system information",
       "required": false
     },
     {
@@ -166,6 +166,6 @@ This is an example of a drop-in file modifying the openscap files.
 
 # SEE ALSO
 
-complyctl(1), complyctl-openscap-plugin(7)
+complyctl(1), complyctl-openscap-provider(7)
 
 See the Upstream project at https://github.com/complytime/complyctl for more detailed documentation.

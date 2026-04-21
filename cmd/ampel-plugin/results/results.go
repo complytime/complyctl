@@ -11,7 +11,7 @@ import (
 
 	"github.com/complytime/complyctl/cmd/ampel-plugin/intoto"
 	"github.com/complytime/complyctl/cmd/ampel-plugin/targets"
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 const maxFieldSize = 10 * 1024 // 10KB per field
@@ -188,14 +188,14 @@ func WritePerRepoResult(result *PerRepoResult, dir string) error {
 	return nil
 }
 
-// ToScanResponse maps a slice of PerRepoResults to a plugin.ScanResponse.
+// ToScanResponse maps a slice of PerRepoResults to a provider.ScanResponse.
 // Findings are grouped by requirement ID (derived from TenetID) into
 // AssessmentLog entries. Each repository/branch scan becomes a Step within
 // the assessment.
-func ToScanResponse(repoResults []*PerRepoResult) *plugin.ScanResponse {
+func ToScanResponse(repoResults []*PerRepoResult) *provider.ScanResponse {
 	type reqGroup struct {
 		requirementID string
-		steps         []plugin.Step
+		steps         []provider.Step
 		passCount     int
 		totalCount    int
 	}
@@ -219,13 +219,13 @@ func ToScanResponse(repoResults []*PerRepoResult) *plugin.ScanResponse {
 			}
 
 			result := mapResult(f.Result, rr.Status)
-			g.steps = append(g.steps, plugin.Step{
+			g.steps = append(g.steps, provider.Step{
 				Name:    stepName,
 				Result:  result,
 				Message: f.Reason,
 			})
 			g.totalCount++
-			if result == plugin.ResultPassed {
+			if result == provider.ResultPassed {
 				g.passCount++
 			}
 		}
@@ -239,42 +239,42 @@ func ToScanResponse(repoResults []*PerRepoResult) *plugin.ScanResponse {
 				groups[errorReqID] = g
 				order = append(order, errorReqID)
 			}
-			g.steps = append(g.steps, plugin.Step{
+			g.steps = append(g.steps, provider.Step{
 				Name:    stepName,
-				Result:  plugin.ResultError,
+				Result:  provider.ResultError,
 				Message: rr.Error,
 			})
 			g.totalCount++
 		}
 	}
 
-	assessments := make([]plugin.AssessmentLog, 0, len(groups))
+	assessments := make([]provider.AssessmentLog, 0, len(groups))
 	for _, reqID := range order {
 		g := groups[reqID]
-		assessments = append(assessments, plugin.AssessmentLog{
+		assessments = append(assessments, provider.AssessmentLog{
 			RequirementID: g.requirementID,
 			Steps:         g.steps,
 			Message:       fmt.Sprintf("%d of %d repositories passed", g.passCount, g.totalCount),
-			Confidence:    plugin.ConfidenceLevelHigh,
+			Confidence:    provider.ConfidenceLevelHigh,
 		})
 	}
 
-	return &plugin.ScanResponse{Assessments: assessments}
+	return &provider.ScanResponse{Assessments: assessments}
 }
 
-func mapResult(findingResult, repoStatus string) plugin.Result {
+func mapResult(findingResult, repoStatus string) provider.Result {
 	if repoStatus == "error" {
-		return plugin.ResultError
+		return provider.ResultError
 	}
 	switch findingResult {
 	case "pass":
-		return plugin.ResultPassed
+		return provider.ResultPassed
 	case "fail":
-		return plugin.ResultFailed
+		return provider.ResultFailed
 	case "skip":
-		return plugin.ResultSkipped
+		return provider.ResultSkipped
 	default:
-		return plugin.ResultError
+		return provider.ResultError
 	}
 }
 

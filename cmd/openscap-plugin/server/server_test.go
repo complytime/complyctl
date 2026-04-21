@@ -14,22 +14,22 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/complytime/complyctl/pkg/plugin"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 func TestMapResultStatus(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          string
-		expectedResult plugin.Result
+		expectedResult provider.Result
 		expectedError  error
 	}{
-		{"pass", "pass", plugin.ResultPassed, nil},
-		{"fixed", "fixed", plugin.ResultPassed, nil},
-		{"fail", "fail", plugin.ResultFailed, nil},
-		{"error", "error", plugin.ResultError, nil},
-		{"unknown", "unknown", plugin.ResultError, nil},
-		{"invalid", "invalid", plugin.ResultError, errors.New("couldn't match invalid")},
+		{"pass", "pass", provider.ResultPassed, nil},
+		{"fixed", "fixed", provider.ResultPassed, nil},
+		{"fail", "fail", provider.ResultFailed, nil},
+		{"error", "error", provider.ResultError, nil},
+		{"unknown", "unknown", provider.ResultError, nil},
+		{"invalid", "invalid", provider.ResultError, errors.New("couldn't match invalid")},
 	}
 
 	for _, tt := range tests {
@@ -87,7 +87,7 @@ func TestParseCheck(t *testing.T) {
 
 func TestPluginServer_Describe(t *testing.T) {
 	s := New()
-	resp, err := s.Describe(context.Background(), &plugin.DescribeRequest{})
+	resp, err := s.Describe(context.Background(), &provider.DescribeRequest{})
 	require.NoError(t, err)
 	assert.True(t, resp.Healthy)
 	assert.Equal(t, "0.1.0", resp.Version)
@@ -96,7 +96,7 @@ func TestPluginServer_Describe(t *testing.T) {
 
 func TestPluginServer_Generate_NoConfig(t *testing.T) {
 	s := New()
-	resp, err := s.Generate(context.Background(), &plugin.GenerateRequest{})
+	resp, err := s.Generate(context.Background(), &provider.GenerateRequest{})
 	require.NoError(t, err)
 	assert.False(t, resp.Success)
 	assert.Contains(t, resp.ErrorMessage, "no assessment configurations")
@@ -104,7 +104,7 @@ func TestPluginServer_Generate_NoConfig(t *testing.T) {
 
 func TestPluginServer_Scan_NoTargets(t *testing.T) {
 	s := New()
-	_, err := s.Scan(context.Background(), &plugin.ScanRequest{})
+	_, err := s.Scan(context.Background(), &provider.ScanRequest{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no targets")
 }

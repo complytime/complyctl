@@ -302,10 +302,10 @@ func TestInitOptions_Run_AlreadyExists(t *testing.T) {
 
 // --- providersOptions tests ---
 
-func TestProvidersOptions_Run_EmptyPluginDir(t *testing.T) {
+func TestProvidersOptions_Run_EmptyProviderDir(t *testing.T) {
 	o := &providersOptions{
-		Common:    &Common{},
-		pluginDir: t.TempDir(),
+		Common:      &Common{},
+		providerDir: t.TempDir(),
 	}
 	err := o.run(context.Background())
 	require.NoError(t, err)

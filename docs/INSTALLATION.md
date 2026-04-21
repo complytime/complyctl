@@ -37,10 +37,10 @@ Binaries are placed in `bin/`. Add it to your `PATH`:
 export PATH="$PWD/bin:$PATH"
 ```
 
-### Build the test plugin (optional)
+### Build the test provider (optional)
 
 ```bash
-make build-test-plugin
+make build-test-provider
 ```
 
 Produces `bin/complyctl-provider-test` for use in E2E testing. See [E2E_INTEGRATION.md](E2E_INTEGRATION.md).
