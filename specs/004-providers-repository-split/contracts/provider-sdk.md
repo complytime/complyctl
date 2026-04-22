@@ -26,12 +26,20 @@ type Provider interface {
     Describe(ctx context.Context, req *DescribeRequest) (*DescribeResponse, error)
     Generate(ctx context.Context, req *GenerateRequest) (*GenerateResponse, error)
     Scan(ctx context.Context, req *ScanRequest) (*ScanResponse, error)
-    Export(ctx context.Context, req *ExportRequest) (*ExportResponse, error)  // added by PR #463
+}
+
+// Exporter is an optional interface for providers that support shipping
+// evidence to a Beacon collector. Provider authors opt in by implementing
+// this interface and declaring SupportsExport: true in DescribeResponse.
+type Exporter interface {
+    Export(ctx context.Context, req *ExportRequest) (*ExportResponse, error)
 }
 ```
 
-> **Note**: `Export` is included in the interface as of the tagged complyctl SDK release that
-> follows PR #463 merging. Providers MUST implement all four methods.
+> **Note**: `Export` is intentionally kept out of `Provider` to follow the Interface Segregation
+> Principle. Providers that do not support evidence export need not implement `Exporter` at all —
+> complyctl detects export capability via `DescribeResponse.SupportsExport` and a runtime type
+> assertion on the client. This design was finalised after PR #463 merged.
 
 ### Entry Point
 
@@ -126,6 +134,7 @@ type DescribeResponse struct {
     ErrorMessage            string
     RequiredGlobalVariables []string
     RequiredTargetVariables []string
+    SupportsExport          bool     // opt in to Exporter capability
 }
 ```
 
@@ -209,17 +218,34 @@ const (
 )
 ```
 
-### Export (added by PR #463)
+### Export (added by PR #463, optional)
 
 The `Export` message types are defined by PR #463 and will be present in the tagged SDK release.
-Providers MUST implement the `Export` method but MAY return an unimplemented stub:
+Export support is **opt-in**: providers that do not ship evidence to a Beacon collector simply
+skip implementing `Exporter`. No stub is required.
+
+To opt in, a provider implements the `Exporter` interface and signals capability via `DescribeResponse`:
 
 ```go
-// Stub implementation — acceptable until Export is fully supported by a provider.
+// MyProviderServer implements provider.Provider (required) and provider.Exporter (optional).
+type MyProviderServer struct{}
+
 func (s *MyProviderServer) Export(ctx context.Context, req *provider.ExportRequest) (*provider.ExportResponse, error) {
-    return nil, status.Error(codes.Unimplemented, "Export not implemented")
+    // ... send evidence to req.Collector.Endpoint ...
+    return &provider.ExportResponse{Success: true, ExportedCount: n}, nil
+}
+
+func (s *MyProviderServer) Describe(_ context.Context, _ *provider.DescribeRequest) (*provider.DescribeResponse, error) {
+    return &provider.DescribeResponse{
+        Healthy:        true,
+        Version:        "1.0.0",
+        SupportsExport: true, // tells complyctl to probe for Exporter at runtime
+    }, nil
 }
 ```
+
+complyctl detects export support at runtime via a type assertion on the gRPC client; providers
+that return `SupportsExport: false` (or omit it) are silently skipped during `--format otel`.
 
 ---
 
@@ -297,7 +323,8 @@ branch (`FR-003`).
 
 | Surface | Stability | Notes |
 |---|---|---|
-| `Provider` interface (Describe, Generate, Scan, Export) | **Stable** | Changes require a new major proto version |
+| `Provider` interface (Describe, Generate, Scan) | **Stable** | Changes require a new major proto version |
+| `Exporter` interface (Export) | **Stable** | Optional; detected via runtime type assertion |
 | Wire protocol (handshake, gRPC service, proto package) | **Frozen** | `complyctl.plugin.v1` — rename deferred |
 | Binary naming convention (`complyctl-provider-<name>`) | **Stable** | Value frozen; identifier renamed |
 | Discovery paths | **Stable** | Unchanged by migration |
