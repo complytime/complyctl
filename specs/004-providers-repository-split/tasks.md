@@ -101,7 +101,7 @@ directive.
 **Purpose**: Vendor dependencies in `complytime-providers` and prepare CI for publishing release artifacts.
 
 - [x] T037 [US2] Run `go mod vendor` in `complytime-providers/` to create the `vendor/` tree
-- [ ] T038 [US2] Remove `replace` directive from `complytime-providers/go.mod`; update `require github.com/complytime/complyctl` to the tagged release version from Phase 1 checkpoint; re-run `go mod vendor`
+- [x] T038 [US2] Remove `replace` directive from `complytime-providers/go.mod`; update `require github.com/complytime/complyctl` to the tagged release version from Phase 1 checkpoint; re-run `go mod vendor`
 - [x] T039 [US2] Create `.github/workflows/ci.yml` in `complytime-providers/` with jobs: build both providers, run tests, and publish release artifacts (`complyctl-provider-openscap` and `complyctl-provider-ampel`) on tag push
 - [x] T040 [US1][US3] Verify `make build` in `complytime-providers/` produces both `complyctl-provider-openscap` and `complyctl-provider-ampel` binaries with no local complyctl source tree present
 
@@ -129,10 +129,10 @@ to download provider binary from `complytime-providers` release artifact.
 - [x] T048 [US4] Confirm `SC-002`: full-text search of complyctl for "plugin" (case-insensitive) in Go sources, Makefile, CI workflows, and docs returns zero provider-concept matches (library name `hashicorp/go-plugin` and proto package `complyctl.plugin.v1` are exempt)
 - [x] T049 [US2] Confirm `SC-003`: both providers build from `complytime-providers` without a local complyctl source tree
 - [x] T050 [US1] Confirm `SC-004`: all complyctl unit tests pass (`go test ./...`)
-- [ ] T051 [US3] Confirm `SC-005`: complyctl E2E tests pass using a provider binary built from `complytime-providers`
-- [ ] T052 [US3] Confirm `SC-006`: a binary built from `complytime-providers` is discovered and invoked by `complyctl scan` correctly (binary name and discovery paths unchanged)
+- [x] T051 [US3] Confirm `SC-005`: complyctl E2E tests pass using a provider binary built from `complytime-providers`
+- [x] T052 [US3] Confirm `SC-006`: a binary built from `complytime-providers` is discovered and invoked by `complyctl scan` correctly (binary name and discovery paths unchanged)
 - [x] T053 [US1] Confirm `SC-007`: `make build` in complyctl produces only the `complyctl` CLI binary
-- [ ] T054 [US1] Confirm `SC-008`: complyctl CI pipeline passes without modification to any step that previously built or tested provider source directories
+- [x] T054 [US1] Confirm `SC-008`: complyctl CI pipeline passes without modification to any step that previously built or tested provider source directories
 
 ---
 
