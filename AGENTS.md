@@ -3,6 +3,7 @@
 Auto-generated from all feature plans. Last updated: 2026-04-21
 
 ## Active Technologies
+- Go 1.25 + go-rpm-macros, Packit, Testing Farm (TMT/FMF) (005-rpm-packaging-ci)
 
 - Go 1.25 (complyctl root `go.mod`) (004-providers-repository-split)
 
@@ -22,6 +23,7 @@ tests/
 Go 1.25 (complyctl root `go.mod`): Follow standard conventions
 
 ## Recent Changes
+- 005-rpm-packaging-ci: Added Go 1.25 + go-rpm-macros, Packit, Testing Farm (TMT/FMF)
 
 - 004-providers-repository-split: Providers (openscap, ampel) migrated to `complytime-providers`; `pkg/plugin/` renamed to `pkg/provider/`; all "plugin" terminology updated to "provider"
 
