@@ -12,10 +12,6 @@ GO_LD_EXTRAFLAGS := -X github.com/complytime/complyctl/internal/version.version=
 
 MAN_COMPLYCTL = docs/man/complyctl.md
 MAN_COMPLYCTL_OUTPUT = docs/man/complyctl.1
-MAN_OPENSCAP_PROVIDER = docs/man/complyctl-openscap-provider.md
-MAN_OPENSCAP_PROVIDER_OUTPUT = docs/man/complyctl-openscap-provider.7
-MAN_OPENSCAP_CONF = docs/man/c2p-openscap-manifest.md
-MAN_OPENSCAP_CONF_OUTPUT = docs/man/c2p-openscap-manifest.5
 
 ##@ Proto
 
@@ -74,9 +70,8 @@ build-behavioral-report: prep-build-dir ## build behavioral report tool (go test
 ##@ Packaging
 
 man: ## generate man pages
-	mkdir -p $(dir $(MAN_COMPLYCTL_OUTPUT)) $(dir $(MAN_OPENSCAP_CONF_OUTPUT))
+	mkdir -p $(dir $(MAN_COMPLYCTL_OUTPUT))
 	pandoc -s -t man $(MAN_COMPLYCTL) -o $(MAN_COMPLYCTL_OUTPUT)
-	pandoc -s -t man $(MAN_OPENSCAP_CONF) -o $(MAN_OPENSCAP_CONF_OUTPUT)
 
 ##@ Environment
 
