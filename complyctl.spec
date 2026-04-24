@@ -3,13 +3,12 @@
 %global goipath github.com/complytime/complyctl
 %global base_url https://%{goipath}
 %global app_dir complytime
-%global gopath %{_builddir}/go
 %global debug_package %{nil}
 
 Name:           complyctl
 Version:        0.0.8
-Release:        0%{?dist}
-Summary:        Gemara-native compliance scanning CLI with pluggable providers
+Release:        1%{?dist}
+Summary:        Compliance scanning CLI for OSCAL-based assessment workflows
 License:        Apache-2.0
 URL:            %{base_url}
 Source0:        %{base_url}/archive/refs/tags/v%{version}.tar.gz
@@ -24,20 +23,13 @@ BuildRequires:  go-rpm-macros
 graphs, dispatches scans to providers via gRPC, and produces compliance
 reports (EvaluationLog, OSCAL, Markdown, SARIF).
 
-%package        openscap-provider
-Summary:        OpenSCAP scanning provider for complyctl
-Requires:       %{name}%{?_isa} = %{version}-%{release}
-Requires:       scap-security-guide
-%description    openscap-provider
-openscap-provider is a scanning provider that extends complyctl with OpenSCAP
-evaluation capabilities. It communicates via gRPC (Generate, Scan, HealthCheck
-RPCs) and follows the complyctl-provider-* discovery convention.
+Providers are distributed separately via the complytime-providers package.
 
 %prep
 %goprep -k
 
 %build
-BUILD_DATE_GO=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+BUILD_DATE_GO=$(date -u +'%%Y-%%m-%%dT%%H:%%M:%%SZ')
 
 # Set up environment variables and flags to build properly and securely
 %set_build_flags
@@ -55,38 +47,37 @@ export GO111MODULE=on
 GO_BUILD_BINDIR=./bin
 mkdir -p ${GO_BUILD_BINDIR}
 
-# Not calling the macro for more control on go env variables
-go build -buildmode=pie -o ${GO_BUILD_BINDIR}/ -ldflags="${GO_LD_EXTRAFLAGS}" ./cmd/...
-
-# Build openscap provider (separate Go module)
-cd cmd/openscap-plugin
-go build -buildmode=pie -o ../../${GO_BUILD_BINDIR}/complyctl-provider-openscap -ldflags="${GO_LD_EXTRAFLAGS}" .
-cd ../..
+# Build only the complyctl binary
+go build -buildmode=pie -o ${GO_BUILD_BINDIR}/complyctl -ldflags="${GO_LD_EXTRAFLAGS}" ./cmd/complyctl
 
 %install
 install -d %{buildroot}%{_bindir}
 install -d -m 0755 %{buildroot}%{_libexecdir}/%{app_dir}/providers
+install -d %{buildroot}%{_mandir}/man1
 
 install -p -m 0755 bin/complyctl %{buildroot}%{_bindir}/complyctl
-install -p -m 0755 bin/complyctl-provider-openscap %{buildroot}%{_libexecdir}/%{app_dir}/providers/complyctl-provider-openscap
+install -p -m 0644 docs/man/complyctl.1 %{buildroot}%{_mandir}/man1/complyctl.1
 
 %check
 # Run unit tests
 go test -mod=vendor -race -v ./...
-cd cmd/openscap-plugin && go test -mod=vendor -race -v ./...
-cd ../..
 
 %files
 %attr(0755, root, root) %{_bindir}/complyctl
-%license LICENSE
+%{_mandir}/man1/complyctl.1*
+%license LICENSE vendor/modules.txt
+%doc README.md
 %dir %{_libexecdir}/%{app_dir}
 %dir %{_libexecdir}/%{app_dir}/providers
 
-%files          openscap-provider
-%attr(0755, root, root) %{_libexecdir}/%{app_dir}/providers/complyctl-provider-openscap
-%license LICENSE
-
 %changelog
+* Fri Apr 24 2026 Marcus Burghardt <maburgha@redhat.com> - 0.0.8-1
+- Simplify spec for core-only delivery after provider split
+- Remove openscap-provider sub-package (moved to complytime-providers)
+- Add complyctl.1 man page
+- Add vendor/modules.txt for automatic bundled provides generation
+- Build only complyctl binary from cmd/complyctl
+
 * Wed Jul 9 2025 Marcus Burghardt <maburgha@redhat.com> - 0.0.8-1
 - Bump to upstream version v0.0.8
 

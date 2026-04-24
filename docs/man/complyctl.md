@@ -23,9 +23,9 @@ Providers communicate with complyctl via gRPC and can be authored using any pref
 
 See more about authoring providers at https://github.com/complytime/complytime-providers/blob/main/docs/provider-guide.md.
 
-Review the `openscap-provider that is shipped with complytime-providers at https://github.com/complytime/complytime/complytime-providers/tree/main/cmd/openscap-provider/README.md.
+Review the openscap-provider that is shipped with complytime-providers at https://github.com/complytime/complytime-providers/tree/main/cmd/openscap-provider/README.md.
 
-Also check the "SEE ALSO" section for provider specific man pages.
+Also check the complytime-providers repository for provider-specific documentation.
 
 Complyctl is built on https://github.com/oscal-compass/compliance-to-policy-go which provides a flexible provider framework for leveraging OSCAL with various PVPs.
 
@@ -168,9 +168,9 @@ Assessment Results will be generated in the `assessment-results.json` file and c
 
 # SEE ALSO
 
-complyctl-openscap-provider(7)
+See the upstream project at https://github.com/complytime/complyctl for more detailed documentation.
 
-See the Upstream project at https://github.com/complytime/complyctl for more detailed documentation.
+See the complytime-providers repository at https://github.com/complytime/complytime-providers for provider-specific documentation.
 
 See https://github.com/oscal-compass/compliance-to-policy-go project.
 

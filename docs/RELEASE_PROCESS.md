@@ -31,15 +31,29 @@ Tests relevant for releases are incorporated in CI tests for every PR.
 
 Releases are currently expected every three weeks. Project maintainers always discuss and agree on releases. Therefore, some releases may be triggered a bit earlier or later when necessary.
 
-## Fedora Package
+## Fedora Packages
 
-Once a new release is out, the [Fedora Package](https://src.fedoraproject.org/rpms/complyctl) also needs to be updated.
+After the repository split, complyctl and complytime-providers are independent Fedora packages with separate release cycles.
+
+### complyctl
+
+Once a new complyctl release is out, the [Fedora Package](https://src.fedoraproject.org/rpms/complyctl) also needs to be updated.
 
 The process is automated by [Packit](https://packit.dev/docs/fedora-releases-guide) according to [.packit.yaml](https://github.com/complytime/complyctl/blob/main/.packit.yaml) configuration file and should only demand a PR review from a Fedora package [maintainer](https://src.fedoraproject.org/rpms/complyctl)
 
 This automation will create PRs for the specified branches. Once the PRs are reviewed and merged:
 - [Koji builds](https://koji.fedoraproject.org/koji/packageinfo?packageID=42298) will be created
 - [Bodhi updates](https://bodhi.fedoraproject.org/updates/?packages=complyctl) will be submitted
+
+### complytime-providers
+
+The [complytime-providers](https://github.com/complytime/complytime-providers) repository has its own independent release and packaging pipeline. It produces two sub-packages:
+- `complytime-providers-openscap` -- OpenSCAP scanning provider
+- `complytime-providers-ampel` -- Ampel scanning provider
+
+The process is also automated by Packit via the `.packit.yaml` in the complytime-providers repository.
+
+> **Note:** The complytime-providers Fedora package requires a one-time [Fedora package review](https://docs.fedoraproject.org/en-US/package-maintainers/Joining_the_Package_Maintainers/) before the automation can function. Once approved, the Packit automation operates identically to complyctl.
 
 ### Preparation (only necessary for Manual Process)
 

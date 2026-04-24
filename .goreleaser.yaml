@@ -24,12 +24,6 @@ builds:
           - "-X github.com/complytime/complyctl/internal/version.gitTreeState={{ .GitTreeState }}"
           - "-X github.com/complytime/complyctl/internal/version.commit={{ .Commit }}"
           - "-X github.com/complytime/complyctl/internal/version.buildDate={{ .Date }}"
-    - id: openscap-plugin
-      binary: openscap-plugin
-      dir: ./cmd/openscap-plugin
-      main: .
-      goos:
-          - linux
 
 archives:
     - format: tar.gz
