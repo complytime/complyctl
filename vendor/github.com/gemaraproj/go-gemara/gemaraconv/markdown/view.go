@@ -26,7 +26,7 @@ type markdownCatalogView struct {
 	ApplicabilityMatrixColumns []markdownApplicabilityColumn
 	ApplicabilityMatrixRows    []markdownApplicabilityMatrixRow
 	Extends                    []gemara.ArtifactMapping
-	Imports                    []gemara.MultiEntryMapping
+	Imports                    []markdownImportView
 	TOC                        bool
 	LineEnding                 string
 	Groups                     []markdownGroupView
@@ -64,6 +64,20 @@ type markdownTOCItem struct {
 	Anchor  string
 	Indent  int // 0 = group, 1 = control under group
 	Control bool
+}
+
+// markdownImportView is one source in the resolved Imports section.
+type markdownImportView struct {
+	// ReferenceId is the mapping-reference identifier.
+	ReferenceId string
+	// Title is the human-readable title from the MappingReference (may be empty).
+	Title string
+	// Url is the source URL from the MappingReference (may be empty).
+	Url string
+	// Remarks is optional prose from the MultiEntryMapping.
+	Remarks string
+	// Entries are the individual imported items.
+	Entries []gemara.ArtifactMapping
 }
 
 type markdownGroupView struct {
@@ -183,7 +197,7 @@ func buildMarkdownCatalogView(catalog *gemara.ControlCatalog, cfg Config, lexGlo
 		ApplicabilityMatrixColumns: applicabilityCols,
 		ApplicabilityMatrixRows:    applicabilityRows,
 		Extends:                    catalog.Extends,
-		Imports:                    catalog.Imports,
+		Imports:                    buildImportViews(catalog),
 		TOC:                        cfg.TOC,
 		LineEnding:                 cfg.LineEnding,
 		Groups:                     groups,
@@ -192,6 +206,32 @@ func buildMarkdownCatalogView(catalog *gemara.ControlCatalog, cfg Config, lexGlo
 		NumARs:                     numARs,
 		LexiconGlossary:            lexGlossary,
 	}
+}
+
+// buildImportViews resolves each Import's ReferenceId against Metadata.MappingReferences
+// to populate the title and URL for the rendered imports section.
+func buildImportViews(catalog *gemara.ControlCatalog) []markdownImportView {
+	if len(catalog.Imports) == 0 {
+		return nil
+	}
+	refMap := make(map[string]gemara.MappingReference, len(catalog.Metadata.MappingReferences))
+	for _, ref := range catalog.Metadata.MappingReferences {
+		refMap[ref.Id] = ref
+	}
+	views := make([]markdownImportView, len(catalog.Imports))
+	for i, imp := range catalog.Imports {
+		v := markdownImportView{
+			ReferenceId: imp.ReferenceId,
+			Remarks:     imp.Remarks,
+			Entries:     imp.Entries,
+		}
+		if ref, ok := refMap[imp.ReferenceId]; ok {
+			v.Title = ref.Title
+			v.Url = ref.Url
+		}
+		views[i] = v
+	}
+	return views
 }
 
 // copyControlsWithSortedARs returns a deep copy of ctrls with AssessmentRequirements

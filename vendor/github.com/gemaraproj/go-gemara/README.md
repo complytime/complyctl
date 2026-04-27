@@ -120,6 +120,50 @@ func main() {
 }
 ```
 
+#### Bundling and Distributing Artifacts via OCI
+
+```go
+package main
+
+import (
+	"context"
+	"os"
+
+	"github.com/gemaraproj/go-gemara/bundle"
+	"github.com/gemaraproj/go-gemara/fetcher"
+	"oras.land/oras-go/v2"
+	"oras.land/oras-go/v2/content/oci"
+	"oras.land/oras-go/v2/registry/remote"
+)
+
+func main() {
+	ctx := context.Background()
+	
+	data, _ := os.ReadFile("policy.yaml")
+	src := bundle.File{Name: "policy.yaml", Data: data}
+
+	// Assemble the full dependency tree (extends + imports)
+	m := bundle.Manifest{BundleVersion: "1", GemaraVersion: "v1.0.0"}
+	asm := bundle.NewAssembler(&fetcher.URI{})
+	b, _ := asm.Assemble(ctx, m, src)
+
+	// Pack into a local OCI layout
+	layoutStore, _ := oci.New("./bundle-output")
+	desc, _ := bundle.Pack(ctx, layoutStore, b)
+	_ = layoutStore.Tag(ctx, desc, "v1.0.0")
+
+	// Push to a remote OCI registry
+	repo, _ := remote.NewRepository("registry.example.com/org/bundle")
+	tagDesc, _ := layoutStore.Resolve(ctx, "v1.0.0")
+	_ = oras.CopyGraph(ctx, layoutStore, repo, tagDesc, oras.DefaultCopyGraphOptions)
+	_ = repo.Tag(ctx, tagDesc, "v1.0.0")
+
+	// Unpack from the registry
+	unpacked, _ := bundle.Unpack(ctx, repo, "v1.0.0")
+	_ = unpacked 
+}
+```
+
 #### Converting to SARIF
 
 ```go

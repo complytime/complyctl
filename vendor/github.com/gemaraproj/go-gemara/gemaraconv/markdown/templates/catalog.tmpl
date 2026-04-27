@@ -63,9 +63,17 @@ This document builds upon all of the requirements and applicability groups detai
 {{end}}
 {{if .Imports}}## Imports
 
-{{template "multi_entry_mapping_table_start"}}
-{{range .Imports}}{{template "multi_entry_mapping_table_row" .}}{{end}}
+The following controls are imported from external catalogs. All assessment requirements and other relevant details for these controls can be found in the respective catalog's source.
 
+{{range .Imports}}### {{lexiconLink .ReferenceId}}{{if .Title}}: {{.Title}}{{end}}
+
+{{if .Remarks}}{{.Remarks}}
+
+{{end}}{{if .Url}}**Source:** [{{.Url}}]({{.Url}})
+
+{{end}}{{range .Entries}}#### {{.ReferenceId}}{{if .Remarks}} — {{.Remarks}}{{end}}
+
+{{end}}{{end}}
 {{end}}
 {{end}}
 

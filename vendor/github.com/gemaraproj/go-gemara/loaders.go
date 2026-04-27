@@ -12,6 +12,24 @@ import (
 	"github.com/gemaraproj/go-gemara/internal/codec"
 )
 
+// TypeMeta is the minimal discriminator parsed from raw YAML/JSON to
+// determine which concrete Gemara type to unmarshal into
+type TypeMeta struct {
+	Metadata struct {
+		Type ArtifactType `json:"type" yaml:"type"`
+	} `json:"metadata" yaml:"metadata"`
+}
+
+// DetectType parses only the metadata.type field from raw artifact data,
+// returning the ArtifactType without requiring a full unmarshal.
+func DetectType(data []byte) (ArtifactType, error) {
+	var tm TypeMeta
+	if err := codec.UnmarshalYAML(data, &tm); err != nil {
+		return InvalidArtifact, fmt.Errorf("reading metadata.type: %w", err)
+	}
+	return tm.Metadata.Type, nil
+}
+
 // Fetcher retrieves content from a source location.
 //
 // Network-capable implementations (e.g. [fetcher.HTTP], [fetcher.URI])
