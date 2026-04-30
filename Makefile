@@ -94,7 +94,7 @@ vendor: ## go mod sync
 
 clean:
 	@rm -rf ./$(GO_BUILD_BINDIR)/*
-	rm -f $(MAN_COMPLYCTL_OUTPUT) $(MAN_OPENSCAP_CONF_OUTPUT)
+	rm -f $(MAN_COMPLYCTL_OUTPUT)
 .PHONY: clean
 
 ##@ Testing
