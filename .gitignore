@@ -46,20 +46,52 @@ go.work*
 
 megalinter-reports/
 
-# Speckit
-.specify/extensions/.cache/
-.specify/extensions/.backup/
-.specify/extensions/*/local-config.yml
+# Speckit — managed by specify init (recreate with: specify init --ai opencode)
+.specify/extensions.yml
+.specify/extensions/
+.specify/init-options.json
+.specify/integration.json
+.specify/integrations/
 .specify/scripts
 .specify/templates
+.specify/workflows/
+.opencode/commands/speckit.*.md
+.opencode/commands/opsx-*.md
+.opencode/skills/speckit-workflow/
+.opencode/skills/openspec-*/
 
 # Agent dirs
 .cursor
 .claude
 
-# Agents specific files
-CLAUDE.md
-
 # Ignore generated credentials from google-github-actions/auth
 # See: https://github.com/google-github-actions/auth
 gha-creds-*.json
+
+# Unbound Force convention packs not applicable to this repository.
+.opencode/uf/packs/typescript.md
+.opencode/uf/packs/typescript-custom.md
+
+# Unbound Force — managed by uf init
+# Runtime data under .uf/ (databases, caches, locks, logs)
+.uf/workflows/
+.uf/artifacts/
+.uf/dewey/graph.db
+.uf/dewey/graph.db-shm
+.uf/dewey/graph.db-wal
+.uf/dewey/*.lock
+.uf/dewey/cache/
+.uf/dewey/dewey.log
+.uf/replicator/*.db
+.uf/replicator/*.db-shm
+.uf/replicator/*.db-wal
+.uf/replicator/*.lock
+.uf/replicator/*.log
+.uf/muti-mind/artifacts/
+.uf/mx-f/data/
+# Legacy tool directories (renamed to .uf/ in Spec 025)
+.dewey/
+.hive/
+.unbound-force/
+.muti-mind/
+.mx-f/

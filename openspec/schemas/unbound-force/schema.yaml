@@ -1,0 +1,77 @@
+name: unbound-force
+version: 1
+description: >
+  Unbound Force specification schema with constitution
+  alignment. Extends the spec-driven workflow with
+  mandatory governance checks.
+
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: >
+      Change proposal with constitution alignment
+    template: proposal.md
+    instruction: >
+      Create a change proposal. You MUST include a
+      Constitution Alignment section assessing this
+      change against all three org constitution
+      principles. Read the constitution from
+      .specify/memory/constitution.md for the full
+      principle definitions.
+    requires: []
+
+  - id: specs
+    generates: "specs/**/*.md"
+    description: >
+      Delta specs describing requirement changes
+    template: spec.md
+    instruction: >
+      Write delta specs using ADDED/MODIFIED/REMOVED
+      sections. Use RFC 2119 language (MUST/SHALL/
+      SHOULD/MAY) for all requirements. Include
+      Given/When/Then scenarios.
+    requires: [proposal]
+
+  - id: design
+    generates: design.md
+    description: >
+      Technical design and architecture decisions
+    template: design.md
+    instruction: >
+      Document the technical approach. Reference the
+      constitution alignment from the proposal. Note
+      any design decisions that relate to Autonomous
+      Collaboration, Composability First, or
+      Observable Quality.
+    requires: [proposal]
+
+  - id: tasks
+    generates: tasks.md
+    description: >
+      Implementation task checklist
+    template: tasks.md
+    instruction: >
+      Break the design into implementable tasks with
+      checkboxes. Group related tasks. Include a task
+      for verifying constitution alignment if the
+      proposal identified relevant principles.
+      Add [P] marker after the task number on tasks
+      that are eligible for parallel execution.
+      A task is parallel-eligible when it: (a) touches
+      different files from other [P] tasks in the same
+      group, (b) has no dependency on prior tasks in
+      the group, (c) can safely execute without ordering
+      constraints. Do NOT add [P] when tasks modify the
+      same file — parallel workers will cause merge
+      conflicts. Format: - [ ] N.M [P] description.
+    requires: [specs, design]
+
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: >
+    Implement tasks from tasks.md. Check off each
+    task as you complete it. Verify that the
+    implementation maintains constitution alignment
+    as documented in the proposal.
+# scaffolded by uf vdev

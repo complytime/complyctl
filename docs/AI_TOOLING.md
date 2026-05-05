@@ -12,7 +12,7 @@ cd <repository>
 opencode .
 ```
 
-OpenCode auto-discovers project-specific commands from `.opencode/command/`. Install the OpenSpec or SpecKit plugin to get framework commands (like `/speckit.specify`).
+OpenCode auto-discovers project-specific commands from `.opencode/commands/`. Install the OpenSpec or SpecKit plugin to get framework commands (like `/speckit.specify`).
 
 ### Other AI Tools
 
@@ -21,16 +21,16 @@ Any AI agent that supports command loading can use this repository's AI tooling:
 1. Clone the repository
 2. Install OpenSpec or SpecKit for your AI agent
 3. Read `.specify/memory/constitution.md` for coding standards
-4. Reference `.opencode/command/` for project-specific command definitions
+4. Reference `.opencode/commands/` for project-specific command definitions
 
 ## Commands
 
-### `/review_pr <number>`
+### `/review-pr <number>`
 
 Reviews a pull request for alignment, security, and compliance. Designed to be token-efficient and CI-aware.
 
 ```
-/review_pr 42
+/review-pr 42
 ```
 
 **How it works:**
@@ -49,11 +49,11 @@ Reviews a pull request for alignment, security, and compliance. Designed to be t
 
 ## Creating Commands
 
-Commands are action-oriented prompts that the agent executes when invoked. They go in `.opencode/command/`. Framework commands (speckit.\*, opsx-\*) are managed by the plugin and should not be committed.
+Commands are action-oriented prompts that the agent executes when invoked. They go in `.opencode/commands/`. Framework commands (speckit.\*, opsx-\*) are managed by the plugin and should not be committed.
 
 ### File structure
 
-1. Create `.opencode/command/your-command.md`
+1. Create `.opencode/commands/your-command.md`
 2. Add YAML frontmatter:
    ```yaml
    ---
@@ -73,7 +73,7 @@ Commands are action-oriented prompts that the agent executes when invoked. They 
 - **Specify the output format**: Define the exact structure of the response (headings, tables, severity levels). This keeps output consistent across runs and reviewers.
 - **Reference, don't inline**: Point to `.specify/memory/constitution.md` for standards instead of copying rules into the command. This avoids drift and saves tokens.
 
-See `.opencode/command/review_pr.md` as a reference implementation.
+See `.opencode/commands/review-pr.md` as a reference implementation.
 
 ## Creating Skills
 
@@ -81,7 +81,7 @@ Skills provide domain knowledge the agent loads as context when activated. Unlik
 
 ### File structure
 
-1. Create a directory: `.agents/skills/your-skill-name/`
+1. Create a directory: `.opencode/skills/your-skill-name/`
 2. Add a `SKILL.md` with YAML frontmatter:
    ```yaml
    ---
@@ -110,8 +110,8 @@ Skills provide domain knowledge the agent loads as context when activated. Unlik
 |------|---------|
 | `.specify/memory/constitution.md` | Organizational governance and coding standards |
 | `docs/AI_TOOLING.md` | This file — AI tooling documentation |
-| `.agents/skills/` | Directory for AI skills — agent-agnostic, auto-discovered by OpenCode |
-| `.opencode/command/review_pr.md` | PR review command |
+| `.opencode/skills/` | Directory for AI skills — agent-agnostic, auto-discovered by OpenCode |
+| `.opencode/commands/review-pr.md` | PR review command |
 | `specs/` | Feature specifications — SpecKit output |
 | `openspec/` | Feature specifications — OpenSpec output |
 
