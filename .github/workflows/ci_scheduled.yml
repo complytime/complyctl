@@ -18,4 +18,4 @@ jobs:
       actions: read           # Required to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
       security-events: write  # Require writing security events to upload SARIF file to security tab
       id-token: write         # Needed to access GitHub's OIDC token which verifies the authenticity of the result when publishing it.
-    uses: complytime/org-infra/.github/workflows/reusable_scheduled.yml@baf5b2e21e61581b4a3a129795286e8592e6afbb # v0.1.0
+    uses: complytime/org-infra/.github/workflows/reusable_scheduled.yml@393ab96ded06d41472526fb46ebe7a7188c422d3 # v0.2.0
