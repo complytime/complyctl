@@ -15,6 +15,13 @@ all Divisor persona agents (during review).
 Use the `CR-NNN` prefix for all custom rules. Use `[MUST]`,
 `[SHOULD]`, or `[MAY]` severity indicators per RFC 2119.
 
-## Custom Rules
+## Testing Conventions (Project Override)
 
-<!-- Add project-specific rules below this line -->
+- **CR-001** [MUST] Use stdlib `testing` +
+  `github.com/stretchr/testify` (assert/require).
+  No other external assertion libraries (gomega, etc.).
+  This overrides go.md TC-001.
+- **CR-002** [MUST] Use `require` for fatal preconditions
+  and `assert` for non-fatal checks. Use `t.Errorf`/`t.Fatalf`
+  only when testify assertions are insufficient.
+  This overrides go.md TC-002.
