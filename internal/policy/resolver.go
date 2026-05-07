@@ -57,6 +57,8 @@ type PolicyTimeline struct {
 // mock injection for unit tests without coupling to OCI store internals.
 type PolicyLoader interface {
 	LoadLayerByMediaType(policyID, version, mediaType string) ([]byte, error)
+	LoadBundleFiles(policyID, version string) (map[string][]byte, error)
+	DetectManifestShape(policyID, version string) (isBundleShape bool, err error)
 	PolicyExists(policyID, version string) bool
 	ResolveVersion(policyID, configVersion string) (string, error)
 }
@@ -79,6 +81,8 @@ func (r *Resolver) ResolveVersion(policyID, configVersion string) (string, error
 }
 
 // ResolvePolicyGraph builds a DependencyGraph from cached OCI layers.
+// It detects the manifest shape (bundle vs split-layer) and delegates
+// to the appropriate loading path.
 func (r *Resolver) ResolvePolicyGraph(policyID, version string) (*DependencyGraph, error) {
 	if policyID == "" {
 		return nil, fmt.Errorf("policy ID cannot be empty")
@@ -92,6 +96,75 @@ func (r *Resolver) ResolvePolicyGraph(policyID, version string) (*DependencyGrap
 		return nil, fmt.Errorf("policy not found: %s@%s", policyID, version)
 	}
 
+	isBundle, detectErr := r.loader.DetectManifestShape(policyID, version)
+	if detectErr != nil {
+		return nil, fmt.Errorf("failed to detect manifest shape for %s@%s: %w", policyID, version, detectErr)
+	}
+
+	if isBundle {
+		return r.resolveBundleGraph(policyID, version)
+	}
+	return r.resolveSplitGraph(policyID, version)
+}
+
+// resolveBundleGraph loads artifacts from a Gemara bundle using bundle.Unpack.
+func (r *Resolver) resolveBundleGraph(policyID, version string) (*DependencyGraph, error) {
+	files, err := r.loader.LoadBundleFiles(policyID, version)
+	if err != nil {
+		return nil, fmt.Errorf("bundle unpack failed for %s@%s: %w", policyID, version, err)
+	}
+
+	graph := &DependencyGraph{
+		PolicyID:    policyID,
+		Controls:    []Control{},
+		Guidelines:  []Guideline{},
+		Assessments: []Assessment{},
+	}
+
+	if catalogData, ok := files["ControlCatalog"]; ok {
+		ctrl := Control{
+			ID:      policyID + "-catalog",
+			Content: catalogData,
+		}
+		parsed, parseErr := parseControlCatalog(catalogData)
+		if parseErr != nil {
+			return nil, fmt.Errorf("policy %s: catalog layer is not valid Gemara: %w", policyID, parseErr)
+		}
+		ctrl.Parsed = parsed
+		graph.Controls = append(graph.Controls, ctrl)
+	}
+
+	if guidanceData, ok := files["GuidanceCatalog"]; ok {
+		gl := Guideline{
+			ID:      policyID + "-guidance",
+			Content: guidanceData,
+		}
+		parsed, parseErr := parseGuidanceCatalog(guidanceData)
+		if parseErr != nil {
+			return nil, fmt.Errorf("policy %s: guidance layer is not valid Gemara: %w", policyID, parseErr)
+		}
+		gl.Parsed = parsed
+		graph.Guidelines = append(graph.Guidelines, gl)
+	}
+
+	policyData, ok := files["Policy"]
+	if !ok {
+		return nil, fmt.Errorf("bundle for %s@%s: missing required Policy artifact", policyID, version)
+	}
+
+	policyLayer, parseErr := parsePolicyLayer(policyID, policyData)
+	if parseErr != nil {
+		return nil, fmt.Errorf("failed to parse policy layer for %s: %w", policyID, parseErr)
+	}
+	graph.EvaluatorID = policyLayer.EvaluatorID
+	graph.Assessments = append(graph.Assessments, policyLayer.Assessments...)
+	graph.Timeline = policyLayer.Timeline
+
+	return graph, nil
+}
+
+// resolveSplitGraph loads artifacts by matching distinct OCI layer media types.
+func (r *Resolver) resolveSplitGraph(policyID, version string) (*DependencyGraph, error) {
 	graph := &DependencyGraph{
 		PolicyID:    policyID,
 		Controls:    []Control{},

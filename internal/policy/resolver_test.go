@@ -13,16 +13,20 @@ import (
 
 // mockPolicyLoader satisfies PolicyLoader for resolver unit tests.
 type mockPolicyLoader struct {
-	layers   map[string][]byte // key: "policyID/version/mediaType"
-	exists   map[string]bool   // key: "policyID/version"
-	versions map[string]string // key: "policyID/configVersion" → resolved version
+	layers      map[string][]byte            // key: "policyID/version/mediaType"
+	exists      map[string]bool              // key: "policyID/version"
+	versions    map[string]string            // key: "policyID/configVersion" → resolved version
+	bundleFiles map[string]map[string][]byte // key: "policyID/version" → type → data
+	bundleShape map[string]bool              // key: "policyID/version" → true if bundle
 }
 
 func newMockLoader() *mockPolicyLoader {
 	return &mockPolicyLoader{
-		layers:   make(map[string][]byte),
-		exists:   make(map[string]bool),
-		versions: make(map[string]string),
+		layers:      make(map[string][]byte),
+		exists:      make(map[string]bool),
+		versions:    make(map[string]string),
+		bundleFiles: make(map[string]map[string][]byte),
+		bundleShape: make(map[string]bool),
 	}
 }
 
@@ -32,6 +36,19 @@ func (m *mockPolicyLoader) LoadLayerByMediaType(policyID, version, mediaType str
 		return data, nil
 	}
 	return nil, fmt.Errorf("layer %s not found", key)
+}
+
+func (m *mockPolicyLoader) LoadBundleFiles(policyID, version string) (map[string][]byte, error) {
+	key := policyID + "/" + version
+	if files, ok := m.bundleFiles[key]; ok {
+		return files, nil
+	}
+	return nil, fmt.Errorf("bundle files not found for %s", key)
+}
+
+func (m *mockPolicyLoader) DetectManifestShape(policyID, version string) (bool, error) {
+	key := policyID + "/" + version
+	return m.bundleShape[key], nil
 }
 
 func (m *mockPolicyLoader) PolicyExists(policyID, version string) bool {
@@ -481,6 +498,104 @@ controls: []
 	_, err := r.ResolvePolicyGraph("no-policy", "v1")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to load policy layer")
+}
+
+// --- Bundle-shape resolver tests (US1: 005-bundle-resolver-alignment) ---
+
+func TestResolvePolicyGraph_BundleAllThreeArtifacts(t *testing.T) {
+	ml := newMockLoader()
+	ml.exists["bundle-policy/v1"] = true
+	ml.bundleShape["bundle-policy/v1"] = true
+	ml.bundleFiles["bundle-policy/v1"] = map[string][]byte{
+		"ControlCatalog": []byte(`
+title: Test Catalog
+metadata:
+  id: cat-1
+  version: "1.0"
+controls: []
+`),
+		"GuidanceCatalog": []byte(`
+title: Test Guidance
+metadata:
+  id: guide-1
+  version: "1.0"
+guidelines: []
+`),
+		"Policy": validPolicyYAML(),
+	}
+
+	r := NewResolver(ml)
+	graph, err := r.ResolvePolicyGraph("bundle-policy", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, "bundle-policy", graph.PolicyID)
+	assert.Len(t, graph.Controls, 1)
+	assert.Len(t, graph.Guidelines, 1)
+	assert.Len(t, graph.Assessments, 1)
+	assert.Equal(t, "openscap", graph.EvaluatorID)
+}
+
+func TestResolvePolicyGraph_BundlePolicyOnly(t *testing.T) {
+	ml := newMockLoader()
+	ml.exists["bundle-minimal/v1"] = true
+	ml.bundleShape["bundle-minimal/v1"] = true
+	ml.bundleFiles["bundle-minimal/v1"] = map[string][]byte{
+		"Policy": validPolicyYAML(),
+	}
+
+	r := NewResolver(ml)
+	graph, err := r.ResolvePolicyGraph("bundle-minimal", "v1")
+	require.NoError(t, err)
+	assert.Empty(t, graph.Controls)
+	assert.Empty(t, graph.Guidelines)
+	assert.Len(t, graph.Assessments, 1)
+	assert.Equal(t, "openscap", graph.EvaluatorID)
+}
+
+func TestResolvePolicyGraph_BundleMissingPolicy(t *testing.T) {
+	ml := newMockLoader()
+	ml.exists["bundle-no-policy/v1"] = true
+	ml.bundleShape["bundle-no-policy/v1"] = true
+	ml.bundleFiles["bundle-no-policy/v1"] = map[string][]byte{
+		"ControlCatalog": []byte(`
+title: Test Catalog
+metadata:
+  id: cat-1
+  version: "1.0"
+controls: []
+`),
+	}
+
+	r := NewResolver(ml)
+	_, err := r.ResolvePolicyGraph("bundle-no-policy", "v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing required Policy artifact")
+}
+
+func TestResolvePolicyGraph_BundleInvalidCatalogYAML(t *testing.T) {
+	ml := newMockLoader()
+	ml.exists["bundle-bad-cat/v1"] = true
+	ml.bundleShape["bundle-bad-cat/v1"] = true
+	ml.bundleFiles["bundle-bad-cat/v1"] = map[string][]byte{
+		"ControlCatalog": []byte("{not: valid: yaml: [}"),
+		"Policy":         validPolicyYAML(),
+	}
+
+	r := NewResolver(ml)
+	_, err := r.ResolvePolicyGraph("bundle-bad-cat", "v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "catalog layer is not valid Gemara")
+}
+
+func TestResolvePolicyGraph_BundleUnpackError(t *testing.T) {
+	ml := newMockLoader()
+	ml.exists["bundle-broken/v1"] = true
+	ml.bundleShape["bundle-broken/v1"] = true
+	// No bundleFiles entry → LoadBundleFiles will return error
+
+	r := NewResolver(ml)
+	_, err := r.ResolvePolicyGraph("bundle-broken", "v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bundle unpack failed")
 }
 
 func validPolicyYAML() []byte {

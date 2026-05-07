@@ -56,6 +56,7 @@ github.com/fatih/color
 # github.com/gemaraproj/go-gemara v0.4.0
 ## explicit; go 1.25.0
 github.com/gemaraproj/go-gemara
+github.com/gemaraproj/go-gemara/bundle
 github.com/gemaraproj/go-gemara/fetcher
 github.com/gemaraproj/go-gemara/gemaraconv
 github.com/gemaraproj/go-gemara/gemaraconv/markdown
