@@ -20,6 +20,7 @@ type Loader struct {
 	cacheMgr *cache.Cache
 }
 
+// NewLoader creates a Loader backed by the given cache manager.
 func NewLoader(cacheMgr *cache.Cache) *Loader {
 	return &Loader{
 		cacheMgr: cacheMgr,
@@ -73,24 +74,9 @@ func (l *Loader) LoadLayerByMediaType(policyID, version, mediaType string) ([]by
 
 	ctx := context.Background()
 
-	manifestDesc, err := store.Resolve(ctx, version)
+	manifest, err := resolveManifest(ctx, store, version)
 	if err != nil {
-		return nil, fmt.Errorf("policy %s@%s not in cache: %w", policyID, version, err)
-	}
-
-	rc, err := store.Fetch(ctx, manifestDesc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch manifest for %s@%s: %w", policyID, version, err)
-	}
-	manifestData, err := io.ReadAll(rc)
-	rc.Close()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read manifest: %w", err)
-	}
-
-	var manifest ocispec.Manifest
-	if err := json.Unmarshal(manifestData, &manifest); err != nil {
-		return nil, fmt.Errorf("failed to parse manifest JSON: %w", err)
+		return nil, fmt.Errorf("policy %s@%s: %w", policyID, version, err)
 	}
 
 	for _, layer := range manifest.Layers {
@@ -215,6 +201,7 @@ func resolveManifest(ctx context.Context, store *ocistore.Store, version string)
 	return manifest, nil
 }
 
+// PolicyExists reports whether a policy with the given ID and version exists in the cache.
 func (l *Loader) PolicyExists(policyID, version string) bool {
 	if policyID == "" || version == "" {
 		return false
@@ -230,6 +217,7 @@ func (l *Loader) PolicyExists(policyID, version string) bool {
 	return err == nil
 }
 
+// GetCachedVersions returns all cached version tags for the given policy.
 func (l *Loader) GetCachedVersions(policyID string) ([]string, error) {
 	if !l.cacheMgr.PolicyStoreExists(policyID) {
 		return []string{}, nil
@@ -253,6 +241,7 @@ func (l *Loader) GetCachedVersions(policyID string) ([]string, error) {
 	return versions, nil
 }
 
+// ListCachedPolicies returns a map of all cached policy IDs to their cached version tags.
 func (l *Loader) ListCachedPolicies() (map[string][]string, error) {
 	policyIDs, err := l.cacheMgr.ListPolicies()
 	if err != nil {

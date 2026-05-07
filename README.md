@@ -53,7 +53,7 @@ A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/
 
 | Component | Description |
 |:---|:---|
-| **OCI Registry** | Remote store for Gemara policies. Each policy is a multi-layer OCI manifest containing catalog, guidance, and policy/assessment YAML layers distinguished by media type. |
+| **OCI Registry** | Remote store for Gemara policies. Supports two OCI manifest layouts: split-layer (distinct media types per artifact) and Gemara bundle format (single artifact media type with annotation-based differentiation). Both formats are auto-detected and resolved transparently. |
 | **Workspace** | Current directory containing `complytime.yaml`. Defines which registry, policies, and targets to use. Scan output lands in `./.complytime/scan/`. |
 | **Cache** | Local OCI Layout stores under `~/.complytime/policies/`. One store per policy ID. `state.json` tracks digests for incremental sync. |
 | **Providers** | Standalone executables in `~/.complytime/providers/` matching the `complyctl-provider-*` naming convention. Communicate via gRPC (`Describe`, `Generate`, `Scan`). Evaluator ID derived from filename. |

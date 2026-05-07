@@ -270,6 +270,7 @@ packages organized by domain responsibility.
 <!-- MANUAL ADDITIONS END -->
 
 ## Recent Changes
+- 005-bundle-resolver-alignment: Policy resolver supports both split-layer and Gemara bundle-format OCI artifacts; `internal/policy/loader.go` gained `LoadBundleFiles()`, `DetectManifestShape()`, `resolveManifest()`; `PolicyLoader` interface extended with bundle methods; `MockBundlePolicySource` added to `internal/cache/cachetest/`
 - 005-rpm-packaging-ci: Added Go 1.25 + go-rpm-macros, Packit, Testing Farm (TMT/FMF)
 
 - 004-providers-repository-split: Providers (openscap, ampel) migrated to `complytime-providers`; `pkg/plugin/` renamed to `pkg/provider/`; all "plugin" terminology updated to "provider"

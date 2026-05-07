@@ -68,6 +68,7 @@ type Resolver struct {
 	loader PolicyLoader
 }
 
+// NewResolver creates a Resolver that uses the given PolicyLoader to load policy artifacts.
 func NewResolver(loader PolicyLoader) *Resolver {
 	return &Resolver{
 		loader: loader,

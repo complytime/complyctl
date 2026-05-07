@@ -191,6 +191,20 @@ func TestDetectManifestShape_Bundle(t *testing.T) {
 	assert.True(t, isBundle, "bundle manifest should be detected as bundle")
 }
 
+func TestDetectManifestShape_EmptyInputs(t *testing.T) {
+	cacheDir := t.TempDir()
+	cacheMgr := cache.NewCache(cacheDir)
+	loader := NewLoader(cacheMgr)
+
+	_, err := loader.DetectManifestShape("", "v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "policy ID and version are required")
+
+	_, err = loader.DetectManifestShape("test", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "policy ID and version are required")
+}
+
 func TestLoadBundleFiles_HappyPath(t *testing.T) {
 	policyData := []byte("metadata:\n  type: Policy\n  id: pol-1\n")
 	catalogData := []byte("metadata:\n  type: ControlCatalog\n  id: cat-1\n")
@@ -202,6 +216,7 @@ func TestLoadBundleFiles_HappyPath(t *testing.T) {
 
 	files, err := loader.LoadBundleFiles("bundle-multi", "v1.0.0")
 	require.NoError(t, err)
+	assert.Len(t, files, 2, "should contain exactly Policy and ControlCatalog")
 	assert.Contains(t, files, "Policy")
 	assert.Contains(t, files, "ControlCatalog")
 	assert.Equal(t, policyData, files["Policy"])

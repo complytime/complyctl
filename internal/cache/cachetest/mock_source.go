@@ -14,7 +14,6 @@ import (
 	"github.com/gemaraproj/go-gemara/bundle"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"oras.land/oras-go/v2"
 	ocistore "oras.land/oras-go/v2/content/oci"
 )
 
@@ -154,9 +153,7 @@ func NewMockBundlePolicySource() *MockBundlePolicySource {
 func (m *MockBundlePolicySource) SeedBundlePolicy(policyID, version, digestStr string, files []bundle.File) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	data := &mockPolicyData{digest: digestStr, version: version}
-	m.policies[policyID] = data
-	m.policies[policyID+":"+version] = data
+	m.policies[policyID] = &mockPolicyData{digest: digestStr, version: version}
 	m.files[policyID] = files
 }
 
@@ -195,26 +192,6 @@ func (m *MockBundlePolicySource) CopyPolicy(ctx context.Context, policyID, tag s
 	}
 
 	return desc, nil
-}
-
-// CopyBundleToStore is a test helper that packs bundle files directly into a
-// local OCI store and tags the result, bypassing the sync workflow.
-func CopyBundleToStore(ctx context.Context, store *ocistore.Store, tag string, files []bundle.File) error {
-	b := &bundle.Bundle{
-		Manifest: bundle.Manifest{BundleVersion: "1", GemaraVersion: "v1.0.0"},
-		Files:    files,
-	}
-
-	desc, err := bundle.Pack(ctx, store, b)
-	if err != nil {
-		return fmt.Errorf("bundle pack: %w", err)
-	}
-	if err := store.Tag(ctx, desc, tag); err != nil {
-		return fmt.Errorf("tag: %w", err)
-	}
-
-	_ = oras.CopyGraph(ctx, store, store, desc, oras.DefaultCopyGraphOptions)
-	return nil
 }
 
 func isDuplicateErr(err error) bool {
