@@ -50,6 +50,13 @@ test-integration: build build-test-provider ## run integration test (mock regist
 	./tests/integration_test.sh
 .PHONY: test-integration
 
+test-cross-repo: build ## run cross-repo integration test (requires PROVIDERS_BIN_DIR and GITHUB_TOKEN)
+ifndef PROVIDERS_BIN_DIR
+	$(error PROVIDERS_BIN_DIR is not set. Set it to the directory containing complyctl-provider-ampel)
+endif
+	timeout 120 ./tests/cross-repo/cross_repo_integration_test.sh
+.PHONY: test-cross-repo
+
 ##@ Compilation
 
 all: clean vendor test-unit build ## compile from scratch
