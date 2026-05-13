@@ -35,7 +35,8 @@ FAILED=0
 FOUND_FILE=""
 
 # Capture and unset GITHUB_TOKEN so only run_complyctl inherits it.
-# This follows least-privilege for environment inheritance (M8).
+# This follows least-privilege for environment inheritance.
+# shellcheck disable=SC2153 # GITHUB_TOKEN is set externally, not a misspelling of _GITHUB_TOKEN
 _GITHUB_TOKEN="${GITHUB_TOKEN}"
 unset GITHUB_TOKEN
 
