@@ -1,0 +1,65 @@
+# Cross-repo integration test workflow.
+# Builds complyctl from the PR branch, checks out complytime-providers@main,
+# builds the Ampel provider binary, installs snappy and ampel, and runs the
+# cross-repo integration test script to validate the full complyctl + Ampel
+# provider pipeline end-to-end.
+name: ci-cross-repo-integration
+
+on:
+    push:
+        branches:
+            - main
+    pull_request:
+
+permissions:
+    contents: read
+
+jobs:
+    cross-repo-integration:
+        name: Cross-Repo Integration Test
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout complyctl
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              with:
+                  persist-credentials: false
+
+            - name: Set up Go (complyctl)
+              uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+              with:
+                  go-version-file: './go.mod'
+
+            - name: Build complyctl
+              run: make build
+
+            # Intentionally tracks main for HEAD-to-HEAD cross-repo integration.
+            # This is a same-org repo under the same maintainer trust boundary.
+            - name: Checkout complytime-providers
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              with:
+                  repository: complytime/complytime-providers
+                  ref: main
+                  path: _providers
+                  persist-credentials: false
+
+            - name: Set up Go (complytime-providers)
+              uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+              with:
+                  go-version-file: './_providers/go.mod'
+
+            - name: Build complytime-providers
+              run: make build
+              working-directory: _providers
+
+            - name: Install snappy
+              uses: carabiner-dev/actions/install/snappy@360ffa1eb909b0105d4eccb6d6ef337911c34952
+
+            - name: Install ampel
+              uses: carabiner-dev/actions/install/ampel@360ffa1eb909b0105d4eccb6d6ef337911c34952
+
+            - name: Run cross-repo integration test
+              env:
+                  PROVIDERS_BIN_DIR: ${{ github.workspace }}/_providers/bin
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: make test-cross-repo PROVIDERS_BIN_DIR="${PROVIDERS_BIN_DIR}"
