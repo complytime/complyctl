@@ -40,6 +40,10 @@ make test-e2e
 make test-integration
 # → ./tests/integration_test.sh
 
+# Cross-repo integration tests (requires PROVIDERS_BIN_DIR and GITHUB_TOKEN)
+make test-cross-repo PROVIDERS_BIN_DIR=/path/to/providers/bin
+# → timeout 120 ./tests/cross-repo/cross_repo_integration_test.sh
+
 # Behavioral assessment (EvaluationLog + SARIF reports)
 make test-behavioral
 ```
@@ -70,6 +74,7 @@ make crapload-check     # check for CRAP regressions against baseline
 | Unit Test | `unit_test.yml` | Unit tests + buf lint |
 | E2E Test | `e2e_test.yml` | End-to-end tests with mock registry |
 | Integration Test | `integration_test.yml` | Shell-based integration tests |
+| Cross-Repo Integration | `ci_cross_repo_integration.yml` | Cross-repo integration tests with complytime-providers |
 | CRAP Load | `ci_crapload.yml` | CRAP analysis on PRs (reusable from org-infra) |
 | CRAP Main | `ci_crapload_main.yml` | CRAP baseline updates on main |
 | Security | `ci_security.yml` | Security scanning |
@@ -113,6 +118,7 @@ scripts/             # maintenance scripts (SPDX checks, workflow setup)
 specs/               # Speckit strategic specifications (NNN-*/  format)
 tests/
 ├── behavioral/      # behavioral test scenarios
+├── cross-repo/      # cross-repo integration tests (complyctl + ampel provider)
 ├── e2e/             # E2E tests (build-tag gated: -tags=e2e)
 └── integration_test.sh  # shell-based integration test
 vendor/              # vendored dependencies
