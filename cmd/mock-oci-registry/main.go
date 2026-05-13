@@ -630,6 +630,20 @@ guidelines:
 		{mediaType: gemaraPolicyType, data: ampelPolicy},
 	})
 
+	// policies/test-branch-protection — minimal policy for cross-repo integration testing
+	testCatalog, err := seedData.ReadFile("testdata/test-branch-protection-catalog.yaml")
+	if err != nil {
+		log.Fatalf("failed to load test branch protection catalog seed data: %v", err)
+	}
+	testPolicy, err := seedData.ReadFile("testdata/test-branch-protection-policy.yaml")
+	if err != nil {
+		log.Fatalf("failed to load test branch protection policy seed data: %v", err)
+	}
+	s.addArtifact("policies/test-branch-protection", []string{"v1.0.0", "latest"}, []layerDef{
+		{mediaType: gemaraCatalogType, data: testCatalog},
+		{mediaType: gemaraPolicyType, data: testPolicy},
+	})
+
 	// Enrichment mappings
 	s.enrichments["OPA:deny-root-user"] = &enrichmentMapping{
 		control: enrichmentControl{

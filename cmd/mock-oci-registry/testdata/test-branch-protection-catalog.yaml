@@ -1,0 +1,26 @@
+title: Test Branch Protection Controls
+controls:
+    - id: force-push-protection
+      title: Restrict Force Pushes
+      objective: Force pushes to protected branches must be blocked
+      group: source-code
+      assessment-requirements:
+          - id: block-force-push
+            text: Force pushes to protected branches must be blocked
+            applicability:
+                - GitHub repositories
+            state: Active
+      state: Active
+groups:
+    - id: source-code
+      title: Source Code Protection
+      description: Controls for protecting source code repositories via branch protection rules
+metadata:
+    id: test-branch-protection
+    type: ControlCatalog
+    gemara-version: 1.0.0
+    description: Minimal branch protection catalog for cross-repo integration testing
+    author:
+        id: complytime
+        name: ComplyTime
+        type: Software Assisted

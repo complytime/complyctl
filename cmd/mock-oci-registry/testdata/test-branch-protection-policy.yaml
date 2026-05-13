@@ -1,0 +1,43 @@
+title: Test Branch Protection Policy
+metadata:
+    id: test-branch-protection-policy
+    description: Minimal policy for cross-repo integration testing using the Ampel provider
+    author:
+        id: complytime
+        name: ComplyTime
+        type: Software Assisted
+    mapping-references:
+        - id: test-branch-protection
+          title: Test Branch Protection Controls
+          version: 1.0.0
+          description: Minimal control catalog for cross-repo integration testing
+contacts:
+    responsible:
+        - name: Repository Administrator
+    accountable:
+        - name: Security Team
+scope:
+    in:
+        technologies:
+            - GitHub
+        users:
+            - Repository maintainers
+imports:
+    catalogs:
+        - reference-id: test-branch-protection
+adherence:
+    evaluation-methods:
+        - type: Behavioral
+          description: Ampel automated branch protection evaluation
+          executor:
+              id: ampel
+              name: AMPEL
+              type: Software
+    assessment-plans:
+        - id: block-force-push
+          requirement-id: block-force-push
+          frequency: on-demand
+          evaluation-methods:
+              - type: Behavioral
+                executor:
+                    id: ampel
