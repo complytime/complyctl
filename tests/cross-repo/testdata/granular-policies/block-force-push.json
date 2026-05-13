@@ -1,0 +1,27 @@
+{
+  "id": "block-force-push",
+  "meta": {
+    "description": "Validate force push blocking is enabled on protected branches via the GitHub API",
+    "controls": [
+      { "framework": "test-branch-protection", "class": "source-code", "id": "force-push-protection" }
+    ]
+  },
+  "tenets": [
+    {
+      "id": "01",
+      "code": "(has(predicates[0].data.values) && type(predicates[0].data.values) == list && predicates[0].data.values.exists(rule, rule.type == \"non_fast_forward\")) || (has(predicates[0].data.values) && type(predicates[0].data.values) != list && has(predicates[0].data.values.allow_force_push) && predicates[0].data.values.allow_force_push == false)",
+      "predicates": {
+        "types": [
+          "http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml"
+        ]
+      },
+      "assessment": {
+        "message": "Force pushing is disabled in protected branch."
+      },
+      "error": {
+        "message": "Force pushes can be sent to protected branch",
+        "guidance": "Create a branch ruleset and enable 'Block force pushes' in the GitHub repository settings."
+      }
+    }
+  ]
+}
