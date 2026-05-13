@@ -444,6 +444,25 @@ func (s *contentStore) enrich(req enrichmentRequest) enrichmentResponse {
 
 // --- Seed Data ---
 
+// seedPolicyFromFiles loads a catalog and policy YAML from embedded testdata
+// files and registers them as a versioned OCI artifact in the content store.
+func (s *contentStore) seedPolicyFromFiles(
+	repoPath, catalogFile, policyFile string, tags []string,
+) {
+	catalog, err := seedData.ReadFile(catalogFile)
+	if err != nil {
+		log.Fatalf("failed to load catalog seed data from %s: %v", catalogFile, err)
+	}
+	policy, err := seedData.ReadFile(policyFile)
+	if err != nil {
+		log.Fatalf("failed to load policy seed data from %s: %v", policyFile, err)
+	}
+	s.addArtifact(repoPath, tags, []layerDef{
+		{mediaType: gemaraCatalogType, data: catalog},
+		{mediaType: gemaraPolicyType, data: policy},
+	})
+}
+
 func (s *contentStore) seedDefaults() {
 	// policies/nist-800-53-r5
 	s.addArtifact("policies/nist-800-53-r5", []string{"v1.0.0", "latest"}, []layerDef{
@@ -601,48 +620,19 @@ guidelines:
 `)},
 	})
 
-	// policies/cis-fedora-l1-workstation — real CIS Fedora L1 Workstation data
-	// sourced from ComplianceAsCode/oscal-content component-definitions
-	cisCatalog, err := seedData.ReadFile("testdata/cis-fedora-l1-workstation-catalog.yaml")
-	if err != nil {
-		log.Fatalf("failed to load CIS Fedora catalog seed data: %v", err)
-	}
-	cisPolicy, err := seedData.ReadFile("testdata/cis-fedora-l1-workstation-policy.yaml")
-	if err != nil {
-		log.Fatalf("failed to load CIS Fedora policy seed data: %v", err)
-	}
-	s.addArtifact("policies/cis-fedora-l1-workstation", []string{"v1.0.0", "latest"}, []layerDef{
-		{mediaType: gemaraCatalogType, data: cisCatalog},
-		{mediaType: gemaraPolicyType, data: cisPolicy},
-	})
-
-	// policies/ampel-branch-protection — AMPEL branch protection controls
-	ampelCatalog, err := seedData.ReadFile("testdata/ampel-branch-protection-catalog.yaml")
-	if err != nil {
-		log.Fatalf("failed to load AMPEL branch protection catalog seed data: %v", err)
-	}
-	ampelPolicy, err := seedData.ReadFile("testdata/ampel-branch-protection-policy.yaml")
-	if err != nil {
-		log.Fatalf("failed to load AMPEL branch protection policy seed data: %v", err)
-	}
-	s.addArtifact("policies/ampel-branch-protection", []string{"v1.0.0", "latest"}, []layerDef{
-		{mediaType: gemaraCatalogType, data: ampelCatalog},
-		{mediaType: gemaraPolicyType, data: ampelPolicy},
-	})
-
-	// policies/test-branch-protection — minimal policy for cross-repo integration testing
-	testCatalog, err := seedData.ReadFile("testdata/test-branch-protection-catalog.yaml")
-	if err != nil {
-		log.Fatalf("failed to load test branch protection catalog seed data: %v", err)
-	}
-	testPolicy, err := seedData.ReadFile("testdata/test-branch-protection-policy.yaml")
-	if err != nil {
-		log.Fatalf("failed to load test branch protection policy seed data: %v", err)
-	}
-	s.addArtifact("policies/test-branch-protection", []string{"v1.0.0", "latest"}, []layerDef{
-		{mediaType: gemaraCatalogType, data: testCatalog},
-		{mediaType: gemaraPolicyType, data: testPolicy},
-	})
+	// File-based policies — catalog + policy YAML loaded from testdata/
+	s.seedPolicyFromFiles("policies/cis-fedora-l1-workstation",
+		"testdata/cis-fedora-l1-workstation-catalog.yaml",
+		"testdata/cis-fedora-l1-workstation-policy.yaml",
+		[]string{"v1.0.0", "latest"})
+	s.seedPolicyFromFiles("policies/ampel-branch-protection",
+		"testdata/ampel-branch-protection-catalog.yaml",
+		"testdata/ampel-branch-protection-policy.yaml",
+		[]string{"v1.0.0", "latest"})
+	s.seedPolicyFromFiles("policies/test-branch-protection",
+		"testdata/test-branch-protection-catalog.yaml",
+		"testdata/test-branch-protection-policy.yaml",
+		[]string{"v1.0.0", "latest"})
 
 	// Enrichment mappings
 	s.enrichments["OPA:deny-root-user"] = &enrichmentMapping{
