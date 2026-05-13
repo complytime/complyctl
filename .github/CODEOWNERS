@@ -2,14 +2,3 @@
 # Unless a later match takes precedence, the team will be requested for review
 # when someone opens a pull request.
 *       @complytime/complytime-dev
-
-# Order is important; the last matching pattern takes the most precedence.
-# Team complytime-approvers will be requested to approve when someone opens
-# a pull request for any change inside `/cmd/complytime` directory
-/cmd/complyctl/ @complytime/complytime-approvers
-
-# Team openscap-plugin-approvers will be requested to approve when someone
-# opens a pull request for any change inside `/cmd/openscap-plugin` directory.
-# However, complytime-approvers can also satisfy this requirement in absence of
-# enough approvers from openscap-plugin-approvers
-/cmd/openscap-plugin/ @complytime/openscap-plugin-approvers @complytime/complytime-approvers
