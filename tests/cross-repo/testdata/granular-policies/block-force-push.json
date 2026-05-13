@@ -12,7 +12,7 @@
       "code": "(has(predicates[0].data.values) && type(predicates[0].data.values) == list && predicates[0].data.values.exists(rule, rule.type == \"non_fast_forward\")) || (has(predicates[0].data.values) && type(predicates[0].data.values) != list && has(predicates[0].data.values.allow_force_push) && predicates[0].data.values.allow_force_push == false)",
       "predicates": {
         "types": [
-          "http://github.com/carabiner-dev/snappy/specs/branch-rules.yaml"
+          "http://github.com/carabiner-dev/snappy/specs/github/branch-rules.yaml"
         ]
       },
       "assessment": {

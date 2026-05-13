@@ -3,7 +3,7 @@
 # builds the Ampel provider binary, installs snappy and ampel, and runs the
 # cross-repo integration test script to validate the full complyctl + Ampel
 # provider pipeline end-to-end.
-name: ci-cross-repo-integration
+name: Cross-Repo Integration Test
 
 on:
     push:
@@ -53,10 +53,10 @@ jobs:
               working-directory: _providers
 
             - name: Install snappy
-              uses: carabiner-dev/actions/install/snappy@360ffa1eb909b0105d4eccb6d6ef337911c34952
+              uses: carabiner-dev/actions/install/snappy@e0e3b8149dafed833431095bc148d50e7eade4e8 # v1.2.0
 
             - name: Install ampel
-              uses: carabiner-dev/actions/install/ampel@360ffa1eb909b0105d4eccb6d6ef337911c34952
+              uses: carabiner-dev/actions/install/ampel@e0e3b8149dafed833431095bc148d50e7eade4e8 # v1.2.0
 
             - name: Run cross-repo integration test
               env:
