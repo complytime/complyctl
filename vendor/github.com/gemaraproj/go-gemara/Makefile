@@ -161,6 +161,7 @@ oscal-export:
 	@mkdir -p artifacts
 	@go run ./cmd/oscalexport catalog ./test-data/good-osps.yml --output ./artifacts/catalog.json
 	@go run ./cmd/oscalexport guidance ./test-data/good-aigf.yaml --catalog-output ./artifacts/guidance.json --profile-output ./artifacts/profile.json
+	@go run ./cmd/oscalexport evaluation ./test-data/good-evaluation-log.yaml --output ./artifacts/assessment-results.json --catalog ./test-data/good-osps.yml
 
 help:
 	@echo "make targets:"

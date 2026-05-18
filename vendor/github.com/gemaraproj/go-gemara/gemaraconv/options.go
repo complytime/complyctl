@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package gemaraconv
 
 import "github.com/gemaraproj/go-gemara"
@@ -9,7 +11,7 @@ type generateOpts struct {
 	controlHREF   string
 }
 
-func (g *generateOpts) completeFromGuidance(doc *gemara.GuidanceCatalog) {
+func (g *generateOpts) completeFromGuidance(doc gemara.GuidanceCatalog) {
 	if g.version == "" {
 		g.version = doc.Metadata.Version
 	}
@@ -21,7 +23,7 @@ func (g *generateOpts) completeFromGuidance(doc *gemara.GuidanceCatalog) {
 	}
 }
 
-func (g *generateOpts) completeFromCatalog(catalog *gemara.ControlCatalog) {
+func (g *generateOpts) completeFromCatalog(catalog gemara.ControlCatalog) {
 	if g.version == "" {
 		g.version = catalog.Metadata.Version
 	}
@@ -135,5 +137,45 @@ func WithLexiconAutolink(enabled bool) MarkdownOption {
 func WithInlineLexicon(terms []InlineLexiconTerm) MarkdownOption {
 	return func(o *markdownOpts) {
 		o.inlineLexicon = terms
+	}
+}
+
+type evalOpts struct {
+	catalog      *gemara.ControlCatalog
+	importApHref string
+	artifactURI  string
+}
+
+func defaultEvalOpts() evalOpts {
+	return evalOpts{importApHref: "#"}
+}
+
+// EvalOption configures EvaluationLog conversions (SARIF, OSCAL Assessment Results).
+// Options irrelevant to a particular output format are ignored.
+type EvalOption func(*evalOpts)
+
+// WithImportApHref sets the URI referencing the governing assessment plan.
+// Used by OSCAL Assessment Results; defaults to "#" if unset.
+func WithImportApHref(href string) EvalOption {
+	return func(o *evalOpts) {
+		if href != "" {
+			o.importApHref = href
+		}
+	}
+}
+
+// WithCatalog provides a ControlCatalog to enrich output with control titles,
+// requirement text, and recommendations. Used by both SARIF and OSCAL Assessment Results.
+func WithCatalog(catalog *gemara.ControlCatalog) EvalOption {
+	return func(o *evalOpts) {
+		o.catalog = catalog
+	}
+}
+
+// WithArtifactURI sets the file path or URI for SARIF PhysicalLocation.
+// Used by SARIF conversion; defaults to a placeholder when empty.
+func WithArtifactURI(uri string) EvalOption {
+	return func(o *evalOpts) {
+		o.artifactURI = uri
 	}
 }

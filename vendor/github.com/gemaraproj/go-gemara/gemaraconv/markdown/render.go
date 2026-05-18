@@ -17,11 +17,7 @@ var templatesFS embed.FS
 
 // CatalogToMarkdown renders a ControlCatalog as Markdown using embedded templates.
 // Only controls whose state is LifecycleActive are included (TOC, body, and summary counts).
-func CatalogToMarkdown(ctx context.Context, catalog *gemara.ControlCatalog, cfg Config) ([]byte, error) {
-	if catalog == nil {
-		return nil, fmt.Errorf("catalog is nil")
-	}
-
+func CatalogToMarkdown(ctx context.Context, catalog gemara.ControlCatalog, cfg Config) ([]byte, error) {
 	lineEnding := cfg.LineEnding
 	if lineEnding == "" {
 		lineEnding = "\n"

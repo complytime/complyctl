@@ -2,7 +2,6 @@ package gemaraconv
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/gemaraproj/go-gemara"
 	"github.com/gemaraproj/go-gemara/gemaraconv/markdown"
@@ -13,11 +12,7 @@ type InlineLexiconTerm = markdown.InlineLexiconTerm
 
 // CatalogToMarkdown renders a ControlCatalog as Markdown using embedded templates.
 // Only controls whose state is LifecycleActive are included (TOC, body, and summary counts).
-func CatalogToMarkdown(ctx context.Context, catalog *gemara.ControlCatalog, opts ...MarkdownOption) ([]byte, error) {
-	if catalog == nil {
-		return nil, fmt.Errorf("catalog is nil")
-	}
-
+func CatalogToMarkdown(ctx context.Context, catalog gemara.ControlCatalog, opts ...MarkdownOption) ([]byte, error) {
 	o := defaultMarkdownOpts()
 	o.apply(opts...)
 

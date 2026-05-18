@@ -10,9 +10,9 @@ import (
 	"github.com/gemaraproj/go-gemara/internal/codec"
 )
 
-// resolveLexiconURL returns the https:// or file:// URI for the lexicon artifact.
+// resolveLexiconURL returns the source string (URL or local path) for the lexicon artifact.
 // Precedence: metadata.mapping-references entry whose id matches metadata.lexicon.reference-id;
-// else metadata.lexicon.remarks if it is a fetchable URL.
+// else metadata.lexicon.remarks if it is a fetchable URL (must use http://, https://, or file://).
 func resolveLexiconURL(meta gemara.Metadata) (string, error) {
 	if meta.Lexicon == nil {
 		return "", fmt.Errorf("lexicon mapping is nil")
@@ -37,8 +37,8 @@ func resolveLexiconURL(meta gemara.Metadata) (string, error) {
 	return "", fmt.Errorf("no mapping-references entry with id %q for metadata.lexicon", refID)
 }
 
-// loadLexiconFromURI fetches a Lexicon from a file:// or http(s):// URI
-// and returns normalized entries.
+// loadLexiconFromURI fetches a Lexicon from an http(s):// URL, a file:// URI,
+// or a local file path, and returns normalized entries.
 func loadLexiconFromURI(ctx context.Context, uri string) ([]lexiconEntry, error) {
 	doc, err := gemara.Load[gemara.Lexicon](ctx, &fetcher.URI{}, uri)
 	if err != nil {

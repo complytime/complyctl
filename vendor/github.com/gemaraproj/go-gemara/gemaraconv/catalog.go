@@ -10,7 +10,7 @@ import (
 )
 
 // CatalogToOSCAL converts a Gemara ControlCatalog to OSCAL Catalog format.
-func CatalogToOSCAL(catalog *gemara.ControlCatalog, opts ...GenerateOption) (oscal.Catalog, error) {
+func CatalogToOSCAL(catalog gemara.ControlCatalog, opts ...GenerateOption) (oscal.Catalog, error) {
 	options := generateOpts{}
 	for _, opt := range opts {
 		opt(&options)

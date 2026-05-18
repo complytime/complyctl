@@ -13,18 +13,19 @@ var emptyArtifactURIMessage = "no file associated with this alert"
 // Each AssessmentLog is emitted as a SARIF result. The rule id is derived from
 // the control id and requirement id.
 //
-// Parameters:
-//   - evaluationLog: The evaluation log to convert
-//   - artifactURI: File path or URI for PhysicalLocation.artifactLocation.uri.
-//     If empty, PhysicalLocation will be nil (no resource URI available).
-//     For GitHub Code Scanning, typically use a file path like "README.md".
-//   - catalog: Optional catalog data to enrich SARIF output with requirement text
-//     and recommendations. If nil, only basic information is included.
+// Use WithArtifactURI to set PhysicalLocation (defaults to a placeholder).
+// Use WithCatalog to enrich rules with requirement text and recommendations.
 //
 // PhysicalLocation identifies the artifact (file/repository) where the result was found.
 // LogicalLocation identifies the logical component (assessment step) that produced the result.
 // Region is left nil as we don't have file-specific line/column data.
-func ToSARIF(evaluationLog gemara.EvaluationLog, artifactURI string, catalog *gemara.ControlCatalog) ([]byte, error) {
+func ToSARIF(evaluationLog gemara.EvaluationLog, opts ...EvalOption) ([]byte, error) {
+	options := defaultEvalOpts()
+	for _, opt := range opts {
+		opt(&options)
+	}
+	artifactURI := options.artifactURI
+	catalog := options.catalog
 	report := &SarifReport{
 		Schema:  "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/123e95847b13fbdd4cbe2120fa5e33355d4a042b/Schemata/sarif-schema-2.1.0.json",
 		Version: "2.1.0",

@@ -185,11 +185,11 @@ func main() {
     }
 
     // Convert EvaluationLog to SARIF
-    evaluationLog := &gemara.EvaluationLog{
+    evaluationLog := gemara.EvaluationLog{
         // ... populate evaluation log ...
     }
 
-    sarifBytes, err := gemaraconv.EvaluationLog(evaluationLog).ToSARIF("file:///path/to/artifact.md", catalog)
+    sarifBytes, err := gemaraconv.EvaluationLog(evaluationLog).ToSARIF(gemaraconv.WithArtifactURI("file:///path/to/artifact.md"), gemaraconv.WithCatalog(catalog))
     if err != nil {
         panic(err)
     }

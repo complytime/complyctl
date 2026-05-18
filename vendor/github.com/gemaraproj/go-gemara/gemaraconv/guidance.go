@@ -14,7 +14,7 @@ import (
 // GuidanceToOSCAL converts a Gemara GuidanceCatalog to both an OSCAL Catalog and Profile.
 // The catalog includes only the locally defined guidelines (categories), not imported ones.
 // The profile includes imports for both external guidelines and the local catalog.
-func GuidanceToOSCAL(g *gemara.GuidanceCatalog, guidanceDocHref string, opts ...GenerateOption) (oscal.Catalog, oscal.Profile, error) {
+func GuidanceToOSCAL(g gemara.GuidanceCatalog, guidanceDocHref string, opts ...GenerateOption) (oscal.Catalog, oscal.Profile, error) {
 	// The guidanceDocHref parameter specifies the location where the OSCAL Catalog
 	// will be saved, used to create the import reference in the Profile. This must
 	// be a relative or absolute URI that accurately reflects where the catalog file
@@ -116,7 +116,7 @@ func GuidanceToOSCAL(g *gemara.GuidanceCatalog, guidanceDocHref string, opts ...
 	return catalog, profile, nil
 }
 
-func createControlGroup(g *gemara.GuidanceCatalog, group gemara.Group, guidelines []gemara.Guideline, resourcesMap map[string]string) oscal.Group {
+func createControlGroup(g gemara.GuidanceCatalog, group gemara.Group, guidelines []gemara.Guideline, resourcesMap map[string]string) oscal.Group {
 	oscalGroup := oscal.Group{
 		Class: "family",
 		ID:    group.Id,
@@ -291,7 +291,7 @@ func guidelineToParts(guideline gemara.Guideline, controlId string, guidelineId 
 	return parts
 }
 
-func guidelineToControl(g *gemara.GuidanceCatalog, guideline gemara.Guideline, resourcesMap map[string]string) (oscal.Control, string) {
+func guidelineToControl(g gemara.GuidanceCatalog, guideline gemara.Guideline, resourcesMap map[string]string) (oscal.Control, string) {
 	controlId := oscalUtils.NormalizeControl(guideline.Id, false)
 
 	control := oscal.Control{

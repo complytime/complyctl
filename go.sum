@@ -41,8 +41,8 @@ github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f/go.mod h1:vw97
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
 github.com/fatih/color v1.18.0 h1:S8gINlzdQ840/4pfAwic/ZE0djQEH3wM94VfqLTZcOM=
 github.com/fatih/color v1.18.0/go.mod h1:4FelSpRwEGDpQ12mAdzqdOukCy4u8WUtOY6lkT/6HfU=
-github.com/gemaraproj/go-gemara v0.4.0 h1:zyn7bJiqAitrRBCDlMYVLb8C1XhDWG2wI0j+pHad3HA=
-github.com/gemaraproj/go-gemara v0.4.0/go.mod h1:knXQmQ4f7vB18eb6TcUCP2A3dqQpn+oZdyz74Qe1+ac=
+github.com/gemaraproj/go-gemara v0.5.0 h1:sKDj3R7fX8tdlksShWGCLUl/sLvo+tGh1xAFs1JaoHU=
+github.com/gemaraproj/go-gemara v0.5.0/go.mod h1:knXQmQ4f7vB18eb6TcUCP2A3dqQpn+oZdyz74Qe1+ac=
 github.com/go-logfmt/logfmt v0.6.1 h1:4hvbpePJKnIzH1B+8OR/JPbTx37NktoI9LE2QZBBkvE=
 github.com/go-logfmt/logfmt v0.6.1/go.mod h1:EV2pOAQoZaT1ZXZbqDl5hrymndi4SY9ED9/z6CO0XAk=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=

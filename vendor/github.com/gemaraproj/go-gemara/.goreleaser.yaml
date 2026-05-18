@@ -38,6 +38,7 @@ changelog:
       - "^test:"
 
 release:
+  disable: true
   prerelease: auto
 
 universal_binaries:

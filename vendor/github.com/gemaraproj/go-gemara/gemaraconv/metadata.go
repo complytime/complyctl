@@ -61,7 +61,7 @@ func createMetadata(title string, version string, published *time.Time, canonica
 }
 
 // createMetadataFromGuidance creates OSCAL metadata from a GuidanceCatalog
-func createMetadataFromGuidance(guidance *gemara.GuidanceCatalog, opts generateOpts) (oscal.Metadata, error) {
+func createMetadataFromGuidance(guidance gemara.GuidanceCatalog, opts generateOpts) (oscal.Metadata, error) {
 	canonicalHref := ""
 	if opts.canonicalHref != "" {
 		canonicalHref = fmt.Sprintf(opts.canonicalHref, opts.version)
@@ -80,7 +80,7 @@ func createMetadataFromGuidance(guidance *gemara.GuidanceCatalog, opts generateO
 }
 
 // createMetadataFromCatalog creates OSCAL metadata from a ControlCatalog
-func createMetadataFromCatalog(catalog *gemara.ControlCatalog, opts generateOpts) (oscal.Metadata, error) {
+func createMetadataFromCatalog(catalog gemara.ControlCatalog, opts generateOpts) (oscal.Metadata, error) {
 	// Handle canonical HREF - prefer controlHREF for Catalog, fallback to canonicalHref
 	var canonicalHref string
 	if opts.controlHREF != "" {

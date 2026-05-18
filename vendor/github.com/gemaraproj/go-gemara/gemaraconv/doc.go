@@ -10,11 +10,11 @@
 //
 // Examples:
 //
-//	sarifBytes, err := gemaraconv.ToSARIF(&log, "file.md", catalog)
+//	sarifBytes, err := gemaraconv.ToSARIF(log, gemaraconv.WithArtifactURI("file.md"), gemaraconv.WithCatalog(catalog))
 //	oscalCatalog, err := gemaraconv.CatalogToOSCAL(catalog, gemaraconv.WithVersion("1.0"))
 //	md, err := gemaraconv.CatalogToMarkdown(ctx, catalog, gemaraconv.WithTOC(true), gemaraconv.WithLexiconAutolink(true))
 //	// Or pass list-shaped entries: WithInlineLexicon([]gemaraconv.InlineLexiconTerm{...})
-//	converter := gemaraconv.EvaluationLog(&log)
-//	sarifBytes, err := converter.ToSARIF("file.md", catalog)
+//	converter := gemaraconv.EvaluationLog(log)
+//	sarifBytes, err := converter.ToSARIF(gemaraconv.WithArtifactURI("file.md"), gemaraconv.WithCatalog(catalog))
 //	md, err := gemaraconv.ControlCatalog(catalog).ToMarkdown(ctx)
 package gemaraconv
