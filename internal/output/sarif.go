@@ -17,7 +17,7 @@ import (
 
 // ToSARIF converts a gemara.EvaluationLog to SARIF using go-gemara gemaraconv.
 func ToSARIF(log *gemara.EvaluationLog, artifactURI, outDir string) (string, error) {
-	sarifBytes, err := gemaraconv.ToSARIF(*log, artifactURI, nil)
+	sarifBytes, err := gemaraconv.ToSARIF(*log, gemaraconv.WithArtifactURI(artifactURI))
 	if err != nil {
 		return "", fmt.Errorf("SARIF conversion failed: %w", err)
 	}

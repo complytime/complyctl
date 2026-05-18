@@ -166,7 +166,7 @@ func writeEvaluationLog(evalLog gemara.EvaluationLog, outDir string) error {
 }
 
 func writeSARIF(evalLog gemara.EvaluationLog, artifactURI, outDir string, catalog *gemara.ControlCatalog) error {
-	sarifBytes, err := gemaraconv.ToSARIF(evalLog, artifactURI, catalog)
+	sarifBytes, err := gemaraconv.ToSARIF(evalLog, gemaraconv.WithArtifactURI(artifactURI), gemaraconv.WithCatalog(catalog))
 	if err != nil {
 		return fmt.Errorf("SARIF conversion: %w", err)
 	}
