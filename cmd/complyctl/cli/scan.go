@@ -465,8 +465,27 @@ func needsRegeneration(genState *policy.GenerationState, digest, eid string) boo
 		fmt.Fprintf(os.Stderr, "Policy %s updated since last generate — regenerating\n", eid)
 		return true
 	}
+	if !evaluatorArtifactsExist(genState.EvaluatorIDs) {
+		fmt.Fprintf(os.Stderr, "Generated artifacts missing on disk for %s — regenerating\n", eid)
+		return true
+	}
 	fmt.Fprintf(os.Stderr, "Reusing generated artifacts for %s (policy unchanged)\n", eid)
 	return false
+}
+
+func evaluatorArtifactsExist(evaluatorIDs []string) bool {
+	for _, evalID := range evaluatorIDs {
+		evalDir := filepath.Join(".", complytime.WorkspaceDir, evalID)
+		info, err := os.Stat(evalDir)
+		if err != nil || !info.IsDir() {
+			return false
+		}
+		entries, err := os.ReadDir(evalDir)
+		if err != nil || len(entries) == 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func runGeneration(ctx context.Context, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string, repository, policyDigest string, evaluatorIDs []string) error {
