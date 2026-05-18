@@ -4,14 +4,20 @@ package registry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"oras.land/oras-go/v2/errdef"
 	"oras.land/oras-go/v2/registry"
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
 )
+
+// ErrVersionNotFound indicates the requested tag/version does not exist in the
+// registry. Callers can use errors.Is to distinguish from network failures.
+var ErrVersionNotFound = errors.New("version not found in registry")
 
 // Fetcher abstracts registry access for testing without a live OCI registry.
 type Fetcher interface {
@@ -56,7 +62,7 @@ func (c *Client) DefinitionVersion(ctx context.Context, modulePath string) (stri
 	ref := buildRef(c.registryHost(), modulePath)
 	digest, version, err := c.fetchVersion(ctx, ref)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to fetch version for %s: %w", modulePath, err)
+		return "", "", err
 	}
 
 	return digest, version, nil
@@ -125,7 +131,10 @@ func (c *Client) fetchVersion(ctx context.Context, ref string) (string, string, 
 
 	desc, err := repo.Resolve(ctx, tag)
 	if err != nil {
-		return "", "", fmt.Errorf("OCI version resolution failed for %s: %w", ref, err)
+		if errors.Is(err, errdef.ErrNotFound) {
+			return "", "", fmt.Errorf("%w: %s tag %q", ErrVersionNotFound, ref, tag)
+		}
+		return "", "", fmt.Errorf("registry communication failed for %s: %w", ref, err)
 	}
 
 	digest := desc.Digest.String()

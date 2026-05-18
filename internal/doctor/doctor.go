@@ -4,6 +4,7 @@ package doctor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"github.com/complytime/complyctl/internal/cache"
 	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/internal/policy"
+	"github.com/complytime/complyctl/internal/registry"
 	"github.com/complytime/complyctl/pkg/provider"
 )
 
@@ -268,7 +270,28 @@ func CheckPolicyVersions(cfg *complytime.WorkspaceConfig, cacheDir string, versi
 		}
 
 		cachedVersion := cachedState.Version
-		if cachedVersion == latestVersion {
+
+		if ref.Version != "" {
+			if cachedVersion == ref.Version {
+				msg := fmt.Sprintf("%s (pinned)", cachedVersion)
+				if latestVersion != cachedVersion {
+					msg = fmt.Sprintf("%s (pinned — latest available: %s)", cachedVersion, latestVersion)
+				}
+				results = append(results, CheckResult{
+					Name:     fmt.Sprintf("policy/%s", eid),
+					Status:   StatusPass,
+					Message:  msg,
+					Blocking: false,
+				})
+			} else {
+				results = append(results, CheckResult{
+					Name:     fmt.Sprintf("policy/%s", eid),
+					Status:   StatusWarn,
+					Message:  fmt.Sprintf("cached %s does not match configured pin @%s — run complyctl get", cachedVersion, ref.Version),
+					Blocking: false,
+				})
+			}
+		} else if cachedVersion == latestVersion {
 			results = append(results, CheckResult{
 				Name:     fmt.Sprintf("policy/%s", eid),
 				Status:   StatusPass,
@@ -290,7 +313,7 @@ func CheckPolicyVersions(cfg *complytime.WorkspaceConfig, cacheDir string, versi
 
 // resolvePinnedFallback attempts to resolve a pinned version when the latest
 // tag is unavailable. Returns a pass result if the pinned version resolves,
-// or a warn result marking the registry as unreachable.
+// or a warn result with a user-friendly diagnosis.
 func resolvePinnedFallback(
 	resolver VersionResolver,
 	ref complytime.PolicyRef,
@@ -308,6 +331,20 @@ func resolvePinnedFallback(
 			}
 		}
 	}
+
+	if errors.Is(latestErr, registry.ErrVersionNotFound) {
+		msg := "latest tag not found — pin a specific version with @<tag>"
+		if ref.Version != "" {
+			msg = fmt.Sprintf("version %q not found in registry", ref.Version)
+		}
+		return CheckResult{
+			Name:     fmt.Sprintf("policy/%s", eid),
+			Status:   StatusWarn,
+			Message:  msg,
+			Blocking: false,
+		}
+	}
+
 	return CheckResult{
 		Name:     fmt.Sprintf("registry/%s", ref.Registry),
 		Status:   StatusWarn,
@@ -678,6 +715,9 @@ func unmappedReason(resolver PolicyGraphResolver, resolveFailures int) string {
 // Non-blocking — the collector is optional. When configured, checks that the
 // endpoint format looks valid and auth fields are complete.
 func CheckCollector(cfg *complytime.WorkspaceConfig) []CheckResult {
+	if cfg == nil {
+		return nil
+	}
 	if cfg.Collector == nil {
 		return []CheckResult{{
 			Name:    "collector",

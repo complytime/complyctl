@@ -13,6 +13,7 @@ import (
 	"github.com/complytime/complyctl/internal/cache"
 	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/internal/policy"
+	"github.com/complytime/complyctl/internal/registry"
 )
 
 // --- Mock VersionResolver ---
@@ -35,32 +36,32 @@ func newMockVersionResolver() *mockVersionResolver {
 	}
 }
 
-func (m *mockVersionResolver) ResolveLatestVersion(registry, repository string) (string, error) {
-	if m.unreachable[registry] {
+func (m *mockVersionResolver) ResolveLatestVersion(reg, repository string) (string, error) {
+	if m.unreachable[reg] {
 		return "", fmt.Errorf("connection refused")
 	}
-	if m.latestMissing[registry] {
-		return "", fmt.Errorf("OCI version resolution failed for %s/%s:latest: not found", registry, repository)
+	if m.latestMissing[reg] {
+		return "", fmt.Errorf("%w: %s/%s tag %q", registry.ErrVersionNotFound, reg, repository, "latest")
 	}
-	key := registry + "|" + repository
+	key := reg + "|" + repository
 	if err, ok := m.errOnResolve[key]; ok {
 		return "", err
 	}
 	if v, ok := m.versions[key]; ok {
 		return v, nil
 	}
-	return "", fmt.Errorf("not found: %s/%s", registry, repository)
+	return "", fmt.Errorf("not found: %s/%s", reg, repository)
 }
 
-func (m *mockVersionResolver) ResolveVersion(registry, repository, version string) (string, error) {
-	if m.unreachable[registry] {
+func (m *mockVersionResolver) ResolveVersion(reg, repository, version string) (string, error) {
+	if m.unreachable[reg] {
 		return "", fmt.Errorf("connection refused")
 	}
-	key := registry + "|" + repository + "|" + version
+	key := reg + "|" + repository + "|" + version
 	if v, ok := m.pinnedVersions[key]; ok {
 		return v, nil
 	}
-	return "", fmt.Errorf("not found: %s/%s:%s", registry, repository, version)
+	return "", fmt.Errorf("not found: %s/%s:%s", reg, repository, version)
 }
 
 // --- Mock PolicyGraphResolver ---
@@ -146,12 +147,43 @@ func TestCheckPolicyVersions_PolicyAtLatest(t *testing.T) {
 	if results[0].Status != StatusPass {
 		t.Errorf("expected pass, got %s: %s", results[0].Status, results[0].Message)
 	}
+	if !strings.Contains(results[0].Message, "(pinned)") {
+		t.Errorf("expected '(pinned)' in message, got %q", results[0].Message)
+	}
+}
+
+func TestCheckPolicyVersions_UnpinnedAtLatest(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	state := &cache.State{Policies: map[string]cache.PolicyState{
+		"policies/nist": {Version: "v1.0.0"},
+	}}
+	if err := cache.SaveState(state, tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &complytime.WorkspaceConfig{
+		Policies: []complytime.PolicyEntry{
+			{URL: "reg.io/policies/nist"},
+		},
+	}
+
+	vr := newMockVersionResolver()
+	vr.versions["reg.io|policies/nist"] = "v1.0.0"
+
+	results := CheckPolicyVersions(cfg, tmpDir, vr)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != StatusPass {
+		t.Errorf("expected pass, got %s: %s", results[0].Status, results[0].Message)
+	}
 	if !strings.Contains(results[0].Message, "(latest)") {
 		t.Errorf("expected '(latest)' in message, got %q", results[0].Message)
 	}
 }
 
-func TestCheckPolicyVersions_PolicyStale(t *testing.T) {
+func TestCheckPolicyVersions_PinnedMatchesCached_LatestDiffers(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	state := &cache.State{Policies: map[string]cache.PolicyState{
@@ -174,6 +206,40 @@ func TestCheckPolicyVersions_PolicyStale(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
+	if results[0].Status != StatusPass {
+		t.Errorf("expected pass for pinned matching cached, got %s: %s", results[0].Status, results[0].Message)
+	}
+	if !strings.Contains(results[0].Message, "(pinned") {
+		t.Errorf("expected 'pinned' in message, got %q", results[0].Message)
+	}
+	if !strings.Contains(results[0].Message, "latest available: v1.1.0") {
+		t.Errorf("expected 'latest available' info in message, got %q", results[0].Message)
+	}
+}
+
+func TestCheckPolicyVersions_UnpinnedStale(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	state := &cache.State{Policies: map[string]cache.PolicyState{
+		"policies/nist": {Version: "v1.0.0"},
+	}}
+	if err := cache.SaveState(state, tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &complytime.WorkspaceConfig{
+		Policies: []complytime.PolicyEntry{
+			{URL: "reg.io/policies/nist"},
+		},
+	}
+
+	vr := newMockVersionResolver()
+	vr.versions["reg.io|policies/nist"] = "v1.1.0"
+
+	results := CheckPolicyVersions(cfg, tmpDir, vr)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
 	if results[0].Status != StatusWarn {
 		t.Errorf("expected warn, got %s: %s", results[0].Status, results[0].Message)
 	}
@@ -182,6 +248,40 @@ func TestCheckPolicyVersions_PolicyStale(t *testing.T) {
 	}
 	if !strings.Contains(results[0].Message, "available v1.1.0") {
 		t.Errorf("expected available version in message, got %q", results[0].Message)
+	}
+}
+
+func TestCheckPolicyVersions_PinnedMismatchCached(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	state := &cache.State{Policies: map[string]cache.PolicyState{
+		"policies/nist": {Version: "v1.0.0"},
+	}}
+	if err := cache.SaveState(state, tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &complytime.WorkspaceConfig{
+		Policies: []complytime.PolicyEntry{
+			{URL: "reg.io/policies/nist@v2.0.0"},
+		},
+	}
+
+	vr := newMockVersionResolver()
+	vr.versions["reg.io|policies/nist"] = "v2.0.0"
+
+	results := CheckPolicyVersions(cfg, tmpDir, vr)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != StatusWarn {
+		t.Errorf("expected warn for pin mismatch, got %s: %s", results[0].Status, results[0].Message)
+	}
+	if !strings.Contains(results[0].Message, "does not match configured pin") {
+		t.Errorf("expected pin mismatch message, got %q", results[0].Message)
+	}
+	if !strings.Contains(results[0].Message, "@v2.0.0") {
+		t.Errorf("expected configured version in message, got %q", results[0].Message)
 	}
 }
 
@@ -317,8 +417,11 @@ func TestCheckPolicyVersions_LatestMissing_NoPinnedVersion(t *testing.T) {
 	if results[0].Status != StatusWarn {
 		t.Errorf("expected warn, got %s: %s", results[0].Status, results[0].Message)
 	}
-	if results[0].Name != "registry/reg.io" {
-		t.Errorf("expected registry warning, got %q", results[0].Name)
+	if !strings.Contains(results[0].Message, "latest tag not found") {
+		t.Errorf("expected 'latest tag not found' in message, got %q", results[0].Message)
+	}
+	if !strings.Contains(results[0].Message, "pin a specific version") {
+		t.Errorf("expected guidance to pin version, got %q", results[0].Message)
 	}
 }
 
@@ -942,6 +1045,13 @@ func TestCheckConfig_MissingFile(t *testing.T) {
 }
 
 // --- CheckCollector Tests ---
+
+func TestCheckCollector_NilConfig(t *testing.T) {
+	results := CheckCollector(nil)
+	if results != nil {
+		t.Errorf("expected nil for nil config, got %d results", len(results))
+	}
+}
 
 func TestCheckCollector_NilCollector(t *testing.T) {
 	cfg := &complytime.WorkspaceConfig{}

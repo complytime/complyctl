@@ -4,7 +4,10 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"github.com/complytime/complyctl/internal/registry"
 )
 
 // Sync provides incremental sync using oras.Copy() for remote-to-local transfer.
@@ -37,10 +40,10 @@ func (s *Sync) SyncPolicy(ctx context.Context, policyID, version string) error {
 
 	remoteDigest, remoteVersion, err := s.source.DefinitionVersion(ctx, lookupRef)
 	if err != nil {
-		return fmt.Errorf(
-			"policy %s: registry unreachable: %w (cached data may still be available)",
-			policyID, err,
-		)
+		if errors.Is(err, registry.ErrVersionNotFound) {
+			return fmt.Errorf("policy %s: %w", policyID, err)
+		}
+		return fmt.Errorf("policy %s: registry unreachable: %w", policyID, err)
 	}
 
 	if version == "" || version == "latest" {
@@ -59,10 +62,7 @@ func (s *Sync) SyncPolicy(ctx context.Context, policyID, version string) error {
 
 	_, err = s.source.CopyPolicy(ctx, policyID, version, localStore)
 	if err != nil {
-		return fmt.Errorf(
-			"policy %s@%s: registry unreachable: %w (local cache unchanged)",
-			policyID, version, err,
-		)
+		return fmt.Errorf("policy %s@%s: copy failed: %w", policyID, version, err)
 	}
 
 	s.state.UpdatePolicyState(policyID, version, remoteDigest)

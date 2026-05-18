@@ -689,7 +689,7 @@ targets:
 	err := o.run(context.Background())
 	require.Error(t, err)
 	// Verify it fails on sync, not on config loading or complypacks parsing.
-	assert.Contains(t, err.Error(), "sync")
+	assert.Contains(t, err.Error(), "registry")
 }
 
 // --- listOptions tests ---

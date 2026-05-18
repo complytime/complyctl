@@ -110,7 +110,7 @@ func (o *getOptions) syncPolicies(ctx context.Context, cfg *complytime.Workspace
 		return fmt.Errorf("authentication setup failed: %w", err)
 	}
 
-	return syncAllPolicies(ctx, cacheMgr, state, credFunc, cfg.Policies, o.cacheDir)
+	return syncAllPolicies(ctx, cacheMgr, state, credFunc, cfg.Policies)
 }
 
 // syncComplypacks fetches complypack artifacts listed in the workspace config.
@@ -135,12 +135,12 @@ func (o *getOptions) syncComplypacks(ctx context.Context, cfg *complytime.Worksp
 	return syncAllComplypacks(ctx, state, credFunc, cfg.Complypacks, o.cacheDir)
 }
 
-func syncAllPolicies(ctx context.Context, cacheMgr *cache.Cache, state *cache.State, credFunc auth.CredentialFunc, policies []complytime.PolicyEntry, cacheDir string) error {
+func syncAllPolicies(ctx context.Context, cacheMgr *cache.Cache, state *cache.State, credFunc auth.CredentialFunc, policies []complytime.PolicyEntry) error {
 	logger.Info("Starting policy synchronization", "policy_count", len(policies))
 
 	total := len(policies)
 	for i, entry := range policies {
-		if err := syncSinglePolicy(ctx, cacheMgr, state, credFunc, entry, i+1, total, cacheDir); err != nil {
+		if err := syncSinglePolicy(ctx, cacheMgr, state, credFunc, entry, i+1, total); err != nil {
 			return err
 		}
 	}
@@ -150,7 +150,7 @@ func syncAllPolicies(ctx context.Context, cacheMgr *cache.Cache, state *cache.St
 	return nil
 }
 
-func syncSinglePolicy(ctx context.Context, cacheMgr *cache.Cache, state *cache.State, credFunc auth.CredentialFunc, entry complytime.PolicyEntry, index, total int, cacheDir string) error {
+func syncSinglePolicy(ctx context.Context, cacheMgr *cache.Cache, state *cache.State, credFunc auth.CredentialFunc, entry complytime.PolicyEntry, index, total int) error {
 	ref := complytime.ParsePolicyRef(entry.URL)
 	version := ref.Version
 
@@ -166,9 +166,8 @@ func syncSinglePolicy(ctx context.Context, cacheMgr *cache.Cache, state *cache.S
 	logger.Info("Syncing policy", "policy", ref.Repository, "version", version)
 	if err := sync.SyncPolicy(ctx, ref.Repository, version); err != nil {
 		fmt.Fprintln(os.Stderr, "failed")
-		suggestMsg := suggestCachedPolicyIDs(cacheDir, ref.Repository)
 		logger.Error("Policy sync failed", "policy", ref.Repository, "error", err)
-		return fmt.Errorf("failed to sync policy %s: %w%s", ref.Repository, err, suggestMsg)
+		return err
 	}
 	fmt.Fprintln(os.Stderr, "done")
 	logger.Info("Policy synced", "policy", entry.EffectiveID())
@@ -185,23 +184,6 @@ func resolveLatestVersion(ctx context.Context, client *registry.Client, reposito
 	}
 	logger.Info("Resolved version", "policy", policyID, "version", resolvedVersion)
 	return resolvedVersion
-}
-
-func suggestCachedPolicyIDs(cacheDir, failedPolicyID string) string {
-	state, err := cache.LoadState(cacheDir)
-	if err != nil || len(state.Policies) == 0 {
-		return ""
-	}
-	cached := make([]string, 0, len(state.Policies))
-	for id := range state.Policies {
-		if id != failedPolicyID {
-			cached = append(cached, id)
-		}
-	}
-	if len(cached) == 0 {
-		return ""
-	}
-	return fmt.Sprintf(" (cached policies: %v)", cached)
 }
 
 func syncAllComplypacks(ctx context.Context, state *cache.State, credFunc auth.CredentialFunc, complypacks []complytime.PolicyEntry, cacheDir string) error {
@@ -232,7 +214,6 @@ func syncSingleComplypack(ctx context.Context, state *cache.State, credFunc auth
 		version = resolveLatestVersion(ctx, client, ref.Repository, entry.EffectiveID())
 	}
 
-	// Task 4.5: Progress output — mirrors the policy sync pattern.
 	fmt.Fprintf(os.Stderr, "Syncing complypack %d/%d: %s... ", index, total, entry.EffectiveID())
 	logger.Info("Syncing complypack", "complypack", ref.Repository, "version", version)
 	fetched, err := cpSync.SyncComplypack(ctx, ref.Repository, version)
@@ -244,9 +225,6 @@ func syncSingleComplypack(ctx context.Context, state *cache.State, credFunc auth
 	fmt.Fprintln(os.Stderr, "done")
 	logger.Info("Complypack synced", "complypack", entry.EffectiveID())
 
-	// Task 4.4: Warn that the artifact has not been cryptographically verified.
-	// Only emit when content was actually downloaded — skip for incremental
-	// no-ops where the cached content is already up-to-date.
 	if fetched {
 		fmt.Fprintf(os.Stderr, "WARNING: complypack %s has not been cryptographically verified\n", entry.EffectiveID())
 		logger.Warn("Complypack not cryptographically verified", "complypack", entry.EffectiveID())

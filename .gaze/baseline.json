@@ -1629,10 +1629,10 @@
       "package": "cache",
       "function": "(*Sync).SyncPolicy",
       "file": "internal/cache/sync.go",
-      "line": 28,
-      "complexity": 13,
-      "line_coverage": 86.95652173913044,
-      "crap": 13.375030821073395
+      "line": 31,
+      "complexity": 14,
+      "line_coverage": 84,
+      "crap": 14.802816
     },
     {
       "package": "complytime",
@@ -1945,19 +1945,19 @@
       "package": "doctor",
       "function": "CheckPolicyVersions",
       "file": "internal/doctor/doctor.go",
-      "line": 219,
-      "complexity": 11,
+      "line": 221,
+      "complexity": 14,
       "line_coverage": 100,
-      "crap": 11
+      "crap": 14
     },
     {
       "package": "doctor",
       "function": "resolvePinnedFallback",
       "file": "internal/doctor/doctor.go",
-      "line": 294,
-      "complexity": 3,
-      "line_coverage": 100,
-      "crap": 3
+      "line": 317,
+      "complexity": 5,
+      "line_coverage": 90,
+      "crap": 5.025
     },
     {
       "package": "doctor",
@@ -2027,10 +2027,10 @@
       "package": "doctor",
       "function": "CheckCollector",
       "file": "internal/doctor/doctor.go",
-      "line": 680,
-      "complexity": 5,
+      "line": 717,
+      "complexity": 6,
       "line_coverage": 100,
-      "crap": 5
+      "crap": 6
     },
     {
       "package": "doctor",
@@ -2595,10 +2595,10 @@
       "package": "registry",
       "function": "(*Client).fetchVersion",
       "file": "internal/registry/client.go",
-      "line": 109,
-      "complexity": 5,
+      "line": 115,
+      "complexity": 6,
       "line_coverage": 0,
-      "crap": 30,
+      "crap": 42,
       "fix_strategy": "add_tests"
     },
     {
