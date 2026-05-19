@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -827,4 +828,106 @@ func TestExtractReqToControlMap_WithControls(t *testing.T) {
 	m := extractReqToControlMap(graph)
 	assert.Equal(t, "ctrl-1", m["req-1"])
 	assert.Equal(t, "ctrl-1", m["req-2"])
+}
+
+// --- evaluatorArtifactsExist tests ---
+
+func TestEvaluatorArtifactsExist_EmptySlice(t *testing.T) {
+	chdirTemp(t)
+	assert.True(t, evaluatorArtifactsExist(nil), "nil evaluator list should return true")
+	assert.True(t, evaluatorArtifactsExist([]string{}), "empty evaluator list should return true")
+}
+
+func TestEvaluatorArtifactsExist_DirExistsWithFiles(t *testing.T) {
+	chdirTemp(t)
+	evalDir := filepath.Join(".", complytime.WorkspaceDir, "ampel")
+	require.NoError(t, os.MkdirAll(evalDir, 0750))
+	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "policy.rego"), []byte("package test"), 0600))
+
+	assert.True(t, evaluatorArtifactsExist([]string{"ampel"}))
+}
+
+func TestEvaluatorArtifactsExist_DirMissing(t *testing.T) {
+	chdirTemp(t)
+	assert.False(t, evaluatorArtifactsExist([]string{"ampel"}))
+}
+
+func TestEvaluatorArtifactsExist_DirExistsButEmpty(t *testing.T) {
+	chdirTemp(t)
+	evalDir := filepath.Join(".", complytime.WorkspaceDir, "ampel")
+	require.NoError(t, os.MkdirAll(evalDir, 0750))
+
+	assert.False(t, evaluatorArtifactsExist([]string{"ampel"}))
+}
+
+func TestEvaluatorArtifactsExist_MultipleEvaluators_AllPresent(t *testing.T) {
+	chdirTemp(t)
+	for _, id := range []string{"ampel", "openscap"} {
+		evalDir := filepath.Join(".", complytime.WorkspaceDir, id)
+		require.NoError(t, os.MkdirAll(evalDir, 0750))
+		require.NoError(t, os.WriteFile(filepath.Join(evalDir, "artifact.json"), []byte("{}"), 0600))
+	}
+
+	assert.True(t, evaluatorArtifactsExist([]string{"ampel", "openscap"}))
+}
+
+func TestEvaluatorArtifactsExist_MultipleEvaluators_OneMissing(t *testing.T) {
+	chdirTemp(t)
+	evalDir := filepath.Join(".", complytime.WorkspaceDir, "ampel")
+	require.NoError(t, os.MkdirAll(evalDir, 0750))
+	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "artifact.json"), []byte("{}"), 0600))
+
+	assert.False(t, evaluatorArtifactsExist([]string{"ampel", "openscap"}),
+		"should return false when any evaluator directory is missing")
+}
+
+func TestEvaluatorArtifactsExist_PathIsFile(t *testing.T) {
+	chdirTemp(t)
+	require.NoError(t, os.MkdirAll(complytime.WorkspaceDir, 0750))
+	filePath := filepath.Join(".", complytime.WorkspaceDir, "ampel")
+	require.NoError(t, os.WriteFile(filePath, []byte("not a dir"), 0600))
+
+	assert.False(t, evaluatorArtifactsExist([]string{"ampel"}),
+		"should return false when path is a file, not a directory")
+}
+
+// --- needsRegeneration tests ---
+
+func TestNeedsRegeneration_NilState(t *testing.T) {
+	assert.True(t, needsRegeneration(nil, "sha256:abc", "test-policy"),
+		"nil generation state should require regeneration")
+}
+
+func TestNeedsRegeneration_StaleDigest(t *testing.T) {
+	state := &policy.GenerationState{
+		PolicyDigest: "sha256:old",
+		EvaluatorIDs: []string{"ampel"},
+	}
+	assert.True(t, needsRegeneration(state, "sha256:new", "test-policy"),
+		"mismatched digest should require regeneration")
+}
+
+func TestNeedsRegeneration_FreshWithArtifacts(t *testing.T) {
+	chdirTemp(t)
+	evalDir := filepath.Join(".", complytime.WorkspaceDir, "ampel")
+	require.NoError(t, os.MkdirAll(evalDir, 0750))
+	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "policy.rego"), []byte("package test"), 0600))
+
+	state := &policy.GenerationState{
+		PolicyDigest: "sha256:current",
+		EvaluatorIDs: []string{"ampel"},
+	}
+	assert.False(t, needsRegeneration(state, "sha256:current", "test-policy"),
+		"fresh digest with existing artifacts should not require regeneration")
+}
+
+func TestNeedsRegeneration_FreshButArtifactsMissing(t *testing.T) {
+	chdirTemp(t)
+	// Do not create the evaluator directory — simulates deleted artifacts.
+	state := &policy.GenerationState{
+		PolicyDigest: "sha256:current",
+		EvaluatorIDs: []string{"ampel"},
+	}
+	assert.True(t, needsRegeneration(state, "sha256:current", "test-policy"),
+		"fresh digest but missing artifacts should require regeneration")
 }
