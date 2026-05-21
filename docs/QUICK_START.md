@@ -56,7 +56,7 @@ targets:
 
 ```yaml
 policies:
-  - url: quay.io/complytime/complytime-policies@ampel-branch-protection
+  - url: quay.io/complytime/policies-ampel-branch-protection:latest
     id: ampel-bp
 
 targets:
@@ -74,7 +74,7 @@ See the [ampel provider configuration](https://github.com/complytime/complytime-
 
 ```yaml
 policies:
-  - url: quay.io/complytime/complytime-policies@cis-fedora-l1-workstation
+  - url: quay.io/complytime/policies-cis-fedora-l1-workstation:latest
     id: cis-fedora-l1
 
 targets:
