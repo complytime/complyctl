@@ -46,6 +46,10 @@ make test-cross-repo PROVIDERS_BIN_DIR=/path/to/providers/bin
 
 # Behavioral assessment (EvaluationLog + SARIF reports)
 make test-behavioral
+
+# Devcontainer smoke test (verifies Containerfile builds)
+make test-devcontainer
+# → podman build -t complyctl-devcontainer-test .devcontainer/
 ```
 
 ### Lint & Format
@@ -88,6 +92,11 @@ make crapload-check     # check for CRAP regressions against baseline
 ## Project Structure
 
 ```text
+.devcontainer/       # devcontainer config for testing environment
+├── Containerfile    # Fedora base image definition
+├── devcontainer.json # devcontainer standard configuration
+└── scripts/
+    └── post-create.sh # setup automation script
 api/                 # protobuf definitions (provider gRPC API)
 cmd/
 ├── complyctl/       # CLI entrypoint (main.go)
@@ -276,6 +285,7 @@ packages organized by domain responsibility.
 <!-- MANUAL ADDITIONS END -->
 
 ## Recent Changes
+- dev-testing-environment: Added `.devcontainer/` with Fedora-based devcontainer for interactive CLI testing; `docs/TESTING_ENVIRONMENT.md` documentation; `make test-devcontainer` CI smoke target; post-create script with GITHUB_TOKEN least-privilege handling
 - scan-error-exit-codes: `complyctl scan` exits non-zero on operational errors; `ScanResponse.errors` proto field added; `ScanResult`/`RouteScanResult()` in `pkg/provider/manager.go`; `FormatOperationalWarnings` in `internal/output/scan_summary.go`; `processScanOutput`/`checkOperationalErrors`/`reportOperationalWarnings` in `cmd/complyctl/cli/scan.go`
 - 005-bundle-resolver-alignment: Policy resolver supports both split-layer and Gemara bundle-format OCI artifacts; `internal/policy/loader.go` gained `LoadBundleFiles()`, `DetectManifestShape()`, `resolveManifest()`; `PolicyLoader` interface extended with bundle methods; `MockBundlePolicySource` added to `internal/cache/cachetest/`
 - 005-rpm-packaging-ci: Added Go 1.25 + go-rpm-macros, Packit, Testing Farm (TMT/FMF)

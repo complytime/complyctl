@@ -4,6 +4,10 @@
 
 ### Added
 
+- Devcontainer configuration for interactive CLI testing during PR
+  reviews (`.devcontainer/`, `docs/TESTING_ENVIRONMENT.md`,
+  `make test-devcontainer`). Supports GitHub Codespaces, DevPod, and
+  VS Code Dev Containers.
 - Cross-repo integration test infrastructure validating the complyctl + Ampel
   provider pipeline end-to-end (`tests/cross-repo/`, `make test-cross-repo`).
 - CI workflow `ci_cross_repo_integration.yml` that builds complyctl from the PR

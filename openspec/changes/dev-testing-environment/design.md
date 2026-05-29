@@ -138,7 +138,41 @@ are same-org, under maintainer trust, and the devcontainer's value is
 testing the latest code. The cloned commit SHA is logged for
 auditability.
 
-### D7: Canonical source in complyctl, thin consumer in complytime-providers
+### D7: GOTOOLCHAIN=auto for Go version compatibility
+
+**Decision**: Set `ENV GOTOOLCHAIN=auto` in the Containerfile rather
+than installing a specific Go version from source.
+
+**Rationale**: Fedora's packaged Go may lag behind what dependencies
+require (e.g., Fedora 43 ships Go 1.25, but snappy requires Go 1.26).
+`GOTOOLCHAIN=auto` lets `go install` download the required toolchain
+automatically, avoiding the need to track Go releases in the
+Containerfile.
+
+### D8: SELinux compatibility via runArgs
+
+**Decision**: Set `--security-opt label=disable` in `devcontainer.json`
+`runArgs` to disable SELinux label enforcement for the container.
+
+**Rationale**: Podman rootless on SELinux-enforcing hosts (Fedora, RHEL)
+blocks access to bind-mounted workspace files without the correct
+SELinux context. Using `label=disable` is the standard devcontainer
+approach for dev-only environments where the security boundary is the
+developer's own workstation.
+
+### D9: Auto-rebuild on source change
+
+**Decision**: The post-create script installs a `.bashrc` hook that
+compares the current HEAD commit against a stored build marker
+(`./bin/.build-commit`). If they differ, `make build` runs
+automatically on shell login.
+
+**Rationale**: The primary use case is testing PR changes. After
+checking out a contributor's branch, the user should immediately have
+working binaries without remembering to run `make build`. The opt-out
+(`COMPLYCTL_SKIP_REBUILD=1`) covers docs-only or spec-only changes.
+
+### D10: Canonical source in complyctl, thin consumer in complytime-providers
 
 **Decision**: The full devcontainer configuration (Containerfile,
 post-create script, documentation) lives in complyctl. complytime-providers
@@ -198,6 +232,13 @@ the testing environment definition.
   it to `complyctl` subprocesses that require it. This prevents `go
   install`, `git clone`, and `make build` from inheriting the token
   unnecessarily.
+
+- **[Podman rootless file ownership shifts]** → Running DevPod with
+  podman rootless causes user namespace UID mapping that changes file
+  ownership on the host. After stopping a devcontainer, files may
+  appear owned by a mapped UID (e.g., 165536). Fix with
+  `podman unshare chown -R 0:0 <dir>`. This is inherent to rootless
+  containers and does not affect the devcontainer's functionality.
 
 - **[Fedora base image tag pinning]** → The Containerfile uses
   `fedora:43` (a specific version tag, not `latest`). While digest

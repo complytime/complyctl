@@ -1,0 +1,15 @@
+{
+  "name": "complyctl",
+  "build": {
+    "dockerfile": "Containerfile"
+  },
+  "remoteUser": "root",
+  "runArgs": [
+    "--security-opt", "label=disable"
+  ],
+  "postCreateCommand": "bash .devcontainer/scripts/post-create.sh",
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb"
+  }
+}

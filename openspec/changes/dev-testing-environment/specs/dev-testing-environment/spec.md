@@ -7,7 +7,9 @@ The repository MUST include a `.devcontainer/` directory with a
 development environment. The Containerfile MUST use
 `registry.fedoraproject.org/fedora:43` as the base image and MUST install
 `openscap-scanner`, `scap-security-guide`, `golang`, `git`, `make`,
-`curl`, and `jq` via dnf.
+`curl`, `jq`, `tree`, and `vim-enhanced` via dnf. The Containerfile
+MUST set `ENV GOTOOLCHAIN=auto` so that `go install` can fetch newer
+Go toolchains when dependencies require them.
 
 #### Scenario: Devcontainer configuration is present and valid
 
@@ -30,8 +32,9 @@ development environment. The Containerfile MUST use
 ### FR-002: Post-create setup produces a ready-to-test environment
 
 The devcontainer MUST define a post-create command (script) that
-automatically builds complyctl from the local source, installs snappy
-and ampel via `go install` at pinned version tags, clones and builds
+automatically builds complyctl from the local source, installs snappy,
+ampel, and conftest via `go install` at pinned version tags, clones and
+builds
 complytime-providers from main, copies provider binaries to the
 discovery path (`~/.complytime/providers/`), configures a test
 workspace with Gemara content, and starts the mock OCI registry in the
@@ -46,8 +49,10 @@ require it (least-privilege: capture, unset, selectively inject).
 - **GIVEN** the devcontainer has been built from the Containerfile
 - **WHEN** the devcontainer post-create command completes successfully
 - **THEN** `complyctl` and `mock-oci-registry` MUST be available in
-  `./bin/` (from `make build`), `snappy` and `ampel` MUST be available
-  in `$GOPATH/bin`, and `complyctl-provider-ampel` MUST be present in
+  `./bin/` (from `make build`), `snappy`, `ampel`, and `conftest` MUST
+  be available in `$GOPATH/bin`, and `complyctl-provider-ampel`,
+  `complyctl-provider-openscap`, and
+  `complyctl-provider-opa` MUST be present in
   `~/.complytime/providers/`
 
 #### Scenario: Test workspace is configured
@@ -96,6 +101,15 @@ require it (least-privilege: capture, unset, selectively inject).
 - **THEN** the command MUST complete successfully and produce scan
   results
 
+#### Scenario: Auto-rebuild on source change
+
+- **GIVEN** the devcontainer is running and the user checks out a
+  different branch (e.g., a contributor's PR)
+- **WHEN** the user opens a new shell session inside the container
+- **THEN** the environment MUST detect the source change (different
+  HEAD commit) and automatically rebuild complyctl. The user MUST be
+  able to skip the auto-rebuild by setting `COMPLYCTL_SKIP_REBUILD=1`
+
 #### Scenario: complyctl scan fails gracefully without GITHUB_TOKEN
 
 - **GIVEN** the environment does NOT have `GITHUB_TOKEN` set
@@ -113,7 +127,10 @@ and VS Code Dev Containers workflows. The documentation MUST explain
 the GITHUB_TOKEN requirement for scan commands that use snappy. The
 documentation MUST include a practical command reference showing the
 commands available in the environment, their expected behavior, and
-what success looks like.
+what success looks like. The `devcontainer.json` MUST include
+`--security-opt label=disable` in `runArgs` for SELinux compatibility
+with podman rootless. The documentation MUST explain how to configure
+DevPod inactivity timeout and how to resume a stopped container.
 
 #### Scenario: Documentation is discoverable from README
 

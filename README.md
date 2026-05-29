@@ -65,6 +65,7 @@ A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/
 - [Quick Start](./docs/QUICK_START.md)
 - [Provider Guide](https://github.com/complytime/complytime-providers/blob/main/docs/provider-guide.md)
 - [E2E Testing](./tests/e2e/README.md)
+- [Testing Environment](./docs/TESTING_ENVIRONMENT.md)
 
 ## CLI Commands
 

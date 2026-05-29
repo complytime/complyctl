@@ -1,0 +1,24 @@
+FROM registry.fedoraproject.org/fedora:43
+
+# hadolint ignore=DL3041
+RUN dnf install -y \
+    openscap-scanner \
+    scap-security-guide \
+    golang \
+    git \
+    make \
+    curl \
+    jq \
+    tree \
+    vim-enhanced \
+    && dnf clean all
+
+# Create non-root user for container security best practice.
+# devcontainer.json sets remoteUser=root for DevPod/Codespaces
+# compatibility, but the default container user is non-root.
+RUN useradd -m -s /bin/bash devuser
+USER devuser
+
+# Allow go install to fetch newer toolchains when dependencies
+# require a Go version newer than the system-packaged one.
+ENV GOTOOLCHAIN=auto

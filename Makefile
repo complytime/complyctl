@@ -57,6 +57,11 @@ endif
 	timeout 120 ./tests/cross-repo/cross_repo_integration_test.sh
 .PHONY: test-cross-repo
 
+test-devcontainer: ## verify devcontainer Containerfile builds
+	podman build -t complyctl-devcontainer-test .devcontainer/
+	@echo "Containerfile builds successfully."
+.PHONY: test-devcontainer
+
 ##@ Compilation
 
 all: clean vendor test-unit build ## compile from scratch

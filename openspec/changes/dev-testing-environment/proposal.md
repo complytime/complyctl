@@ -37,13 +37,13 @@ environment for any PR.
 ## Impact
 
 - **New files**: `.devcontainer/Containerfile`, `.devcontainer/devcontainer.json`,
-  `.devcontainer/scripts/post-create.sh`, `docs/dev-testing-environment.md`
+  `.devcontainer/scripts/post-create.sh`, `docs/TESTING_ENVIRONMENT.md`
 - **Modified files**: `README.md` (add link to new docs)
 - **Dependencies**: Uses `registry.fedoraproject.org/fedora:43` as the base
   container image. Installs `openscap-scanner`, `scap-security-guide`, `curl`,
-  and `jq` via dnf. Installs `snappy` (v0.2.4) and `ampel` (v1.2.1) via
-  `go install` at pinned versions from `carabiner-dev`. Clones
-  `complytime-providers` from GitHub at build time.
+  `jq`, `tree`, and `vim-enhanced` via dnf. Installs `snappy` (v0.2.4),
+  `ampel` (v1.2.1), and `conftest` (v0.68.2) via `go install` at pinned
+  versions. Clones `complytime-providers` from GitHub at build time.
 - **No changes to existing code**: This is purely additive infrastructure.
 - **Downstream**: complytime-providers will add its own thin devcontainer
   configuration in a follow-up change, consuming the same pattern.
