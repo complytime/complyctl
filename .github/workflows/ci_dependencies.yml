@@ -25,7 +25,7 @@ env:
 jobs:
   call_deps_reviewer:
     name: General
-    uses: complytime/org-infra/.github/workflows/reusable_deps_reviewer.yml@cfd981e757253218aefb37c91969c32827e5c4b1 # v0.2.1
+    uses: complytime/org-infra/.github/workflows/reusable_deps_reviewer.yml@15476efc3c2837fa9564943a1f8714cd71ddc288 # v0.3.0
 
   call_dependabot_reviewer:
     name: Dependabot
