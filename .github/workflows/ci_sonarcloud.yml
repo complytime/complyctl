@@ -31,7 +31,7 @@ jobs:
       contents: read
       pull-requests: read
     needs: generate-coverage
-    uses: complytime/org-infra/.github/workflows/reusable_sonarqube.yml@cfd981e757253218aefb37c91969c32827e5c4b1 # v0.2.1
+    uses: complytime/org-infra/.github/workflows/reusable_sonarqube.yml@15476efc3c2837fa9564943a1f8714cd71ddc288 # v0.3.0
     with:
       sonar_organization: ${{ vars.SONAR_ORGANIZATION }}
       sonar_project_key: ${{ vars.SONAR_PROJECT_KEY }}
