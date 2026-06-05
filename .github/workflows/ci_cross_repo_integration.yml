@@ -53,10 +53,10 @@ jobs:
               working-directory: _providers
 
             - name: Install snappy
-              uses: carabiner-dev/actions/install/snappy@e0e3b8149dafed833431095bc148d50e7eade4e8 # v1.2.0
+              uses: carabiner-dev/actions/install/snappy@94f29392187fe5082d1195a7d4cae3a7ddf09d9c # v1.2.1
 
             - name: Install ampel
-              uses: carabiner-dev/actions/install/ampel@e0e3b8149dafed833431095bc148d50e7eade4e8 # v1.2.0
+              uses: carabiner-dev/actions/install/ampel@94f29392187fe5082d1195a7d4cae3a7ddf09d9c # v1.2.1
 
             - name: Run cross-repo integration test
               env:
