@@ -81,7 +81,7 @@ Skills provide domain knowledge the agent loads as context when activated. Unlik
 
 ### File structure
 
-1. Create a directory: `.opencode/skills/your-skill-name/`
+1. Create a directory: `.agents/skills/your-skill-name/`
 2. Add a `SKILL.md` with YAML frontmatter:
    ```yaml
    ---
@@ -110,7 +110,7 @@ Skills provide domain knowledge the agent loads as context when activated. Unlik
 |------|---------|
 | `.specify/memory/constitution.md` | Organizational governance and coding standards |
 | `docs/AI_TOOLING.md` | This file — AI tooling documentation |
-| `.opencode/skills/` | Directory for AI skills — agent-agnostic, auto-discovered by OpenCode |
+| `.agents/skills/` | Directory for AI skills — agent-agnostic, auto-discovered by OpenCode |
 | `.opencode/commands/review-pr.md` | PR review command |
 | `specs/` | Feature specifications — SpecKit output |
 | `openspec/` | Feature specifications — OpenSpec output |
