@@ -14,8 +14,8 @@ jobs:
       trigger: pull_request
       targets:
           - fedora-rawhide-x86_64
+          - fedora-44-x86_64
           - fedora-43-x86_64
-          - fedora-42-x86_64
           - centos-stream-9-x86_64
           - centos-stream-10-x86_64
 
@@ -24,8 +24,8 @@ jobs:
       trigger: pull_request
       targets:
           - fedora-rawhide-x86_64
+          - fedora-44-x86_64
           - fedora-43-x86_64
-          - fedora-42-x86_64
           - centos-stream-9-x86_64
           - centos-stream-10-x86_64
 
@@ -35,20 +35,20 @@ jobs:
       trigger: release
       dist_git_branches:
           - rawhide
+          - f44
           - f43
-          - f42
 
 # Automatically submit builds to Koji after PR is merged into dist-git
     - job: koji_build
       trigger: commit
       dist_git_branches:
           - rawhide
+          - f44
           - f43
-          - f42
 
 # Trigger Bodhi update for released Fedora versions
     - job: bodhi_update
       trigger: commit
       dist_git_branches:
+          - f44
           - f43
-          - f42
