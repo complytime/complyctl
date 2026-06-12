@@ -93,7 +93,7 @@ func TestProviderStepToGemara_ResultMapping(t *testing.T) {
 // did not populate the Steps field, causing evaluation log YAML to always
 // contain steps: [] even when providers sent populated step data.
 func TestProviderToGemaraAssessment_StepsPopulated(t *testing.T) {
-	e := NewEvaluator("test-policy", "target-1", nil, nil, nil, nil)
+	e := NewEvaluator("test-policy", "target-1", nil, nil, nil)
 
 	assessment := &provider.AssessmentLog{
 		RequirementID: "req-1",

@@ -1515,23 +1515,40 @@ func TestReverseMap_Nil(t *testing.T) {
 	assert.Empty(t, r)
 }
 
-// --- buildComplypackRefs tests ---
+// --- buildReqToComplypackRef tests ---
 
-func TestBuildComplypackRefs_NoComplypacks(t *testing.T) {
-	refs := buildComplypackRefs(t.TempDir(), nil)
-	assert.Empty(t, refs)
+func TestBuildReqToComplypackRef_EmptyGroups(t *testing.T) {
+	m := buildReqToComplypackRef(t.TempDir(), map[string]policy.EvaluatorGroup{})
+	assert.Empty(t, m)
 }
 
-func TestBuildComplypackRefs_NoCacheState(t *testing.T) {
-	refs := buildComplypackRefs(t.TempDir(), []complytime.PolicyEntry{
-		{URL: "registry.example.com/complypacks/opa@v1"},
-	})
-	assert.Empty(t, refs)
+func TestBuildReqToComplypackRef_NoCacheState(t *testing.T) {
+	groups := map[string]policy.EvaluatorGroup{
+		"opa": {
+			EvaluatorID: "opa",
+			Configs:     []provider.AssessmentConfiguration{{RequirementID: "req-1"}},
+		},
+	}
+	m := buildReqToComplypackRef(t.TempDir(), groups)
+	assert.Empty(t, m)
 }
 
-// --- extractReqToEvaluator tests ---
+func TestBuildReqToComplypackRef_ResolvesRequirements(t *testing.T) {
+	cacheDir := t.TempDir()
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"registry.example.com/complypacks/opa": {
+				Digest:      "sha256:abc123",
+				EvaluatorID: "opa",
+			},
+			"registry.example.com/complypacks/kyverno": {
+				Digest:      "sha256:def456",
+				EvaluatorID: "kyverno",
+			},
+		},
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
 
-func TestExtractReqToEvaluator_SingleGroup(t *testing.T) {
 	groups := map[string]policy.EvaluatorGroup{
 		"opa": {
 			EvaluatorID: "opa",
@@ -1540,33 +1557,37 @@ func TestExtractReqToEvaluator_SingleGroup(t *testing.T) {
 				{RequirementID: "req-2"},
 			},
 		},
+		"kyverno": {
+			EvaluatorID: "kyverno",
+			Configs: []provider.AssessmentConfiguration{
+				{RequirementID: "req-3"},
+			},
+		},
 	}
-	m := extractReqToEvaluator(groups)
-	assert.Equal(t, "opa", m["req-1"])
-	assert.Equal(t, "opa", m["req-2"])
+	m := buildReqToComplypackRef(cacheDir, groups)
+	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:abc123", m["req-1"])
+	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:abc123", m["req-2"])
+	assert.Equal(t, "registry.example.com/complypacks/kyverno@sha256:def456", m["req-3"])
 }
 
-func TestExtractReqToEvaluator_MultipleGroups(t *testing.T) {
+func TestBuildReqToComplypackRef_SkipsMissingDigest(t *testing.T) {
+	cacheDir := t.TempDir()
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"registry.example.com/complypacks/opa": {
+				Digest:      "",
+				EvaluatorID: "opa",
+			},
+		},
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
+
 	groups := map[string]policy.EvaluatorGroup{
 		"opa": {
 			EvaluatorID: "opa",
-			Configs: []provider.AssessmentConfiguration{
-				{RequirementID: "req-1"},
-			},
-		},
-		"openscap": {
-			EvaluatorID: "openscap",
-			Configs: []provider.AssessmentConfiguration{
-				{RequirementID: "req-2"},
-			},
+			Configs:     []provider.AssessmentConfiguration{{RequirementID: "req-1"}},
 		},
 	}
-	m := extractReqToEvaluator(groups)
-	assert.Equal(t, "opa", m["req-1"])
-	assert.Equal(t, "openscap", m["req-2"])
-}
-
-func TestExtractReqToEvaluator_EmptyGroups(t *testing.T) {
-	m := extractReqToEvaluator(map[string]policy.EvaluatorGroup{})
+	m := buildReqToComplypackRef(cacheDir, groups)
 	assert.Empty(t, m)
 }

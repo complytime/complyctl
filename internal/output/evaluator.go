@@ -18,14 +18,13 @@ import (
 // Evaluator accumulates provider assessments for a single target and produces
 // a gemara.EvaluationLog grouped by control.
 type Evaluator struct {
-	policyID       string
-	targetID       string
-	reqToControl   map[string]string
-	reqToPlan      map[string]string
-	complypackRefs map[string]string
-	reqToEvaluator map[string]string
-	controlEvals   map[string]*gemara.ControlEvaluation
-	controlOrder   []string
+	policyID           string
+	targetID           string
+	reqToControl       map[string]string
+	reqToPlan          map[string]string
+	reqToComplypackRef map[string]string
+	controlEvals       map[string]*gemara.ControlEvaluation
+	controlOrder       []string
 	// controlStepNames tracks step name strings parallel to each control's
 	// AssessmentLogs slice. Keyed by control ID, each value is a slice of
 	// step name slices (one per assessment log under that control).
@@ -43,21 +42,18 @@ func defaultMap(m map[string]string) map[string]string {
 // NewEvaluator creates an Evaluator scoped to a single target. reqToControl
 // maps requirement IDs to control IDs; pass nil when the catalog is unavailable.
 // reqToPlan maps requirement IDs to assessment plan IDs for populating the Plan
-// field; pass nil when unavailable. complypackRefs maps evaluator IDs to OCI
-// references (repository@digest) for step identity; pass nil when no complypacks
-// are configured. reqToEvaluator maps requirement IDs to evaluator IDs for
-// resolving which complypack reference applies to each assessment; pass nil
-// when unavailable.
-func NewEvaluator(policyID, targetID string, reqToControl, reqToPlan, complypackRefs, reqToEvaluator map[string]string) *Evaluator {
+// field; pass nil when unavailable. reqToComplypackRef maps requirement IDs
+// directly to OCI references (repository@digest) for step identity; pass nil
+// when no complypacks are configured.
+func NewEvaluator(policyID, targetID string, reqToControl, reqToPlan, reqToComplypackRef map[string]string) *Evaluator {
 	return &Evaluator{
-		policyID:         policyID,
-		targetID:         targetID,
-		reqToControl:     defaultMap(reqToControl),
-		reqToPlan:        defaultMap(reqToPlan),
-		complypackRefs:   defaultMap(complypackRefs),
-		reqToEvaluator:   defaultMap(reqToEvaluator),
-		controlEvals:     make(map[string]*gemara.ControlEvaluation),
-		controlStepNames: make(map[string][][]string),
+		policyID:           policyID,
+		targetID:           targetID,
+		reqToControl:       defaultMap(reqToControl),
+		reqToPlan:          defaultMap(reqToPlan),
+		reqToComplypackRef: defaultMap(reqToComplypackRef),
+		controlEvals:       make(map[string]*gemara.ControlEvaluation),
+		controlStepNames:   make(map[string][][]string),
 	}
 }
 
@@ -299,16 +295,10 @@ func formatStepIdentity(complypackRef, stepName string) string {
 	return stepName
 }
 
-// resolveComplypackRef returns the OCI reference for the complypack associated
-// with the given requirement ID. It looks up the evaluator that owns the
-// requirement, then resolves the complypack reference for that evaluator.
-// Returns "" when no complypack is configured for the requirement's evaluator.
+// resolveComplypackRef returns the pre-resolved OCI reference for the
+// complypack associated with the given requirement ID.
 func (e *Evaluator) resolveComplypackRef(requirementID string) string {
-	evalID, ok := e.reqToEvaluator[requirementID]
-	if !ok {
-		return ""
-	}
-	return e.complypackRefs[evalID]
+	return e.reqToComplypackRef[requirementID]
 }
 
 // toSerializable converts a gemara.EvaluationLog into the shadow struct,

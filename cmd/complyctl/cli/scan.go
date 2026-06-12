@@ -34,12 +34,11 @@ type scanOptions struct {
 
 // resolvedMappings groups the ID-resolution maps built during scan setup.
 // Bundling them into a struct prevents parameter-transposition bugs across
-// the four identically-typed map[string]string arguments.
+// the identically-typed map[string]string arguments.
 type resolvedMappings struct {
-	reqToControl   map[string]string
-	reqToPlan      map[string]string
-	complypackRefs map[string]string
-	reqToEvaluator map[string]string
+	reqToControl       map[string]string
+	reqToPlan          map[string]string
+	reqToComplypackRef map[string]string
 }
 
 func scanCmd(common *Common) *cobra.Command {
@@ -293,8 +292,8 @@ func (o *scanOptions) scanPolicy(ctx context.Context, cfg *complytime.WorkspaceC
 }
 
 func (o *scanOptions) executeScanPhase(ctx context.Context, cfg *complytime.WorkspaceConfig, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, repository, eid string, graph *policy.DependencyGraph, targetIDs []string, baseDir string) error {
-	complypackRefs := buildComplypackRefs(o.cacheDir, cfg.Complypacks)
-	if err := runScanAndReport(ctx, o.format, mgr, groups, complypackRefs, policyTargets, repository, eid, graph, targetIDs, baseDir); err != nil {
+	reqToComplypackRef := buildReqToComplypackRef(o.cacheDir, groups)
+	if err := runScanAndReport(ctx, o.format, mgr, groups, reqToComplypackRef, policyTargets, repository, eid, graph, targetIDs, baseDir); err != nil {
 		return err
 	}
 	return o.maybeExport(ctx, cfg, mgr, groups)
@@ -377,13 +376,12 @@ func ensureGenerated(ctx context.Context, cacheDir, baseDir string, mgr *provide
 // runScanAndReport executes the scan across all targets and processes the
 // combined output (reports + error checking). It delegates post-scan handling
 // to processScanOutput.
-func runScanAndReport(ctx context.Context, format string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, complypackRefs map[string]string, policyTargets []complytime.TargetConfig, repository, eid string, graph *policy.DependencyGraph, targetIDs []string, baseDir string) error {
+func runScanAndReport(ctx context.Context, format string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, reqToComplypackRef map[string]string, policyTargets []complytime.TargetConfig, repository, eid string, graph *policy.DependencyGraph, targetIDs []string, baseDir string) error {
 	planToReq := extractPlanToReqMap(graph)
 	mappings := resolvedMappings{
-		reqToControl:   extractReqToControlMap(graph),
-		reqToPlan:      reverseMap(planToReq),
-		complypackRefs: complypackRefs,
-		reqToEvaluator: extractReqToEvaluator(groups),
+		reqToControl:       extractReqToControlMap(graph),
+		reqToPlan:          reverseMap(planToReq),
+		reqToComplypackRef: reqToComplypackRef,
 	}
 	targetsWithWorkspace := injectWorkspaceIntoTargets(policyTargets, baseDir)
 	scanOut, err := executeScan(ctx, mgr, groups, targetsWithWorkspace)
@@ -440,7 +438,7 @@ func checkOperationalErrors(errors []string) error {
 func buildEvaluators(repository string, mappings *resolvedMappings, policyTargets []complytime.TargetConfig, allAssessments []provider.AssessmentLog, assessmentTargets []string) []*output.Evaluator {
 	evaluators := make([]*output.Evaluator, 0, len(policyTargets))
 	for _, target := range policyTargets {
-		eval := output.NewEvaluator(repository, target.ID, mappings.reqToControl, mappings.reqToPlan, mappings.complypackRefs, mappings.reqToEvaluator)
+		eval := output.NewEvaluator(repository, target.ID, mappings.reqToControl, mappings.reqToPlan, mappings.reqToComplypackRef)
 		var targetAssessments []provider.AssessmentLog
 		for j, a := range allAssessments {
 			if assessmentTargets[j] == target.ID {
@@ -917,35 +915,48 @@ func reverseMap(m map[string]string) map[string]string {
 	return r
 }
 
-// buildComplypackRefs builds a map of evaluator-id → OCI reference
-// (repository@digest) from the complypacks configuration and cached state.
-// Returns an empty map when no complypacks are configured or state is unavailable.
-func buildComplypackRefs(cacheDir string, complypacks []complytime.PolicyEntry) map[string]string {
-	refs := make(map[string]string)
-	if len(complypacks) == 0 {
-		return refs
+// buildReqToComplypackRef produces a pre-resolved requirement-ID →
+// OCI reference (repository@digest) map by composing two lookups:
+//
+//  1. state.Complypacks: evaluator-ID → repository@digest
+//  2. evaluator groups:  requirement-ID → evaluator-ID
+//
+// Resolving the chain here keeps the Evaluator free of evaluator-ID
+// routing concerns and makes it easier to change selection logic later
+// (e.g., per-requirement complypack selection).
+func buildReqToComplypackRef(cacheDir string, groups map[string]policy.EvaluatorGroup) map[string]string {
+	m := make(map[string]string)
+	if len(groups) == 0 {
+		return m
 	}
 	state, err := cache.LoadState(cacheDir)
 	if err != nil {
 		logger.Debug("failed to load cache state for complypack ref resolution", "error", err)
-		return refs
+		return m
 	}
-	for repo, ps := range state.Complypacks {
-		if ps.Digest != "" && ps.EvaluatorID != "" {
-			refs[ps.EvaluatorID] = repo + "@" + ps.Digest
-		}
-	}
-	return refs
-}
 
-// extractReqToEvaluator builds a requirement-ID → evaluator-ID mapping from
-// the evaluator groups. This allows resolving which complypack reference
-// applies to each assessment result.
-func extractReqToEvaluator(groups map[string]policy.EvaluatorGroup) map[string]string {
-	m := make(map[string]string)
+	evalToRef := make(map[string]string)
+	for repo, ps := range state.Complypacks {
+		if ps.Digest == "" || ps.EvaluatorID == "" {
+			continue
+		}
+		if existing, ok := evalToRef[ps.EvaluatorID]; ok {
+			logger.Warn("multiple complypacks cached for same evaluator",
+				"evaluator", ps.EvaluatorID, "kept", existing, "dropped", repo+"@"+ps.Digest)
+		}
+		evalToRef[ps.EvaluatorID] = repo + "@" + ps.Digest
+	}
+	if len(evalToRef) == 0 {
+		return m
+	}
+
 	for evalID, group := range groups {
+		ref, ok := evalToRef[evalID]
+		if !ok {
+			continue
+		}
 		for _, cfg := range group.Configs {
-			m[cfg.RequirementID] = evalID
+			m[cfg.RequirementID] = ref
 		}
 	}
 	return m
