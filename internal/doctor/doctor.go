@@ -262,7 +262,7 @@ func CheckPolicyVersions(cfg *complytime.WorkspaceConfig, cacheDir string, versi
 		latestVersion, err := versionResolver.ResolveLatestVersion(ref.Registry, ref.Repository)
 		if err != nil {
 			result := resolvePinnedFallback(versionResolver, ref, eid, cachedState.Version, err)
-			if result.Status == StatusWarn {
+			if result.Status == StatusWarn && !errors.Is(err, registry.ErrVersionNotFound) {
 				unreachable[ref.Registry] = true
 			}
 			results = append(results, result)

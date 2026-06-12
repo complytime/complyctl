@@ -425,6 +425,143 @@ func TestCheckPolicyVersions_LatestMissing_NoPinnedVersion(t *testing.T) {
 	}
 }
 
+func TestCheckPolicyVersions_LatestMissing_DoesNotPoisonSameRegistry(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	state := &cache.State{Policies: map[string]cache.PolicyState{
+		"policies/alpha": {Version: "v1.0.0"},
+		"policies/beta":  {Version: "v2.0.0"},
+	}}
+	if err := cache.SaveState(state, tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &complytime.WorkspaceConfig{
+		Policies: []complytime.PolicyEntry{
+			{URL: "reg.io/policies/alpha"},
+			{URL: "reg.io/policies/beta"},
+		},
+	}
+
+	vr := newMockVersionResolver()
+	vr.latestMissing["reg.io"] = true
+
+	results := CheckPolicyVersions(cfg, tmpDir, vr)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results (404 should not skip second policy), got %d: %+v", len(results), results)
+	}
+	for _, r := range results {
+		if r.Status != StatusWarn {
+			t.Errorf("expected warn for %s, got %s", r.Name, r.Status)
+		}
+		if !strings.Contains(r.Message, "latest tag not found") {
+			t.Errorf("expected 'latest tag not found' in %s message, got %q", r.Name, r.Message)
+		}
+	}
+}
+
+func TestCheckPolicyVersions_PinnedBoth404(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	state := &cache.State{Policies: map[string]cache.PolicyState{
+		"policies/nist": {Version: "v1.0.0"},
+	}}
+	if err := cache.SaveState(state, tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &complytime.WorkspaceConfig{
+		Policies: []complytime.PolicyEntry{
+			{URL: "reg.io/policies/nist@v2.0.0"},
+		},
+	}
+
+	vr := newMockVersionResolver()
+	vr.latestMissing["reg.io"] = true
+	// pinnedVersions NOT populated → ResolveVersion also fails
+
+	results := CheckPolicyVersions(cfg, tmpDir, vr)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d: %+v", len(results), results)
+	}
+	if results[0].Status != StatusWarn {
+		t.Errorf("expected warn, got %s: %s", results[0].Status, results[0].Message)
+	}
+	if !strings.Contains(results[0].Message, "not found in registry") {
+		t.Errorf("expected 'not found in registry' in message, got %q", results[0].Message)
+	}
+}
+
+func TestCheckPolicyVersions_MixedRegistries_Unreachable_And_404(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	state := &cache.State{Policies: map[string]cache.PolicyState{
+		"policies/alpha": {Version: "v1.0.0"},
+		"policies/beta":  {Version: "v2.0.0"},
+	}}
+	if err := cache.SaveState(state, tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &complytime.WorkspaceConfig{
+		Policies: []complytime.PolicyEntry{
+			{URL: "down.io/policies/alpha"},
+			{URL: "up.io/policies/beta"},
+		},
+	}
+
+	vr := newMockVersionResolver()
+	vr.unreachable["down.io"] = true
+	vr.latestMissing["up.io"] = true
+
+	results := CheckPolicyVersions(cfg, tmpDir, vr)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results (one per registry), got %d: %+v", len(results), results)
+	}
+	if results[0].Name != "registry/down.io" {
+		t.Errorf("expected registry/down.io, got %q", results[0].Name)
+	}
+	if !strings.Contains(results[0].Message, "unreachable") {
+		t.Errorf("expected 'unreachable' for down.io, got %q", results[0].Message)
+	}
+	if !strings.Contains(results[1].Message, "latest tag not found") {
+		t.Errorf("expected '404' message for up.io, got %q", results[1].Message)
+	}
+}
+
+func TestCheckPolicyVersions_PinnedNetworkFailure_BothFail(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	state := &cache.State{Policies: map[string]cache.PolicyState{
+		"policies/nist": {Version: "v1.0.0"},
+		"policies/cis":  {Version: "v1.0.0"},
+	}}
+	if err := cache.SaveState(state, tmpDir); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &complytime.WorkspaceConfig{
+		Policies: []complytime.PolicyEntry{
+			{URL: "flaky.io/policies/nist@v1.0.0"},
+			{URL: "flaky.io/policies/cis@v1.0.0", ID: "cis"},
+		},
+	}
+
+	vr := newMockVersionResolver()
+	vr.unreachable["flaky.io"] = true
+
+	results := CheckPolicyVersions(cfg, tmpDir, vr)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result (second policy skipped via unreachable), got %d: %+v", len(results), results)
+	}
+	if results[0].Name != "registry/flaky.io" {
+		t.Errorf("expected registry-level warning, got %q", results[0].Name)
+	}
+	if !strings.Contains(results[0].Message, "unreachable") {
+		t.Errorf("expected 'unreachable' in message, got %q", results[0].Message)
+	}
+}
+
 func TestCheckPolicyVersions_BadCacheState(t *testing.T) {
 	tmpDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmpDir, complytime.StateFileName), []byte("{bad json"), 0600); err != nil {

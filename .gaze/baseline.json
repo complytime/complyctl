@@ -1946,9 +1946,9 @@
       "function": "CheckPolicyVersions",
       "file": "internal/doctor/doctor.go",
       "line": 221,
-      "complexity": 14,
+      "complexity": 15,
       "line_coverage": 100,
-      "crap": 14
+      "crap": 15
     },
     {
       "package": "doctor",
@@ -2551,9 +2551,9 @@
       "function": "(*Client).DefinitionVersion",
       "file": "internal/registry/client.go",
       "line": 47,
-      "complexity": 4,
-      "line_coverage": 44.44444444444444,
-      "crap": 6.743484224965707
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 11.442524417731029
     },
     {
       "package": "registry",

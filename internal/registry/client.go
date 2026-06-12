@@ -62,7 +62,10 @@ func (c *Client) DefinitionVersion(ctx context.Context, modulePath string) (stri
 	ref := buildRef(c.registryHost(), modulePath)
 	digest, version, err := c.fetchVersion(ctx, ref)
 	if err != nil {
-		return "", "", err
+		if errors.Is(err, ErrVersionNotFound) {
+			return "", "", err
+		}
+		return "", "", fmt.Errorf("failed to fetch version for %s: %w", modulePath, err)
 	}
 
 	return digest, version, nil
