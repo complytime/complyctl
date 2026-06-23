@@ -13,6 +13,65 @@ import (
 // The message may be an error string or other descriptive text.
 type AssessmentStep func(payload interface{}) (Result, string, ConfidenceLevel)
 
+// EvidenceCollector is an embeddable helper that gives a targetData payload the
+// well-known evidence location and satisfies HasEvidence via method promotion,
+// so the consumer writes no methods. Embed it in a payload struct:
+//
+//	type myTarget struct {
+//		gemara.EvidenceCollector
+//		Config SomeConfig
+//	}
+//
+//	t := &myTarget{Config: cfg}   // pointer, so step mutations propagate
+//	t.AddEvidence(ev)             // inside a step; may be called more than once
+//	assessment.Run(t)             // copies evidence into assessment.Evidence,
+//	                              // clearing the payload after each step
+type EvidenceCollector struct {
+	// Long name to avoid any possibility of collision
+	gemaraStepEvidence []Evidence
+}
+
+// GetEvidence returns the evidence recorded since the last clear.
+func (e *EvidenceCollector) GetEvidence() []Evidence {
+	return e.gemaraStepEvidence
+}
+
+// AddEvidence appends a piece of evidence, so a single step may record evidence
+// more than once. The accumulated evidence is copied into the log and cleared
+// after each step runs.
+func (e *EvidenceCollector) AddEvidence(evidence Evidence) {
+	e.gemaraStepEvidence = append(e.gemaraStepEvidence, evidence)
+}
+
+// ClearEvidence empties the evidence location. The assessment calls it after
+// copying each step's evidence into the log, so evidence does not linger
+// in memory or get re-copied by a later step that records nothing.
+func (e *EvidenceCollector) ClearEvidence() {
+	e.gemaraStepEvidence = nil
+}
+
+// HasEvidence is the well-known interface a targetData payload may implement to
+// surface Evidence collected while an assessment runs. A step records evidence
+// into the payload (typically by mutating a shared field, which requires the
+// payload to be passed by reference), and the AssessmentLog harvests it from
+// this single location after running.
+//
+// Implementing the interface is optional: a payload that does not implement it
+// simply contributes no evidence, which is not an error.
+type HasEvidence interface {
+	// GetEvidence returns the evidence recorded since the last clear.
+	GetEvidence() []Evidence
+
+	// AddEvidence appends a piece of evidence; it may be called more than once
+	// within a single step.
+	AddEvidence(evidence Evidence)
+
+	// ClearEvidence empties the evidence location. The assessment calls it after
+	// copying each step's evidence into the log, so a later step that records
+	// nothing does not cause this step's evidence to be re-copied.
+	ClearEvidence()
+}
+
 func (as AssessmentStep) String() string {
 	// Get the function pointer correctly
 	fn := runtime.FuncForPC(reflect.ValueOf(as).Pointer())
@@ -55,6 +114,15 @@ func (a *AssessmentLog) runStep(targetData interface{}, step AssessmentStep) Res
 	result, message, confidence := step(targetData)
 	a.Result = UpdateAggregateResult(a.Result, result)
 
+	// Move any evidence the step recorded from the payload into the log: copy it
+	// out, then clear the payload. The clear is required so a later step that
+	// records nothing does not leave this step's evidence in place for the next
+	// harvest to re-copy as a duplicate.
+	if provider, ok := targetData.(HasEvidence); ok {
+		a.Evidence = append(a.Evidence, provider.GetEvidence()...)
+		provider.ClearEvidence()
+	}
+
 	// Always update message to show what steps have been run and their context.
 	a.Message = message
 
@@ -70,9 +138,6 @@ func (a *AssessmentLog) runStep(targetData interface{}, step AssessmentStep) Res
 // Run will execute all steps, halting if any step does not return Passed.
 func (a *AssessmentLog) Run(targetData interface{}) Result {
 	a.Result = NotRun
-	if a.Result != NotRun {
-		return a.Result
-	}
 
 	a.Start = Datetime(time.Now().Format(time.RFC3339))
 	err := a.precheck()

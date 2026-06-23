@@ -488,6 +488,19 @@ func unmarshalJSONEnum[T any](data []byte, m map[string]T, name string, dest *T)
 	return unknownEnumStringError(name, s, m)
 }
 
+// unmarshalTextEnum decodes the plain enum string into dest. It backs the
+// encoding.TextUnmarshaler implementations, which yaml.v3-family libraries
+// (gopkg.in/yaml.v3, go.yaml.in/yaml/v3) honor for scalar values, unlike the
+// goccy/go-yaml BytesUnmarshaler signature used by UnmarshalYAML.
+func unmarshalTextEnum[T any](data []byte, m map[string]T, name string, dest *T) error {
+	s := string(data)
+	if val, ok := m[s]; ok {
+		*dest = val
+		return nil
+	}
+	return unknownEnumStringError(name, s, m)
+}
+
 // unknownEnumStringError builds an error for an invalid enum string, including valid values.
 func unknownEnumStringError[T any](name, got string, validMap map[string]T) error {
 	valid := make([]string, 0, len(validMap))
@@ -525,6 +538,11 @@ func (r *Result) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToResult, "Result", r)
 }
 
+// UnmarshalText lets yaml.v3-family decoders deserialize Result from a string
+func (r *Result) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToResult, "Result", r)
+}
+
 func (a ArtifactType) String() string {
 	if s, ok := artifactTypeToString[a]; ok {
 		return s
@@ -550,6 +568,11 @@ func (a *ArtifactType) UnmarshalYAML(data []byte) error {
 // UnmarshalJSON ensures that ArtifactType can be deserialized from a JSON string
 func (a *ArtifactType) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToArtifactType, "ArtifactType", a)
+}
+
+// UnmarshalText lets yaml.v3-family decoders deserialize ArtifactType from a string
+func (a *ArtifactType) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToArtifactType, "ArtifactType", a)
 }
 
 func (e EntityType) String() string {
@@ -579,6 +602,11 @@ func (e *EntityType) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToEntityType, "EntityType", e)
 }
 
+// UnmarshalText lets yaml.v3-family decoders deserialize EntityType from a string
+func (e *EntityType) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToEntityType, "EntityType", e)
+}
+
 func (l Lifecycle) String() string {
 	if s, ok := lifecycleToString[l]; ok {
 		return s
@@ -604,6 +632,11 @@ func (l *Lifecycle) UnmarshalYAML(data []byte) error {
 // UnmarshalJSON ensures that Lifecycle can be deserialized from a JSON string
 func (l *Lifecycle) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToLifecycle, "Lifecycle", l)
+}
+
+// UnmarshalText lets yaml.v3-family decoders deserialize Lifecycle from a string
+func (l *Lifecycle) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToLifecycle, "Lifecycle", l)
 }
 
 func (e EntryType) String() string {
@@ -633,6 +666,11 @@ func (e *EntryType) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToEntryType, "EntryType", e)
 }
 
+// UnmarshalText lets yaml.v3-family decoders deserialize EntryType from a string
+func (e *EntryType) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToEntryType, "EntryType", e)
+}
+
 func (c ConfidenceLevel) String() string {
 	if s, ok := confidenceLevelToString[c]; ok {
 		return s
@@ -658,6 +696,11 @@ func (c *ConfidenceLevel) UnmarshalYAML(data []byte) error {
 // UnmarshalJSON ensures that ConfidenceLevel can be deserialized from a JSON string
 func (c *ConfidenceLevel) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToConfidenceLevel, "ConfidenceLevel", c)
+}
+
+// UnmarshalText lets yaml.v3-family decoders deserialize ConfidenceLevel from a string
+func (c *ConfidenceLevel) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToConfidenceLevel, "ConfidenceLevel", c)
 }
 
 func (r RelationshipType) String() string {
@@ -687,6 +730,11 @@ func (r *RelationshipType) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToRelationshipType, "RelationshipType", r)
 }
 
+// UnmarshalText lets yaml.v3-family decoders deserialize RelationshipType from a string
+func (r *RelationshipType) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToRelationshipType, "RelationshipType", r)
+}
+
 func (m MethodType) String() string {
 	if s, ok := methodTypeToString[m]; ok {
 		return s
@@ -712,6 +760,11 @@ func (m *MethodType) UnmarshalYAML(data []byte) error {
 // UnmarshalJSON ensures that MethodType can be deserialized from a JSON string
 func (m *MethodType) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToMethodType, "MethodType", m)
+}
+
+// UnmarshalText lets yaml.v3-family decoders deserialize MethodType from a string
+func (m *MethodType) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToMethodType, "MethodType", m)
 }
 
 func (m ModeType) String() string {
@@ -741,6 +794,11 @@ func (m *ModeType) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToModeType, "ModeType", m)
 }
 
+// UnmarshalText lets yaml.v3-family decoders deserialize ModeType from a string
+func (m *ModeType) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToModeType, "ModeType", m)
+}
+
 func (d Disposition) String() string {
 	if s, ok := dispositionToString[d]; ok {
 		return s
@@ -766,6 +824,11 @@ func (d *Disposition) UnmarshalYAML(data []byte) error {
 // UnmarshalJSON ensures that Disposition can be deserialized from a JSON string
 func (d *Disposition) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToDisposition, "Disposition", d)
+}
+
+// UnmarshalText lets yaml.v3-family decoders deserialize Disposition from a string
+func (d *Disposition) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToDisposition, "Disposition", d)
 }
 
 func (s Severity) String() string {
@@ -795,6 +858,11 @@ func (s *Severity) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToSeverity, "Severity", s)
 }
 
+// UnmarshalText lets yaml.v3-family decoders deserialize Severity from a string
+func (s *Severity) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToSeverity, "Severity", s)
+}
+
 func (g GuidanceType) String() string {
 	if s, ok := guidanceTypeToString[g]; ok {
 		return s
@@ -820,6 +888,11 @@ func (g *GuidanceType) UnmarshalYAML(data []byte) error {
 // UnmarshalJSON ensures that GuidanceType can be deserialized from a JSON string
 func (g *GuidanceType) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToGuidanceType, "GuidanceType", g)
+}
+
+// UnmarshalText lets yaml.v3-family decoders deserialize GuidanceType from a string
+func (g *GuidanceType) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToGuidanceType, "GuidanceType", g)
 }
 
 func (r RiskAppetite) String() string {
@@ -849,6 +922,11 @@ func (r *RiskAppetite) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToRiskAppetite, "RiskAppetite", r)
 }
 
+// UnmarshalText lets yaml.v3-family decoders deserialize RiskAppetite from a string
+func (r *RiskAppetite) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToRiskAppetite, "RiskAppetite", r)
+}
+
 func (m ModType) String() string {
 	if s, ok := modTypeToString[m]; ok {
 		return s
@@ -876,6 +954,11 @@ func (m *ModType) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToModType, "ModType", m)
 }
 
+// UnmarshalText lets yaml.v3-family decoders deserialize ModType from a string
+func (m *ModType) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToModType, "ModType", m)
+}
+
 func (r ResultType) String() string {
 	if r, ok := resultTypeToString[r]; ok {
 		return r
@@ -892,6 +975,11 @@ func (r *ResultType) UnmarshalYAML(data []byte) error {
 
 func (r *ResultType) UnmarshalJSON(data []byte) error {
 	return unmarshalJSONEnum(data, stringToResultType, "ResultType", r)
+}
+
+// UnmarshalText lets yaml.v3-family decoders deserialize ResultType from a string
+func (r *ResultType) UnmarshalText(data []byte) error {
+	return unmarshalTextEnum(data, stringToResultType, "ResultType", r)
 }
 
 // ToArtifactType converts an EvidenceType to the corresponding ArtifactType.

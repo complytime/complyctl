@@ -481,6 +481,28 @@ type AssessmentLog struct {
 
 	// ConfidenceLevel indicates the evaluator's confidence level in this specific assessment result.
 	ConfidenceLevel ConfidenceLevel `json:"confidence-level,omitempty" yaml:"confidence-level,omitempty"`
+
+	// Evidence records the raw data cited to support this assessment's opinion.
+	Evidence []Evidence `json:"evidence,omitempty" yaml:"evidence,omitempty"`
+}
+
+// Evidence records what was cited to support an opinion for a specific activity:
+// raw data for the evaluation layer, evaluation and enforcement artifacts for the audit layer.
+type Evidence struct {
+	// id uniquely identifies this evidence
+	Id string `json:"id" yaml:"id"`
+
+	// type categorizes the kind of evidence
+	Type EvidenceType `json:"type" yaml:"type"`
+
+	// collected-at is the timestamp when the evidence was gathered
+	CollectedAt Datetime `json:"collected-at" yaml:"collected-at"`
+
+	// payload is the raw evidence data collected
+	Payload any `json:"payload,omitempty" yaml:"payload,omitempty"`
+
+	// description explains what this evidence represents
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
 // GuidanceCatalog represents a concerted documentation effort to help bring about an optimal future without foreknowledge of the implementation details
@@ -953,24 +975,6 @@ type AuditResult struct {
 	Recommendations []Recommendation `json:"recommendations,omitempty" yaml:"recommendations,omitempty"`
 }
 
-// Evidence records a specific data source consulted during an audit
-type Evidence struct {
-	// id uniquely identifies this evidence
-	Id string `json:"id,omitempty" yaml:"id,omitempty"`
-
-	// type categorizes the kind of evidence
-	Type EvidenceType `json:"type" yaml:"type"`
-
-	// collected is the timestamp when the evidence was gathered
-	Collected Datetime `json:"collected" yaml:"collected"`
-
-	// location references the artifact containing this evidence
-	Location ArtifactMapping `json:"location" yaml:"location"`
-
-	// description explains what this evidence represents
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-}
-
 // Recommendation provides a corrective action for an audit result
 type Recommendation struct {
 	// id uniquely identifies this recommendation
@@ -1042,6 +1046,11 @@ type Risk struct {
 
 	// severity describes the assessed level of this risk
 	Severity Severity `json:"severity" yaml:"severity"`
+
+	// rank optionally orders risks for the same catalog (e.g. when several share the same severity).
+	// Lower values mean higher relative importance. Omitted when the four severity levels are enough.
+	// When set, each value must be unique among all risks in the catalog that specify rank.
+	Rank int64 `json:"rank,omitempty" yaml:"rank,omitempty"`
 
 	// owner defines the RACI roles responsible for managing this risk
 	Owner RACI `json:"owner,omitempty" yaml:"owner,omitempty"`
