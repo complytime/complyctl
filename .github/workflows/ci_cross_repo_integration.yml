@@ -52,6 +52,15 @@ jobs:
               run: make build
               working-directory: _providers
 
+            # actions/setup-go writes GOTOOLCHAIN=local to $GITHUB_ENV,
+            # which prevents Go from auto-downloading a newer toolchain.
+            # When the two setup-go calls install different Go versions,
+            # the second one can leave a Go binary older than what
+            # complyctl's go directive requires. Restoring auto lets Go
+            # download the correct toolchain for each module on demand.
+            - name: Enable Go toolchain auto-download
+              run: echo "GOTOOLCHAIN=auto" >> "$GITHUB_ENV"
+
             - name: Install snappy
               uses: carabiner-dev/actions/install/snappy@94f29392187fe5082d1195a7d4cae3a7ddf09d9c # v1.2.1
 
