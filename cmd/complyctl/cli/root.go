@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/spf13/cobra"
 
 	"github.com/complytime/complyctl/internal/complytime"
+	"github.com/complytime/complyctl/internal/version"
 	"github.com/complytime/complyctl/pkg/log"
 )
 
@@ -85,11 +87,17 @@ func enableDebug(opts *Common) {
 
 func New() *cobra.Command {
 
+	var buf strings.Builder
+	_ = version.WriteVersion(&buf)
+
 	cmd := &cobra.Command{
 		Use:           "complyctl [command]",
+		Version:       buf.String(),
 		SilenceErrors: true,
 		SilenceUsage:  true,
 	}
+	cmd.SetVersionTemplate(`{{.Version}}`)
+	cmd.Flags().Bool("version", false, "version for complyctl")
 
 	opts := Common{
 		Output: Output{
