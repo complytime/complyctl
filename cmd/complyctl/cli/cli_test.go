@@ -21,6 +21,7 @@ import (
 	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/internal/policy"
 	"github.com/complytime/complyctl/internal/terminal"
+	"github.com/complytime/complyctl/internal/version"
 	"github.com/complytime/complyctl/pkg/provider"
 	"github.com/complytime/complypack/pkg/complypack"
 )
@@ -1266,6 +1267,51 @@ func TestNew_ReturnsValidCommand(t *testing.T) {
 	assert.Contains(t, subNames, "list")
 	assert.Contains(t, subNames, "providers")
 	assert.Contains(t, subNames, "version")
+}
+
+// TestNew_VersionFlagOutput verifies that `complyctl --version` produces
+// the expected version output with all required fields.
+func TestNew_VersionFlagOutput(t *testing.T) {
+	cmd := New()
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--version"})
+	require.NoError(t, cmd.Execute())
+
+	output := buf.String()
+	require.NotEmpty(t, output, "--version flag should produce output")
+	assert.Contains(t, output, "Version:")
+	assert.Contains(t, output, "Go Version:")
+	assert.Contains(t, output, "Git Commit:")
+	assert.Contains(t, output, "Build Date:")
+	assert.Contains(t, output, "Platform:")
+}
+
+// TestNew_VersionFlagMatchesSubcommand verifies that `complyctl --version`
+// produces the same output as `complyctl version`.
+func TestNew_VersionFlagMatchesSubcommand(t *testing.T) {
+	// Generate the expected version string directly.
+	var expected strings.Builder
+	require.NoError(t, version.WriteVersion(&expected))
+
+	// Run --version flag and capture its output.
+	cmd := New()
+	var flagOut bytes.Buffer
+	cmd.SetOut(&flagOut)
+	cmd.SetArgs([]string{"--version"})
+	require.NoError(t, cmd.Execute())
+
+	assert.Equal(t, expected.String(), flagOut.String(),
+		"--version flag output must match version.WriteVersion output")
+}
+
+// TestNew_VersionFlagRegistered verifies that the --version flag is registered
+// on the root command.
+func TestNew_VersionFlagRegistered(t *testing.T) {
+	cmd := New()
+	vFlag := cmd.Flags().Lookup("version")
+	require.NotNil(t, vFlag, "--version flag should be registered on root command")
+	assert.Equal(t, "false", vFlag.DefValue)
 }
 
 func TestNew_PersistentPreRunSetsWorkspace(t *testing.T) {
