@@ -6,7 +6,7 @@ policies:
     id: ampel-bp
 
 complypacks:
-  - url: http://localhost:8765/complypacks/ampel-bp@v1.0.0
+  - url: quay.io/complytime/complypack-ampel-branch-protection:latest
     id: ampel-bp-pack
 
 targets:
