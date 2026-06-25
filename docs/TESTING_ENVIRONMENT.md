@@ -245,6 +245,12 @@ Note: The OPA provider requires the `complyctl-provider-opa`
 binary in `~/.complytime/providers/` (installed by the
 post-create script from `complytime-providers`).
 
+For OPA complypacks, `complytime-mapping.json` entries use the
+Gemara assessment plan `id` in `requirement_id`. This is the ID
+sent to providers during generation. It is different from the
+assessment plan's `requirement-id`, which complyctl resolves later
+when writing scan results.
+
 ## Private Bundles
 
 The devcontainer can serve private Gemara policies through
