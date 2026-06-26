@@ -951,15 +951,16 @@ func reverseMap(m map[string]string) map[string]string {
 	return r
 }
 
-// buildReqToComplypackRef produces a pre-resolved requirement-ID →
+// buildReqToComplypackRef produces a pre-resolved match-ID →
 // OCI reference (repository@digest) map by composing two lookups:
 //
 //  1. state.Complypacks: evaluator-ID → repository@digest
-//  2. evaluator groups: requirement-ID → evaluator-ID
+//  2. evaluator groups: match-ID → evaluator-ID
 //
-// Resolving the chain here keeps the Evaluator free of evaluator-ID
-// routing concerns and makes it easier to change selection logic later
-// (e.g., per-requirement complypack selection).
+// The match-ID is cfg.MatchID(), which prefers PlanID and falls back to
+// RequirementID. Resolving the chain here keeps the Evaluator free of
+// evaluator-ID routing concerns and makes it easier to change selection
+// logic later (e.g., per-requirement complypack selection).
 func buildReqToComplypackRef(cacheDir string, groups map[string]policy.EvaluatorGroup) map[string]string {
 	m := make(map[string]string)
 	if len(groups) == 0 {
