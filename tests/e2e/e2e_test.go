@@ -96,7 +96,7 @@ func TestE2E_FullWorkflow(t *testing.T) {
 
 		evalDir := filepath.Join(scanDir, complytime.WorkspaceDir, complytime.ScanOutputDir)
 		assertOutputFile(t, evalDir, "evaluation-log-", ".yaml")
-		oscalFile := assertOutputFile(t, scanDir, "assessment-results-", ".json")
+		oscalFile := assertOutputFile(t, evalDir, "assessment-results-", ".json")
 
 		data, err := os.ReadFile(oscalFile)
 		require.NoError(t, err)
@@ -125,7 +125,7 @@ func TestE2E_FullWorkflow(t *testing.T) {
 
 		evalDir := filepath.Join(scanDir, complytime.WorkspaceDir, complytime.ScanOutputDir)
 		assertOutputFile(t, evalDir, "evaluation-log-", ".yaml")
-		mdFile := assertOutputFile(t, scanDir, "report-", ".md")
+		mdFile := assertOutputFile(t, evalDir, "report-", ".md")
 
 		data, err := os.ReadFile(mdFile)
 		require.NoError(t, err)
@@ -146,7 +146,7 @@ func TestE2E_FullWorkflow(t *testing.T) {
 
 		evalDir := filepath.Join(scanDir, complytime.WorkspaceDir, complytime.ScanOutputDir)
 		assertOutputFile(t, evalDir, "evaluation-log-", ".yaml")
-		sarifFile := assertOutputFile(t, scanDir, "scan-", ".json")
+		sarifFile := assertOutputFile(t, evalDir, "scan-", ".json")
 
 		data, err := os.ReadFile(sarifFile)
 		require.NoError(t, err)
@@ -581,13 +581,13 @@ func TestE2E_NestedPolicyID(t *testing.T) {
 
 		evalDir := filepath.Join(scanDir, complytime.WorkspaceDir, complytime.ScanOutputDir)
 		evalLog := assertOutputFile(t, evalDir, "evaluation-log-", ".yaml")
-		oscalFile := assertOutputFile(t, scanDir, "assessment-results-", ".json")
+		oscalFile := assertOutputFile(t, evalDir, "assessment-results-", ".json")
 
 		// Filenames must be flat (no intermediate directories from slashed IDs)
 		assert.Equal(t, evalDir, filepath.Dir(evalLog),
 			"evaluation log must be directly in output dir, not nested")
-		assert.Equal(t, scanDir, filepath.Dir(oscalFile),
-			"OSCAL file must be directly in CWD, not nested")
+		assert.Equal(t, evalDir, filepath.Dir(oscalFile),
+			"OSCAL file must be directly in scan output dir, not nested")
 	})
 }
 
@@ -687,7 +687,8 @@ func TestE2E_ScanExportEnabledWithFormatSarif(t *testing.T) {
 
 	// Verify SARIF report was produced
 	assert.Contains(t, out, "SARIF report written")
-	assertOutputFile(t, scanDir, "scan-", ".sarif.json")
+	evalDir := filepath.Join(scanDir, complytime.WorkspaceDir, complytime.ScanOutputDir)
+	assertOutputFile(t, evalDir, "scan-", ".sarif.json")
 
 	// Verify export summary was also printed
 	assert.Contains(t, out, "Export Summary")

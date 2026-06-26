@@ -196,7 +196,7 @@ assert_file_exists "scan oscal: evaluation-log exists" \
     "${WORK_DIR}/.complytime/scan/evaluation-log-*.yaml" >/dev/null
 
 OSCAL_FILE="$(assert_file_exists "scan oscal: assessment-results exists" \
-    "${WORK_DIR}/assessment-results-*.json")"
+    "${WORK_DIR}/.complytime/scan/assessment-results-*.json")"
 
 if [[ -n "${OSCAL_FILE}" ]]; then
     assert_json_eq "scan oscal: oscal-version is 1.1.3" \
@@ -213,7 +213,7 @@ echo "${OUT}"
 assert_contains "scan pretty: completed" "${OUT}" "requirements:"
 
 MD_FILE="$(assert_file_exists "scan pretty: markdown report exists" \
-    "${WORK_DIR}/report-*.md")"
+    "${WORK_DIR}/.complytime/scan/report-*.md")"
 
 if [[ -n "${MD_FILE}" ]]; then
     MD_CONTENT="$(cat "${MD_FILE}")"
@@ -228,7 +228,7 @@ echo "${OUT}"
 assert_contains "scan sarif: completed" "${OUT}" "requirements:"
 
 SARIF_FILE="$(assert_file_exists "scan sarif: sarif file exists" \
-    "${WORK_DIR}/scan-*.sarif.json")"
+    "${WORK_DIR}/.complytime/scan/scan-*.sarif.json")"
 
 if [[ -n "${SARIF_FILE}" ]]; then
     assert_json_eq "scan sarif: version is 2.1.0" \
@@ -238,16 +238,15 @@ fi
 echo ""
 echo "=== scan (default, no --format) ==="
 rm -rf "${WORK_DIR}/.complytime/scan"
-rm -f "${WORK_DIR}"/assessment-results-* "${WORK_DIR}"/report-* "${WORK_DIR}"/scan-*
 OUT="$(run_complyctl scan --policy-id "${POLICY_ID}")"
 echo "${OUT}"
 assert_contains "scan default: completed" "${OUT}" "requirements:"
 assert_file_exists "scan default: evaluation-log exists" \
     "${WORK_DIR}/.complytime/scan/evaluation-log-*.yaml" >/dev/null
 
-NO_OSCAL=$(ls "${WORK_DIR}/assessment-results-"* 2>/dev/null || true)
-NO_MD=$(ls "${WORK_DIR}/report-"* 2>/dev/null || true)
-NO_SARIF=$(ls "${WORK_DIR}/scan-"* 2>/dev/null || true)
+NO_OSCAL=$(ls "${WORK_DIR}/.complytime/scan/assessment-results-"* 2>/dev/null || true)
+NO_MD=$(ls "${WORK_DIR}/.complytime/scan/report-"* 2>/dev/null || true)
+NO_SARIF=$(ls "${WORK_DIR}/.complytime/scan/scan-"* 2>/dev/null || true)
 if [[ -z "${NO_OSCAL}" && -z "${NO_MD}" && -z "${NO_SARIF}" ]]; then
     pass "scan default: no formatted output without --format"
 else

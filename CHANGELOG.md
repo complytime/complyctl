@@ -72,6 +72,10 @@
 
 ### Fixed
 
+- `complyctl scan --format` reports (SARIF, OSCAL, Markdown) now written
+  to `.complytime/scan/` alongside the evaluation log, matching
+  documented behavior. Previously, format reports were written to the
+  workspace root. (#615)
 - Generation freshness detection now tracks complypack digests alongside
   policy digests. Previously, updating a complypack without changing the
   policy would skip regeneration, causing providers to use stale

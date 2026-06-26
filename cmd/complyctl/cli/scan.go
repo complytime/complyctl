@@ -414,7 +414,7 @@ func processScanOutput(format string, scanOut *scanOutput, repository string, ma
 
 	outDir := filepath.Join(baseDir, complytime.WorkspaceDir, complytime.ScanOutputDir)
 	for _, eval := range evaluators {
-		if err := writeScanReports(format, eval, outDir, baseDir, repository); err != nil {
+		if err := writeScanReports(format, eval, outDir, repository); err != nil {
 			return err
 		}
 	}
@@ -645,36 +645,36 @@ func scanSingleTarget(ctx context.Context, mgr *provider.Manager, groups map[str
 	return results, operationalErrors, nil
 }
 
-func writeScanReports(format string, eval *output.Evaluator, outDir, reportDir, repository string) error {
+func writeScanReports(format string, eval *output.Evaluator, outDir, repository string) error {
 	logPath, err := eval.Write(outDir)
 	if err != nil {
 		return fmt.Errorf("failed to write evaluation log: %w", err)
 	}
 	fmt.Printf("Evaluation log written: %s [target: %s]\n", logPath, eval.TargetID())
 
-	if err := writeFormatReport(format, eval, logPath, reportDir, repository); err != nil {
+	if err := writeFormatReport(format, eval, logPath, outDir, repository); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func writeFormatReport(format string, eval *output.Evaluator, logPath, reportDir, repository string) error {
+func writeFormatReport(format string, eval *output.Evaluator, logPath, outDir, repository string) error {
 	switch format {
 	case complytime.OutputFormatPretty:
-		return writePrettyReport(eval, logPath, reportDir, repository)
+		return writePrettyReport(eval, logPath, outDir, repository)
 	case complytime.OutputFormatSARIF:
-		return writeSARIFReport(eval, reportDir)
+		return writeSARIFReport(eval, outDir)
 	case complytime.OutputFormatOSCAL:
-		return writeOSCALReport(eval, reportDir)
+		return writeOSCALReport(eval, outDir)
 	}
 	return nil
 }
 
-func writePrettyReport(eval *output.Evaluator, logPath, reportDir, repository string) error {
+func writePrettyReport(eval *output.Evaluator, logPath, outDir, repository string) error {
 	md := output.NewMarkdown(repository, eval.GemaraLog())
 	md.SetEmbedEvaluationLog(logPath)
-	mdPath, err := md.Write(reportDir)
+	mdPath, err := md.Write(outDir)
 	if err != nil {
 		return fmt.Errorf("failed to write markdown report: %w", err)
 	}
@@ -682,8 +682,8 @@ func writePrettyReport(eval *output.Evaluator, logPath, reportDir, repository st
 	return nil
 }
 
-func writeSARIFReport(eval *output.Evaluator, reportDir string) error {
-	sarifPath, err := output.ToSARIF(eval.GemaraLog(), "file:///scan", reportDir)
+func writeSARIFReport(eval *output.Evaluator, outDir string) error {
+	sarifPath, err := output.ToSARIF(eval.GemaraLog(), "file:///scan", outDir)
 	if err != nil {
 		return fmt.Errorf("failed to export SARIF: %w", err)
 	}
@@ -691,8 +691,8 @@ func writeSARIFReport(eval *output.Evaluator, reportDir string) error {
 	return nil
 }
 
-func writeOSCALReport(eval *output.Evaluator, reportDir string) error {
-	oscalPath, err := output.ToOSCAL(eval.GemaraLog(), reportDir)
+func writeOSCALReport(eval *output.Evaluator, outDir string) error {
+	oscalPath, err := output.ToOSCAL(eval.GemaraLog(), outDir)
 	if err != nil {
 		return fmt.Errorf("failed to export OSCAL: %w", err)
 	}
