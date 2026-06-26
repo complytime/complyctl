@@ -111,7 +111,7 @@ func (o *generateOptions) generatePolicy(ctx context.Context, cfg *complytime.Wo
 	}
 	defer mgr.Cleanup()
 
-	configs := policy.ExtractAssessmentConfigs(ref.Repository, graph)
+	configs := policy.ExtractAssessmentConfigs(graph)
 	groups := policy.GroupByEvaluator(configs, graph)
 	policyTargets := filterTargetsForPolicy(cfg.Targets, eid)
 

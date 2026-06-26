@@ -16,13 +16,13 @@ type EvaluatorGroup struct {
 // AssessmentConfiguration entries. EvaluatorID is set as a routing field
 // on the struct — it is not injected into Parameters. Parameters should
 // only carry per-requirement variable overrides for the provider.
-func ExtractAssessmentConfigs(policyID string, graph *DependencyGraph) []provider.AssessmentConfiguration {
+func ExtractAssessmentConfigs(graph *DependencyGraph) []provider.AssessmentConfiguration {
 	configs := make([]provider.AssessmentConfiguration, 0, len(graph.Assessments))
 
 	for _, a := range graph.Assessments {
 		configs = append(configs, provider.AssessmentConfiguration{
-			PlanID:        policyID,
-			RequirementID: a.ID,
+			PlanID:        a.ID,
+			RequirementID: a.RequirementID,
 			Parameters:    a.Parameters,
 			EvaluatorID:   a.EvaluatorID,
 		})

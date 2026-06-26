@@ -271,7 +271,7 @@ func (o *scanOptions) scanPolicy(ctx context.Context, cfg *complytime.WorkspaceC
 	}
 	fmt.Fprintf(os.Stderr, "Resolved %s version: %s\n", ref.Repository, version)
 
-	assessmentConfigs := policy.ExtractAssessmentConfigs(ref.Repository, graph)
+	assessmentConfigs := policy.ExtractAssessmentConfigs(graph)
 	groups := policy.GroupByEvaluator(assessmentConfigs, graph)
 
 	mgr, err := loadProviders(o.providerDir)
@@ -955,7 +955,7 @@ func reverseMap(m map[string]string) map[string]string {
 // OCI reference (repository@digest) map by composing two lookups:
 //
 //  1. state.Complypacks: evaluator-ID → repository@digest
-//  2. evaluator groups:  requirement-ID → evaluator-ID
+//  2. evaluator groups: requirement-ID → evaluator-ID
 //
 // Resolving the chain here keeps the Evaluator free of evaluator-ID
 // routing concerns and makes it easier to change selection logic later

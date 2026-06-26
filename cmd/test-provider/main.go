@@ -47,7 +47,7 @@ func (t *testEvaluator) Describe(_ context.Context, _ *provider.DescribeRequest)
 func (t *testEvaluator) Generate(_ context.Context, req *provider.GenerateRequest) (*provider.GenerateResponse, error) {
 	t.requirementIDs = make([]string, 0, len(req.Configuration))
 	for _, cfg := range req.Configuration {
-		t.requirementIDs = append(t.requirementIDs, cfg.RequirementID)
+		t.requirementIDs = append(t.requirementIDs, cfg.PlanID)
 	}
 
 	// Log complypack content path receipt for E2E test observability.

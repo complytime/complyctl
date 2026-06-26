@@ -486,7 +486,7 @@ func CheckVariables(cfg *complytime.WorkspaceConfig, healthData []ProviderHealth
 					})
 					continue
 				}
-				configs := policy.ExtractAssessmentConfigs(ref.Repository, graph)
+				configs := policy.ExtractAssessmentConfigs(graph)
 				groups := policy.GroupByEvaluator(configs, graph)
 				for evalID := range groups {
 					evaluatorTargets[evalID] = append(evaluatorTargets[evalID], target)
@@ -839,7 +839,7 @@ func CheckComplypacks(cfg *complytime.WorkspaceConfig, cacheDir string, resolver
 		if err != nil {
 			continue
 		}
-		configs := policy.ExtractAssessmentConfigs(ref.Repository, graph)
+		configs := policy.ExtractAssessmentConfigs(graph)
 		groups := policy.GroupByEvaluator(configs, graph)
 		for evalID := range groups {
 			evaluatorIDs[evalID] = true

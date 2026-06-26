@@ -17,7 +17,7 @@ func TestExtractAssessmentConfigs_EmptyGraph(t *testing.T) {
 		PolicyID:    "test",
 		Assessments: []Assessment{},
 	}
-	configs := ExtractAssessmentConfigs("test", graph)
+	configs := ExtractAssessmentConfigs(graph)
 	assert.Empty(t, configs)
 }
 
@@ -30,15 +30,16 @@ func TestExtractAssessmentConfigs_ThreeAssessments(t *testing.T) {
 			{ID: "ap-3", RequirementID: "req-3", EvaluatorID: "kube-eval"},
 		},
 	}
-	configs := ExtractAssessmentConfigs("nist", graph)
+	configs := ExtractAssessmentConfigs(graph)
 	require.Len(t, configs, 3)
 
-	assert.Equal(t, "nist", configs[0].PlanID)
-	assert.Equal(t, "ap-1", configs[0].RequirementID, "providers receive plan ID, not requirement ID")
+	assert.Equal(t, "ap-1", configs[0].PlanID)
+	assert.Equal(t, "req-1", configs[0].RequirementID)
 	assert.Equal(t, "openscap", configs[0].EvaluatorID)
 	assert.Equal(t, "xccdf_ssg", configs[0].Parameters["profile"])
 
-	assert.Equal(t, "ap-2", configs[1].RequirementID)
+	assert.Equal(t, "ap-2", configs[1].PlanID)
+	assert.Equal(t, "req-2", configs[1].RequirementID)
 	assert.Equal(t, "kube-eval", configs[2].EvaluatorID)
 }
 

@@ -24,10 +24,10 @@ type GenerateRequest struct {
 	ComplypackContentPath string
 }
 
-// AssessmentConfiguration carries the assessment plan selected for provider
-// generation. RequirementID is the Gemara assessment plan id used for matching
-// provider content; it is resolved back to the Gemara requirement-id in scan
-// output.
+// AssessmentConfiguration carries one Gemara assessment plan selected for
+// provider generation. PlanID is the assessment plan id used by providers for
+// matching provider content. RequirementID is the Gemara requirement-id used
+// later for report output.
 type AssessmentConfiguration struct {
 	PlanID        string
 	RequirementID string
