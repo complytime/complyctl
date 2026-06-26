@@ -1621,7 +1621,7 @@ func TestBuildReqToComplypackRef_NoCacheState(t *testing.T) {
 	groups := map[string]policy.EvaluatorGroup{
 		"opa": {
 			EvaluatorID: "opa",
-			Configs:     []provider.AssessmentConfiguration{{RequirementID: "req-1"}},
+			Configs:     []provider.AssessmentConfiguration{{PlanID: "plan-1", RequirementID: "req-1"}},
 		},
 	}
 	m := buildReqToComplypackRef(t.TempDir(), groups)
@@ -1648,8 +1648,8 @@ func TestBuildReqToComplypackRef_ResolvesRequirements(t *testing.T) {
 		"opa": {
 			EvaluatorID: "opa",
 			Configs: []provider.AssessmentConfiguration{
-				{RequirementID: "req-1"},
-				{RequirementID: "req-2"},
+				{PlanID: "plan-1", RequirementID: "req-1"},
+				{PlanID: "plan-2", RequirementID: "req-2"},
 			},
 		},
 		"kyverno": {
@@ -1660,8 +1660,8 @@ func TestBuildReqToComplypackRef_ResolvesRequirements(t *testing.T) {
 		},
 	}
 	m := buildReqToComplypackRef(cacheDir, groups)
-	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:abc123", m["req-1"])
-	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:abc123", m["req-2"])
+	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:abc123", m["plan-1"])
+	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:abc123", m["plan-2"])
 	assert.Equal(t, "registry.example.com/complypacks/kyverno@sha256:def456", m["req-3"])
 }
 
@@ -1680,7 +1680,7 @@ func TestBuildReqToComplypackRef_SkipsMissingDigest(t *testing.T) {
 	groups := map[string]policy.EvaluatorGroup{
 		"opa": {
 			EvaluatorID: "opa",
-			Configs:     []provider.AssessmentConfiguration{{RequirementID: "req-1"}},
+			Configs:     []provider.AssessmentConfiguration{{PlanID: "plan-1", RequirementID: "req-1"}},
 		},
 	}
 	m := buildReqToComplypackRef(cacheDir, groups)

@@ -245,7 +245,7 @@ func (p *capturingProvider) Generate(_ context.Context, req *provider.GenerateRe
 	p.receivedComplypackPath = req.ComplypackContentPath
 	p.requirementIDs = make([]string, 0, len(req.Configuration))
 	for _, cfg := range req.Configuration {
-		p.requirementIDs = append(p.requirementIDs, cfg.PlanID)
+		p.requirementIDs = append(p.requirementIDs, cfg.MatchID())
 	}
 	return &provider.GenerateResponse{Success: true}, nil
 }

@@ -12,6 +12,16 @@ import (
 	"github.com/complytime/complyctl/pkg/provider"
 )
 
+func TestAssessmentConfiguration_MatchID(t *testing.T) {
+	assert.Equal(t, "plan-1", provider.AssessmentConfiguration{
+		PlanID:        "plan-1",
+		RequirementID: "req-1",
+	}.MatchID())
+	assert.Equal(t, "req-1", provider.AssessmentConfiguration{
+		RequirementID: "req-1",
+	}.MatchID())
+}
+
 func TestMockClient_Describe(t *testing.T) {
 	mock := newMockClient()
 
@@ -43,7 +53,7 @@ func TestMockClient_Scan(t *testing.T) {
 	genReq := &provider.GenerateRequest{
 		Configuration: []provider.AssessmentConfiguration{
 			{PlanID: "plan-1", RequirementID: "req-1"},
-			{PlanID: "plan-1", RequirementID: "req-2"},
+			{PlanID: "plan-2", RequirementID: "req-2"},
 		},
 	}
 	_, err := mock.Generate(context.Background(), genReq)
@@ -57,7 +67,7 @@ func TestMockClient_Scan(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resp.Assessments, 2)
 
-	expectedIDs := []string{"req-1", "req-2"}
+	expectedIDs := []string{"plan-1", "plan-2"}
 	for i, a := range resp.Assessments {
 		assert.Equal(t, expectedIDs[i], a.RequirementID)
 		assert.Equal(t, "mock passed", a.Message)
@@ -134,6 +144,6 @@ func TestMockClient_Scan_ResponseMapping(t *testing.T) {
 	resp, err := mock.Scan(context.Background(), scanReq)
 	require.NoError(t, err)
 	require.Len(t, resp.Assessments, 1)
-	assert.Equal(t, "single-req", resp.Assessments[0].RequirementID)
+	assert.Equal(t, "plan-1", resp.Assessments[0].RequirementID)
 	assert.Equal(t, "mock-check", resp.Assessments[0].Steps[0].Name)
 }

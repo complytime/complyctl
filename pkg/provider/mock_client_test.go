@@ -12,10 +12,10 @@ import (
 var _ provider.Provider = (*mockClient)(nil)
 
 // mockClient provides an in-memory mock provider.Provider for testing only.
-// Like real providers, it stores requirement IDs during Generate and uses
+// Like real providers, it stores match IDs during Generate and uses
 // them during Scan (R47).
 type mockClient struct {
-	requirementIDs        []string
+	matchIDs              []string
 	complypackContentPath string
 }
 
@@ -32,19 +32,19 @@ func (m *mockClient) Describe(_ context.Context, _ *provider.DescribeRequest) (*
 }
 
 func (m *mockClient) Generate(_ context.Context, req *provider.GenerateRequest) (*provider.GenerateResponse, error) {
-	m.requirementIDs = make([]string, 0, len(req.Configuration))
+	m.matchIDs = make([]string, 0, len(req.Configuration))
 	for _, cfg := range req.Configuration {
-		m.requirementIDs = append(m.requirementIDs, cfg.RequirementID)
+		m.matchIDs = append(m.matchIDs, cfg.MatchID())
 	}
 	m.complypackContentPath = req.ComplypackContentPath
 	return &provider.GenerateResponse{Success: true}, nil
 }
 
 func (m *mockClient) Scan(_ context.Context, _ *provider.ScanRequest) (*provider.ScanResponse, error) {
-	assessments := make([]provider.AssessmentLog, 0, len(m.requirementIDs))
-	for _, reqID := range m.requirementIDs {
+	assessments := make([]provider.AssessmentLog, 0, len(m.matchIDs))
+	for _, matchID := range m.matchIDs {
 		assessments = append(assessments, provider.AssessmentLog{
-			RequirementID: reqID,
+			RequirementID: matchID,
 			Steps: []provider.Step{
 				{Name: "mock-check", Result: provider.ResultPassed, Message: "mock check passed"},
 			},

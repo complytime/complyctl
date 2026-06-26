@@ -37,6 +37,16 @@ type AssessmentConfiguration struct {
 	EvaluatorID string
 }
 
+// MatchID returns the identifier providers should use to match generated
+// content. Assessment plan IDs take precedence when present; global evaluator
+// configurations can fall back to requirement IDs.
+func (c AssessmentConfiguration) MatchID() string {
+	if c.PlanID != "" {
+		return c.PlanID
+	}
+	return c.RequirementID
+}
+
 // GenerateResponse confirms whether policy preparation succeeded.
 type GenerateResponse struct {
 	Success      bool

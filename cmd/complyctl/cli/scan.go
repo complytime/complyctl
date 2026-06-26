@@ -992,7 +992,7 @@ func buildReqToComplypackRef(cacheDir string, groups map[string]policy.Evaluator
 			continue
 		}
 		for _, cfg := range group.Configs {
-			m[cfg.RequirementID] = ref
+			m[cfg.MatchID()] = ref
 		}
 	}
 	return m
