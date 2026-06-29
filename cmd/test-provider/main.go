@@ -31,7 +31,7 @@ var (
 
 // testEvaluator returns predefined responses for all RPCs.
 type testEvaluator struct {
-	requirementIDs []string
+	matchIDs []string
 }
 
 func (t *testEvaluator) Describe(_ context.Context, _ *provider.DescribeRequest) (*provider.DescribeResponse, error) {
@@ -43,9 +43,9 @@ func (t *testEvaluator) Describe(_ context.Context, _ *provider.DescribeRequest)
 }
 
 func (t *testEvaluator) Generate(_ context.Context, req *provider.GenerateRequest) (*provider.GenerateResponse, error) {
-	t.requirementIDs = make([]string, 0, len(req.Configuration))
+	t.matchIDs = make([]string, 0, len(req.Configuration))
 	for _, cfg := range req.Configuration {
-		t.requirementIDs = append(t.requirementIDs, cfg.MatchID())
+		t.matchIDs = append(t.matchIDs, cfg.MatchID())
 	}
 
 	// Log complypack content path receipt for E2E test observability.
@@ -64,10 +64,10 @@ func logComplypackPath(path string) {
 }
 
 func (t *testEvaluator) Scan(_ context.Context, req *provider.ScanRequest) (*provider.ScanResponse, error) {
-	assessments := make([]provider.AssessmentLog, 0, len(t.requirementIDs))
-	for _, reqID := range t.requirementIDs {
+	assessments := make([]provider.AssessmentLog, 0, len(t.matchIDs))
+	for _, matchID := range t.matchIDs {
 		assessments = append(assessments, provider.AssessmentLog{
-			RequirementID: reqID,
+			PlanID: matchID,
 			Steps: []provider.Step{
 				{
 					Name:    "test-check",
@@ -79,9 +79,9 @@ func (t *testEvaluator) Scan(_ context.Context, req *provider.ScanRequest) (*pro
 			Confidence: provider.ConfidenceLevelHigh,
 			Evidence: []provider.Evidence{
 				{
-					ID:          "ev-" + reqID,
+					ID:          "ev-" + matchID,
 					Type:        "log",
-					Description: "test evidence for " + reqID,
+					Description: "test evidence for " + matchID,
 					Payload:     []byte("sample payload"),
 					CollectedAt: time.Now().Format(time.RFC3339),
 				},

@@ -329,7 +329,7 @@ func TestManager_RouteScanResult_Broadcast_RPCFailure(t *testing.T) {
 	// Assessments come only from the clean provider — RPC failures do not
 	// inject synthetic assessments (D3).
 	require.Len(t, result.Assessments, 1)
-	assert.Equal(t, "req-1", result.Assessments[0].RequirementID)
+	assert.Equal(t, "req-1", result.Assessments[0].PlanID)
 }
 
 func TestManager_RouteScan_DropsProviderErrors(t *testing.T) {

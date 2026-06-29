@@ -740,12 +740,20 @@ func extractPlanToReqMap(graph *policy.DependencyGraph) map[string]string {
 	return m
 }
 
-// resolveAssessmentIDs replaces plan IDs in assessment results with actual
-// requirement IDs using the plan-to-requirement mapping from the policy graph.
+// resolveAssessmentIDs replaces provider match IDs in assessment results with
+// actual requirement IDs using the plan-to-requirement mapping from the policy
+// graph. Providers return plan IDs for plan-scoped assessments, while global
+// evaluators can return requirement IDs directly.
 func resolveAssessmentIDs(assessments []provider.AssessmentLog, planToReq map[string]string) {
 	for i := range assessments {
-		if reqID, ok := planToReq[assessments[i].RequirementID]; ok {
+		matchID := assessments[i].PlanID
+		if matchID == "" {
+			matchID = assessments[i].RequirementID
+		}
+		if reqID, ok := planToReq[matchID]; ok {
 			assessments[i].RequirementID = reqID
+		} else if assessments[i].RequirementID == "" {
+			assessments[i].RequirementID = matchID
 		}
 	}
 }

@@ -83,8 +83,12 @@ func (s *grpcServer) Scan(ctx context.Context, req *proto.ScanRequest) (*proto.S
 				Message: step.Message,
 			})
 		}
+		matchID := a.PlanID
+		if matchID == "" {
+			matchID = a.RequirementID
+		}
 		protoAssessments = append(protoAssessments, &proto.AssessmentLog{
-			RequirementId:  a.RequirementID,
+			RequirementId:  matchID,
 			Steps:          protoSteps,
 			Message:        a.Message,
 			Confidence:     internalConfidenceToProto(a.Confidence),

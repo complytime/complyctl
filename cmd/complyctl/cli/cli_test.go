@@ -767,17 +767,18 @@ func TestExtractPlanToReqMap_EmptyAssessments(t *testing.T) {
 
 func TestResolveAssessmentIDs_ReplacesMatchingIDs(t *testing.T) {
 	assessments := []provider.AssessmentLog{
-		{RequirementID: "ap-1"},
+		{PlanID: "ap-1"},
 		{RequirementID: "req-already-correct"},
 	}
 	planToReq := map[string]string{"ap-1": "req-1"}
 	resolveAssessmentIDs(assessments, planToReq)
+	assert.Equal(t, "ap-1", assessments[0].PlanID)
 	assert.Equal(t, "req-1", assessments[0].RequirementID)
 	assert.Equal(t, "req-already-correct", assessments[1].RequirementID)
 }
 
 func TestResolveAssessmentIDs_EmptyMap(t *testing.T) {
-	assessments := []provider.AssessmentLog{{RequirementID: "ap-1"}}
+	assessments := []provider.AssessmentLog{{PlanID: "ap-1"}}
 	resolveAssessmentIDs(assessments, map[string]string{})
 	assert.Equal(t, "ap-1", assessments[0].RequirementID)
 }
@@ -789,8 +790,8 @@ func TestResolveAssessmentIDs_NilAssessments(t *testing.T) {
 
 func TestResolveAssessmentIDs_AllReplaced(t *testing.T) {
 	assessments := []provider.AssessmentLog{
-		{RequirementID: "ap-1"},
-		{RequirementID: "ap-2"},
+		{PlanID: "ap-1"},
+		{PlanID: "ap-2"},
 	}
 	planToReq := map[string]string{
 		"ap-1": "req-1",

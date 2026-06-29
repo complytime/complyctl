@@ -44,7 +44,7 @@ func (m *mockClient) Scan(_ context.Context, _ *provider.ScanRequest) (*provider
 	assessments := make([]provider.AssessmentLog, 0, len(m.matchIDs))
 	for _, matchID := range m.matchIDs {
 		assessments = append(assessments, provider.AssessmentLog{
-			RequirementID: matchID,
+			PlanID: matchID,
 			Steps: []provider.Step{
 				{Name: "mock-check", Result: provider.ResultPassed, Message: "mock check passed"},
 			},

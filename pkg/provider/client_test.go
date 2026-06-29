@@ -69,7 +69,8 @@ func TestMockClient_Scan(t *testing.T) {
 
 	expectedIDs := []string{"plan-1", "plan-2"}
 	for i, a := range resp.Assessments {
-		assert.Equal(t, expectedIDs[i], a.RequirementID)
+		assert.Equal(t, expectedIDs[i], a.PlanID)
+		assert.Empty(t, a.RequirementID)
 		assert.Equal(t, "mock passed", a.Message)
 		assert.Equal(t, provider.ConfidenceLevelHigh, a.Confidence)
 		require.Len(t, a.Steps, 1)
@@ -144,6 +145,7 @@ func TestMockClient_Scan_ResponseMapping(t *testing.T) {
 	resp, err := mock.Scan(context.Background(), scanReq)
 	require.NoError(t, err)
 	require.Len(t, resp.Assessments, 1)
-	assert.Equal(t, "plan-1", resp.Assessments[0].RequirementID)
+	assert.Equal(t, "plan-1", resp.Assessments[0].PlanID)
+	assert.Empty(t, resp.Assessments[0].RequirementID)
 	assert.Equal(t, "mock-check", resp.Assessments[0].Steps[0].Name)
 }

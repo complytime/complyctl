@@ -228,7 +228,7 @@ func TestComplypackPipeline_MultipleEvaluators(t *testing.T) {
 // It mirrors the test-provider's behavior but runs in-process.
 type capturingProvider struct {
 	receivedComplypackPath string
-	requirementIDs         []string
+	matchIDs               []string
 }
 
 // Compile-time check: capturingProvider must implement provider.Provider.
@@ -243,18 +243,18 @@ func (p *capturingProvider) Describe(_ context.Context, _ *provider.DescribeRequ
 
 func (p *capturingProvider) Generate(_ context.Context, req *provider.GenerateRequest) (*provider.GenerateResponse, error) {
 	p.receivedComplypackPath = req.ComplypackContentPath
-	p.requirementIDs = make([]string, 0, len(req.Configuration))
+	p.matchIDs = make([]string, 0, len(req.Configuration))
 	for _, cfg := range req.Configuration {
-		p.requirementIDs = append(p.requirementIDs, cfg.MatchID())
+		p.matchIDs = append(p.matchIDs, cfg.MatchID())
 	}
 	return &provider.GenerateResponse{Success: true}, nil
 }
 
 func (p *capturingProvider) Scan(_ context.Context, _ *provider.ScanRequest) (*provider.ScanResponse, error) {
-	assessments := make([]provider.AssessmentLog, 0, len(p.requirementIDs))
-	for _, reqID := range p.requirementIDs {
+	assessments := make([]provider.AssessmentLog, 0, len(p.matchIDs))
+	for _, matchID := range p.matchIDs {
 		assessments = append(assessments, provider.AssessmentLog{
-			RequirementID: reqID,
+			PlanID: matchID,
 			Steps: []provider.Step{
 				{Name: "capture-check", Result: provider.ResultPassed, Message: "captured"},
 			},

@@ -73,8 +73,13 @@ type ScanResponse struct {
 	Errors      []string
 }
 
-// AssessmentLog holds the evaluation result for a single requirement.
+// AssessmentLog holds the evaluation result for one provider assessment.
 type AssessmentLog struct {
+	// PlanID carries the provider-returned match ID before scan output resolves
+	// it to the Gemara requirement-id.
+	PlanID string
+	// RequirementID carries the final Gemara requirement-id after scan output
+	// resolution. Output/reporting code should use this field.
 	RequirementID  string
 	Steps          []Step
 	Message        string
@@ -219,7 +224,7 @@ func (c *Client) Scan(ctx context.Context, req *ScanRequest) (*ScanResponse, err
 			})
 		}
 		assessments = append(assessments, AssessmentLog{
-			RequirementID:  pa.GetRequirementId(),
+			PlanID:         pa.GetRequirementId(),
 			Steps:          steps,
 			Message:        pa.GetMessage(),
 			Confidence:     protoConfidenceToInternal(pa.GetConfidence()),
