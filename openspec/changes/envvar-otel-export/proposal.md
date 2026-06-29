@@ -1,3 +1,11 @@
+## SUPERSEDED
+
+**This proposal was superseded by issue #606 on 2026-06-24.**
+
+The export infrastructure described in this proposal (including `COMPLYTIME_EXPORT_ENABLED`) was removed as speculative infrastructure built before backend design was finalized. Export functionality will be redesigned and reintroduced when the backend shape is known. See CHANGELOG.md for migration guidance.
+
+---
+
 ## Why
 
 The `--format otel` flag on the `scan` command conflates two concerns: output format selection and export behavior. The other `--format` values (`oscal`, `pretty`, `sarif`) control the local file format of scan results. `otel` is fundamentally different — it triggers a network export to a remote Beacon collector as a side effect, not a file format choice. This creates UX confusion and prevents users from exporting to a collector while also producing a local report (e.g., `--format sarif` + export).
@@ -26,15 +34,15 @@ Switching to an environment variable (`COMPLYTIME_EXPORT_ENABLED`) decouples the
 
 ## Constitution Alignment
 
-| Principle | Status | Evidence |
-|-----------|--------|----------|
-| I. Single Source of Truth | PASS | New `ExportEnabledEnvVar` constant centralizes the env var name. No magic strings. |
-| II. Simplicity & Isolation | PASS | Minimal change — replaces one check in `maybeExport()`. No structural changes to scan flow. |
-| III. Incremental Improvement | PASS | Single-concern change. No unrelated refactoring bundled in. |
-| IV. Readability First | PASS | `COMPLYTIME_EXPORT_ENABLED` is self-documenting. `--format otel` rejected with standard invalid format error; migration documented in release notes. |
-| V. Do Not Reinvent the Wheel | PASS | Uses `strconv.ParseBool` (stdlib) for boolean parsing. No custom env var framework. |
-| VI. Composability | PASS | Export and format are now independent — users can compose `--format sarif` + export. Improves composability. |
-| VII. Convention Over Configuration | PASS | Export defaults to off (env var not set). Consistent with existing env var pattern for collector credentials. |
+| Principle                          | Status | Evidence                                                                                                                                             |
+|------------------------------------|--------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| I. Single Source of Truth          | PASS   | New `ExportEnabledEnvVar` constant centralizes the env var name. No magic strings.                                                                   |
+| II. Simplicity & Isolation         | PASS   | Minimal change — replaces one check in `maybeExport()`. No structural changes to scan flow.                                                          |
+| III. Incremental Improvement       | PASS   | Single-concern change. No unrelated refactoring bundled in.                                                                                          |
+| IV. Readability First              | PASS   | `COMPLYTIME_EXPORT_ENABLED` is self-documenting. `--format otel` rejected with standard invalid format error; migration documented in release notes. |
+| V. Do Not Reinvent the Wheel       | PASS   | Uses `strconv.ParseBool` (stdlib) for boolean parsing. No custom env var framework.                                                                  |
+| VI. Composability                  | PASS   | Export and format are now independent — users can compose `--format sarif` + export. Improves composability.                                         |
+| VII. Convention Over Configuration | PASS   | Export defaults to off (env var not set). Consistent with existing env var pattern for collector credentials.                                        |
 
 ## Impact
 

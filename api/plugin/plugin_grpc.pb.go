@@ -27,7 +27,6 @@ const (
 	Plugin_Generate_FullMethodName = "/complyctl.plugin.v1.Plugin/Generate"
 	Plugin_Scan_FullMethodName     = "/complyctl.plugin.v1.Plugin/Scan"
 	Plugin_Describe_FullMethodName = "/complyctl.plugin.v1.Plugin/Describe"
-	Plugin_Export_FullMethodName   = "/complyctl.plugin.v1.Plugin/Export"
 )
 
 // PluginClient is the client API for Plugin service.
@@ -46,12 +45,6 @@ type PluginClient interface {
 	// Describe reports plugin identity, health, and declared variable
 	// requirements. Called during plugin discovery and doctor diagnostics.
 	Describe(ctx context.Context, in *DescribeRequest, opts ...grpc.CallOption) (*DescribeResponse, error)
-	// Export ships scan evidence to a Beacon collector
-	// via ProofWatch. Called during `complyctl scan` when
-	// COMPLYTIME_EXPORT_ENABLED is set, after scan completes.
-	// Only plugins that declare supports_export=true in
-	// DescribeResponse will receive this call.
-	Export(ctx context.Context, in *ExportRequest, opts ...grpc.CallOption) (*ExportResponse, error)
 }
 
 type pluginClient struct {
@@ -92,16 +85,6 @@ func (c *pluginClient) Describe(ctx context.Context, in *DescribeRequest, opts .
 	return out, nil
 }
 
-func (c *pluginClient) Export(ctx context.Context, in *ExportRequest, opts ...grpc.CallOption) (*ExportResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ExportResponse)
-	err := c.cc.Invoke(ctx, Plugin_Export_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // PluginServer is the server API for Plugin service.
 // All implementations must embed UnimplementedPluginServer
 // for forward compatibility.
@@ -118,12 +101,6 @@ type PluginServer interface {
 	// Describe reports plugin identity, health, and declared variable
 	// requirements. Called during plugin discovery and doctor diagnostics.
 	Describe(context.Context, *DescribeRequest) (*DescribeResponse, error)
-	// Export ships scan evidence to a Beacon collector
-	// via ProofWatch. Called during `complyctl scan` when
-	// COMPLYTIME_EXPORT_ENABLED is set, after scan completes.
-	// Only plugins that declare supports_export=true in
-	// DescribeResponse will receive this call.
-	Export(context.Context, *ExportRequest) (*ExportResponse, error)
 	mustEmbedUnimplementedPluginServer()
 }
 
@@ -142,9 +119,6 @@ func (UnimplementedPluginServer) Scan(context.Context, *ScanRequest) (*ScanRespo
 }
 func (UnimplementedPluginServer) Describe(context.Context, *DescribeRequest) (*DescribeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Describe not implemented")
-}
-func (UnimplementedPluginServer) Export(context.Context, *ExportRequest) (*ExportResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method Export not implemented")
 }
 func (UnimplementedPluginServer) mustEmbedUnimplementedPluginServer() {}
 func (UnimplementedPluginServer) testEmbeddedByValue()                {}
@@ -221,24 +195,6 @@ func _Plugin_Describe_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Plugin_Export_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ExportRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(PluginServer).Export(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Plugin_Export_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PluginServer).Export(ctx, req.(*ExportRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Plugin_ServiceDesc is the grpc.ServiceDesc for Plugin service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -257,10 +213,6 @@ var Plugin_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Describe",
 			Handler:    _Plugin_Describe_Handler,
-		},
-		{
-			MethodName: "Export",
-			Handler:    _Plugin_Export_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

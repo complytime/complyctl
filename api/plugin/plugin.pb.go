@@ -804,11 +804,8 @@ type DescribeResponse struct {
 	// Required target variable names — doctor validates these
 	// keys exist in relevant config.targets[].variables (R51)
 	RequiredTargetVariables []string `protobuf:"bytes,5,rep,name=required_target_variables,json=requiredTargetVariables,proto3" json:"required_target_variables,omitempty"`
-	// Whether this plugin implements the Export RPC for shipping
-	// evidence to a Beacon collector. Defaults to false.
-	SupportsExport bool `protobuf:"varint,6,opt,name=supports_export,json=supportsExport,proto3" json:"supports_export,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *DescribeResponse) Reset() {
@@ -876,183 +873,6 @@ func (x *DescribeResponse) GetRequiredTargetVariables() []string {
 	return nil
 }
 
-func (x *DescribeResponse) GetSupportsExport() bool {
-	if x != nil {
-		return x.SupportsExport
-	}
-	return false
-}
-
-// ExportRequest carries collector configuration for evidence export.
-type ExportRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Collector     *CollectorConfig       `protobuf:"bytes,1,opt,name=collector,proto3" json:"collector,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ExportRequest) Reset() {
-	*x = ExportRequest{}
-	mi := &file_plugin_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ExportRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ExportRequest) ProtoMessage() {}
-
-func (x *ExportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ExportRequest.ProtoReflect.Descriptor instead.
-func (*ExportRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *ExportRequest) GetCollector() *CollectorConfig {
-	if x != nil {
-		return x.Collector
-	}
-	return nil
-}
-
-// CollectorConfig holds the Beacon collector endpoint and auth credentials.
-type CollectorConfig struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Collector OTLP endpoint (e.g. "collector.example.com:4317")
-	Endpoint string `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
-	// Resolved bearer token — complyctl handles OIDC exchange, plugins
-	// receive a ready-to-use token. Empty if no auth is configured.
-	AuthToken     string `protobuf:"bytes,2,opt,name=auth_token,json=authToken,proto3" json:"auth_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CollectorConfig) Reset() {
-	*x = CollectorConfig{}
-	mi := &file_plugin_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CollectorConfig) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CollectorConfig) ProtoMessage() {}
-
-func (x *CollectorConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CollectorConfig.ProtoReflect.Descriptor instead.
-func (*CollectorConfig) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *CollectorConfig) GetEndpoint() string {
-	if x != nil {
-		return x.Endpoint
-	}
-	return ""
-}
-
-func (x *CollectorConfig) GetAuthToken() string {
-	if x != nil {
-		return x.AuthToken
-	}
-	return ""
-}
-
-// ExportResponse reports the outcome of evidence export.
-type ExportResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	ExportedCount int32                  `protobuf:"varint,2,opt,name=exported_count,json=exportedCount,proto3" json:"exported_count,omitempty"`
-	FailedCount   int32                  `protobuf:"varint,3,opt,name=failed_count,json=failedCount,proto3" json:"failed_count,omitempty"`
-	ErrorMessage  string                 `protobuf:"bytes,4,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ExportResponse) Reset() {
-	*x = ExportResponse{}
-	mi := &file_plugin_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ExportResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ExportResponse) ProtoMessage() {}
-
-func (x *ExportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ExportResponse.ProtoReflect.Descriptor instead.
-func (*ExportResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *ExportResponse) GetSuccess() bool {
-	if x != nil {
-		return x.Success
-	}
-	return false
-}
-
-func (x *ExportResponse) GetExportedCount() int32 {
-	if x != nil {
-		return x.ExportedCount
-	}
-	return 0
-}
-
-func (x *ExportResponse) GetFailedCount() int32 {
-	if x != nil {
-		return x.FailedCount
-	}
-	return 0
-}
-
-func (x *ExportResponse) GetErrorMessage() string {
-	if x != nil {
-		return x.ErrorMessage
-	}
-	return ""
-}
-
 var File_plugin_proto protoreflect.FileDescriptor
 
 const file_plugin_proto_rawDesc = "" +
@@ -1111,25 +931,13 @@ const file_plugin_proto_rawDesc = "" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x18\n" +
 	"\apayload\x18\x04 \x01(\fR\apayload\x12!\n" +
 	"\fcollected_at\x18\x05 \x01(\tR\vcollectedAt\"\x11\n" +
-	"\x0fDescribeRequest\"\x8c\x02\n" +
+	"\x0fDescribeRequest\"\xe3\x01\n" +
 	"\x10DescribeResponse\x12\x18\n" +
 	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12#\n" +
 	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\x12:\n" +
 	"\x19required_global_variables\x18\x04 \x03(\tR\x17requiredGlobalVariables\x12:\n" +
-	"\x19required_target_variables\x18\x05 \x03(\tR\x17requiredTargetVariables\x12'\n" +
-	"\x0fsupports_export\x18\x06 \x01(\bR\x0esupportsExport\"S\n" +
-	"\rExportRequest\x12B\n" +
-	"\tcollector\x18\x01 \x01(\v2$.complyctl.plugin.v1.CollectorConfigR\tcollector\"L\n" +
-	"\x0fCollectorConfig\x12\x1a\n" +
-	"\bendpoint\x18\x01 \x01(\tR\bendpoint\x12\x1d\n" +
-	"\n" +
-	"auth_token\x18\x02 \x01(\tR\tauthToken\"\x99\x01\n" +
-	"\x0eExportResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12%\n" +
-	"\x0eexported_count\x18\x02 \x01(\x05R\rexportedCount\x12!\n" +
-	"\ffailed_count\x18\x03 \x01(\x05R\vfailedCount\x12#\n" +
-	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage*\xa4\x01\n" +
+	"\x19required_target_variables\x18\x05 \x03(\tR\x17requiredTargetVariables*\xa4\x01\n" +
 	"\x0fConfidenceLevel\x12\x1c\n" +
 	"\x18CONFIDENCE_LEVEL_NOT_SET\x10\x00\x12!\n" +
 	"\x1dCONFIDENCE_LEVEL_UNDETERMINED\x10\x01\x12\x18\n" +
@@ -1141,12 +949,11 @@ const file_plugin_proto_rawDesc = "" +
 	"\rRESULT_PASSED\x10\x01\x12\x11\n" +
 	"\rRESULT_FAILED\x10\x02\x12\x12\n" +
 	"\x0eRESULT_SKIPPED\x10\x03\x12\x10\n" +
-	"\fRESULT_ERROR\x10\x042\xda\x02\n" +
+	"\fRESULT_ERROR\x10\x042\x87\x02\n" +
 	"\x06Plugin\x12W\n" +
 	"\bGenerate\x12$.complyctl.plugin.v1.GenerateRequest\x1a%.complyctl.plugin.v1.GenerateResponse\x12K\n" +
 	"\x04Scan\x12 .complyctl.plugin.v1.ScanRequest\x1a!.complyctl.plugin.v1.ScanResponse\x12W\n" +
-	"\bDescribe\x12$.complyctl.plugin.v1.DescribeRequest\x1a%.complyctl.plugin.v1.DescribeResponse\x12Q\n" +
-	"\x06Export\x12\".complyctl.plugin.v1.ExportRequest\x1a#.complyctl.plugin.v1.ExportResponseBCZAgithub.com/complytime/complyctl/internal/proto/plugin/v1;pluginv1b\x06proto3"
+	"\bDescribe\x12$.complyctl.plugin.v1.DescribeRequest\x1a%.complyctl.plugin.v1.DescribeResponseBCZAgithub.com/complytime/complyctl/internal/proto/plugin/v1;pluginv1b\x06proto3"
 
 var (
 	file_plugin_proto_rawDescOnce sync.Once
@@ -1161,7 +968,7 @@ func file_plugin_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_plugin_proto_goTypes = []any{
 	(ConfidenceLevel)(0),            // 0: complyctl.plugin.v1.ConfidenceLevel
 	(Result)(0),                     // 1: complyctl.plugin.v1.Result
@@ -1176,40 +983,34 @@ var file_plugin_proto_goTypes = []any{
 	(*Evidence)(nil),                // 10: complyctl.plugin.v1.Evidence
 	(*DescribeRequest)(nil),         // 11: complyctl.plugin.v1.DescribeRequest
 	(*DescribeResponse)(nil),        // 12: complyctl.plugin.v1.DescribeResponse
-	(*ExportRequest)(nil),           // 13: complyctl.plugin.v1.ExportRequest
-	(*CollectorConfig)(nil),         // 14: complyctl.plugin.v1.CollectorConfig
-	(*ExportResponse)(nil),          // 15: complyctl.plugin.v1.ExportResponse
-	nil,                             // 16: complyctl.plugin.v1.GenerateRequest.GlobalVariablesEntry
-	nil,                             // 17: complyctl.plugin.v1.GenerateRequest.TargetVariablesEntry
-	nil,                             // 18: complyctl.plugin.v1.AssessmentConfiguration.ParametersEntry
-	nil,                             // 19: complyctl.plugin.v1.Target.VariablesEntry
+	nil,                             // 13: complyctl.plugin.v1.GenerateRequest.GlobalVariablesEntry
+	nil,                             // 14: complyctl.plugin.v1.GenerateRequest.TargetVariablesEntry
+	nil,                             // 15: complyctl.plugin.v1.AssessmentConfiguration.ParametersEntry
+	nil,                             // 16: complyctl.plugin.v1.Target.VariablesEntry
 }
 var file_plugin_proto_depIdxs = []int32{
-	16, // 0: complyctl.plugin.v1.GenerateRequest.global_variables:type_name -> complyctl.plugin.v1.GenerateRequest.GlobalVariablesEntry
+	13, // 0: complyctl.plugin.v1.GenerateRequest.global_variables:type_name -> complyctl.plugin.v1.GenerateRequest.GlobalVariablesEntry
 	3,  // 1: complyctl.plugin.v1.GenerateRequest.configurations:type_name -> complyctl.plugin.v1.AssessmentConfiguration
-	17, // 2: complyctl.plugin.v1.GenerateRequest.target_variables:type_name -> complyctl.plugin.v1.GenerateRequest.TargetVariablesEntry
-	18, // 3: complyctl.plugin.v1.AssessmentConfiguration.parameters:type_name -> complyctl.plugin.v1.AssessmentConfiguration.ParametersEntry
+	14, // 2: complyctl.plugin.v1.GenerateRequest.target_variables:type_name -> complyctl.plugin.v1.GenerateRequest.TargetVariablesEntry
+	15, // 3: complyctl.plugin.v1.AssessmentConfiguration.parameters:type_name -> complyctl.plugin.v1.AssessmentConfiguration.ParametersEntry
 	6,  // 4: complyctl.plugin.v1.ScanRequest.targets:type_name -> complyctl.plugin.v1.Target
-	19, // 5: complyctl.plugin.v1.Target.variables:type_name -> complyctl.plugin.v1.Target.VariablesEntry
+	16, // 5: complyctl.plugin.v1.Target.variables:type_name -> complyctl.plugin.v1.Target.VariablesEntry
 	8,  // 6: complyctl.plugin.v1.ScanResponse.assessments:type_name -> complyctl.plugin.v1.AssessmentLog
 	9,  // 7: complyctl.plugin.v1.AssessmentLog.steps:type_name -> complyctl.plugin.v1.Step
 	0,  // 8: complyctl.plugin.v1.AssessmentLog.confidence:type_name -> complyctl.plugin.v1.ConfidenceLevel
 	10, // 9: complyctl.plugin.v1.AssessmentLog.evidence:type_name -> complyctl.plugin.v1.Evidence
 	1,  // 10: complyctl.plugin.v1.Step.result:type_name -> complyctl.plugin.v1.Result
-	14, // 11: complyctl.plugin.v1.ExportRequest.collector:type_name -> complyctl.plugin.v1.CollectorConfig
-	2,  // 12: complyctl.plugin.v1.Plugin.Generate:input_type -> complyctl.plugin.v1.GenerateRequest
-	5,  // 13: complyctl.plugin.v1.Plugin.Scan:input_type -> complyctl.plugin.v1.ScanRequest
-	11, // 14: complyctl.plugin.v1.Plugin.Describe:input_type -> complyctl.plugin.v1.DescribeRequest
-	13, // 15: complyctl.plugin.v1.Plugin.Export:input_type -> complyctl.plugin.v1.ExportRequest
-	4,  // 16: complyctl.plugin.v1.Plugin.Generate:output_type -> complyctl.plugin.v1.GenerateResponse
-	7,  // 17: complyctl.plugin.v1.Plugin.Scan:output_type -> complyctl.plugin.v1.ScanResponse
-	12, // 18: complyctl.plugin.v1.Plugin.Describe:output_type -> complyctl.plugin.v1.DescribeResponse
-	15, // 19: complyctl.plugin.v1.Plugin.Export:output_type -> complyctl.plugin.v1.ExportResponse
-	16, // [16:20] is the sub-list for method output_type
-	12, // [12:16] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	2,  // 11: complyctl.plugin.v1.Plugin.Generate:input_type -> complyctl.plugin.v1.GenerateRequest
+	5,  // 12: complyctl.plugin.v1.Plugin.Scan:input_type -> complyctl.plugin.v1.ScanRequest
+	11, // 13: complyctl.plugin.v1.Plugin.Describe:input_type -> complyctl.plugin.v1.DescribeRequest
+	4,  // 14: complyctl.plugin.v1.Plugin.Generate:output_type -> complyctl.plugin.v1.GenerateResponse
+	7,  // 15: complyctl.plugin.v1.Plugin.Scan:output_type -> complyctl.plugin.v1.ScanResponse
+	12, // 16: complyctl.plugin.v1.Plugin.Describe:output_type -> complyctl.plugin.v1.DescribeResponse
+	14, // [14:17] is the sub-list for method output_type
+	11, // [11:14] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_plugin_proto_init() }
@@ -1223,7 +1024,7 @@ func file_plugin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_proto_rawDesc), len(file_plugin_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   18,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

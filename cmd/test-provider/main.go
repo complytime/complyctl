@@ -27,7 +27,6 @@ import (
 // Compile-time checks
 var (
 	_ provider.Provider = (*testEvaluator)(nil)
-	_ provider.Exporter = (*testEvaluator)(nil)
 )
 
 // testEvaluator returns predefined responses for all RPCs.
@@ -40,7 +39,6 @@ func (t *testEvaluator) Describe(_ context.Context, _ *provider.DescribeRequest)
 		Healthy:                 true,
 		Version:                 "test-v0.1.0",
 		RequiredGlobalVariables: []string{"workspace"},
-		SupportsExport:          true,
 	}, nil
 }
 
@@ -92,18 +90,6 @@ func (t *testEvaluator) Scan(_ context.Context, req *provider.ScanRequest) (*pro
 		})
 	}
 	return &provider.ScanResponse{Assessments: assessments}, nil
-}
-
-func (t *testEvaluator) Export(_ context.Context, _ *provider.ExportRequest) (*provider.ExportResponse, error) {
-	n := len(t.requirementIDs)
-	if n == 0 {
-		n = 1 // always report at least one exported record
-	}
-	return &provider.ExportResponse{
-		Success:       true,
-		ExportedCount: int32(n), //nolint:gosec // test provider; requirementIDs count is always small
-		FailedCount:   0,
-	}, nil
 }
 
 func main() {

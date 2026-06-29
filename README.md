@@ -171,8 +171,6 @@ complyctl scan prod --format oscal
 complyctl scan --policy-id nist-800-53-r5 --format pretty
 complyctl scan --policy-id nist-800-53-r5 --format sarif
 
-# Export evidence to Beacon collector (with optional format report)
-COMPLYTIME_EXPORT_ENABLED=true complyctl scan --policy-id nist-800-53-r5 --format sarif
 ```
 
 | Argument / Flag | Short | Description |
@@ -183,10 +181,6 @@ COMPLYTIME_EXPORT_ENABLED=true complyctl scan --policy-id nist-800-53-r5 --forma
 
 When a target is specified and references exactly one policy, `--policy-id` is inferred.
 At least one of `[target]` or `--policy-id` is required.
-
-| Environment Variable | Description |
-|:---|:---|
-| `COMPLYTIME_EXPORT_ENABLED` | Set to `true` to export evidence to a Beacon collector after scan. Requires a `collector` section in `complytime.yaml`. |
 
 Output written to `./.complytime/scan/`.
 
@@ -235,12 +229,6 @@ targets:
     variables:
       kubeconfig: /path/to/kubeconfig
       api_token: ${MY_API_TOKEN}
-# collector:                                      # Optional — needed when COMPLYTIME_EXPORT_ENABLED is set
-#   endpoint: "collector.example.com:4317"
-#   auth:
-#     client-id: "${BEACON_CLIENT_ID}"
-#     client-secret: "${BEACON_CLIENT_SECRET}"
-#     token-endpoint: "https://sso.example.com/realms/comply/protocol/openid-connect/token"
 ```
 
 | Field | Description |
@@ -251,8 +239,6 @@ targets:
 | `targets[].id` | Scan target identifier |
 | `targets[].policies` | List of effective policy IDs to evaluate against this target |
 | `targets[].variables` | Provider-specific key-value pairs; supports `${VAR}` env substitution |
-| `collector.endpoint` | Beacon collector OTLP endpoint (host:port) |
-| `collector.auth` | Optional OIDC client credentials for collector authentication |
 
 ## Contributing
 

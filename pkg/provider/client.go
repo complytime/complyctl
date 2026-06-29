@@ -12,7 +12,6 @@ import (
 
 var (
 	_ Provider = (*Client)(nil)
-	_ Exporter = (*Client)(nil)
 )
 
 // GenerateRequest carries assessment plan configuration to a provider.
@@ -134,26 +133,6 @@ type DescribeResponse struct {
 	ErrorMessage            string
 	RequiredGlobalVariables []string
 	RequiredTargetVariables []string
-	SupportsExport          bool
-}
-
-// ExportRequest carries collector configuration for evidence export.
-type ExportRequest struct {
-	Collector CollectorConfig
-}
-
-// CollectorConfig holds the Beacon collector endpoint and auth credentials.
-type CollectorConfig struct {
-	Endpoint  string
-	AuthToken string //nolint:gosec // not a hardcoded credential
-}
-
-// ExportResponse reports the outcome of evidence export.
-type ExportResponse struct {
-	Success       bool
-	ExportedCount int32
-	FailedCount   int32
-	ErrorMessage  string
 }
 
 // Client provides gRPC communication with a provider subprocess managed by
@@ -184,7 +163,6 @@ func (c *Client) Describe(ctx context.Context, req *DescribeRequest) (*DescribeR
 		ErrorMessage:            protoResp.GetErrorMessage(),
 		RequiredGlobalVariables: protoResp.GetRequiredGlobalVariables(),
 		RequiredTargetVariables: protoResp.GetRequiredTargetVariables(),
-		SupportsExport:          protoResp.GetSupportsExport(),
 	}, nil
 }
 
@@ -256,25 +234,6 @@ func (c *Client) Scan(ctx context.Context, req *ScanRequest) (*ScanResponse, err
 	}, nil
 }
 
-func (c *Client) Export(ctx context.Context, req *ExportRequest) (*ExportResponse, error) {
-	protoResp, err := c.grpcClient.Export(ctx, &pluginv2.ExportRequest{
-		Collector: &pluginv2.CollectorConfig{
-			Endpoint:  req.Collector.Endpoint,
-			AuthToken: req.Collector.AuthToken,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("Export RPC failed: %w", err)
-	}
-
-	return &ExportResponse{
-		Success:       protoResp.GetSuccess(),
-		ExportedCount: protoResp.GetExportedCount(),
-		FailedCount:   protoResp.GetFailedCount(),
-		ErrorMessage:  protoResp.GetErrorMessage(),
-	}, nil
-}
-
 func protoEvidenceToInternal(pe []*pluginv2.Evidence) []Evidence {
 	if len(pe) == 0 {
 		return nil
@@ -291,6 +250,7 @@ func protoEvidenceToInternal(pe []*pluginv2.Evidence) []Evidence {
 	}
 	return evidence
 }
+
 
 func protoResultToInternal(r pluginv2.Result) Result {
 	switch r {

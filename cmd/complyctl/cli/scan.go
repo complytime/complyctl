@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/complytime/complyctl/internal/cache"
 	"github.com/complytime/complyctl/internal/complytime"
@@ -51,20 +50,13 @@ func scanCmd(common *Common) *cobra.Command {
 		Long: `Scan targets and produce compliance reports.
 
 Specify a target to scope the scan to a single target from complytime.yaml.
+
 When the target references exactly one policy, --policy-id is inferred.
 When no target is given, --policy-id is required and all matching targets are scanned.
 
-Set COMPLYTIME_EXPORT_ENABLED=true to export evidence to a Beacon collector
-after the scan completes. Requires a collector section in complytime.yaml.
-Export works alongside any --format flag. The variable must be set in the
-same shell session or CI job step that invokes complyctl scan.
-
-Exit codes:
+EXIT CODES:
   0  Scan completed (findings are reported, not errors)
-  1  Operational error (provider failure, bad config, zero assessed)
-
-Policy findings are data, not errors. To gate a pipeline on compliance
-results, parse the --format output (SARIF, OSCAL) with your policy engine.`,
+  1  Operational error (provider failure, bad config, zero assessed)`,
 		Example: `  # Scan a specific target (policy inferred if target has exactly one)
   complyctl scan prod
 
@@ -78,8 +70,8 @@ results, parse the --format output (SARIF, OSCAL) with your policy engine.`,
   complyctl scan prod --policy-id nist-800-53-r5 --format pretty
   complyctl scan --policy-id nist-800-53-r5 --format oscal
 
-  # Export evidence to Beacon collector alongside format report
-  COMPLYTIME_EXPORT_ENABLED=true complyctl scan prod --format sarif`,
+  # Scan with SARIF output
+  complyctl scan prod --policy-id nist-800-53-r5 --format sarif`,
 		SilenceUsage:      true,
 		Args:              cobra.MaximumNArgs(1),
 		ValidArgsFunction: completeTargetIDs,
@@ -298,28 +290,8 @@ func (o *scanOptions) scanPolicy(ctx context.Context, cfg *complytime.WorkspaceC
 	targetIDs := targetIDList(policyTargets)
 	fmt.Println(output.FormatPreScanSummary(len(assessmentConfigs), evaluatorIDs, targetIDs))
 
-	return o.executeScanPhase(ctx, cfg, mgr, groups, policyTargets, ref.Repository, eid, graph, targetIDs, baseDir)
-}
-
-func (o *scanOptions) executeScanPhase(ctx context.Context, cfg *complytime.WorkspaceConfig, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, repository, eid string, graph *policy.DependencyGraph, targetIDs []string, baseDir string) error {
 	reqToComplypackRef := buildReqToComplypackRef(o.cacheDir, groups)
-	if err := runScanAndReport(ctx, o.format, mgr, groups, reqToComplypackRef, policyTargets, repository, eid, graph, targetIDs, baseDir); err != nil {
-		return err
-	}
-	return o.maybeExport(ctx, cfg, mgr, groups)
-}
-
-func (o *scanOptions) maybeExport(ctx context.Context, cfg *complytime.WorkspaceConfig, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup) error {
-	enabled, raw, err := complytime.ExportEnabled()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "WARNING: %s=%q is not a recognized boolean value; export disabled (accepted: true, false, 1, 0, t, f)\n",
-			complytime.ExportEnabledEnvVar, raw)
-		return nil
-	}
-	if !enabled {
-		return nil
-	}
-	return o.runExport(ctx, cfg, mgr, groups)
+	return runScanAndReport(ctx, o.format, mgr, groups, reqToComplypackRef, policyTargets, ref.Repository, eid, graph, targetIDs, baseDir)
 }
 
 func resolveVersionAndGraph(cacheDir string, ref complytime.PolicyRef) (string, *policy.DependencyGraph, error) {
@@ -698,184 +670,6 @@ func writeOSCALReport(eval *output.Evaluator, outDir string) error {
 	}
 	fmt.Printf("OSCAL report written: %s\n\n", oscalPath)
 	return nil
-}
-
-// runExport orchestrates evidence export to the configured Beacon collector.
-// Called when COMPLYTIME_EXPORT_ENABLED is set to a truthy value, after the scan phase completes.
-func (o *scanOptions) runExport(ctx context.Context, cfg *complytime.WorkspaceConfig, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup) error {
-	if cfg.Collector == nil || cfg.Collector.Endpoint == "" {
-		return fmt.Errorf("export requires a collector section in complytime.yaml (see docs for configuration)")
-	}
-	collector := cfg.Collector
-
-	authToken, err := resolveCollectorAuth(ctx, collector.Auth)
-	if err != nil {
-		return err
-	}
-
-	exportReq := &provider.ExportRequest{
-		Collector: provider.CollectorConfig{
-			Endpoint:  collector.Endpoint,
-			AuthToken: authToken,
-		},
-	}
-
-	results := exportToProviders(ctx, mgr, groups, exportReq)
-	fmt.Println(formatExportSummary(results))
-	if failed := countExportFailures(results); failed > 0 {
-		return fmt.Errorf("export failed for %d provider(s)", failed)
-	}
-	return nil
-}
-
-func authRequired(auth *complytime.AuthConfig) bool {
-	return auth != nil && auth.TokenEndpoint != ""
-}
-
-func validateAuthCredentials(auth *complytime.AuthConfig) error {
-	if auth.ClientID == "" || auth.ClientSecret == "" {
-		return fmt.Errorf("collector auth requires client-id and client-secret when token-endpoint is set")
-	}
-	return nil
-}
-
-func resolveCollectorAuth(ctx context.Context, auth *complytime.AuthConfig) (string, error) {
-	if !authRequired(auth) {
-		return "", nil
-	}
-	if err := validateAuthCredentials(auth); err != nil {
-		return "", err
-	}
-	fmt.Fprintf(os.Stderr, "Resolving OIDC token from %s\n", auth.TokenEndpoint)
-	token, err := resolveOIDCToken(ctx, auth)
-	if err != nil {
-		return "", fmt.Errorf("OIDC token exchange failed: %w", err)
-	}
-	return token, nil
-}
-
-func exportToProviders(ctx context.Context, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, req *provider.ExportRequest) []exportResult {
-	var results []exportResult
-	for evalID := range groups {
-		results = append(results, exportSingleProvider(ctx, mgr, evalID, req))
-	}
-	return results
-}
-
-func exportSingleProvider(ctx context.Context, mgr *provider.Manager, evalID string, req *provider.ExportRequest) exportResult {
-	p, err := mgr.GetProvider(evalID)
-	if err != nil {
-		return exportResult{providerID: evalID, evalID: evalID, err: err}
-	}
-	if !p.SupportsExport {
-		return exportResult{providerID: p.Info.ProviderID, evalID: evalID, skipped: true}
-	}
-	resp, exportErr := mgr.RouteExport(ctx, evalID, req)
-	return exportResult{
-		providerID: p.Info.ProviderID,
-		evalID:     evalID,
-		response:   resp,
-		err:        exportErr,
-	}
-}
-
-func resolveOIDCToken(ctx context.Context, auth *complytime.AuthConfig) (string, error) {
-	cfg := clientcredentials.Config{
-		ClientID:     auth.ClientID,
-		ClientSecret: auth.ClientSecret,
-		TokenURL:     auth.TokenEndpoint,
-	}
-	token, err := cfg.Token(ctx)
-	if err != nil {
-		return "", err
-	}
-	return token.AccessToken, nil
-}
-
-func formatExportSummary(results []exportResult) string {
-	var sb strings.Builder
-	sb.WriteString("\nExport Summary\n")
-	fmt.Fprintf(&sb, "%-20s %-10s %-10s %s\n", "PROVIDER", "EXPORTED", "FAILED", "STATUS")
-
-	var errorMessages []string
-	for _, r := range results {
-		errorMessages = appendExportRow(&sb, r, errorMessages)
-	}
-
-	if len(errorMessages) > 0 {
-		sb.WriteString("\n")
-		for _, msg := range errorMessages {
-			sb.WriteString(msg + "\n")
-		}
-	}
-
-	return sb.String()
-}
-
-func appendExportRow(sb *strings.Builder, r exportResult, errors []string) []string {
-	if r.skipped {
-		fmt.Fprintf(sb, "%-20s %-10s %-10s %s (no export support)\n",
-			r.providerID, "-", "-", complytime.StatusSkipped)
-		return errors
-	}
-	if r.err != nil {
-		fmt.Fprintf(sb, "%-20s %-10s %-10s %s\n",
-			r.providerID, "-", "-", complytime.StatusError)
-		return append(errors, fmt.Sprintf("%s: %v", r.providerID, r.err))
-	}
-	return appendResponseRow(sb, r, errors)
-}
-
-func appendResponseRow(sb *strings.Builder, r exportResult, errors []string) []string {
-	if r.response == nil {
-		return errors
-	}
-	status, errMsg := exportResponseStatus(r)
-	fmt.Fprintf(sb, "%-20s %-10d %-10d %s\n",
-		r.providerID, r.response.ExportedCount, r.response.FailedCount, status)
-	if errMsg != "" {
-		errors = append(errors, errMsg)
-	}
-	return errors
-}
-
-func exportResponseStatus(r exportResult) (string, string) {
-	if r.response.FailedCount > 0 || !r.response.Success {
-		var errMsg string
-		if r.response.ErrorMessage != "" {
-			errMsg = fmt.Sprintf("%s: %s", r.providerID, r.response.ErrorMessage)
-		}
-		return complytime.StatusFailed, errMsg
-	}
-	return complytime.StatusPassed, ""
-}
-
-type exportResult struct {
-	providerID string
-	evalID     string
-	response   *provider.ExportResponse
-	skipped    bool
-	err        error
-}
-
-// countExportFailures returns the number of export results that represent
-// a failure: a transport error or a response where Success is false or
-// FailedCount is non-zero. Skipped providers are not counted as failures.
-func countExportFailures(results []exportResult) int {
-	count := 0
-	for _, r := range results {
-		if r.skipped {
-			continue
-		}
-		if r.err != nil {
-			count++
-			continue
-		}
-		if r.response != nil && (!r.response.Success || r.response.FailedCount > 0) {
-			count++
-		}
-	}
-	return count
 }
 
 // injectWorkspaceIntoTargets returns a copy of targets with the resolved

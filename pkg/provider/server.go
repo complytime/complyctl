@@ -28,7 +28,6 @@ func (s *grpcServer) Describe(ctx context.Context, _ *proto.DescribeRequest) (*p
 		ErrorMessage:            resp.ErrorMessage,
 		RequiredGlobalVariables: resp.RequiredGlobalVariables,
 		RequiredTargetVariables: resp.RequiredTargetVariables,
-		SupportsExport:          resp.SupportsExport,
 	}, nil
 }
 
@@ -100,38 +99,6 @@ func (s *grpcServer) Scan(ctx context.Context, req *proto.ScanRequest) (*proto.S
 	}, nil
 }
 
-func (s *grpcServer) Export(ctx context.Context, req *proto.ExportRequest) (*proto.ExportResponse, error) {
-	exporter, ok := s.impl.(Exporter)
-	if !ok {
-		return &proto.ExportResponse{
-			Success:      false,
-			ErrorMessage: "plugin does not implement export",
-		}, nil
-	}
-
-	var collector CollectorConfig
-	if req.GetCollector() != nil {
-		collector = CollectorConfig{
-			Endpoint:  req.GetCollector().GetEndpoint(),
-			AuthToken: req.GetCollector().GetAuthToken(),
-		}
-	}
-
-	resp, err := exporter.Export(ctx, &ExportRequest{
-		Collector: collector,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &proto.ExportResponse{
-		Success:       resp.Success,
-		ExportedCount: resp.ExportedCount,
-		FailedCount:   resp.FailedCount,
-		ErrorMessage:  resp.ErrorMessage,
-	}, nil
-}
-
 func internalEvidenceToProto(evidence []Evidence) []*proto.Evidence {
 	if len(evidence) == 0 {
 		return nil
@@ -148,6 +115,7 @@ func internalEvidenceToProto(evidence []Evidence) []*proto.Evidence {
 	}
 	return pe
 }
+
 
 func internalResultToProto(r Result) proto.Result {
 	switch r {

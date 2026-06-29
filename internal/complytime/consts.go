@@ -5,7 +5,6 @@ package complytime
 import (
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -29,26 +28,6 @@ const (
 	OutputFormatPretty = "pretty"
 	OutputFormatSARIF  = "sarif"
 )
-
-// ExportEnabledEnvVar is the environment variable that controls whether
-// the scan command triggers evidence export to a Beacon collector.
-// Parsed via strconv.ParseBool — accepts "true", "TRUE", "1", etc.
-const ExportEnabledEnvVar = "COMPLYTIME_EXPORT_ENABLED"
-
-// ExportEnabled checks whether COMPLYTIME_EXPORT_ENABLED is set to a truthy
-// value. Returns (true, "", nil) when enabled, (false, "", nil) when unset or
-// falsy, and (false, rawValue, err) when set to an unrecognized value.
-func ExportEnabled() (enabled bool, raw string, err error) {
-	raw = os.Getenv(ExportEnabledEnvVar)
-	if raw == "" {
-		return false, "", nil
-	}
-	enabled, err = strconv.ParseBool(raw)
-	if err != nil {
-		return false, raw, err
-	}
-	return enabled, raw, nil
-}
 
 const ScanOutputDir = "scan"
 

@@ -1,8 +1,16 @@
 # Feature Specification: ComplyBeacon Evidence Export
 
+## SUPERSEDED
+
+**This specification was superseded by issue #606 on 2026-06-24.**
+
+The export infrastructure described in this specification was removed as speculative infrastructure built before backend design was finalized. Export functionality will be redesigned and reintroduced when the backend shape is known. See CHANGELOG.md for migration guidance.
+
+---
+
 **Feature Branch**: `003-complybeacon-export`
 **Created**: 2026-03-10
-**Status**: Amended
+**Status**: ~~Amended~~ **Superseded** (Removed in #606)
 **Amended By**: `openspec/changes/envvar-otel-export/` — The `--format otel` trigger mechanism (FR-001, FR-011, FR-012) has been replaced by the `COMPLYTIME_EXPORT_ENABLED` environment variable. All other requirements (Export RPC, provider routing, collector config, OIDC auth, export summary) remain unchanged.
 **Input**: Jira ticket: "Improve Integration with ComplyBeacon. Plugins leverage Proofwatch and send results directly to the collector on a plugin by plugin basis."
 

@@ -87,7 +87,6 @@ func Run(cfg *complytime.WorkspaceConfig, configPath, providerDir, cacheDir stri
 	results = append(results, CheckPolicyActivePeriod(cfg, resolver, verbose)...)
 	results = append(results, CheckVariables(cfg, healthData, resolver, verbose)...)
 	results = append(results, CheckComplypacks(cfg, cacheDir, resolver)...)
-	results = append(results, CheckCollector(cfg)...)
 	return results
 }
 
@@ -761,41 +760,6 @@ func unmappedReason(resolver PolicyGraphResolver, resolveFailures int) string {
 	return "evaluator not referenced by any cached policy"
 }
 
-// CheckCollector validates collector configuration when present.
-// Non-blocking — the collector is optional. When configured, checks that the
-// endpoint format looks valid and auth fields are complete.
-func CheckCollector(cfg *complytime.WorkspaceConfig) []CheckResult {
-	if cfg == nil {
-		return nil
-	}
-	if cfg.Collector == nil {
-		return []CheckResult{{
-			Name:    "collector",
-			Status:  StatusPass,
-			Message: "no collector configured (optional — needed when " + complytime.ExportEnabledEnvVar + " is set)",
-		}}
-	}
-	if cfg.Collector.Endpoint == "" {
-		return []CheckResult{{
-			Name:    "collector",
-			Status:  StatusFail,
-			Message: "collector.endpoint is empty",
-		}}
-	}
-	results := []CheckResult{{
-		Name:    "collector",
-		Status:  StatusPass,
-		Message: fmt.Sprintf("collector endpoint: %s", cfg.Collector.Endpoint),
-	}}
-	if cfg.Collector.Auth != nil {
-		results = append(results, checkCollectorAuth(cfg.Collector.Auth))
-	}
-	if result, ok := checkExportEnabled(); ok {
-		results = append(results, result)
-	}
-	return results
-}
-
 // CheckComplypacks verifies that cached complypacks exist for every evaluator-id
 // referenced by the workspace's policies. The check only runs when the config
 // contains a non-empty complypacks section — workspaces without complypacks
@@ -880,57 +844,6 @@ func CheckComplypacks(cfg *complytime.WorkspaceConfig, cacheDir string, resolver
 	}
 
 	return results
-}
-
-// checkExportEnabled checks whether the export env var is set when a collector
-// is configured. Returns a warning result and true if the env var is not
-// enabled. Returns zero value and false when export is enabled (no warning needed).
-func checkExportEnabled() (CheckResult, bool) {
-	enabled, raw, err := complytime.ExportEnabled()
-	if err != nil {
-		return CheckResult{
-			Name:    "collector-export",
-			Status:  StatusWarn,
-			Message: fmt.Sprintf("%s=%q is not a recognized boolean value — export will not trigger", complytime.ExportEnabledEnvVar, raw),
-		}, true
-	}
-	if raw == "" {
-		return CheckResult{
-			Name:    "collector-export",
-			Status:  StatusWarn,
-			Message: fmt.Sprintf("collector configured but %s is not set — export will not trigger", complytime.ExportEnabledEnvVar),
-		}, true
-	}
-	if !enabled {
-		return CheckResult{
-			Name:    "collector-export",
-			Status:  StatusWarn,
-			Message: fmt.Sprintf("collector configured but %s=%s — export will not trigger", complytime.ExportEnabledEnvVar, raw),
-		}, true
-	}
-	return CheckResult{}, false
-}
-
-func checkCollectorAuth(auth *complytime.AuthConfig) CheckResult {
-	if auth.TokenEndpoint == "" {
-		return CheckResult{
-			Name:    "collector-auth",
-			Status:  StatusWarn,
-			Message: "collector.auth.token-endpoint is empty — OIDC auth will not work",
-		}
-	}
-	if auth.ClientID == "" || auth.ClientSecret == "" {
-		return CheckResult{
-			Name:    "collector-auth",
-			Status:  StatusWarn,
-			Message: "collector.auth client-id or client-secret missing — OIDC auth will fail",
-		}
-	}
-	return CheckResult{
-		Name:    "collector-auth",
-		Status:  StatusPass,
-		Message: fmt.Sprintf("OIDC client credentials configured (token-endpoint: %s)", auth.TokenEndpoint),
-	}
 }
 
 // effectiveGlobals merges config-defined global variables with system-injected

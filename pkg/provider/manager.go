@@ -21,13 +21,6 @@ type Provider interface {
 	Scan(ctx context.Context, req *ScanRequest) (*ScanResponse, error)
 }
 
-// Exporter is an optional interface for providers that support shipping
-// evidence to a Beacon collector. Provider authors opt in by implementing
-// this interface and declaring supports_export=true in DescribeResponse.
-type Exporter interface {
-	Export(ctx context.Context, req *ExportRequest) (*ExportResponse, error)
-}
-
 // Manager handles provider discovery, lifecycle, and request routing.
 type Manager struct {
 	discovery *Discovery
@@ -37,9 +30,8 @@ type Manager struct {
 
 // LoadedProvider pairs discovery metadata with a live gRPC client.
 type LoadedProvider struct {
-	Info           ProviderInfo
-	Client         Provider
-	SupportsExport bool
+	Info   ProviderInfo
+	Client Provider
 }
 
 func NewManager(providerDir string, logger hclog.Logger) (*Manager, error) {
@@ -87,9 +79,8 @@ func (m *Manager) LoadProviders() error {
 		}
 
 		lp := &LoadedProvider{
-			Info:           info,
-			Client:         client,
-			SupportsExport: descResp.SupportsExport,
+			Info:   info,
+			Client: client,
 		}
 
 		m.plugins[info.EvaluatorID] = lp
@@ -276,36 +267,6 @@ func (m *Manager) scanErrorMessage(providerID string, scanErr error, ctx context
 			"\n  - Check .complytime/complyctl.log"
 	}
 	return msg
-}
-
-// RouteExport dispatches an ExportRequest to the provider matching evaluatorID.
-// Only providers that declared supports_export=true and implement Exporter are eligible.
-func (m *Manager) RouteExport(ctx context.Context, evaluatorID string, req *ExportRequest) (*ExportResponse, error) {
-	exporter, providerID, err := m.resolveExporter(evaluatorID)
-	if err != nil {
-		return nil, err
-	}
-	m.logger.Info("Exporting via provider", "provider_id", providerID, "evaluator_id", evaluatorID)
-	resp, exportErr := exporter.Export(ctx, req)
-	if exportErr != nil {
-		return nil, fmt.Errorf("provider %s export failed: %w", providerID, exportErr)
-	}
-	return resp, nil
-}
-
-func (m *Manager) resolveExporter(evaluatorID string) (Exporter, string, error) {
-	p, err := m.GetProvider(evaluatorID)
-	if err != nil {
-		return nil, "", fmt.Errorf("no provider registered for evaluator %q: %w", evaluatorID, err)
-	}
-	if !p.SupportsExport {
-		return nil, "", fmt.Errorf("provider %s does not support export", p.Info.ProviderID)
-	}
-	exporter, ok := p.GetClient().(Exporter)
-	if !ok {
-		return nil, "", fmt.Errorf("provider %s declared supports_export but does not implement Exporter", p.Info.ProviderID)
-	}
-	return exporter, p.Info.ProviderID, nil
 }
 
 func errorAssessments(evaluatorID string, message string) []AssessmentLog {

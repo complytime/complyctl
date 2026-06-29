@@ -24,13 +24,6 @@ service Plugin {
   // Describe reports plugin identity, health, and declared variable
   // requirements. Called during plugin discovery and doctor diagnostics.
   rpc Describe(DescribeRequest) returns (DescribeResponse);
-
-  // Export ships scan evidence to a Beacon collector
-  // via ProofWatch. Called during `complyctl scan` when
-  // COMPLYTIME_EXPORT_ENABLED is set, after scan completes.
-  // Only plugins that declare supports_export=true in
-  // DescribeResponse will receive this call.
-  rpc Export(ExportRequest) returns (ExportResponse);
 }
 
 // GenerateRequest contains assessment plan configuration
@@ -213,31 +206,4 @@ message DescribeResponse {
   // Required target variable names — doctor validates these
   // keys exist in relevant config.targets[].variables (R51)
   repeated string required_target_variables = 5;
-
-  // Whether this plugin implements the Export RPC for shipping
-  // evidence to a Beacon collector. Defaults to false.
-  bool supports_export = 6;
-}
-
-// ExportRequest carries collector configuration for evidence export.
-message ExportRequest {
-  CollectorConfig collector = 1;
-}
-
-// CollectorConfig holds the Beacon collector endpoint and auth credentials.
-message CollectorConfig {
-  // Collector OTLP endpoint (e.g. "collector.example.com:4317")
-  string endpoint = 1;
-
-  // Resolved bearer token — complyctl handles OIDC exchange, plugins
-  // receive a ready-to-use token. Empty if no auth is configured.
-  string auth_token = 2;
-}
-
-// ExportResponse reports the outcome of evidence export.
-message ExportResponse {
-  bool success = 1;
-  int32 exported_count = 2;
-  int32 failed_count = 3;
-  string error_message = 4;
 }

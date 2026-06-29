@@ -483,68 +483,6 @@ func TestResolveEnvVars_EmptyValue(t *testing.T) {
 	assert.Equal(t, "", cfg.Targets[0].Variables["val"])
 }
 
-//nolint:gosec // G101: test data, not real credentials
-func TestResolveEnvVars_CollectorAuth(t *testing.T) {
-	t.Setenv("CT_CLIENT_ID", "my-client")
-	t.Setenv("CT_CLIENT_SECRET", "my-secret")
-	t.Setenv("CT_TOKEN_EP", "https://idp.example.com/token")
-
-	cfg := &complytime.WorkspaceConfig{
-		Policies: []complytime.PolicyEntry{{URL: "registry.com/p1:v1"}},
-		Collector: &complytime.CollectorConfig{
-			Endpoint: "localhost:4317",
-			Auth: &complytime.AuthConfig{
-				ClientID:      "${CT_CLIENT_ID}",
-				ClientSecret:  "${CT_CLIENT_SECRET}",
-				TokenEndpoint: "${CT_TOKEN_EP}",
-			},
-		},
-	}
-
-	require.NoError(t, complytime.ResolveEnvVars(cfg))
-	assert.Equal(t, "my-client", cfg.Collector.Auth.ClientID)
-	assert.Equal(t, "my-secret", cfg.Collector.Auth.ClientSecret)
-	assert.Equal(t, "https://idp.example.com/token", cfg.Collector.Auth.TokenEndpoint)
-}
-
-//nolint:gosec // G101: test data, not real credentials
-func TestResolveEnvVars_CollectorAuthUnset(t *testing.T) {
-	cfg := &complytime.WorkspaceConfig{
-		Policies: []complytime.PolicyEntry{{URL: "registry.com/p1:v1"}},
-		Collector: &complytime.CollectorConfig{
-			Endpoint: "localhost:4317",
-			Auth: &complytime.AuthConfig{
-				ClientID:      "${CT_UNSET_CLIENT_ID_99}",
-				ClientSecret:  "literal-secret",
-				TokenEndpoint: "https://idp.example.com/token",
-			},
-		},
-	}
-
-	err := complytime.ResolveEnvVars(cfg)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "CT_UNSET_CLIENT_ID_99")
-}
-
-func TestResolveEnvVars_CollectorNoAuth(t *testing.T) {
-	cfg := &complytime.WorkspaceConfig{
-		Policies: []complytime.PolicyEntry{{URL: "registry.com/p1:v1"}},
-		Collector: &complytime.CollectorConfig{
-			Endpoint: "localhost:4317",
-		},
-	}
-
-	require.NoError(t, complytime.ResolveEnvVars(cfg))
-}
-
-func TestResolveEnvVars_NoCollector(t *testing.T) {
-	cfg := &complytime.WorkspaceConfig{
-		Policies: []complytime.PolicyEntry{{URL: "registry.com/p1:v1"}},
-	}
-
-	require.NoError(t, complytime.ResolveEnvVars(cfg))
-}
-
 func TestValidate_UnsupportedVersion(t *testing.T) {
 	cfg := &complytime.WorkspaceConfig{
 		Version: 99,

@@ -2,11 +2,11 @@
 
 ## Unreleased
 
-### Breaking Changes
+### Removed
 
-- `--format otel` removed from `complyctl scan`. Export is now triggered
-  via the `COMPLYTIME_EXPORT_ENABLED=true` environment variable and works
-  alongside any `--format` flag.
+- **BREAKING**: Removed collector export infrastructure (`COMPLYTIME_EXPORT_ENABLED`, `collector:` config block, Export RPC). This was speculative infrastructure added before backend design was finalized. Export functionality will be redesigned and reintroduced when the backend shape is known. Tracking issue needed: "Design and implement evidence export v2 post-backend-finalization". (#606)
+
+  **Migration**: Users who configured `collector:` in `complytime.yaml` or set `COMPLYTIME_EXPORT_ENABLED=true` should remove these configurations. Export functionality is not available in this release. If you require evidence export to a Beacon collector, remain on the previous version until the redesigned export infrastructure is released.
 
 ### Added
 

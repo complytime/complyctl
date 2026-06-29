@@ -66,20 +66,6 @@ type WorkspaceConfig struct {
 	Complypacks []PolicyEntry     `yaml:"complypacks,omitempty"`
 	Targets     []TargetConfig    `yaml:"targets"`
 	Variables   map[string]string `yaml:"variables,omitempty"`
-	Collector   *CollectorConfig  `yaml:"collector,omitempty"`
-}
-
-// CollectorConfig holds the Beacon collector endpoint and OIDC credentials.
-type CollectorConfig struct {
-	Endpoint string      `yaml:"endpoint"`
-	Auth     *AuthConfig `yaml:"auth,omitempty"`
-}
-
-// AuthConfig holds OIDC client credentials for collector authentication.
-type AuthConfig struct {
-	ClientID      string `yaml:"client-id"`
-	ClientSecret  string `yaml:"client-secret"` //nolint:gosec // not a hardcoded credential
-	TokenEndpoint string `yaml:"token-endpoint"`
 }
 
 // PolicyEntry pairs a full OCI reference with an optional user-chosen shortname.
@@ -310,8 +296,8 @@ func validatePolicyRefs(config *WorkspaceConfig) error {
 }
 
 // resolveEnvVars expands ${VAR} references in target variable values
-// and collector auth fields from the process environment. Returns an
-// error if a referenced variable is not set.
+// from the process environment. Returns an error if a referenced
+// variable is not set.
 func resolveEnvVars(config *WorkspaceConfig) error {
 	for i, target := range config.Targets {
 		for key, val := range target.Variables {
@@ -321,26 +307,6 @@ func resolveEnvVars(config *WorkspaceConfig) error {
 			}
 			config.Targets[i].Variables[key] = resolved
 		}
-	}
-	return resolveCollectorEnvVars(config.Collector)
-}
-
-func resolveCollectorEnvVars(collector *CollectorConfig) error {
-	if collector == nil || collector.Auth == nil {
-		return nil
-	}
-	auth := collector.Auth
-	fields := map[string]*string{
-		"collector.auth.client-id":      &auth.ClientID,
-		"collector.auth.client-secret":  &auth.ClientSecret,
-		"collector.auth.token-endpoint": &auth.TokenEndpoint,
-	}
-	for label, ptr := range fields {
-		resolved, err := expandEnvRef(*ptr)
-		if err != nil {
-			return fmt.Errorf("%s: %w", label, err)
-		}
-		*ptr = resolved
 	}
 	return nil
 }

@@ -299,4 +299,4 @@ packages organized by domain responsibility.
 
 - 004-providers-repository-split: Providers (openscap, ampel) migrated to `complytime-providers`; `pkg/plugin/` renamed to `pkg/provider/`; all "plugin" terminology updated to "provider"
 
-- envvar-otel-export: **BREAKING** — `--format otel` removed; export now triggered via `COMPLYTIME_EXPORT_ENABLED=true` env var. Export works alongside any `--format` flag.
+- remove-exporter-infrastructure: **BREAKING** — Removed collector export infrastructure (`COMPLYTIME_EXPORT_ENABLED`, `collector:` config block, Export RPC). This was speculative infrastructure added before backend design was finalized. Export functionality will be redesigned and reintroduced when the backend shape is known. (#606)

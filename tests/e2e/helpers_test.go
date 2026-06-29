@@ -410,29 +410,6 @@ targets:
 	require.NoError(t, os.WriteFile(filepath.Join(configDir, "complytime.yaml"), []byte(yaml), 0644))
 }
 
-// writeWorkspaceConfigWithCollector creates .complytime/complytime.yaml with a collector section
-// for testing export functionality (COMPLYTIME_EXPORT_ENABLED).
-func writeWorkspaceConfigWithCollector(t *testing.T, dir, registryURL, policyID, collectorEndpoint string) {
-	t.Helper()
-	yaml := fmt.Sprintf(`policies:
-  - url: %s/%s
-    id: %s
-variables:
-  workspace: /tmp/e2e-workspace
-targets:
-  - id: e2e-target
-    policies:
-      - %s
-    variables:
-      env: test
-collector:
-  endpoint: "%s"
-`, registryURL, policyID, policyID, policyID, collectorEndpoint)
-	configDir := filepath.Join(dir, ".complytime")
-	require.NoError(t, os.MkdirAll(configDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(configDir, "complytime.yaml"), []byte(yaml), 0644))
-}
-
 // copyWorkspaceConfig copies .complytime/complytime.yaml from src to dst directory.
 func copyWorkspaceConfig(t *testing.T, srcDir, dstDir string) {
 	t.Helper()
