@@ -120,7 +120,6 @@ func internalEvidenceToProto(evidence []Evidence) []*proto.Evidence {
 	return pe
 }
 
-
 func internalResultToProto(r Result) proto.Result {
 	switch r {
 	case ResultPassed:

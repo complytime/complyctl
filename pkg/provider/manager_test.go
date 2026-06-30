@@ -92,7 +92,7 @@ func (f *failingMockClient) Scan(_ context.Context, _ *provider.ScanRequest) (*p
 	if f.failScan {
 		return nil, fmt.Errorf("scan RPC failed")
 	}
-	return &provider.ScanResponse{Assessments: []provider.AssessmentLog{{RequirementID: "test-req"}}}, nil
+	return &provider.ScanResponse{Assessments: []provider.AssessmentLog{{PlanID: "test-req"}}}, nil
 }
 
 func TestManager_RouteGenerate_SpecificProvider(t *testing.T) {
@@ -234,9 +234,9 @@ type errorEmbeddingMockClient struct {
 func (e *errorEmbeddingMockClient) Scan(_ context.Context, _ *provider.ScanRequest) (*provider.ScanResponse, error) {
 	return &provider.ScanResponse{
 		Assessments: []provider.AssessmentLog{{
-			RequirementID: "req-1",
-			Steps:         []provider.Step{{Name: "check", Result: provider.ResultPassed}},
-			Message:       "evaluated",
+			PlanID:  "req-1",
+			Steps:   []provider.Step{{Name: "check", Result: provider.ResultPassed}},
+			Message: "evaluated",
 		}},
 		Errors: []string{"target 'staging': clone failed: auth denied"},
 	}, nil
@@ -257,7 +257,7 @@ func TestManager_RouteScanResult_PartialResults(t *testing.T) {
 	assert.True(t, result.HasErrors())
 	assert.Contains(t, result.Errors[0], "clone failed")
 	require.Len(t, result.Assessments, 1)
-	assert.Equal(t, "req-1", result.Assessments[0].RequirementID)
+	assert.Equal(t, "req-1", result.Assessments[0].PlanID)
 }
 
 func TestManager_RouteScanResult_NoErrors(t *testing.T) {
@@ -315,7 +315,10 @@ func TestManager_RouteScanResult_Broadcast_RPCFailure(t *testing.T) {
 	lpClean := provider.NewMockLoadedProvider("clean-provider", "clean-eval", clean)
 	mgr.RegisterProviderForTest("clean-eval", lpClean)
 	_, _ = clean.Generate(context.Background(), &provider.GenerateRequest{
-		Configuration: []provider.AssessmentConfiguration{{RequirementID: "req-1"}},
+		Configuration: []provider.AssessmentConfiguration{
+			{PlanID: "plan-1", RequirementID: "req-1"},
+			{RequirementID: "fallback-req"},
+		},
 	})
 
 	// Broadcast: both providers scanned, one fails
@@ -328,8 +331,9 @@ func TestManager_RouteScanResult_Broadcast_RPCFailure(t *testing.T) {
 	assert.Contains(t, result.Errors[0], "scan RPC failed")
 	// Assessments come only from the clean provider — RPC failures do not
 	// inject synthetic assessments (D3).
-	require.Len(t, result.Assessments, 1)
-	assert.Equal(t, "req-1", result.Assessments[0].PlanID)
+	require.Len(t, result.Assessments, 2)
+	assert.Equal(t, "plan-1", result.Assessments[0].PlanID)
+	assert.Equal(t, "fallback-req", result.Assessments[1].PlanID)
 }
 
 func TestManager_RouteScan_DropsProviderErrors(t *testing.T) {
@@ -348,7 +352,7 @@ func TestManager_RouteScan_DropsProviderErrors(t *testing.T) {
 
 	// Assessments are returned
 	require.Len(t, results, 1)
-	assert.Equal(t, "req-1", results[0].RequirementID)
+	assert.Equal(t, "req-1", results[0].PlanID)
 	// The error is silently dropped (backwards-compatible behavior)
 }
 

@@ -256,7 +256,6 @@ func protoEvidenceToInternal(pe []*pluginv2.Evidence) []Evidence {
 	return evidence
 }
 
-
 func protoResultToInternal(r pluginv2.Result) Result {
 	switch r {
 	case pluginv2.Result_RESULT_PASSED:
