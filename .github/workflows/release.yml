@@ -1,3 +1,14 @@
+# Release
+# =======
+# Release pipeline triggered via workflow_dispatch.
+# Validates preflight conditions (semver format, tag
+# uniqueness, CI status, unreleased commits), creates
+# an annotated tag, and builds release artifacts via
+# GoReleaser with cosign signatures and SBOM.
+#
+# Pattern replicated from unbound-force/gaze.
+# See: https://github.com/complytime/complyctl/issues/560
+
 name: Release
 
 on:
@@ -8,25 +19,146 @@ on:
                 required: true
                 type: string
 
-
 permissions:
     contents: none
     id-token: none
 
-jobs:
-    release:
-        name: Release
-        runs-on: ubuntu-latest
+concurrency:
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
 
+jobs:
+    preflight:
+        name: Preflight
+        runs-on: ubuntu-latest
         permissions:
-            contents: write # for github releases
-            id-token: write # for keyless signing
+            contents: write
+            checks: read
+        timeout-minutes: 10
+        env:
+            RELEASE_TAG: ${{ inputs.tag }}
 
         steps:
             - name: Checkout Code
               uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
               with:
                   fetch-depth: 0
+
+            # Accepts vMAJOR.MINOR.PATCH with optional
+            # pre-release suffix (e.g., v1.0.0-beta.0).
+            # TODO: tighten to strict semver after v1.0.0
+            # transition completes.
+            - name: Validate tag format
+              run: |
+                  if ! echo "$RELEASE_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$'; then
+                      echo "::error::Invalid tag format: '$RELEASE_TAG'. Must match vMAJOR.MINOR.PATCH[-PRERELEASE] (e.g., v1.2.3 or v1.0.0-beta.0)."
+                      exit 1
+                  fi
+                  echo "Tag format valid: $RELEASE_TAG"
+
+            - name: Check tag uniqueness
+              run: |
+                  if git ls-remote --tags origin | grep -q "refs/tags/${RELEASE_TAG}$"; then
+                      echo "::error::Tag '$RELEASE_TAG' already exists. Choose a different version."
+                      exit 1
+                  fi
+                  echo "Tag '$RELEASE_TAG' does not exist yet."
+
+            - name: Verify semver ordering
+              run: |
+                  LATEST=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -1)
+                  if [ -z "$LATEST" ]; then
+                      echo "No existing tags found. First release."
+                      exit 0
+                  fi
+                  echo "Latest existing tag: $LATEST"
+                  # Compare using sort -V: if TAG sorts after
+                  # LATEST, it is greater.
+                  HIGHER=$(printf '%s\n%s' "$LATEST" "$RELEASE_TAG" | sort -V | tail -1)
+                  if [ "$HIGHER" = "$LATEST" ]; then
+                      echo "::error::Tag '$RELEASE_TAG' is not greater than latest release '$LATEST'."
+                      exit 1
+                  fi
+                  echo "Version ordering valid: $RELEASE_TAG > $LATEST"
+
+            # Check names are derived from the job keys in
+            # unit_test.yml, e2e_test.yml, and
+            # integration_test.yml. If those workflow job
+            # names change, update the REQUIRED_CHECKS
+            # array below to match.
+            - name: Verify CI passed on HEAD
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GH_REPO: ${{ github.repository }}
+              run: |
+                  HEAD_SHA=$(git rev-parse HEAD)
+                  echo "Checking CI status for commit $HEAD_SHA"
+
+                  REQUIRED_CHECKS=(
+                      "unit-test"
+                      "e2e-test"
+                      "integration-test"
+                  )
+
+                  for CHECK_NAME in "${REQUIRED_CHECKS[@]}"; do
+                      STATUS=$(gh api "repos/${GH_REPO}/commits/${HEAD_SHA}/check-runs" \
+                          --jq ".check_runs[] | select(.name == \"${CHECK_NAME}\") | .conclusion" \
+                          2>/dev/null | head -1)
+                      if [ "$STATUS" != "success" ]; then
+                          echo "::error::Required check '${CHECK_NAME}' has not passed (status: ${STATUS:-not found}). Push to main and wait for CI before releasing."
+                          exit 1
+                      fi
+                      echo "  ${CHECK_NAME}: success"
+                  done
+
+                  echo "All required CI checks passed."
+
+            - name: Verify unreleased commits
+              run: |
+                  LATEST=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -1)
+                  if [ -z "$LATEST" ]; then
+                      COUNT=$(git rev-list --count HEAD)
+                  else
+                      COUNT=$(git rev-list --count "${LATEST}..HEAD")
+                  fi
+                  if [ "$COUNT" -eq 0 ]; then
+                      echo "::error::No unreleased commits since ${LATEST:-initial commit}. Nothing to release."
+                      exit 1
+                  fi
+                  echo "$COUNT commit(s) since ${LATEST:-initial commit}."
+
+            - name: Create and push tag
+              run: |
+                  # Skip if tag was already created (e.g.,
+                  # re-run after partial failure or manual
+                  # tag push).
+                  if git ls-remote --tags origin | grep -q "refs/tags/${RELEASE_TAG}$"; then
+                      echo "Tag $RELEASE_TAG already exists, skipping creation."
+                      exit 0
+                  fi
+                  # Annotated tags require a committer
+                  # identity on the CI runner.
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git tag -a "$RELEASE_TAG" -m "$RELEASE_TAG"
+                  git push origin "$RELEASE_TAG"
+                  echo "Created and pushed tag: $RELEASE_TAG"
+
+    release:
+        name: Release
+        runs-on: ubuntu-latest
+        needs: preflight
+
+        permissions:
+            contents: write
+            id-token: write
+
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+              with:
+                  fetch-depth: 0
+                  ref: ${{ inputs.tag }}
                   persist-credentials: false
 
             - name: Setup Go

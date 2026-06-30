@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- Release workflow gains preflight validation gate: tag format and
+  uniqueness check, semver ordering verification, CI status query
+  via GitHub Checks API, unreleased commits guard, and idempotent
+  annotated tag creation. Concurrency group prevents parallel
+  releases. (#560)
+
 ### Removed
 
 - **BREAKING**: Removed collector export infrastructure (`COMPLYTIME_EXPORT_ENABLED`, `collector:` config block, Export RPC). This was speculative infrastructure added before backend design was finalized. Export functionality will be redesigned and reintroduced when the backend shape is known. Tracking issue needed: "Design and implement evidence export v2 post-backend-finalization". (#606)
