@@ -696,7 +696,7 @@ func TestProcessScanOutput_NoErrors_ReturnsNil(t *testing.T) {
 		reqToControl: map[string]string{"req-1": "ctrl-1"},
 	}
 
-	err = processScanOutput("", scanOut, "test-repo", mappings, policyTargets, "test-policy", []string{"target-1"}, tmpDir)
+	err = processScanOutput("", scanOut, "test-repo", mappings, policyTargets, "test-policy", []string{"target-1"}, tmpDir, true)
 	assert.NoError(t, err)
 }
 
@@ -727,7 +727,7 @@ func TestProcessScanOutput_WithErrors_ReturnsError(t *testing.T) {
 		reqToControl: map[string]string{"req-1": "ctrl-1"},
 	}
 
-	err = processScanOutput("", scanOut, "test-repo", mappings, policyTargets, "test-policy", []string{"target-1"}, tmpDir)
+	err = processScanOutput("", scanOut, "test-repo", mappings, policyTargets, "test-policy", []string{"target-1"}, tmpDir, true)
 	w.Close()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "1 operational error")

@@ -18,6 +18,13 @@
   (`AssessmentLog` proto message). Providers can now return evidence
   collected during assessment and remediation guidance for non-passing
   results. Fields are optional and backward compatible (#572)
+- `complyctl scan --show-passing` flag (default: `true`) shows passing
+  controls in the terminal summary table alongside non-passing results.
+  Set `--show-passing=false` or `COMPLYTIME_SHOW_PASSING=false` to
+  restore the previous behavior of only showing non-passing controls.
+  If your CI pipeline parses scan stdout, add `--show-passing=false`
+  or set `COMPLYTIME_SHOW_PASSING=false` to preserve previous behavior.
+  (#438)
 - Workspace configuration: `--workspace` / `-w` flag and `COMPLYTIME_WORKSPACE` environment variable for running commands from any directory (#433)
 - Config file location: `complytime.yaml` moved to `.complytime/complytime.yaml` with backward compatibility (#527)
 - Deprecation warning for legacy config file location at repository root

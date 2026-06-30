@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 
 type scanOptions struct {
 	*Common
+	showPassing bool
 	target      string
 	policyID    string
 	format      string
@@ -85,12 +87,29 @@ EXIT CODES:
 			if err := o.complete(); err != nil {
 				return err
 			}
+			// Env var override: COMPLYTIME_SHOW_PASSING takes effect
+			// when the --show-passing flag was not explicitly set.
+			// Precedence: flag > env var > default (true).
+			if !cmd.Flags().Changed("show-passing") {
+				if envVal := os.Getenv(complytime.ShowPassingEnvVar); envVal != "" {
+					parsed, err := strconv.ParseBool(envVal)
+					if err != nil {
+						return fmt.Errorf(
+							"invalid %s=%q: %w",
+							complytime.ShowPassingEnvVar, envVal, err,
+						)
+					}
+					o.showPassing = parsed
+				}
+			}
 			return o.run(cmd.Context())
 		},
 	}
 	cmd.Flags().StringVarP(&o.policyID, "policy-id", "p", "", "Policy ID to scan (see complyctl list)")
 	cmd.Flags().StringVarP(&o.format, "format", "f", "", "Output format: oscal, pretty, sarif")
 	cmd.Flags().DurationVarP(&o.timeout, "timeout", "t", complytime.DefaultCommandTimeout, "Maximum time for the scan operation (e.g. 5m, 10m, 1h)")
+	cmd.Flags().BoolVar(&o.showPassing, "show-passing", true,
+		fmt.Sprintf("Include passing controls in scan summary table (env: %s)", complytime.ShowPassingEnvVar))
 	if err := cmd.RegisterFlagCompletionFunc("format", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return []string{complytime.OutputFormatOSCAL, complytime.OutputFormatPretty, complytime.OutputFormatSARIF}, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
@@ -291,7 +310,7 @@ func (o *scanOptions) scanPolicy(ctx context.Context, cfg *complytime.WorkspaceC
 	fmt.Println(output.FormatPreScanSummary(len(assessmentConfigs), evaluatorIDs, targetIDs))
 
 	reqToComplypackRef := buildReqToComplypackRef(o.cacheDir, groups)
-	return runScanAndReport(ctx, o.format, mgr, groups, reqToComplypackRef, policyTargets, ref.Repository, eid, graph, targetIDs, baseDir)
+	return runScanAndReport(ctx, o.format, mgr, groups, reqToComplypackRef, policyTargets, ref.Repository, eid, graph, targetIDs, baseDir, o.showPassing)
 }
 
 func resolveVersionAndGraph(cacheDir string, ref complytime.PolicyRef) (string, *policy.DependencyGraph, error) {
@@ -358,7 +377,7 @@ func ensureGenerated(ctx context.Context, cacheDir, baseDir string, mgr *provide
 // runScanAndReport executes the scan across all targets and processes the
 // combined output (reports + error checking). It delegates post-scan handling
 // to processScanOutput.
-func runScanAndReport(ctx context.Context, format string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, reqToComplypackRef map[string]string, policyTargets []complytime.TargetConfig, repository, eid string, graph *policy.DependencyGraph, targetIDs []string, baseDir string) error {
+func runScanAndReport(ctx context.Context, format string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, reqToComplypackRef map[string]string, policyTargets []complytime.TargetConfig, repository, eid string, graph *policy.DependencyGraph, targetIDs []string, baseDir string, showPassing bool) error {
 	planToReq := extractPlanToReqMap(graph)
 	mappings := resolvedMappings{
 		reqToControl:       extractReqToControlMap(graph),
@@ -372,14 +391,14 @@ func runScanAndReport(ctx context.Context, format string, mgr *provider.Manager,
 	}
 
 	resolveAssessmentIDs(scanOut.assessments, planToReq)
-	return processScanOutput(format, scanOut, repository, &mappings, policyTargets, eid, targetIDs, baseDir)
+	return processScanOutput(format, scanOut, repository, &mappings, policyTargets, eid, targetIDs, baseDir, showPassing)
 }
 
 // processScanOutput handles post-scan output: prints operational warnings to
 // stderr, writes evaluation reports, and returns an error when operational
 // failures are present (triggering non-zero exit). Reports are always written
 // before the error return so partial results remain available.
-func processScanOutput(format string, scanOut *scanOutput, repository string, mappings *resolvedMappings, policyTargets []complytime.TargetConfig, eid string, targetIDs []string, baseDir string) error {
+func processScanOutput(format string, scanOut *scanOutput, repository string, mappings *resolvedMappings, policyTargets []complytime.TargetConfig, eid string, targetIDs []string, baseDir string, showPassing bool) error {
 	reportOperationalWarnings(scanOut.errors)
 
 	evaluators := buildEvaluators(repository, mappings, policyTargets, scanOut.assessments, scanOut.assessmentTargets)
@@ -391,7 +410,7 @@ func processScanOutput(format string, scanOut *scanOutput, repository string, ma
 		}
 	}
 
-	fmt.Println(output.FormatScanSummary(scanOut.assessments, scanOut.assessmentTargets, mappings.reqToControl, eid, targetIDs))
+	fmt.Println(output.FormatScanSummary(scanOut.assessments, scanOut.assessmentTargets, mappings.reqToControl, eid, targetIDs, showPassing))
 
 	if err := checkOperationalErrors(scanOut.errors); err != nil {
 		return err

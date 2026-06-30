@@ -14,7 +14,7 @@ import (
 	"github.com/complytime/complyctl/pkg/provider"
 )
 
-type nonPassingEntry struct {
+type summaryEntry struct {
 	targetID      string
 	requirementID string
 	controlID     string
@@ -23,7 +23,7 @@ type nonPassingEntry struct {
 	message       string
 }
 
-func nonPassingSortPriority(r gemara.Result) int {
+func sortPriority(r gemara.Result) int {
 	switch r {
 	case gemara.Failed:
 		return 1
@@ -33,6 +33,8 @@ func nonPassingSortPriority(r gemara.Result) int {
 		return 3
 	case gemara.NotApplicable, gemara.NotRun:
 		return 4
+	case gemara.Passed:
+		return 6
 	default:
 		return 5
 	}
@@ -53,12 +55,14 @@ func matchingStepMessage(steps []provider.Step, target gemara.Result) string {
 	return ""
 }
 
-// FormatScanSummary builds a report-style post-scan output per FR-037.
-// Intro text, plain aligned text table of non-passing results, compact totals.
-// See spec.md Session 2026-02-26e.
-func FormatScanSummary(assessments []provider.AssessmentLog, assessmentTargets []string, reqToControl map[string]string, policyID string, targetIDs []string) string {
+// FormatScanSummary builds a report-style post-scan output.
+// Intro text, plain aligned text table of results, compact totals.
+// When showPassing is true, passing controls are included in the table;
+// when false, only non-passing results are shown. Pass counts are always
+// included in the totals line regardless of showPassing.
+func FormatScanSummary(assessments []provider.AssessmentLog, assessmentTargets []string, reqToControl map[string]string, policyID string, targetIDs []string, showPassing bool) string {
 	var passCount, failCount, notApplicableCount, skipCount, errCount int
-	var entries []nonPassingEntry
+	var entries []summaryEntry
 
 	for i := range assessments {
 		a := &assessments[i]
@@ -77,9 +81,17 @@ func FormatScanSummary(assessments []provider.AssessmentLog, assessmentTargets [
 		switch result {
 		case gemara.Passed:
 			passCount++
+			entries = append(entries, summaryEntry{
+				targetID:      targetID,
+				requirementID: a.RequirementID,
+				controlID:     ctrlID,
+				result:        result,
+				emoji:         complytime.StatusPassed,
+				message:       matchingStepMessage(a.Steps, result),
+			})
 		case gemara.Failed:
 			failCount++
-			entries = append(entries, nonPassingEntry{
+			entries = append(entries, summaryEntry{
 				targetID:      targetID,
 				requirementID: a.RequirementID,
 				controlID:     ctrlID,
@@ -89,7 +101,7 @@ func FormatScanSummary(assessments []provider.AssessmentLog, assessmentTargets [
 			})
 		case gemara.NotApplicable:
 			notApplicableCount++
-			entries = append(entries, nonPassingEntry{
+			entries = append(entries, summaryEntry{
 				targetID:      targetID,
 				requirementID: a.RequirementID,
 				controlID:     ctrlID,
@@ -99,7 +111,7 @@ func FormatScanSummary(assessments []provider.AssessmentLog, assessmentTargets [
 			})
 		case gemara.NotRun:
 			skipCount++
-			entries = append(entries, nonPassingEntry{
+			entries = append(entries, summaryEntry{
 				targetID:      targetID,
 				requirementID: a.RequirementID,
 				controlID:     ctrlID,
@@ -109,7 +121,7 @@ func FormatScanSummary(assessments []provider.AssessmentLog, assessmentTargets [
 			})
 		default:
 			errCount++
-			entries = append(entries, nonPassingEntry{
+			entries = append(entries, summaryEntry{
 				targetID:      targetID,
 				requirementID: a.RequirementID,
 				controlID:     ctrlID,
@@ -120,8 +132,16 @@ func FormatScanSummary(assessments []provider.AssessmentLog, assessmentTargets [
 		}
 	}
 
-	slices.SortStableFunc(entries, func(a, b nonPassingEntry) int {
-		return nonPassingSortPriority(a.result) - nonPassingSortPriority(b.result)
+	// Filter out passing entries when showPassing is false.
+	// Pass count is already accumulated above for the totals line.
+	if !showPassing {
+		entries = slices.DeleteFunc(entries, func(e summaryEntry) bool {
+			return e.result == gemara.Passed
+		})
+	}
+
+	slices.SortStableFunc(entries, func(a, b summaryEntry) int {
+		return sortPriority(a.result) - sortPriority(b.result)
 	})
 
 	total := len(assessments)

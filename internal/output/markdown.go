@@ -108,7 +108,7 @@ func collectFindings(evals []*gemara.ControlEvaluation) []finding {
 		}
 	}
 	slices.SortStableFunc(findings, func(a, b finding) int {
-		return nonPassingSortPriority(a.result) - nonPassingSortPriority(b.result)
+		return sortPriority(a.result) - sortPriority(b.result)
 	})
 	return findings
 }

@@ -29,6 +29,12 @@ const (
 	OutputFormatSARIF  = "sarif"
 )
 
+// ShowPassingEnvVar is the environment variable that controls whether
+// passing controls appear in the scan summary table. When set, it
+// overrides the default (true) unless --show-passing is explicitly
+// provided on the command line.
+const ShowPassingEnvVar = "COMPLYTIME_SHOW_PASSING"
+
 const ScanOutputDir = "scan"
 
 // LogFileName is the log file name written to {WorkspaceDir}/{LogFileName}.
