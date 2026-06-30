@@ -44,3 +44,7 @@ make build-test-provider
 ```
 
 Produces `bin/complyctl-provider-test` for use in E2E testing. See [E2E_INTEGRATION.md](E2E_INTEGRATION.md).
+
+## Next steps
+
+complyctl requires scanning providers to run compliance scans. After installing complyctl, see the [Quick Start](QUICK_START.md) to set up a provider and run your first scan.

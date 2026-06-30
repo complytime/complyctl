@@ -6,14 +6,9 @@ See [INSTALLATION.md](INSTALLATION.md).
 
 ## Step 2: Install a provider
 
-Scanning providers are standalone executables placed in `~/.complytime/providers/`. The filename determines the evaluator ID.
-
-```bash
-mkdir -p ~/.complytime/providers
-cp bin/complyctl-provider-<name> ~/.complytime/providers/
-```
-
-Naming convention: `complyctl-provider-<evaluator-id>`. The CLI strips the prefix to derive the evaluator ID used for routing.
+Scanning providers are standalone executables that integrate
+complyctl with policy engines. At least one provider must be
+installed before `complyctl scan` can run.
 
 ### Available providers
 
@@ -21,8 +16,53 @@ Naming convention: `complyctl-provider-<evaluator-id>`. The CLI strips the prefi
 |----------|--------|-------------------|---------------|
 | [openscap](https://github.com/complytime/complytime-providers/blob/main/cmd/openscap-provider/docs/configuration.md) | `complyctl-provider-openscap` | SCAP policies (CIS, STIG, HIPAA, OSPP, etc.) | `openscap-scanner`, `scap-security-guide` |
 | [ampel](https://github.com/complytime/complytime-providers/tree/main/cmd/ampel-provider) | `complyctl-provider-ampel` | GitHub / GitLab branch protection | `snappy`, `ampel`, `GITHUB_TOKEN` or `GITLAB_TOKEN` |
+| [opa](https://github.com/complytime/complytime-providers/tree/main/cmd/opa-provider) | `complyctl-provider-opa` | OPA/Rego policies via conftest | `conftest`, `git` |
 
-See the [Provider Guide](https://github.com/complytime/complytime-providers/blob/main/docs/provider-guide.md) for authoring details.
+Pre-built Linux binaries (ampel, opa) are available from the
+[complytime-providers releases](https://github.com/complytime/complytime-providers/releases/latest)
+page. To build from source, see the
+[complytime-providers README](https://github.com/complytime/complytime-providers#install).
+Provider binaries go in `~/.complytime/providers/`.
+
+### Install provider prerequisites
+
+Each provider requires external tools on `PATH`. Install the
+prerequisites for the provider(s) you plan to use.
+
+**Ampel:**
+
+```bash
+go install github.com/carabiner-dev/snappy@v0.2.4
+go install github.com/carabiner-dev/ampel/cmd/ampel@v1.2.1
+```
+
+**OPA:**
+
+```bash
+go install github.com/open-policy-agent/conftest@v0.68.2
+```
+
+`git` is also required and is typically already installed.
+
+**OpenSCAP** (Fedora / RHEL / CentOS):
+
+```bash
+sudo dnf install openscap-scanner scap-security-guide
+```
+
+### Verify the installation
+
+```bash
+complyctl doctor
+```
+
+`doctor` checks whether provider binaries are discovered and
+whether each provider's prerequisites are met. You can also
+list discovered providers directly:
+
+```bash
+complyctl providers
+```
 
 ## Step 3: Create workspace config
 
