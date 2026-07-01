@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1253,4 +1254,69 @@ func TestValidate_ValidMixedVerificationConfigs(t *testing.T) {
 		},
 	}
 	assert.NoError(t, complytime.Validate(cfg))
+}
+
+func TestFilenameSafe(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"no slashes", "test-policy", "test-policy"},
+		{"single slash", "org/policy", "org-policy"},
+		{"multiple slashes", "org/sub/policy", "org-sub-policy"},
+		{"empty", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, complytime.FilenameSafe(tt.input))
+		})
+	}
+}
+
+func TestExpandPath(t *testing.T) {
+	t.Run("tilde prefix", func(t *testing.T) {
+		result := complytime.ExpandPath("~/test")
+		assert.NotEqual(t, "~/test", result)
+		assert.True(t, strings.HasSuffix(result, "/test"))
+	})
+	t.Run("no tilde", func(t *testing.T) {
+		assert.Equal(t, "/absolute/path", complytime.ExpandPath("/absolute/path"))
+	})
+	t.Run("relative path", func(t *testing.T) {
+		assert.Equal(t, "relative/path", complytime.ExpandPath("relative/path"))
+	})
+}
+
+func TestResolveCacheDir(t *testing.T) {
+	dir, err := complytime.ResolveCacheDir()
+	require.NoError(t, err)
+	assert.NotEmpty(t, dir)
+	assert.Contains(t, dir, ".complytime")
+}
+
+func TestResolveProviderDir(t *testing.T) {
+	dir, err := complytime.ResolveProviderDir()
+	require.NoError(t, err)
+	assert.NotEmpty(t, dir)
+	assert.Contains(t, dir, ".complytime")
+	assert.Contains(t, dir, "providers")
+}
+
+func TestValidate_DuplicatePolicyInTarget(t *testing.T) {
+	cfg := &complytime.WorkspaceConfig{
+		Version: 1,
+		Policies: []complytime.PolicyEntry{
+			{URL: "registry.com/policies/nist:v1.0", ID: "nist"},
+		},
+		Targets: []complytime.TargetConfig{
+			{
+				ID:       "prod",
+				Policies: []string{"nist", "nist"},
+			},
+		},
+	}
+	err := complytime.Validate(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate policy")
 }
