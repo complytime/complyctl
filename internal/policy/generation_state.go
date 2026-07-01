@@ -107,6 +107,15 @@ func NewGenerationState(policyID, digest string, evaluatorIDs []string, complypa
 func InvalidateForEvaluator(baseDir, evaluatorID string) (warnings []string, _ error) {
 	genDir := filepath.Join(baseDir, complytime.WorkspaceDir, "generation")
 
+	root, rootErr := os.OpenRoot(genDir)
+	if rootErr != nil {
+		if os.IsNotExist(rootErr) {
+			return nil, nil
+		}
+		return nil, rootErr
+	}
+	defer root.Close()
+
 	err := filepath.WalkDir(genDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -117,7 +126,11 @@ func InvalidateForEvaluator(baseDir, evaluatorID string) (warnings []string, _ e
 		if d.IsDir() || !strings.HasSuffix(d.Name(), ".json") {
 			return nil
 		}
-		data, readErr := os.ReadFile(path)
+		relPath, relErr := filepath.Rel(genDir, path)
+		if relErr != nil {
+			return fmt.Errorf("failed to compute relative path for %s: %w", path, relErr)
+		}
+		data, readErr := root.ReadFile(relPath)
 		if readErr != nil {
 			warnings = append(warnings, fmt.Sprintf("skipped unreadable file %s: %v", path, readErr))
 			return nil
@@ -128,7 +141,7 @@ func InvalidateForEvaluator(baseDir, evaluatorID string) (warnings []string, _ e
 			return nil
 		}
 		if slices.Contains(state.EvaluatorIDs, evaluatorID) {
-			if rmErr := os.Remove(path); rmErr != nil && !os.IsNotExist(rmErr) {
+			if rmErr := root.Remove(relPath); rmErr != nil && !os.IsNotExist(rmErr) {
 				return fmt.Errorf("failed to remove generation state %s: %w", path, rmErr)
 			}
 		}
