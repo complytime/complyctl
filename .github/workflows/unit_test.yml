@@ -38,8 +38,5 @@ jobs:
               with:
                   go-version-file: './go.mod'
 
-            - name: Install dependencies
-              run: go mod tidy
-
             - name: Run unit tests
-              run: go list ./... | grep -v /tests | xargs go test -v
+              run: make test-unit
