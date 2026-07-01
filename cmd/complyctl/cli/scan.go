@@ -515,6 +515,19 @@ func complypackDigestsByEvaluator(cacheState *cache.State) map[string]string {
 	return m
 }
 
+// filterComplypackDigests returns a new map containing only the digests for
+// evaluator-ids that had complypack content actually available during
+// generation. If availableEvaluators is nil or empty, an empty map is returned.
+func filterComplypackDigests(allDigests map[string]string, availableEvaluators []string) map[string]string {
+	filtered := make(map[string]string)
+	for _, evalID := range availableEvaluators {
+		if digest, ok := allDigests[evalID]; ok {
+			filtered[evalID] = digest
+		}
+	}
+	return filtered
+}
+
 func needsRegeneration(baseDir string, genState *policy.GenerationState, digest string, complypackDigests map[string]string, eid string) bool {
 	if genState == nil {
 		fmt.Fprintf(os.Stderr, "No prior generation found — generating artifacts for %s\n", eid)
@@ -552,35 +565,44 @@ func runGeneration(ctx context.Context, cacheDir, baseDir string, mgr *provider.
 	genSpin.Start()
 	defer genSpin.Stop()
 
-	if err := generateForAllTargets(ctx, cacheDir, mgr, groups, policyTargets, globalVars); err != nil {
+	availableEvaluators, err := generateForAllTargets(ctx, cacheDir, mgr, groups, policyTargets, globalVars)
+	if err != nil {
 		return err
 	}
 
-	newGenState := policy.NewGenerationState(repository, policyDigest, evaluatorIDs, complypackDigests)
+	filteredDigests := filterComplypackDigests(complypackDigests, availableEvaluators)
+	newGenState := policy.NewGenerationState(repository, policyDigest, evaluatorIDs, filteredDigests)
 	if err := policy.SaveGenerationState(baseDir, repository, newGenState); err != nil {
 		return fmt.Errorf("failed to save generation state: %w", err)
 	}
 	return nil
 }
 
-func generateForAllTargets(ctx context.Context, cacheDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string) error {
+// generateForAllTargets invokes providers for each evaluator/target combination.
+// It returns the list of evaluator-ids that had complypack content available
+// (non-empty content path from LookupByEvaluatorID).
+func generateForAllTargets(ctx context.Context, cacheDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string) ([]string, error) {
 	complypackCache := cache.NewComplypackCache(cacheDir)
 	workspace := globalVars[complytime.WorkspaceVarKey]
+	var availableEvaluators []string
 	for evalID, group := range groups {
 		// Look up cached complypack content for this evaluator-id.
 		// If no complypack is cached, contentPath is "" (backward compatible).
 		contentPath, _, err := complypackCache.LookupByEvaluatorID(evalID)
 		if err != nil {
-			return fmt.Errorf("failed to look up complypack for evaluator %s: %w", evalID, err)
+			return nil, fmt.Errorf("failed to look up complypack for evaluator %s: %w", evalID, err)
+		}
+		if contentPath != "" {
+			availableEvaluators = append(availableEvaluators, evalID)
 		}
 		for _, target := range policyTargets {
 			targetVars := complytime.WithWorkspaceVar(target.Variables, workspace)
 			if err := mgr.RouteGenerate(ctx, evalID, globalVars, targetVars, group.Configs, contentPath); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
-	return nil
+	return availableEvaluators, nil
 }
 
 func executeScan(ctx context.Context, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig) (*scanOutput, error) {

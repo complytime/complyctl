@@ -448,8 +448,9 @@ func TestGenerateForAllTargets_EmptyGroups(t *testing.T) {
 	cacheDir := t.TempDir()
 	groups := map[string]policy.EvaluatorGroup{}
 	targets := []complytime.TargetConfig{{ID: "local"}}
-	err := generateForAllTargets(context.Background(), cacheDir, nil, groups, targets, nil)
+	available, err := generateForAllTargets(context.Background(), cacheDir, nil, groups, targets, nil)
 	assert.NoError(t, err)
+	assert.Empty(t, available)
 }
 
 // --- getOptions tests ---
@@ -1058,6 +1059,188 @@ func TestComplypackDigestsByEvaluator_ExtractsDigests(t *testing.T) {
 		"io.complytime.opa":   "sha256:aaa",
 		"io.complytime.ampel": "sha256:bbb",
 	}, result)
+}
+
+// --- filterComplypackDigests tests ---
+
+func TestFilterComplypackDigests_AllAvailable(t *testing.T) {
+	allDigests := map[string]string{
+		"io.complytime.opa":   "sha256:aaa",
+		"io.complytime.ampel": "sha256:bbb",
+	}
+	available := []string{"io.complytime.opa", "io.complytime.ampel"}
+	result := filterComplypackDigests(allDigests, available)
+	assert.Equal(t, map[string]string{
+		"io.complytime.opa":   "sha256:aaa",
+		"io.complytime.ampel": "sha256:bbb",
+	}, result)
+}
+
+func TestFilterComplypackDigests_Unavailable(t *testing.T) {
+	allDigests := map[string]string{
+		"io.complytime.opa":   "sha256:aaa",
+		"io.complytime.ampel": "sha256:bbb",
+	}
+	// Only opa was available; ampel had no content.
+	available := []string{"io.complytime.opa"}
+	result := filterComplypackDigests(allDigests, available)
+	assert.Equal(t, map[string]string{
+		"io.complytime.opa": "sha256:aaa",
+	}, result)
+	assert.NotContains(t, result, "io.complytime.ampel",
+		"unavailable evaluator must not have digest recorded")
+}
+
+func TestFilterComplypackDigests_MixedAvailability(t *testing.T) {
+	allDigests := map[string]string{
+		"io.complytime.opa":     "sha256:aaa",
+		"io.complytime.ampel":   "sha256:bbb",
+		"io.complytime.kyverno": "sha256:ccc",
+	}
+	available := []string{"io.complytime.opa", "io.complytime.kyverno"}
+	result := filterComplypackDigests(allDigests, available)
+	assert.Equal(t, map[string]string{
+		"io.complytime.opa":     "sha256:aaa",
+		"io.complytime.kyverno": "sha256:ccc",
+	}, result)
+	assert.NotContains(t, result, "io.complytime.ampel")
+}
+
+func TestFilterComplypackDigests_NoComplypacks(t *testing.T) {
+	allDigests := map[string]string{
+		"io.complytime.opa": "sha256:aaa",
+	}
+	// No evaluators had complypack content available.
+	result := filterComplypackDigests(allDigests, nil)
+	assert.Empty(t, result, "nil availableEvaluators should produce empty digests")
+
+	result = filterComplypackDigests(allDigests, []string{})
+	assert.Empty(t, result, "empty availableEvaluators should produce empty digests")
+}
+
+// --- saveGenerationAndPrint integration tests ---
+
+func TestSaveGenerationAndPrint_AllComplypacksAvailable(t *testing.T) {
+	cacheDir := t.TempDir()
+	baseDir := t.TempDir()
+
+	// Set up cache state with two complypack entries.
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"test-repo": {Version: "1.0.0", Digest: "sha256:policy-digest"},
+		},
+		Complypacks: map[string]cache.PolicyState{
+			"example.com/cp/opa":   {EvaluatorID: "io.complytime.opa", Digest: "sha256:opa-digest"},
+			"example.com/cp/ampel": {EvaluatorID: "io.complytime.ampel", Digest: "sha256:ampel-digest"},
+		},
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
+
+	// Both evaluators had content available.
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+		[]string{"io.complytime.opa", "io.complytime.ampel"},
+		[]string{"io.complytime.opa", "io.complytime.ampel"},
+		nil,
+	)
+	require.NoError(t, err)
+
+	genState, err := policy.LoadGenerationState(baseDir, "test-repo")
+	require.NoError(t, err)
+	require.NotNil(t, genState)
+	assert.Equal(t, "sha256:policy-digest", genState.PolicyDigest)
+	assert.Equal(t, map[string]string{
+		"io.complytime.opa":   "sha256:opa-digest",
+		"io.complytime.ampel": "sha256:ampel-digest",
+	}, genState.ComplypackDigests)
+}
+
+func TestSaveGenerationAndPrint_ComplypackUnavailable(t *testing.T) {
+	cacheDir := t.TempDir()
+	baseDir := t.TempDir()
+
+	// State has a complypack entry, but content was not available.
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"test-repo": {Version: "1.0.0", Digest: "sha256:policy-digest"},
+		},
+		Complypacks: map[string]cache.PolicyState{
+			"example.com/cp/opa": {EvaluatorID: "io.complytime.opa", Digest: "sha256:opa-digest"},
+		},
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
+
+	// No evaluators had content available (cache deleted, etc).
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+		[]string{"io.complytime.opa"},
+		nil, // no available evaluators
+		nil,
+	)
+	require.NoError(t, err)
+
+	genState, err := policy.LoadGenerationState(baseDir, "test-repo")
+	require.NoError(t, err)
+	require.NotNil(t, genState)
+	assert.Empty(t, genState.ComplypackDigests,
+		"digest must be empty when complypack content was unavailable")
+}
+
+func TestSaveGenerationAndPrint_MixedAvailability(t *testing.T) {
+	cacheDir := t.TempDir()
+	baseDir := t.TempDir()
+
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"test-repo": {Version: "1.0.0", Digest: "sha256:policy-digest"},
+		},
+		Complypacks: map[string]cache.PolicyState{
+			"example.com/cp/opa":   {EvaluatorID: "io.complytime.opa", Digest: "sha256:opa-digest"},
+			"example.com/cp/ampel": {EvaluatorID: "io.complytime.ampel", Digest: "sha256:ampel-digest"},
+		},
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
+
+	// Only opa had content available; ampel was missing.
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+		[]string{"io.complytime.opa", "io.complytime.ampel"},
+		[]string{"io.complytime.opa"}, // only opa available
+		nil,
+	)
+	require.NoError(t, err)
+
+	genState, err := policy.LoadGenerationState(baseDir, "test-repo")
+	require.NoError(t, err)
+	require.NotNil(t, genState)
+	assert.Equal(t, map[string]string{
+		"io.complytime.opa": "sha256:opa-digest",
+	}, genState.ComplypackDigests,
+		"only available evaluator's digest should be recorded")
+}
+
+func TestSaveGenerationAndPrint_NoComplypacks(t *testing.T) {
+	cacheDir := t.TempDir()
+	baseDir := t.TempDir()
+
+	// No complypack entries in state at all.
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"test-repo": {Version: "1.0.0", Digest: "sha256:policy-digest"},
+		},
+		Complypacks: make(map[string]cache.PolicyState),
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
+
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+		[]string{"io.complytime.opa"},
+		nil,
+		nil,
+	)
+	require.NoError(t, err)
+
+	genState, err := policy.LoadGenerationState(baseDir, "test-repo")
+	require.NoError(t, err)
+	require.NotNil(t, genState)
+	assert.Empty(t, genState.ComplypackDigests,
+		"no complypacks configured should produce empty digests")
 }
 
 // --- lazyLogWriter tests ---

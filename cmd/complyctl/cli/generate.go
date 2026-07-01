@@ -115,26 +115,27 @@ func (o *generateOptions) generatePolicy(ctx context.Context, cfg *complytime.Wo
 	groups := policy.GroupByEvaluator(configs, graph)
 	policyTargets := filterTargetsForPolicy(cfg.Targets, eid)
 
-	evaluatorIDs, planRows, err := invokeGenerate(ctx, o.cacheDir, baseDir, mgr, groups, policyTargets, cfg.Variables)
+	evaluatorIDs, availableEvaluators, planRows, err := invokeGenerate(ctx, o.cacheDir, baseDir, mgr, groups, policyTargets, cfg.Variables)
 	if err != nil {
 		return err
 	}
 
-	return saveGenerationAndPrint(o.cacheDir, baseDir, ref.Repository, eid, evaluatorIDs, planRows)
+	return saveGenerationAndPrint(o.cacheDir, baseDir, ref.Repository, eid, evaluatorIDs, availableEvaluators, planRows)
 }
 
-func invokeGenerate(ctx context.Context, cacheDir, baseDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, configVars map[string]string) ([]string, []output.ExecutionPlanRow, error) {
+func invokeGenerate(ctx context.Context, cacheDir, baseDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, configVars map[string]string) ([]string, []string, []output.ExecutionPlanRow, error) {
 	spin := terminal.NewSpinner("Generating policy artifacts...")
 	spin.Start()
 	defer spin.Stop()
 
 	globalVars := complytime.WithWorkspaceVar(configVars, baseDir)
-	if err := generateForAllTargets(ctx, cacheDir, mgr, groups, policyTargets, globalVars); err != nil {
-		return nil, nil, err
+	availableEvaluators, err := generateForAllTargets(ctx, cacheDir, mgr, groups, policyTargets, globalVars)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	evaluatorIDs, planRows := buildExecutionPlan(mgr, groups, policyTargets)
-	return evaluatorIDs, planRows, nil
+	return evaluatorIDs, availableEvaluators, planRows, nil
 }
 
 func buildExecutionPlan(mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig) ([]string, []output.ExecutionPlanRow) {
@@ -162,13 +163,21 @@ func providerStatus(mgr *provider.Manager, evalID string) string {
 	return "healthy"
 }
 
-func saveGenerationAndPrint(cacheDir, baseDir, repository, eid string, evaluatorIDs []string, planRows []output.ExecutionPlanRow) error {
+// saveGenerationAndPrint saves the generation state file and prints the
+// execution plan. availableEvaluators is the set of evaluator-ids that had
+// complypack content actually resolved during generation. Only digests for
+// these evaluators are recorded — evaluators without content get no digest
+// entry, which forces regeneration when the complypack becomes available.
+func saveGenerationAndPrint(cacheDir, baseDir, repository, eid string, evaluatorIDs, availableEvaluators []string, planRows []output.ExecutionPlanRow) error {
 	cacheState, err := cache.LoadState(cacheDir)
 	if err != nil {
 		return fmt.Errorf("failed to load cache state: %w", err)
 	}
 	policyState, _ := cacheState.GetPolicyState(repository)
-	cpDigests := complypackDigestsByEvaluator(cacheState)
+	cpDigests := filterComplypackDigests(
+		complypackDigestsByEvaluator(cacheState),
+		availableEvaluators,
+	)
 	genState := policy.NewGenerationState(repository, policyState.Digest, evaluatorIDs, cpDigests)
 	if err := policy.SaveGenerationState(baseDir, repository, genState); err != nil {
 		return fmt.Errorf("failed to save generation state: %w", err)
