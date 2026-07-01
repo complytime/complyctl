@@ -4,12 +4,15 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/mattn/go-isatty"
+	"github.com/muesli/termenv"
 	"github.com/spf13/cobra"
 
 	"github.com/complytime/complyctl/internal/complytime"
@@ -79,9 +82,18 @@ func Error(msg string) {
 	logger.Error(msg)
 }
 
-func enableDebug(opts *Common) {
+func enableDebug(opts *Common, lw io.Writer, stderrW *os.File) {
 	if opts.Debug {
+		tw := log.NewTeeWriter(stderrW, lw)
+		logger = log.NewLogger(tw)
 		logger.SetLevel(hclog.Debug)
+		if isatty.IsTerminal(stderrW.Fd()) && !termenv.EnvNoColor() {
+			if cl, ok := logger.(interface {
+				SetColorProfile(termenv.Profile)
+			}); ok {
+				cl.SetColorProfile(termenv.ANSI256)
+			}
+		}
 	}
 }
 
@@ -118,12 +130,22 @@ func New() *cobra.Command {
 		doctorCmd(&opts),
 	)
 	cmd.PersistentPreRun = func(_ *cobra.Command, _ []string) {
-		enableDebug(&opts)
 		baseDir, err := opts.ResolveWorkspace()
 		if err == nil {
 			lw.SetWorkspace(baseDir)
 		} else {
 			lw.SetWorkspace(".")
+		}
+		enableDebug(&opts, lw, os.Stderr)
+		if opts.Debug {
+			resolvedBase := lw.baseDir
+			if resolvedBase == "" {
+				resolvedBase = "."
+			}
+			logPath := filepath.Join(
+				resolvedBase, complytime.WorkspaceDir, complytime.LogFileName,
+			)
+			fmt.Fprintf(os.Stderr, "Debug log: %s\n", logPath)
 		}
 	}
 	cmd.PersistentPostRun = func(_ *cobra.Command, _ []string) {

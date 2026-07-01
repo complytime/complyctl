@@ -5,6 +5,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1711,4 +1712,196 @@ func TestInvalidateGenerationForComplypack_NoOpWhenEvaluatorIDEmpty(t *testing.T
 	loaded, err := policy.LoadGenerationState(baseDir, "test-policy")
 	assert.NoError(t, err)
 	assert.NotNil(t, loaded, "generation state should be preserved when evaluator ID is empty")
+}
+
+// --- enableDebug tests ---
+
+// saveLogger saves the package-level logger and lw, restoring them on cleanup.
+// Tests that call saveLogger mutate package-level state and MUST NOT use t.Parallel().
+func saveLogger(t *testing.T) {
+	t.Helper()
+	origLogger := logger
+	origLw := lw
+	t.Cleanup(func() {
+		logger = origLogger
+		lw = origLw
+	})
+}
+
+// TestEnableDebug_True verifies that enableDebug with debug=true reconstructs
+// the logger so that a subsequent Debug call writes output containing "DEBUG"
+// to the stderr pipe.
+func TestEnableDebug_True(t *testing.T) {
+	saveLogger(t)
+
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	defer r.Close()
+
+	var fileBuf bytes.Buffer
+	opts := &Common{Debug: true}
+	enableDebug(opts, &fileBuf, w)
+	logger.Debug("test message")
+	w.Close()
+
+	var output bytes.Buffer
+	_, _ = io.Copy(&output, r)
+	assert.Contains(t, output.String(), "DEBUG")
+	assert.Contains(t, output.String(), "test message")
+}
+
+// TestEnableDebug_False verifies that enableDebug with debug=false produces
+// no output on the stderr pipe.
+func TestEnableDebug_False(t *testing.T) {
+	saveLogger(t)
+
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	defer r.Close()
+
+	var fileBuf bytes.Buffer
+	opts := &Common{Debug: false}
+	enableDebug(opts, &fileBuf, w)
+	logger.Debug("should not appear")
+	w.Close()
+
+	var output bytes.Buffer
+	_, _ = io.Copy(&output, r)
+	assert.Empty(t, output.String())
+}
+
+// TestDebugHint_AppearsOnStderr verifies that when --debug is active,
+// PersistentPreRun prints "Debug log:" to stderr before any debug log lines.
+func TestDebugHint_AppearsOnStderr(t *testing.T) {
+	saveLogger(t)
+	chdirTemp(t)
+
+	// Capture os.Stderr via pipe.
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	cmd := New()
+	cmd.SetArgs([]string{"--debug", "version"})
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	_ = cmd.Execute()
+	w.Close()
+
+	var stderrBuf bytes.Buffer
+	_, _ = io.Copy(&stderrBuf, r)
+	output := stderrBuf.String()
+	assert.Contains(t, output, "Debug log:")
+	assert.Contains(t, output, complytime.LogFileName)
+
+	// Verify the hint appears before any DEBUG log lines.
+	hintIdx := strings.Index(output, "Debug log:")
+	debugIdx := strings.Index(output, "DEBUG")
+	if debugIdx >= 0 {
+		assert.Less(t, hintIdx, debugIdx,
+			"Debug log hint should appear before DEBUG log lines")
+	}
+}
+
+// TestDebugHint_AbsentWithoutDebug verifies that no "Debug log:" hint appears
+// on stderr when --debug is not set.
+func TestDebugHint_AbsentWithoutDebug(t *testing.T) {
+	saveLogger(t)
+	chdirTemp(t)
+
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	cmd := New()
+	cmd.SetArgs([]string{"version"})
+	var stdout bytes.Buffer
+	cmd.SetOut(&stdout)
+	_ = cmd.Execute()
+	w.Close()
+
+	var stderrBuf bytes.Buffer
+	_, _ = io.Copy(&stderrBuf, r)
+	assert.NotContains(t, stderrBuf.String(), "Debug log:")
+}
+
+// TestDebugFlagDescription verifies the --debug flag description text.
+func TestDebugFlagDescription(t *testing.T) {
+	cmd := New()
+	f := cmd.PersistentFlags().Lookup("debug")
+	require.NotNil(t, f)
+	assert.Equal(t, "output debug logs to stderr and log file", f.Usage)
+}
+
+// TestEnableDebug_UnwritableLogDir verifies that when the log directory cannot
+// be created, debug output still appears on stderr and a warning about the log
+// directory failure is present.
+func TestEnableDebug_UnwritableLogDir(t *testing.T) {
+	saveLogger(t)
+
+	// Create a read-only directory so MkdirAll fails inside lazyLogWriter.
+	readOnlyDir := t.TempDir()
+	require.NoError(t, os.Chmod(readOnlyDir, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(readOnlyDir, 0o700) })
+
+	testLw := &lazyLogWriter{}
+	testLw.SetWorkspace(filepath.Join(readOnlyDir, "nested"))
+	lw = testLw
+
+	// Capture stderr via pipe.
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	opts := &Common{Debug: true}
+	enableDebug(opts, testLw, w)
+	logger.Debug("debug despite unwritable dir")
+
+	// Trigger the lazyLogWriter to attempt file creation.
+	_, _ = testLw.Write([]byte("trigger\n"))
+
+	w.Close()
+
+	var stderrBuf bytes.Buffer
+	_, _ = io.Copy(&stderrBuf, r)
+	output := stderrBuf.String()
+
+	// Debug output should still appear on stderr even though the log file
+	// could not be created.
+	assert.Contains(t, output, "DEBUG")
+	assert.Contains(t, output, "debug despite unwritable dir")
+
+	// The lazyLogWriter should have emitted a warning about the failure.
+	assert.Contains(t, output, "Warning:")
+}
+
+// TestEnableDebug_NoColor verifies that with NO_COLOR=1, enableDebug does not
+// force a color profile and stderr output contains no ANSI escape sequences.
+func TestEnableDebug_NoColor(t *testing.T) {
+	saveLogger(t)
+	t.Setenv("NO_COLOR", "1")
+
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	defer r.Close()
+
+	var fileBuf bytes.Buffer
+	opts := &Common{Debug: true}
+	enableDebug(opts, &fileBuf, w)
+	logger.Debug("no color message")
+	w.Close()
+
+	var output bytes.Buffer
+	_, _ = io.Copy(&output, r)
+	// Verify output exists (debug is still active).
+	assert.Contains(t, output.String(), "no color message")
+	// Verify no ANSI escape sequences (ESC [ = \x1b[).
+	assert.NotContains(t, output.String(), "\x1b[",
+		"output should not contain ANSI escape sequences when NO_COLOR is set")
 }

@@ -13,7 +13,28 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	charmlog "github.com/charmbracelet/log"
+	"github.com/muesli/termenv"
 )
+
+// teeWriter writes to both a primary and secondary writer.
+// Errors from the secondary writer do not prevent output to the primary writer.
+type teeWriter struct {
+	primary   io.Writer
+	secondary io.Writer
+}
+
+// NewTeeWriter creates a writer that writes to both primary and secondary.
+// The primary writer receives all data regardless of secondary writer errors.
+func NewTeeWriter(primary, secondary io.Writer) io.Writer {
+	return &teeWriter{primary: primary, secondary: secondary}
+}
+
+func (t *teeWriter) Write(p []byte) (int, error) {
+	// Write to secondary first (best-effort, ignore errors)
+	_, _ = t.secondary.Write(p)
+	// Primary writer's result determines the return value
+	return t.primary.Write(p)
+}
 
 // Initializing the colors for the charm logger.
 var (
@@ -179,3 +200,10 @@ func (c *CharmHclog) StandardLogger(opts *hclog.StandardLoggerOptions) *log.Logg
 }
 
 func (c *CharmHclog) StandardWriter(opts *hclog.StandardLoggerOptions) io.Writer { return os.Stdout }
+
+// SetColorProfile forces a specific color profile on the underlying charm logger.
+// This is used to override termenv's TTY auto-detection when writing to
+// a non-*os.File writer (like teeWriter) that termenv cannot probe.
+func (c *CharmHclog) SetColorProfile(profile termenv.Profile) {
+	c.logger.SetColorProfile(profile)
+}

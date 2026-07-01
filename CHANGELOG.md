@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+
+- `--debug` flag now produces visible output on stderr in addition to
+  writing to the log file. Previously, `--debug` only wrote debug
+  messages to `.complytime/complyctl.log` with no terminal output.
+  A `Debug log: <path>` hint is printed to stderr so users know where
+  the full log file lives. The flag description is updated to
+  `"output debug logs to stderr and log file"`. (#614)
+
 ### Changed
 
 - Release workflow gains preflight validation gate: tag format and

@@ -9,6 +9,7 @@ import (
 
 	charmlogger "github.com/charmbracelet/log"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Declaring the test logger to be a new charm logger.
@@ -117,6 +118,45 @@ func TestTypes(t *testing.T) {
 			charmlogger.Info(fmt.Sprintf("The ComplyTime command at level %s was executed successfully.", tt.level))
 		})
 	}
+}
+
+// --- teeWriter tests ---
+
+// errWriter is a writer that always returns an error.
+type errWriter struct{}
+
+func (e *errWriter) Write(_ []byte) (int, error) {
+	return 0, fmt.Errorf("write failed")
+}
+
+func TestTeeWriter_WritesBothDestinations(t *testing.T) {
+	var primary, secondary bytes.Buffer
+	tw := NewTeeWriter(&primary, &secondary)
+	msg := []byte("hello debug")
+	n, err := tw.Write(msg)
+	require.NoError(t, err)
+	assert.Equal(t, len(msg), n)
+	assert.Equal(t, "hello debug", primary.String())
+	assert.Equal(t, "hello debug", secondary.String())
+}
+
+func TestTeeWriter_PrimaryReceivesDataOnSecondaryError(t *testing.T) {
+	var primary bytes.Buffer
+	tw := NewTeeWriter(&primary, &errWriter{})
+	msg := []byte("still works")
+	n, err := tw.Write(msg)
+	require.NoError(t, err)
+	assert.Equal(t, len(msg), n)
+	assert.Equal(t, "still works", primary.String())
+}
+
+func TestTeeWriter_PrimaryErrorPropagated(t *testing.T) {
+	var secondary bytes.Buffer
+	tw := NewTeeWriter(&errWriter{}, &secondary)
+	_, err := tw.Write([]byte("data"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "write failed")
+	assert.Equal(t, "data", secondary.String())
 }
 
 // Testing various prefixes and levels entered.
