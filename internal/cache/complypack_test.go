@@ -116,33 +116,114 @@ func TestComplypackCache_Store_AtomicWrite(t *testing.T) {
 	assert.NoDirExists(t, evilDir)
 }
 
-func TestComplypackCache_Store_MultipleVersions(t *testing.T) {
+func TestComplypackCache_Store_EvictsOldVersions(t *testing.T) {
 	cacheDir := t.TempDir()
 	cc := cache.NewComplypackCache(cacheDir)
 
+	// Store version 1.0.0.
 	cfg1 := newTestConfig("io.complytime.opa", "1.0.0")
-	path1, err := cc.Store(cfg1, strings.NewReader("v1 content"))
+	_, err := cc.Store(cfg1, strings.NewReader("v1 content"))
 	require.NoError(t, err)
+	assert.DirExists(t, filepath.Join(cacheDir, "complypacks", "io.complytime.opa", "1.0.0"))
 
+	// Store version 2.0.0 — should evict 1.0.0.
 	cfg2 := newTestConfig("io.complytime.opa", "2.0.0")
 	path2, err := cc.Store(cfg2, strings.NewReader("v2 content"))
 	require.NoError(t, err)
 
-	// Both versions must exist independently.
-	assert.FileExists(t, path1)
+	// Old version must be removed.
+	assert.NoDirExists(t, filepath.Join(cacheDir, "complypacks", "io.complytime.opa", "1.0.0"))
+	// New version must exist with correct content.
 	assert.FileExists(t, path2)
-
-	// Verify they are in separate directories.
-	assert.DirExists(t, filepath.Join(cacheDir, "complypacks", "io.complytime.opa", "1.0.0"))
-	assert.DirExists(t, filepath.Join(cacheDir, "complypacks", "io.complytime.opa", "2.0.0"))
-
-	// Verify content is distinct.
-	data1, err := os.ReadFile(path1)
-	require.NoError(t, err)
 	data2, err := os.ReadFile(path2)
 	require.NoError(t, err)
-	assert.Equal(t, "v1 content", string(data1))
 	assert.Equal(t, "v2 content", string(data2))
+}
+
+func TestComplypackCache_Store_EvictsMultipleOldVersions(t *testing.T) {
+	cacheDir := t.TempDir()
+	cc := cache.NewComplypackCache(cacheDir)
+
+	// Pre-seed three versions by creating directories with content directly.
+	evalDir := filepath.Join(cacheDir, "complypacks", "io.complytime.opa")
+	for _, v := range []string{"0.1.0", "0.2.0", "0.3.0"} {
+		dir := filepath.Join(evalDir, v)
+		require.NoError(t, os.MkdirAll(dir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "content.tar.gz"), []byte("old"), 0600))
+	}
+
+	// Store version 1.0.0 — should evict all three old versions.
+	cfg := newTestConfig("io.complytime.opa", "1.0.0")
+	_, err := cc.Store(cfg, strings.NewReader("new content"))
+	require.NoError(t, err)
+
+	// All old versions must be removed.
+	assert.NoDirExists(t, filepath.Join(evalDir, "0.1.0"))
+	assert.NoDirExists(t, filepath.Join(evalDir, "0.2.0"))
+	assert.NoDirExists(t, filepath.Join(evalDir, "0.3.0"))
+	// New version must exist.
+	assert.DirExists(t, filepath.Join(evalDir, "1.0.0"))
+}
+
+func TestComplypackCache_Store_DoesNotAffectOtherEvaluators(t *testing.T) {
+	cacheDir := t.TempDir()
+	cc := cache.NewComplypackCache(cacheDir)
+
+	// Store opa/1.0.0 and ampel/1.0.0.
+	cfgOpa := newTestConfig("opa", "1.0.0")
+	_, err := cc.Store(cfgOpa, strings.NewReader("opa v1"))
+	require.NoError(t, err)
+
+	cfgAmpel := newTestConfig("ampel", "1.0.0")
+	ampelPath, err := cc.Store(cfgAmpel, strings.NewReader("ampel v1"))
+	require.NoError(t, err)
+
+	// Store opa/2.0.0 — should evict opa/1.0.0 but not touch ampel.
+	cfgOpa2 := newTestConfig("opa", "2.0.0")
+	_, err = cc.Store(cfgOpa2, strings.NewReader("opa v2"))
+	require.NoError(t, err)
+
+	// ampel/1.0.0 must be untouched.
+	assert.FileExists(t, ampelPath)
+	assert.DirExists(t, filepath.Join(cacheDir, "complypacks", "ampel", "1.0.0"))
+
+	// opa/1.0.0 must be evicted.
+	assert.NoDirExists(t, filepath.Join(cacheDir, "complypacks", "opa", "1.0.0"))
+	assert.DirExists(t, filepath.Join(cacheDir, "complypacks", "opa", "2.0.0"))
+}
+
+func TestComplypackCache_Store_SameVersionIdempotent(t *testing.T) {
+	cacheDir := t.TempDir()
+	cc := cache.NewComplypackCache(cacheDir)
+
+	cfg := newTestConfig("io.complytime.opa", "1.0.0")
+
+	// Store the same version twice — should succeed without error.
+	_, err := cc.Store(cfg, strings.NewReader("first write"))
+	require.NoError(t, err)
+
+	path, err := cc.Store(cfg, strings.NewReader("second write"))
+	require.NoError(t, err)
+
+	// Content should reflect the second write (atomic replace).
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "second write", string(data))
+}
+
+func TestComplypackCache_Store_NoExistingDir(t *testing.T) {
+	cacheDir := t.TempDir()
+	cc := cache.NewComplypackCache(cacheDir)
+
+	// Store with no prior evaluator directory — should succeed.
+	cfg := newTestConfig("brand-new-evaluator", "1.0.0")
+	path, err := cc.Store(cfg, strings.NewReader("fresh content"))
+	require.NoError(t, err)
+
+	assert.FileExists(t, path)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "fresh content", string(data))
 }
 
 func TestComplypackCache_Lookup_Found(t *testing.T) {

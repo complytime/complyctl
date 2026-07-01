@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/charmbracelet/log"
+
 	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complypack/pkg/complypack"
 )
@@ -128,6 +130,10 @@ func (c *ComplypackCache) Store(config complypack.Config, content io.Reader) (st
 		return "", fmt.Errorf("failed to write config file: %w", err)
 	}
 
+	// Evict old version directories for the same evaluator-id.
+	// This ensures at most one version exists per evaluator-id after Store().
+	evictOldVersions(parentDir, config.Version)
+
 	// Remove any existing final directory before the atomic rename.
 	if err := os.RemoveAll(finalDir); err != nil {
 		return "", fmt.Errorf("failed to remove existing cache directory %s: %w", finalDir, err)
@@ -140,6 +146,42 @@ func (c *ComplypackCache) Store(config complypack.Config, content io.Reader) (st
 	cleanup = false // Rename succeeded; don't remove the final directory.
 
 	return filepath.Join(finalDir, complypackContentFile), nil
+}
+
+// evictOldVersions removes all version directories under evaluatorDir that are
+// not the target version and not hidden (dot-prefixed). Eviction errors are
+// non-fatal: a warning is logged but the store operation continues.
+func evictOldVersions(evaluatorDir, targetVersion string) {
+	entries, err := os.ReadDir(evaluatorDir)
+	if err != nil {
+		// If the directory doesn't exist yet, nothing to evict.
+		if os.IsNotExist(err) {
+			return
+		}
+		log.Warn("failed to list complypack versions for eviction",
+			"dir", evaluatorDir, "error", err)
+		return
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		// Skip hidden/temporary directories (e.g. .complypack-tmp-*).
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+		// Skip the version being stored.
+		if name == targetVersion {
+			continue
+		}
+		oldDir := filepath.Join(evaluatorDir, name)
+		if removeErr := os.RemoveAll(oldDir); removeErr != nil {
+			log.Warn("failed to evict old complypack version",
+				"dir", oldDir, "error", removeErr)
+		}
+	}
 }
 
 // Lookup finds the cached complypack content path and config for a specific
