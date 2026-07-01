@@ -18,11 +18,13 @@ installed before `complyctl scan` can run.
 | [ampel](https://github.com/complytime/complytime-providers/tree/main/cmd/ampel-provider) | `complyctl-provider-ampel` | GitHub / GitLab branch protection | `snappy`, `ampel`, `GITHUB_TOKEN` or `GITLAB_TOKEN` |
 | [opa](https://github.com/complytime/complytime-providers/tree/main/cmd/opa-provider) | `complyctl-provider-opa` | OPA/Rego policies via conftest | `conftest`, `git` |
 
-Pre-built Linux binaries (ampel, opa) are available from the
+Pre-built Linux binaries are available from the
 [complytime-providers releases](https://github.com/complytime/complytime-providers/releases/latest)
 page. To build from source, see the
 [complytime-providers README](https://github.com/complytime/complytime-providers#install).
 Provider binaries go in `~/.complytime/providers/`.
+
+See the [Provider Guide](https://github.com/complytime/complytime-providers/blob/main/docs/provider-guide.md) for authoring new providers.
 
 ### Install provider prerequisites
 
