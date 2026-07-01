@@ -66,6 +66,58 @@ func TestGetCachedVersions_NonexistentPolicy(t *testing.T) {
 	assert.Empty(t, versions)
 }
 
+// --- ResolveVersion happy-path tests ---
+
+func TestResolveVersion_DirectTagMatch(t *testing.T) {
+	loader := seedTestPolicy(t, "resolve-direct", "v1.0.0")
+
+	version, err := loader.ResolveVersion("resolve-direct", "v1.0.0")
+	require.NoError(t, err)
+	assert.Equal(t, "v1.0.0", version)
+}
+
+func TestResolveVersion_LatestFallbackToCachedVersion(t *testing.T) {
+	loader := seedTestPolicy(t, "resolve-latest", "v1.0.0")
+
+	version, err := loader.ResolveVersion("resolve-latest", "")
+	require.NoError(t, err)
+	assert.Equal(t, "v1.0.0", version, "should fall back to the last cached version when 'latest' tag doesn't exist")
+}
+
+// --- ListCachedPolicies tests ---
+
+func TestListCachedPolicies_EmptyCache(t *testing.T) {
+	cacheDir := t.TempDir()
+	cacheMgr := cache.NewCache(cacheDir)
+	loader := NewLoader(cacheMgr)
+
+	result, err := loader.ListCachedPolicies()
+	require.NoError(t, err)
+	assert.Empty(t, result)
+}
+
+func TestListCachedPolicies_SeededCache(t *testing.T) {
+	cacheDir := filepath.Join(t.TempDir(), "cache")
+	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+
+	mock := cachetest.NewMockPolicySource()
+	mock.SeedPolicy("policy-a", "v1.0.0", "sha256:digest-a")
+
+	cacheMgr := cache.NewCache(cacheDir)
+	state, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+
+	sync := cache.NewSync(cacheMgr, state, mock)
+	_, err = sync.SyncPolicy(context.Background(), "policy-a", "latest")
+	require.NoError(t, err)
+
+	loader := NewLoader(cacheMgr)
+	result, err := loader.ListCachedPolicies()
+	require.NoError(t, err)
+	require.Contains(t, result, "policy-a")
+	assert.Equal(t, []string{"v1.0.0"}, result["policy-a"])
+}
+
 // --- T156: LoadLayerByMediaType ---
 
 func TestLoadLayerByMediaType_EmptyPolicyID(t *testing.T) {

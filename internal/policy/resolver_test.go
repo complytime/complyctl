@@ -148,6 +148,12 @@ adherence:
 	assert.Len(t, graph.Assessments, 1)
 	assert.Equal(t, "openscap", graph.EvaluatorID)
 	assert.Equal(t, "ap-1", graph.Assessments[0].ID)
+
+	// Verify parsed content (matches bundle-path test pattern)
+	require.NotNil(t, graph.Controls[0].Parsed)
+	assert.Equal(t, "cat-1", graph.Controls[0].Parsed.Metadata.Id)
+	require.NotNil(t, graph.Guidelines[0].Parsed)
+	assert.Equal(t, "guide-1", graph.Guidelines[0].Parsed.Metadata.Id)
 }
 
 func TestResolvePolicyGraph_MissingOptionalLayers(t *testing.T) {
