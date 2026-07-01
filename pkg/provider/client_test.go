@@ -90,7 +90,7 @@ func TestMockClient_Scan_NoGenerate(t *testing.T) {
 	assert.Empty(t, resp.Assessments)
 }
 
-func TestClient_Generate_ComplypackPathPopulated(t *testing.T) {
+func TestMockClient_Generate_ComplypackPathPopulated(t *testing.T) {
 	mock := newMockClient()
 
 	complypackPath := "/home/user/.complytime/complypacks/io.complytime.opa/1.0.0/content.tar.gz"
@@ -109,7 +109,7 @@ func TestClient_Generate_ComplypackPathPopulated(t *testing.T) {
 		"ComplypackContentPath should propagate through GenerateRequest to the provider")
 }
 
-func TestClient_Generate_ComplypackPathEmpty(t *testing.T) {
+func TestMockClient_Generate_ComplypackPathEmpty(t *testing.T) {
 	mock := newMockClient()
 
 	req := &provider.GenerateRequest{

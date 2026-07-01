@@ -172,7 +172,8 @@ func TestManager_RouteScan_SpecificProvider(t *testing.T) {
 
 	results, err := mgr.RouteScan(context.Background(), "test-eval", []provider.Target{{TargetID: "t1"}})
 	require.NoError(t, err)
-	assert.NotEmpty(t, results)
+	require.Len(t, results, 1)
+	assert.Equal(t, "test-req", results[0].PlanID)
 }
 
 func TestManager_RouteScan_UnknownEvaluator(t *testing.T) {
@@ -194,7 +195,8 @@ func TestManager_RouteScan_Broadcast(t *testing.T) {
 
 	results, err := mgr.RouteScan(context.Background(), "", []provider.Target{{TargetID: "t1"}})
 	require.NoError(t, err)
-	assert.NotEmpty(t, results)
+	require.Len(t, results, 1)
+	assert.Equal(t, "test-req", results[0].PlanID)
 }
 
 func TestManager_RouteScan_ProviderError_ReturnsErrorAssessment(t *testing.T) {
