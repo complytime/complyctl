@@ -931,13 +931,13 @@ const file_plugin_proto_rawDesc = "" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x18\n" +
 	"\apayload\x18\x04 \x01(\fR\apayload\x12!\n" +
 	"\fcollected_at\x18\x05 \x01(\tR\vcollectedAt\"\x11\n" +
-	"\x0fDescribeRequest\"\xe3\x01\n" +
+	"\x0fDescribeRequest\"\xfa\x01\n" +
 	"\x10DescribeResponse\x12\x18\n" +
 	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12#\n" +
 	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\x12:\n" +
 	"\x19required_global_variables\x18\x04 \x03(\tR\x17requiredGlobalVariables\x12:\n" +
-	"\x19required_target_variables\x18\x05 \x03(\tR\x17requiredTargetVariables*\xa4\x01\n" +
+	"\x19required_target_variables\x18\x05 \x03(\tR\x17requiredTargetVariablesJ\x04\b\x06\x10\aR\x0fsupports_export*\xa4\x01\n" +
 	"\x0fConfidenceLevel\x12\x1c\n" +
 	"\x18CONFIDENCE_LEVEL_NOT_SET\x10\x00\x12!\n" +
 	"\x1dCONFIDENCE_LEVEL_UNDETERMINED\x10\x01\x12\x18\n" +

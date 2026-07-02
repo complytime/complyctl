@@ -1,0 +1,10 @@
+# protolint configuration for complyctl
+# MegaLinter uses this file when present instead of its bundled default.
+#
+# REPEATED_FIELD_NAMES_PLURALIZED is disabled because the proto API
+# intentionally mirrors go-gemara type names (e.g. "repeated Evidence
+# evidence" matches the Evidence type, not "evidences").
+lint:
+  rules:
+    remove:
+      - REPEATED_FIELD_NAMES_PLURALIZED
