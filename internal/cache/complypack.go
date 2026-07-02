@@ -151,6 +151,10 @@ func (c *ComplypackCache) Store(config complypack.Config, content io.Reader) (st
 // evictOldVersions removes all version directories under evaluatorDir that are
 // not the target version and not hidden (dot-prefixed). Eviction errors are
 // non-fatal: a warning is logged but the store operation continues.
+//
+// evaluatorDir must be a path within the complypack cache root
+// (e.g. {cacheDir}/complypacks/{evaluator-id}). Callers are responsible
+// for validating the path before calling this function.
 func evictOldVersions(evaluatorDir, targetVersion string) {
 	entries, err := os.ReadDir(evaluatorDir)
 	if err != nil {
