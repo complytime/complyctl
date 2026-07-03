@@ -1,7 +1,4 @@
 version: "2"
-run:
-  skip-dirs:
-    - vendor
 linters:
   default: standard   # https://golangci-lint.run/usage/linters/#enabled-by-default
   enable:
