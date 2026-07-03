@@ -97,21 +97,8 @@ func TestListCachedPolicies_EmptyCache(t *testing.T) {
 }
 
 func TestListCachedPolicies_SeededCache(t *testing.T) {
-	cacheDir := filepath.Join(t.TempDir(), "cache")
-	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+	loader := seedTestPolicy(t, "policy-a", "v1.0.0")
 
-	mock := cachetest.NewMockPolicySource()
-	mock.SeedPolicy("policy-a", "v1.0.0", "sha256:digest-a")
-
-	cacheMgr := cache.NewCache(cacheDir)
-	state, err := cache.LoadState(cacheDir)
-	require.NoError(t, err)
-
-	sync := cache.NewSync(cacheMgr, state, mock)
-	_, err = sync.SyncPolicy(context.Background(), "policy-a", "latest")
-	require.NoError(t, err)
-
-	loader := NewLoader(cacheMgr)
 	result, err := loader.ListCachedPolicies()
 	require.NoError(t, err)
 	require.Contains(t, result, "policy-a")
