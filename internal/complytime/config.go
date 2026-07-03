@@ -119,9 +119,16 @@ func (v *VerificationConfig) IsConfigured() bool {
 
 // PolicyEntry pairs a full OCI reference with an optional user-chosen shortname.
 // If ID is empty, EffectiveID derives one from the last path segment of URL.
+//
+// Per-entry verification: when Verification is set, it overrides the
+// workspace-level VerificationConfig for this entry (D1: standalone
+// blocks, no field merging). SkipVerify opts this entry out of
+// verification entirely. Setting both is a validation error (D2).
 type PolicyEntry struct {
-	URL string `yaml:"url"`
-	ID  string `yaml:"id,omitempty"`
+	URL          string              `yaml:"url"`
+	ID           string              `yaml:"id,omitempty"`
+	Verification *VerificationConfig `yaml:"verification,omitempty"`
+	SkipVerify   bool                `yaml:"skip_verify,omitempty"`
 }
 
 // EffectiveID returns the explicit ID if set, otherwise derives one from the
@@ -474,6 +481,29 @@ func validateEntries(label string, entries []PolicyEntry) error {
 			return fmt.Errorf("%s: duplicate id %s", label, eid)
 		}
 		seenID[eid] = true
+
+		// Per-entry verification validation (FR-002, FR-004).
+		// Mutual exclusivity check comes first: skip_verify and a
+		// configured verification block cannot coexist on the same
+		// entry (D2).
+		if entry.SkipVerify && entry.Verification != nil &&
+			entry.Verification.IsConfigured() {
+			return fmt.Errorf(
+				"%s[%s]: skip_verify and verification "+
+					"are mutually exclusive",
+				label, eid,
+			)
+		}
+
+		// Validate entry-level verification config with the same
+		// rules as the workspace-level block (FR-004).
+		if err := ValidateVerificationConfig(
+			entry.Verification,
+		); err != nil {
+			return fmt.Errorf(
+				"%s[%s]: verification: %w", label, eid, err,
+			)
+		}
 	}
 	return nil
 }

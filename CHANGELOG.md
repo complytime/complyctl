@@ -35,6 +35,16 @@
   cache. `--skip-verify` flag bypasses verification. `complyctl list`
   displays a VERIFIED column. `complyctl doctor` reports verification
   status of cached artifacts. (#643)
+- Per-policy and per-complypack verification configuration: each entry
+  in the `policies` or `complypacks` section of `complytime.yaml` can
+  now declare its own `verification:` block or `skip_verify: true` to
+  override the workspace-level verification default. Workspace-level
+  `verification:` applies to all entries that do not provide their own.
+  When multiple entries fail verification, all entries are still
+  attempted and errors are collected rather than failing on the first
+  error. Verifiers are cached by configuration to avoid redundant
+  construction for entries sharing the same verification settings.
+  (#680)
 - Redesigned markdown report (`--format pretty`) with summary metadata
   table, pass rate, grouped controls table with messages, findings
   section grouped by result type with recommendation and collapsible
