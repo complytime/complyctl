@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -441,13 +440,11 @@ func TestSyncAllPolicies_ErrorsUnwrappable(t *testing.T) {
 	// errors.Join returns an error implementing Unwrap() []error.
 	// Verify individual errors are accessible.
 	var joined interface{ Unwrap() []error }
-	if errors.As(err, &joined) {
-		unwrapped := joined.Unwrap()
-		assert.Len(t, unwrapped, 1,
-			"should contain exactly one wrapped error")
-	}
-	// String matching as fallback (unwrap may not be available
-	// when only one error).
+	require.True(t, errors.As(err, &joined),
+		"errors.Join should return unwrappable error")
+	unwrapped := joined.Unwrap()
+	assert.Len(t, unwrapped, 1,
+		"should contain exactly one wrapped error")
 	assert.Contains(t, err.Error(), "policies/x")
 }
 
@@ -605,11 +602,8 @@ func TestSyncAllPolicies_VerificationError(t *testing.T) {
 	assert.Contains(t, errMsg, "mock TUF error")
 	// Policy "b" skips verification but still fails at registry.
 	// Both errors should be collected.
-	assert.True(t,
-		strings.Contains(errMsg, "a") ||
-			strings.Contains(errMsg, "b"),
-		"at least one policy error should be reported",
-	)
+	assert.Contains(t, errMsg, "policies/b",
+		"policy b sync error should be collected")
 }
 
 // --- Integration tests (Phase 4, Tasks 4.1–4.4) ---
