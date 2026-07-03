@@ -99,8 +99,8 @@ duplicate verifiers when multiple entries share the same config.
 is directly comparable and works as a map key.
 
 **Rationale:** `NewKeylessVerifier` fetches the TUF trusted root
-(~30s network call). Without caching, N entries with the same
-workspace-level config would trigger N fetches. The cache is
+(up to 30s timeout per call). Without caching, N entries with the
+same workspace-level config would trigger N fetches. The cache is
 scoped to a single `complyctl get` invocation (no persistence).
 
 ### D5: Error collection with `errors.Join`
@@ -153,3 +153,21 @@ acceptable and safe.
   behavior will now see multiple errors at once. Mitigation: this
   is strictly more informative. The exit code remains non-zero
   when any error occurs.
+
+- **[Doctor diagnostic ambiguity]** The existing
+  `CheckVerification` doctor check reports all unverified
+  artifacts without distinguishing intentional `skip_verify`
+  entries from entries missing verification config. Users with
+  mixed verified/intentionally-skipped states may habituate to
+  ignoring the unverified count warning. Mitigation: acceptable
+  for this change; a follow-up could add `skip_verify`-awareness
+  to `CheckVerification` to distinguish intentional skips from
+  missing config.
+
+- **[TUF fetch latency for multiple keyless configs]** If a
+  workspace has N distinct keyless verification configs, the
+  system performs N sequential TUF fetches (each with up to 30s
+  timeout). Worst case: 3 distinct keyless configs = up to 90s
+  before any sync begins. Mitigation: the verifier cache (D4)
+  ensures shared configs are fetched once; distinct keyless
+  configs are expected to be rare (typically 1-2 publishers).

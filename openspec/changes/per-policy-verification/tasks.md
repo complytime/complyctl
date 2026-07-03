@@ -7,8 +7,12 @@
   error messages
 - [ ] 1.3 Add validation that `skip_verify` and `verification` on the
   same entry is an error
-- [ ] 1.4 Add unit tests for per-entry config parsing, validation, and
-  mutual exclusivity
+- [ ] 1.4 Add unit tests for per-entry config: `LoadFrom` YAML
+  roundtrip tests for new fields (deserialization of `verification:`
+  and `skip_verify:` on entries), `Validate` tests for mutual
+  exclusivity, per-entry verification validation rules, and backward
+  compatibility (existing `PolicyEntry` structs without new fields
+  pass validation unchanged)
 
 ## 2. Verifier Resolution and Caching
 
@@ -22,7 +26,10 @@
   config instead of a shared slice
 - [ ] 2.4 Add unit tests for resolution priority chain:
   `--skip-verify` > `skip_verify` > entry config > workspace config
-  > no verification
+  > no verification. Include negative/boundary cases: `skip_verify:
+  false` (explicit) behaves identically to omitted; `verification:
+  {}` (empty struct) falls through to workspace config; verifier
+  cache hit/miss with identical and different configs
 
 ## 3. Error Collection
 
@@ -31,12 +38,18 @@
 - [ ] 3.2 Refactor `syncAllComplypacks()` with the same error
   collection pattern
 - [ ] 3.3 Add unit tests for error collection: partial success,
-  all fail, all succeed scenarios
+  all fail, all succeed scenarios. Verify error messages include
+  effective policy IDs and individual errors are unwrappable
 
 ## 4. Integration and E2E
 
+E2E tests inject mock `VerifyFunc` instances via the existing
+`SyncOption`/`WithVerifier()` functional options pattern to test
+the resolution and error collection logic without requiring real
+sigstore infrastructure or signed artifacts.
+
 - [ ] 4.1 Add E2E test for mixed verification configs (keyless +
-  keyed entries in the same workspace)
+  keyed entries in the same workspace) using mock verifiers
 - [ ] 4.2 Add E2E test for `skip_verify` entry alongside verified
   entries
 - [ ] 4.3 Add E2E test for error collection (one entry fails, others
@@ -46,6 +59,11 @@
 
 ## 5. Documentation
 
-- [ ] 5.1 Update AGENTS.md Recent Changes with per-policy-verification
-  summary
-- [ ] 5.2 Update CHANGELOG.md with the new feature entry
+- [ ] 5.1 [P] Update AGENTS.md Recent Changes with
+  per-entry-verification summary
+- [ ] 5.2 [P] Update CHANGELOG.md with the new feature entry
+- [ ] 5.3 File `unbound-force/website` issue for per-entry
+  verification documentation: new `verification:` and `skip_verify:`
+  fields on policy/complypack entries, resolution priority chain,
+  error collection behavior change, config validation rules
+<!-- spec-review: passed -->

@@ -45,6 +45,8 @@ Validation rules:
 
 ### Modified Capabilities
 
+None.
+
 ## Impact
 
 - `internal/complytime/config.go`: `PolicyEntry` struct gains two
