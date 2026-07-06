@@ -1,5 +1,8 @@
 # Use LF line endings
 * text eol=lf
 # Tells Git to treat the file as a binary file, which prevents any line ending conversions.
+vendor/github.com/cyberphone/json-canonicalization/LICENSE -text
+vendor/github.com/digitorus/timestamp/README.md -text
 vendor/github.com/go-logfmt/logfmt/README.md -text
+vendor/github.com/theupdateframework/go-tuf/v2/LICENSE -text
 vendor/oras.land/oras-go/v2/MIGRATION_GUIDE.md -text
