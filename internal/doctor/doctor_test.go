@@ -10,6 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/complytime/complyctl/internal/cache"
 	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/internal/policy"
@@ -1420,11 +1423,26 @@ func TestCheckComplypacks_AllPresent(t *testing.T) {
 	seedComplypackCache(t, tmpDir, "openscap", "v1.0.0")
 
 	results := CheckComplypacks(cfg, tmpDir, resolver)
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d: %+v", len(results), results)
+	// Expect: 1 pass (complypack cached) + 1 cache-size + orphan/untracked results.
+	if len(results) < 1 {
+		t.Fatalf("expected at least 1 result, got %d: %+v", len(results), results)
 	}
-	if results[0].Status != StatusPass {
-		t.Errorf("expected pass, got %s: %s", results[0].Status, results[0].Message)
+
+	foundPass := false
+	foundCacheSize := false
+	for _, r := range results {
+		if r.Name == "complypacks" && r.Status == StatusPass {
+			foundPass = true
+		}
+		if r.Name == "complypacks/cache-size" && r.Status == StatusPass {
+			foundCacheSize = true
+		}
+	}
+	if !foundPass {
+		t.Errorf("expected pass result for complypacks, results: %+v", results)
+	}
+	if !foundCacheSize {
+		t.Errorf("expected cache-size result, results: %+v", results)
 	}
 }
 
@@ -1449,18 +1467,147 @@ func TestCheckComplypacks_Missing(t *testing.T) {
 
 	// Do NOT seed the cache — complypack is missing.
 	results := CheckComplypacks(cfg, tmpDir, resolver)
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d: %+v", len(results), results)
+	// Expect: 1 warn (missing complypack) + 1 cache-size.
+	if len(results) < 1 {
+		t.Fatalf("expected at least 1 result, got %d: %+v", len(results), results)
 	}
-	if results[0].Status != StatusWarn {
-		t.Errorf("expected warn, got %s: %s", results[0].Status, results[0].Message)
+
+	foundMissing := false
+	for _, r := range results {
+		if r.Status == StatusWarn && strings.Contains(r.Message, "openscap") &&
+			strings.Contains(r.Message, "complyctl get") {
+			foundMissing = true
+		}
 	}
-	if !strings.Contains(results[0].Message, "openscap") {
-		t.Errorf("expected evaluator-id 'openscap' in message, got %q", results[0].Message)
+	if !foundMissing {
+		t.Errorf("expected warn about missing openscap complypack, results: %+v", results)
 	}
-	if !strings.Contains(results[0].Message, "complyctl get") {
-		t.Errorf("expected 'complyctl get' suggestion in message, got %q", results[0].Message)
+}
+
+// --- Doctor cache health helper tests ---
+
+// TestWalkCacheSize_KnownFiles verifies that walkCacheSize returns the
+// expected byte count for a cache with known-size files.
+func TestWalkCacheSize_KnownFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a complypack cache directory with known-size files.
+	evalDir := filepath.Join(tmpDir, "complypacks", "io.complytime.opa", "1.0.0")
+	require.NoError(t, os.MkdirAll(evalDir, 0755))
+
+	// Write files with known sizes.
+	data100 := make([]byte, 100)
+	data200 := make([]byte, 200)
+	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "content.tar.gz"), data100, 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "config.json"), data200, 0600))
+
+	size, err := walkCacheSize(tmpDir)
+	require.NoError(t, err)
+	assert.Equal(t, int64(300), size, "expected 300 bytes total")
+}
+
+// TestWalkCacheSize_EmptyDir verifies walkCacheSize returns 0 for a
+// non-existent complypacks directory.
+func TestWalkCacheSize_EmptyDir(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	size, err := walkCacheSize(tmpDir)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), size, "expected 0 bytes for non-existent dir")
+}
+
+// TestFindOrphanedVersions_OrphanDetected verifies FR-006: when state.json
+// tracks v2.0.0 only and v1.0.0 and v2.0.0 directories exist, v1.0.0 is
+// identified as orphaned.
+func TestFindOrphanedVersions_OrphanDetected(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	evalID := "io.complytime.opa"
+	// Create v1.0.0 and v2.0.0 directories.
+	for _, v := range []string{"1.0.0", "2.0.0"} {
+		dir := filepath.Join(tmpDir, "complypacks", evalID, v)
+		require.NoError(t, os.MkdirAll(dir, 0755))
 	}
+
+	// State only tracks v2.0.0.
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"repo/opa": {
+				EvaluatorID: evalID,
+				Version:     "2.0.0",
+			},
+		},
+	}
+
+	orphans := findOrphanedVersions(tmpDir, state)
+
+	require.Len(t, orphans, 1, "expected 1 orphaned version")
+	assert.Equal(t, evalID, orphans[0].EvaluatorID)
+	assert.Equal(t, "1.0.0", orphans[0].Version)
+	assert.False(t, orphans[0].Untracked, "should be orphaned, not untracked")
+}
+
+// TestFindOrphanedVersions_NoOrphans verifies that when all on-disk versions
+// are tracked in state, no orphans are returned.
+func TestFindOrphanedVersions_NoOrphans(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	evalID := "io.complytime.opa"
+	dir := filepath.Join(tmpDir, "complypacks", evalID, "2.0.0")
+	require.NoError(t, os.MkdirAll(dir, 0755))
+
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"repo/opa": {
+				EvaluatorID: evalID,
+				Version:     "2.0.0",
+			},
+		},
+	}
+
+	orphans := findOrphanedVersions(tmpDir, state)
+	assert.Empty(t, orphans, "expected no orphans when all versions are tracked")
+}
+
+// TestFindOrphanedVersions_UntrackedWithNilState verifies FR-006: when
+// state is nil, version directories are reported as "untracked" (not
+// "orphaned") with Untracked=true.
+func TestFindOrphanedVersions_UntrackedWithNilState(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	evalID := "io.complytime.opa"
+	for _, v := range []string{"1.0.0", "2.0.0"} {
+		dir := filepath.Join(tmpDir, "complypacks", evalID, v)
+		require.NoError(t, os.MkdirAll(dir, 0755))
+	}
+
+	// nil state — all versions should be untracked.
+	orphans := findOrphanedVersions(tmpDir, nil)
+
+	require.Len(t, orphans, 2, "expected 2 untracked versions")
+	for _, o := range orphans {
+		assert.True(t, o.Untracked,
+			"version %s should be untracked, not orphaned", o.Version)
+	}
+}
+
+// TestFindOrphanedVersions_UntrackedWithEmptyState verifies that when
+// state has an empty Complypacks map, versions are reported as untracked.
+func TestFindOrphanedVersions_UntrackedWithEmptyState(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	evalID := "io.complytime.opa"
+	dir := filepath.Join(tmpDir, "complypacks", evalID, "1.0.0")
+	require.NoError(t, os.MkdirAll(dir, 0755))
+
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{},
+	}
+
+	orphans := findOrphanedVersions(tmpDir, state)
+
+	require.Len(t, orphans, 1, "expected 1 untracked version")
+	assert.True(t, orphans[0].Untracked, "should be untracked with empty state")
 }
 
 func TestCheckComplypacks_NilConfig(t *testing.T) {

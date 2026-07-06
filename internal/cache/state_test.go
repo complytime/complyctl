@@ -14,6 +14,70 @@ import (
 	"github.com/complytime/complyctl/internal/cache"
 )
 
+// --- EvaluatorIDToVersion tests ---
+
+func TestEvaluatorIDToVersion_Found(t *testing.T) {
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"repo/opa": {
+				EvaluatorID: "io.complytime.opa",
+				Version:     "2.0.0",
+			},
+			"repo/ampel": {
+				EvaluatorID: "io.complytime.ampel",
+				Version:     "1.0.0",
+			},
+		},
+	}
+
+	version, ok := state.EvaluatorIDToVersion("io.complytime.opa")
+	assert.True(t, ok)
+	assert.Equal(t, "2.0.0", version)
+}
+
+func TestEvaluatorIDToVersion_NotFound(t *testing.T) {
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"repo/opa": {
+				EvaluatorID: "io.complytime.opa",
+				Version:     "2.0.0",
+			},
+		},
+	}
+
+	version, ok := state.EvaluatorIDToVersion("io.complytime.nonexistent")
+	assert.False(t, ok)
+	assert.Empty(t, version)
+}
+
+func TestEvaluatorIDToVersion_EmptyComplypacks(t *testing.T) {
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{},
+	}
+
+	version, ok := state.EvaluatorIDToVersion("io.complytime.opa")
+	assert.False(t, ok)
+	assert.Empty(t, version)
+}
+
+func TestEvaluatorIDToVersion_NilComplypacks(t *testing.T) {
+	state := &cache.State{
+		Complypacks: nil,
+	}
+
+	version, ok := state.EvaluatorIDToVersion("io.complytime.opa")
+	assert.False(t, ok)
+	assert.Empty(t, version)
+}
+
+func TestEvaluatorIDToVersion_NilReceiver(t *testing.T) {
+	var state *cache.State
+
+	version, ok := state.EvaluatorIDToVersion("io.complytime.opa")
+	assert.False(t, ok)
+	assert.Empty(t, version)
+}
+
 func TestPolicyState_BackwardCompatibility_NoVerifiedField(t *testing.T) {
 	tmpDir := t.TempDir()
 

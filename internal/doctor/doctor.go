@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -811,6 +812,135 @@ func unmappedReason(resolver PolicyGraphResolver, resolveFailures int) string {
 	return "evaluator not referenced by any cached policy"
 }
 
+// OrphanedVersion describes a complypack version directory on disk that is
+// not tracked in state.json. When Untracked is true, no state.json exists
+// (or it has no complypack entries), so the version is "untracked" rather
+// than "orphaned" — the distinction drives different doctor messaging.
+type OrphanedVersion struct {
+	EvaluatorID string
+	Version     string
+	Path        string
+	Untracked   bool
+}
+
+// walkCacheSize sums file sizes under {cacheDir}/complypacks/ using
+// filepath.WalkDir. Returns 0 if the directory does not exist (FR-007).
+func walkCacheSize(cacheDir string) (int64, error) {
+	complypacksDir := filepath.Join(cacheDir, complytime.ComplypacksSubdir)
+
+	var totalBytes int64
+	err := filepath.WalkDir(complypacksDir, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			// WalkDir passes os.ErrNotExist for the root directory
+			// when it does not exist — return nil to produce 0 bytes.
+			if os.IsNotExist(err) {
+				return filepath.SkipAll
+			}
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		info, infoErr := d.Info()
+		if infoErr != nil {
+			return infoErr
+		}
+		totalBytes += info.Size()
+		return nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to walk complypack cache: %w", err)
+	}
+	return totalBytes, nil
+}
+
+// findOrphanedVersions walks {cacheDir}/complypacks/{evaluator-id}/{version}/
+// directories and cross-references them against state.json complypack entries.
+// When state is nil or has no complypack entries, versions are reported as
+// "untracked" instead of "orphaned" (FR-006).
+func findOrphanedVersions(cacheDir string, state *cache.State) []OrphanedVersion {
+	complypacksDir := filepath.Join(cacheDir, complytime.ComplypacksSubdir)
+	evalEntries, err := os.ReadDir(complypacksDir)
+	if err != nil {
+		return nil
+	}
+
+	noState := state == nil || len(state.Complypacks) == 0
+
+	// Build a set of tracked (evaluator-id, version) pairs from state.
+	type evalVersion struct {
+		evaluatorID string
+		version     string
+	}
+	tracked := make(map[evalVersion]bool)
+	if !noState {
+		for _, ps := range state.Complypacks {
+			if ps.EvaluatorID != "" && ps.Version != "" {
+				tracked[evalVersion{ps.EvaluatorID, ps.Version}] = true
+			}
+		}
+	}
+
+	var orphans []OrphanedVersion
+	for _, evalEntry := range evalEntries {
+		if !evalEntry.IsDir() {
+			continue
+		}
+		evaluatorID := evalEntry.Name()
+		versionEntries, readErr := os.ReadDir(
+			filepath.Join(complypacksDir, evaluatorID),
+		)
+		if readErr != nil {
+			continue
+		}
+		for _, vEntry := range versionEntries {
+			if !vEntry.IsDir() {
+				continue
+			}
+			version := vEntry.Name()
+			vPath := filepath.Join(
+				complypacksDir, evaluatorID, version,
+			)
+			if noState {
+				orphans = append(orphans, OrphanedVersion{
+					EvaluatorID: evaluatorID,
+					Version:     version,
+					Path:        vPath,
+					Untracked:   true,
+				})
+			} else if !tracked[evalVersion{evaluatorID, version}] {
+				orphans = append(orphans, OrphanedVersion{
+					EvaluatorID: evaluatorID,
+					Version:     version,
+					Path:        vPath,
+					Untracked:   false,
+				})
+			}
+		}
+	}
+	return orphans
+}
+
+// formatBytes converts a byte count to a human-readable string with
+// appropriate units (B, KB, MB, GB).
+func formatBytes(bytes int64) string {
+	const (
+		kb = 1024
+		mb = kb * 1024
+		gb = mb * 1024
+	)
+	switch {
+	case bytes >= gb:
+		return fmt.Sprintf("%.1f GB", float64(bytes)/float64(gb))
+	case bytes >= mb:
+		return fmt.Sprintf("%.1f MB", float64(bytes)/float64(mb))
+	case bytes >= kb:
+		return fmt.Sprintf("%.1f KB", float64(bytes)/float64(kb))
+	default:
+		return fmt.Sprintf("%d B", bytes)
+	}
+}
+
 // CheckComplypacks verifies that cached complypacks exist for every evaluator-id
 // referenced by the workspace's policies. The check only runs when the config
 // contains a non-empty complypacks section — workspaces without complypacks
@@ -820,6 +950,9 @@ func unmappedReason(resolver PolicyGraphResolver, resolveFailures int) string {
 // (same pattern as CheckVariables). Each unique evaluator-id is then checked
 // against the ComplypackCache via LookupByEvaluatorID. Missing complypacks
 // produce a non-blocking warning suggesting `complyctl get`.
+//
+// Additionally reports cache size (FR-007) and orphaned/untracked version
+// directories (FR-006) by loading state.json internally.
 func CheckComplypacks(cfg *complytime.WorkspaceConfig, cacheDir string, resolver PolicyGraphResolver) []CheckResult {
 	if cfg == nil || len(cfg.Complypacks) == 0 {
 		return nil
@@ -829,12 +962,26 @@ func CheckComplypacks(cfg *complytime.WorkspaceConfig, cacheDir string, resolver
 		return nil
 	}
 
-	cpCache := cache.NewComplypackCache(cacheDir)
+	var results []CheckResult
+
+	// Load state once for both state-driven lookup and orphan detection.
+	// Graceful degradation: if state cannot be loaded, pass nil to the
+	// cache (falls back to directory scan) and skip orphan detection.
+	cacheState, cacheStateErr := cache.LoadState(cacheDir)
+	if cacheStateErr != nil {
+		results = append(results, CheckResult{
+			Name:     "complypacks/state",
+			Status:   StatusWarn,
+			Message:  fmt.Sprintf("cannot load state: %v", cacheStateErr),
+			Blocking: false,
+		})
+		cacheState = nil
+	}
+	cpCache := cache.NewComplypackCache(cacheDir, cacheState)
 
 	// Collect unique evaluator-ids from all policies via the dependency graph,
 	// following the same resolution pattern as CheckVariables.
 	evaluatorIDs := make(map[string]bool)
-	var results []CheckResult
 	for _, p := range cfg.Policies {
 		ref, refErr := complytime.ParsePolicyRef(p.URL)
 		if refErr != nil {
@@ -892,6 +1039,50 @@ func CheckComplypacks(cfg *complytime.WorkspaceConfig, cacheDir string, resolver
 			Message:  fmt.Sprintf("%d complypack(s) cached", len(evaluatorIDs)),
 			Blocking: false,
 		})
+	}
+
+	// Cache size reporting (FR-007): sum file sizes under complypacks/.
+	cacheBytes, sizeErr := walkCacheSize(cacheDir)
+	if sizeErr != nil {
+		results = append(results, CheckResult{
+			Name:     "complypacks/cache-size",
+			Status:   StatusWarn,
+			Message:  fmt.Sprintf("unable to calculate cache size: %v", sizeErr),
+			Blocking: false,
+		})
+	} else {
+		results = append(results, CheckResult{
+			Name:     "complypacks/cache-size",
+			Status:   StatusPass,
+			Message:  formatBytes(cacheBytes),
+			Blocking: false,
+		})
+	}
+
+	// Orphan detection (FR-006): compare on-disk versions against state.
+	// Uses cacheState loaded at the top of CheckComplypacks — no redundant
+	// LoadState call. When cacheState is nil (load failed), findOrphanedVersions
+	// reports versions as "untracked" rather than "orphaned".
+	orphans := findOrphanedVersions(cacheDir, cacheState)
+	for _, o := range orphans {
+		if o.Untracked {
+			results = append(results, CheckResult{
+				Name:     fmt.Sprintf("complypacks/%s/%s", o.EvaluatorID, o.Version),
+				Status:   StatusWarn,
+				Message:  "complypack not tracked in state — run complyctl get to rebuild state",
+				Blocking: false,
+			})
+		} else {
+			results = append(results, CheckResult{
+				Name:   fmt.Sprintf("complypacks/%s/%s", o.EvaluatorID, o.Version),
+				Status: StatusWarn,
+				Message: fmt.Sprintf(
+					"orphaned complypack version %s for evaluator %s — not referenced in state.json",
+					o.Version, o.EvaluatorID,
+				),
+				Blocking: false,
+			})
+		}
 	}
 
 	return results

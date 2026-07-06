@@ -45,9 +45,9 @@ func TestComplypackPipeline_SyncLookupGenerate(t *testing.T) {
 		"test policy content for pipeline integration",
 	)
 
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
 	_, err = syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/test-bundle", "1.0.0")
@@ -135,7 +135,7 @@ func TestComplypackPipeline_SyncLookupGenerate(t *testing.T) {
 // string to the provider (backward compatible behavior).
 func TestComplypackPipeline_NoComplypack_BackwardCompatible(t *testing.T) {
 	cacheDir := t.TempDir()
-	complypackCache := cache.NewComplypackCache(cacheDir)
+	complypackCache := cache.NewComplypackCache(cacheDir, nil)
 
 	// LookupByEvaluatorID for a non-existent evaluator should return empty.
 	contentPath, lookupCfg, err := complypackCache.LookupByEvaluatorID("io.complytime.nonexistent")
@@ -184,9 +184,9 @@ func TestComplypackPipeline_MultipleEvaluators(t *testing.T) {
 		"kyverno policy content",
 	)
 
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
 

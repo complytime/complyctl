@@ -459,6 +459,39 @@ func TestGenerateForAllTargets_EmptyGroups(t *testing.T) {
 	assert.Empty(t, available)
 }
 
+// TestGenerateForAllTargets_CorruptState verifies that generateForAllTargets
+// degrades gracefully when state.json is corrupt. It should warn to stderr
+// and fall back to directory-scan mode (nil state) rather than returning a
+// hard error.
+func TestGenerateForAllTargets_CorruptState(t *testing.T) {
+	cacheDir := t.TempDir()
+
+	// Write corrupt state.json.
+	statePath := filepath.Join(cacheDir, complytime.StateFileName)
+	require.NoError(t, os.WriteFile(statePath, []byte("not valid json"), 0600))
+
+	// Capture stderr to verify warning.
+	origStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	groups := map[string]policy.EvaluatorGroup{}
+	targets := []complytime.TargetConfig{{ID: "local"}}
+	available, err := generateForAllTargets(
+		context.Background(), cacheDir, nil, groups, targets, nil,
+	)
+
+	w.Close()
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+
+	assert.NoError(t, err, "should not return error on corrupt state")
+	assert.Empty(t, available)
+	assert.Contains(t, buf.String(), "WARNING: failed to load cache state",
+		"should warn to stderr about corrupt state")
+}
+
 // --- getOptions tests ---
 
 func TestGetOptions_Run_NoWorkspace(t *testing.T) {
@@ -632,7 +665,7 @@ func TestProvidersOptions_Run_EmptyProviderDir(t *testing.T) {
 // evaluator-id.
 func TestProviders_WithComplypack(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	// Store a complypack for the evaluator-id.
 	cfg := complypack.Config{
@@ -666,7 +699,7 @@ func TestProviders_WithComplypack(t *testing.T) {
 // provider's evaluator-id.
 func TestProviders_WithoutComplypack(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	// No complypack stored — lookupComplypackVersion should return "none".
 	version := lookupComplypackVersion(cc, "io.complytime.opa")

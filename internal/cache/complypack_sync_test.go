@@ -137,6 +137,171 @@ func (e *complypackNotFoundError) Error() string {
 	return "complypack " + e.ref + " not found"
 }
 
+// --- Local cache hit tests ---
+
+// TestComplypackSync_LocalCacheHit verifies FR-004: when switching to a version
+// that already exists in the local cache, SyncComplypack returns (true, nil)
+// without calling CopyComplypack, and state.json is updated to reflect the
+// switched version.
+func TestComplypackSync_LocalCacheHit(t *testing.T) {
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+
+	t.Setenv("COMPLYTIME_CACHE_VERSIONS", "3")
+
+	mock := newMockComplypackSource()
+	repository := "example.com/complypacks/opa-bundle"
+	evalID := "io.complytime.opa"
+
+	// Seed v1.0.0 via a real sync.
+	mock.seedComplypack(repository, evalID, "1.0.0", "sha256:v1digest", "v1 content")
+	state, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	cpCache := cache.NewComplypackCache(cacheDir, state)
+	syncMgr := cache.NewComplypackSync(cpCache, state, mock)
+
+	fetched, err := syncMgr.SyncComplypack(context.Background(), repository, "1.0.0")
+	require.NoError(t, err)
+	assert.True(t, fetched)
+	assert.Equal(t, 1, mock.getCopyCount())
+
+	// Seed v2.0.0 via a real sync (simulates switching to a new version).
+	mock.seedComplypack(repository, evalID, "2.0.0", "sha256:v2digest", "v2 content")
+	state2, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	cpCache2 := cache.NewComplypackCache(cacheDir, state2)
+	syncMgr2 := cache.NewComplypackSync(cpCache2, state2, mock)
+
+	fetched2, err := syncMgr2.SyncComplypack(context.Background(), repository, "2.0.0")
+	require.NoError(t, err)
+	assert.True(t, fetched2)
+	assert.Equal(t, 2, mock.getCopyCount())
+
+	// Now switch back to v1.0.0 — should be a local cache hit.
+	// Update mock to return v1.0.0 as the remote version.
+	mock.seedComplypack(repository, evalID, "1.0.0", "sha256:v1digest", "v1 content")
+	state3, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	cpCache3 := cache.NewComplypackCache(cacheDir, state3)
+	syncMgr3 := cache.NewComplypackSync(cpCache3, state3, mock)
+
+	fetched3, err := syncMgr3.SyncComplypack(context.Background(), repository, "1.0.0")
+	require.NoError(t, err)
+	assert.True(t, fetched3, "local cache hit should return true for generation invalidation")
+	assert.Equal(t, 2, mock.getCopyCount(),
+		"CopyComplypack should NOT be called for local cache hit")
+
+	// Verify state.json was updated to reflect v1.0.0 as active.
+	state4, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	ps, ok := state4.GetComplypackState(repository)
+	require.True(t, ok)
+	assert.Equal(t, "1.0.0", ps.Version,
+		"state should reflect switched version")
+}
+
+// TestComplypackSync_LocalCacheMiss_CorruptedContent verifies that when a
+// version directory exists but content files are missing, the sync falls
+// through to remote fetch (CopyComplypack IS called).
+func TestComplypackSync_LocalCacheMiss_CorruptedContent(t *testing.T) {
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+
+	t.Setenv("COMPLYTIME_CACHE_VERSIONS", "3")
+
+	mock := newMockComplypackSource()
+	repository := "example.com/complypacks/opa-bundle"
+	evalID := "io.complytime.opa"
+
+	// First sync v2.0.0 to establish state.
+	mock.seedComplypack(repository, evalID, "2.0.0", "sha256:v2digest", "v2 content")
+	state, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	cpCache := cache.NewComplypackCache(cacheDir, state)
+	syncMgr := cache.NewComplypackSync(cpCache, state, mock)
+
+	_, err = syncMgr.SyncComplypack(context.Background(), repository, "2.0.0")
+	require.NoError(t, err)
+	assert.Equal(t, 1, mock.getCopyCount())
+
+	// Create a v1.0.0 directory but with missing content (corrupted).
+	corruptDir := filepath.Join(cacheDir, "complypacks", evalID, "1.0.0")
+	require.NoError(t, os.MkdirAll(corruptDir, 0755))
+	// No content.tar.gz or config.json — Lookup will fail.
+
+	// Now try to sync v1.0.0 — should fall through to remote fetch.
+	mock.seedComplypack(repository, evalID, "1.0.0", "sha256:v1digest", "v1 content")
+	state2, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	cpCache2 := cache.NewComplypackCache(cacheDir, state2)
+	syncMgr2 := cache.NewComplypackSync(cpCache2, state2, mock)
+
+	fetched, err := syncMgr2.SyncComplypack(context.Background(), repository, "1.0.0")
+	require.NoError(t, err)
+	assert.True(t, fetched)
+	assert.Equal(t, 2, mock.getCopyCount(),
+		"CopyComplypack should be called when local cache is corrupted")
+}
+
+// TestComplypackSync_LocalCacheHit_WithVerifier verifies FR-010: when a
+// verifier is configured and a local cache hit occurs, re-verification
+// occurs before accepting the cache hit.
+func TestComplypackSync_LocalCacheHit_WithVerifier(t *testing.T) {
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+
+	t.Setenv("COMPLYTIME_CACHE_VERSIONS", "3")
+
+	mock := newMockComplypackSource()
+	repository := "example.com/complypacks/opa-bundle"
+	evalID := "io.complytime.opa"
+
+	// Sync v1.0.0 first (no verifier).
+	mock.seedComplypack(repository, evalID, "1.0.0", "sha256:v1digest", "v1 content")
+	state, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	cpCache := cache.NewComplypackCache(cacheDir, state)
+	syncMgr := cache.NewComplypackSync(cpCache, state, mock)
+
+	_, err = syncMgr.SyncComplypack(context.Background(), repository, "1.0.0")
+	require.NoError(t, err)
+
+	// Sync v2.0.0 to switch active version.
+	mock.seedComplypack(repository, evalID, "2.0.0", "sha256:v2digest", "v2 content")
+	state2, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	cpCache2 := cache.NewComplypackCache(cacheDir, state2)
+	syncMgr2 := cache.NewComplypackSync(cpCache2, state2, mock)
+
+	_, err = syncMgr2.SyncComplypack(context.Background(), repository, "2.0.0")
+	require.NoError(t, err)
+
+	// Now switch back to v1.0.0 WITH a verifier — verify it's called.
+	mock.seedComplypack(repository, evalID, "1.0.0", "sha256:v1digest", "v1 content")
+	state3, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	cpCache3 := cache.NewComplypackCache(cacheDir, state3)
+
+	verifyCalled := false
+	mockVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
+		verifyCalled = true
+		return &cache.VerificationResult{Verified: true}, nil
+	}
+
+	syncMgr3 := cache.NewComplypackSync(
+		cpCache3, state3, mock,
+		cache.WithVerifier(mockVerifier),
+	)
+
+	fetched, err := syncMgr3.SyncComplypack(context.Background(), repository, "1.0.0")
+	require.NoError(t, err)
+	assert.True(t, fetched, "local cache hit should return true")
+	assert.True(t, verifyCalled, "verifier should be called on local cache hit")
+}
+
 // TestComplypackSync_FetchAndStore verifies the full fetch-unpack-store pipeline:
 // a valid complypack artifact is created via complypack.Pack() in the mock source,
 // synced through ComplypackSync, and the resulting cache contains the expected
@@ -155,9 +320,9 @@ func TestComplypackSync_FetchAndStore(t *testing.T) {
 		"test policy content for opa",
 	)
 
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
 
@@ -206,9 +371,9 @@ func TestComplypackSync_IncrementalSkip(t *testing.T) {
 		"opa bundle content",
 	)
 
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
 
@@ -222,7 +387,8 @@ func TestComplypackSync_IncrementalSkip(t *testing.T) {
 	state2, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	syncMgr2 := cache.NewComplypackSync(complypackCache, state2, mock)
+	complypackCache2 := cache.NewComplypackCache(cacheDir, state2)
+	syncMgr2 := cache.NewComplypackSync(complypackCache2, state2, mock)
 
 	// Second sync with same digest — should be a no-op.
 	fetched2, err := syncMgr2.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
@@ -257,9 +423,9 @@ func TestComplypackSync_CacheMissing_RefetchesDespiteMatchingDigest(t *testing.T
 		"opa bundle content for cache-missing test",
 	)
 
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
 
@@ -291,7 +457,8 @@ func TestComplypackSync_CacheMissing_RefetchesDespiteMatchingDigest(t *testing.T
 	assert.Equal(t, "sha256:cache-missing-test", ps.Digest,
 		"state should still have the old digest")
 
-	syncMgr2 := cache.NewComplypackSync(complypackCache, state2, mock)
+	complypackCache2 := cache.NewComplypackCache(cacheDir, state2)
+	syncMgr2 := cache.NewComplypackSync(complypackCache2, state2, mock)
 
 	// Second sync — same digest, but cache is missing. Should re-fetch.
 	fetched2, err := syncMgr2.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
@@ -324,9 +491,9 @@ func TestComplypackSync_DigestChanged(t *testing.T) {
 		"opa bundle content v1",
 	)
 
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
 
@@ -349,7 +516,8 @@ func TestComplypackSync_DigestChanged(t *testing.T) {
 	state2, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	syncMgr2 := cache.NewComplypackSync(complypackCache, state2, mock)
+	complypackCache2 := cache.NewComplypackCache(cacheDir, state2)
+	syncMgr2 := cache.NewComplypackSync(complypackCache2, state2, mock)
 
 	// Second sync — digest changed, should re-fetch.
 	fetched2, err := syncMgr2.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
@@ -390,9 +558,9 @@ func TestComplypackSync_InvalidEvaluatorID(t *testing.T) {
 		"evil content",
 	)
 
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, maliciousMock)
 
@@ -466,9 +634,9 @@ func TestComplypackSync_UnsignedWarning(t *testing.T) {
 		"unsigned policy content",
 	)
 
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
 
@@ -510,9 +678,9 @@ func TestComplypackSync_EmptyVersion_ResolvesToRemote(t *testing.T) {
 		"content for empty version resolution",
 	)
 
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
 
@@ -556,9 +724,9 @@ func TestComplypackSync_LatestVersion_ResolvesToRemote(t *testing.T) {
 		"content for latest version resolution",
 	)
 
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
 
@@ -593,9 +761,9 @@ func TestComplypackSync_EmptyRepository(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	mock := newMockComplypackSource()
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
 
@@ -623,9 +791,9 @@ func TestComplypackSync_UnpackFailure(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	brokenMock := &brokenUnpackMock{}
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, brokenMock)
 

@@ -582,7 +582,18 @@ func runGeneration(ctx context.Context, cacheDir, baseDir string, mgr *provider.
 // It returns the list of evaluator-ids that had complypack content available
 // (non-empty content path from LookupByEvaluatorID).
 func generateForAllTargets(ctx context.Context, cacheDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string) ([]string, error) {
-	complypackCache := cache.NewComplypackCache(cacheDir)
+	cacheState, stateErr := cache.LoadState(cacheDir)
+	if stateErr != nil {
+		// Degrade gracefully: a corrupt state.json should not block
+		// scanning when the complypack content on disk is valid.
+		// LookupByEvaluatorID falls back to directory scan when
+		// state is nil.
+		fmt.Fprintf(os.Stderr,
+			"WARNING: failed to load cache state, falling back to directory scan: %v\n",
+			stateErr)
+		cacheState = nil
+	}
+	complypackCache := cache.NewComplypackCache(cacheDir, cacheState)
 	workspace := globalVars[complytime.WorkspaceVarKey]
 	var availableEvaluators []string
 	for evalID, group := range groups {

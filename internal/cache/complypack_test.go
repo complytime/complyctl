@@ -3,6 +3,7 @@
 package cache_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,7 +72,7 @@ func newTestConfig(evaluatorID, version string) complypack.Config {
 
 func TestComplypackCache_Store_CreatesDirectoryStructure(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	cfg := newTestConfig("io.complytime.opa", "1.0.0")
 	contentPath, err := cc.Store(cfg, strings.NewReader("test content"))
@@ -93,7 +94,7 @@ func TestComplypackCache_Store_CreatesDirectoryStructure(t *testing.T) {
 
 func TestComplypackCache_Store_AtomicWrite(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	// First store succeeds — establishes a valid cache entry.
 	cfg := newTestConfig("io.complytime.opa", "1.0.0")
@@ -119,7 +120,7 @@ func TestComplypackCache_Store_AtomicWrite(t *testing.T) {
 
 func TestComplypackCache_Store_EvictsOldVersions(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	// Store version 1.0.0.
 	cfg1 := newTestConfig("io.complytime.opa", "1.0.0")
@@ -143,7 +144,7 @@ func TestComplypackCache_Store_EvictsOldVersions(t *testing.T) {
 
 func TestComplypackCache_Store_EvictsMultipleOldVersions(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	// Pre-seed three versions by creating directories with content directly.
 	evalDir := filepath.Join(cacheDir, "complypacks", "io.complytime.opa")
@@ -168,7 +169,7 @@ func TestComplypackCache_Store_EvictsMultipleOldVersions(t *testing.T) {
 
 func TestComplypackCache_Store_DoesNotAffectOtherEvaluators(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	// Store opa/1.0.0 and ampel/1.0.0.
 	cfgOpa := newTestConfig("opa", "1.0.0")
@@ -195,7 +196,7 @@ func TestComplypackCache_Store_DoesNotAffectOtherEvaluators(t *testing.T) {
 
 func TestComplypackCache_Store_SameVersionIdempotent(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	cfg := newTestConfig("io.complytime.opa", "1.0.0")
 
@@ -214,7 +215,7 @@ func TestComplypackCache_Store_SameVersionIdempotent(t *testing.T) {
 
 func TestComplypackCache_Store_NoExistingDir(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	// Store with no prior evaluator directory — should succeed.
 	cfg := newTestConfig("brand-new-evaluator", "1.0.0")
@@ -229,7 +230,7 @@ func TestComplypackCache_Store_NoExistingDir(t *testing.T) {
 
 func TestComplypackCache_Lookup_Found(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	cfg := newTestConfig("io.complytime.opa", "1.0.0")
 	storedPath, err := cc.Store(cfg, strings.NewReader("test content"))
@@ -248,7 +249,7 @@ func TestComplypackCache_Lookup_Found(t *testing.T) {
 
 func TestComplypackCache_Lookup_NotFound(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	_, _, err := cc.Lookup("io.complytime.opa", "9.9.9")
 	require.Error(t, err)
@@ -258,9 +259,58 @@ func TestComplypackCache_Lookup_NotFound(t *testing.T) {
 
 // --- LookupByEvaluatorID tests ---
 
+// TestComplypackCache_LookupByEvaluatorID_WithState verifies FR-005: when
+// state is injected, LookupByEvaluatorID resolves the active version from
+// state rather than scanning the filesystem.
+func TestComplypackCache_LookupByEvaluatorID_WithState(t *testing.T) {
+	cacheDir := t.TempDir()
+
+	evalID := "io.complytime.opa"
+	// Seed two versions on disk.
+	seedVersionDir(t, cacheDir, evalID, "1.0.0")
+	seedVersionDir(t, cacheDir, evalID, "2.0.0")
+
+	// State points to v2.0.0 as the active version.
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"repo/opa": {
+				EvaluatorID: evalID,
+				Version:     "2.0.0",
+				LastUpdated: time.Now(),
+			},
+		},
+	}
+
+	cc := cache.NewComplypackCache(cacheDir, state)
+
+	contentPath, cfg, err := cc.LookupByEvaluatorID(evalID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, contentPath, "should find cached content")
+	assert.Contains(t, contentPath, "2.0.0",
+		"should resolve to v2.0.0 from state, not v1.0.0")
+	assert.NotNil(t, cfg)
+}
+
+// TestComplypackCache_LookupByEvaluatorID_NilState verifies that with nil
+// state, LookupByEvaluatorID falls back to directory scan (current behavior).
+func TestComplypackCache_LookupByEvaluatorID_NilState(t *testing.T) {
+	cacheDir := t.TempDir()
+
+	evalID := "io.complytime.opa"
+	seedVersionDir(t, cacheDir, evalID, "1.0.0")
+
+	// nil state — should fall back to directory scan.
+	cc := cache.NewComplypackCache(cacheDir, nil)
+
+	contentPath, cfg, err := cc.LookupByEvaluatorID(evalID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, contentPath, "should find cached content via dir scan")
+	assert.NotNil(t, cfg)
+}
+
 func TestComplypackCache_LookupByEvaluatorID_NotFound(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	// Lookup an evaluator that was never stored — should return empty path,
 	// nil config, nil error (non-error "not found" contract).
@@ -272,7 +322,7 @@ func TestComplypackCache_LookupByEvaluatorID_NotFound(t *testing.T) {
 
 func TestComplypackCache_LookupByEvaluatorID_SkipsHiddenDirs(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	// Create a hidden directory that simulates an in-progress atomic write.
 	// This mimics the .complypack-tmp-xxx directories created by Store().
@@ -298,12 +348,209 @@ func TestComplypackCache_LookupByEvaluatorID_SkipsHiddenDirs(t *testing.T) {
 
 func TestComplypackCache_LookupByEvaluatorID_InvalidInput(t *testing.T) {
 	cacheDir := t.TempDir()
-	cc := cache.NewComplypackCache(cacheDir)
+	cc := cache.NewComplypackCache(cacheDir, nil)
 
 	// Path traversal input must be rejected by ValidatePathComponent.
 	_, _, err := cc.LookupByEvaluatorID("../../evil")
 	require.Error(t, err, "path traversal evaluator-id must be rejected")
 	assert.Contains(t, err.Error(), "invalid evaluator-id")
+}
+
+// --- Retention-aware eviction tests ---
+
+// seedVersionDir creates a version directory with content.tar.gz and
+// config.json under {cacheDir}/complypacks/{evaluatorID}/{version}/.
+func seedVersionDir(t *testing.T, cacheDir, evaluatorID, version string) {
+	t.Helper()
+	dir := filepath.Join(cacheDir, "complypacks", evaluatorID, version)
+	require.NoError(t, os.MkdirAll(dir, 0755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, "content.tar.gz"), []byte("content-"+version), 0600,
+	))
+	cfgJSON := fmt.Sprintf(
+		`{"evaluator-id":"%s","version":"%s"}`, evaluatorID, version,
+	)
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, "config.json"), []byte(cfgJSON), 0600,
+	))
+}
+
+// TestEvictOldVersions_RetentionN2 verifies FR-001: with N=2, storing v4
+// when v1 (oldest), v2, v3 (newest) exist keeps v4 and v3, removes v1 and v2.
+func TestEvictOldVersions_RetentionN2(t *testing.T) {
+	cacheDir := t.TempDir()
+	t.Setenv("COMPLYTIME_CACHE_VERSIONS", "2")
+
+	evalID := "io.complytime.opa"
+
+	// Pre-seed 3 versions on disk.
+	for _, v := range []string{"1.0.0", "2.0.0", "3.0.0"} {
+		seedVersionDir(t, cacheDir, evalID, v)
+	}
+
+	// Build state with explicit timestamps: v1 oldest, v3 newest.
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"repo/v1": {
+				EvaluatorID: evalID,
+				Version:     "1.0.0",
+				LastUpdated: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+			},
+			"repo/v2": {
+				EvaluatorID: evalID,
+				Version:     "2.0.0",
+				LastUpdated: time.Date(2025, 2, 1, 0, 0, 0, 0, time.UTC),
+			},
+			"repo/v3": {
+				EvaluatorID: evalID,
+				Version:     "3.0.0",
+				LastUpdated: time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
+	cc := cache.NewComplypackCache(cacheDir, state)
+
+	// Store v4.0.0 — with N=2, should keep v4 and v3, remove v1 and v2.
+	cfg := newTestConfig(evalID, "4.0.0")
+	_, err := cc.Store(cfg, strings.NewReader("v4 content"))
+	require.NoError(t, err)
+
+	evalDir := filepath.Join(cacheDir, "complypacks", evalID)
+	assert.DirExists(t, filepath.Join(evalDir, "4.0.0"), "v4 should exist")
+	assert.DirExists(t, filepath.Join(evalDir, "3.0.0"), "v3 should be retained")
+	assert.NoDirExists(t, filepath.Join(evalDir, "2.0.0"), "v2 should be evicted")
+	assert.NoDirExists(t, filepath.Join(evalDir, "1.0.0"), "v1 should be evicted")
+}
+
+// TestEvictOldVersions_RetentionN1 verifies FR-002: default N=1 preserves
+// current behavior — only the new version remains.
+func TestEvictOldVersions_RetentionN1(t *testing.T) {
+	cacheDir := t.TempDir()
+	// Do not set COMPLYTIME_CACHE_VERSIONS — default is 1.
+
+	evalID := "io.complytime.opa"
+	seedVersionDir(t, cacheDir, evalID, "1.0.0")
+
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"repo/v1": {
+				EvaluatorID: evalID,
+				Version:     "1.0.0",
+				LastUpdated: time.Now(),
+			},
+		},
+	}
+
+	cc := cache.NewComplypackCache(cacheDir, state)
+
+	cfg := newTestConfig(evalID, "2.0.0")
+	_, err := cc.Store(cfg, strings.NewReader("v2 content"))
+	require.NoError(t, err)
+
+	evalDir := filepath.Join(cacheDir, "complypacks", evalID)
+	assert.DirExists(t, filepath.Join(evalDir, "2.0.0"), "v2 should exist")
+	assert.NoDirExists(t, filepath.Join(evalDir, "1.0.0"), "v1 should be evicted")
+}
+
+// TestEvictOldVersions_OrphanedBeforeTracked verifies that orphaned directories
+// (not in state) are evicted before tracked versions. Given N=2, 1 tracked
+// version (v2.0.0) and 2 orphaned dirs (v0.1.0, v0.2.0), after Store(v3.0.0):
+// v3.0.0 and v2.0.0 remain, orphans removed.
+func TestEvictOldVersions_OrphanedBeforeTracked(t *testing.T) {
+	cacheDir := t.TempDir()
+	t.Setenv("COMPLYTIME_CACHE_VERSIONS", "2")
+
+	evalID := "io.complytime.opa"
+
+	// Seed tracked version and orphaned directories.
+	seedVersionDir(t, cacheDir, evalID, "2.0.0")
+	seedVersionDir(t, cacheDir, evalID, "0.1.0")
+	seedVersionDir(t, cacheDir, evalID, "0.2.0")
+
+	// State only tracks v2.0.0 — v0.1.0 and v0.2.0 are orphaned.
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"repo/v2": {
+				EvaluatorID: evalID,
+				Version:     "2.0.0",
+				LastUpdated: time.Now(),
+			},
+		},
+	}
+
+	cc := cache.NewComplypackCache(cacheDir, state)
+
+	cfg := newTestConfig(evalID, "3.0.0")
+	_, err := cc.Store(cfg, strings.NewReader("v3 content"))
+	require.NoError(t, err)
+
+	evalDir := filepath.Join(cacheDir, "complypacks", evalID)
+	assert.DirExists(t, filepath.Join(evalDir, "3.0.0"), "v3 should exist")
+	assert.DirExists(t, filepath.Join(evalDir, "2.0.0"), "v2 tracked, should be retained")
+	assert.NoDirExists(t, filepath.Join(evalDir, "0.1.0"), "orphan v0.1.0 should be evicted")
+	assert.NoDirExists(t, filepath.Join(evalDir, "0.2.0"), "orphan v0.2.0 should be evicted")
+}
+
+// TestEvictOldVersions_NilState verifies that when state is nil, all versions
+// except the target are removed (current single-version behavior fallback).
+func TestEvictOldVersions_NilState(t *testing.T) {
+	cacheDir := t.TempDir()
+
+	evalID := "io.complytime.opa"
+	seedVersionDir(t, cacheDir, evalID, "1.0.0")
+	seedVersionDir(t, cacheDir, evalID, "2.0.0")
+
+	// nil state — falls back to remove-all-except-target.
+	cc := cache.NewComplypackCache(cacheDir, nil)
+
+	cfg := newTestConfig(evalID, "3.0.0")
+	_, err := cc.Store(cfg, strings.NewReader("v3 content"))
+	require.NoError(t, err)
+
+	evalDir := filepath.Join(cacheDir, "complypacks", evalID)
+	assert.DirExists(t, filepath.Join(evalDir, "3.0.0"), "target should exist")
+	assert.NoDirExists(t, filepath.Join(evalDir, "1.0.0"), "v1 should be evicted")
+	assert.NoDirExists(t, filepath.Join(evalDir, "2.0.0"), "v2 should be evicted")
+}
+
+// TestEvictOldVersions_CrossEvaluatorIsolation verifies FR-008: eviction is
+// scoped to the target evaluator-id. Versions for other evaluators are untouched.
+func TestEvictOldVersions_CrossEvaluatorIsolation(t *testing.T) {
+	cacheDir := t.TempDir()
+	// N=1 — only the new version should remain for the target evaluator.
+
+	seedVersionDir(t, cacheDir, "opa", "1.0.0")
+	seedVersionDir(t, cacheDir, "ampel", "1.0.0")
+
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"repo/opa": {
+				EvaluatorID: "opa",
+				Version:     "1.0.0",
+				LastUpdated: time.Now(),
+			},
+			"repo/ampel": {
+				EvaluatorID: "ampel",
+				Version:     "1.0.0",
+				LastUpdated: time.Now(),
+			},
+		},
+	}
+
+	cc := cache.NewComplypackCache(cacheDir, state)
+
+	// Store opa/2.0.0 — should evict opa/1.0.0 but NOT ampel/1.0.0.
+	cfg := newTestConfig("opa", "2.0.0")
+	_, err := cc.Store(cfg, strings.NewReader("opa v2 content"))
+	require.NoError(t, err)
+
+	assert.DirExists(t, filepath.Join(cacheDir, "complypacks", "opa", "2.0.0"),
+		"opa/2.0.0 should exist")
+	assert.NoDirExists(t, filepath.Join(cacheDir, "complypacks", "opa", "1.0.0"),
+		"opa/1.0.0 should be evicted")
+	assert.DirExists(t, filepath.Join(cacheDir, "complypacks", "ampel", "1.0.0"),
+		"ampel/1.0.0 must be untouched")
 }
 
 // --- State complypack round-trip tests ---

@@ -480,7 +480,7 @@ func syncSingleComplypack(
 
 	client := registry.NewClient(ref.Registry, credFunc)
 	source := cache.NewRegistryComplypackSource(client)
-	complypackCache := cache.NewComplypackCache(cacheDir)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 	cpSync := cache.NewComplypackSync(
 		complypackCache, state, source, syncOpts...,
 	)

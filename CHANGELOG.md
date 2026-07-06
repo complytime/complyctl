@@ -32,6 +32,14 @@
 
 ### Added
 
+- Complypack cache version management: `COMPLYTIME_CACHE_VERSIONS`
+  environment variable configures how many complypack versions to
+  retain per evaluator-id in the local cache (default: 1, preserving
+  current single-version behavior). When set to N>1, `complyctl get`
+  retains up to N versions, enabling version switching without
+  re-downloading from the OCI registry. `complyctl doctor` reports
+  complypack cache disk usage and orphaned versions not tracked in
+  state.json. (#676)
 - Signature verification for OCI artifacts: `complyctl get` verifies
   cosign/sigstore signatures via `sigstore-go` when `verification:`
   is configured in `complytime.yaml`. Supports keyless (OIDC issuer +

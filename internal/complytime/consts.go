@@ -61,6 +61,11 @@ const (
 
 const OCIEmptyConfig = "application/vnd.oci.empty.v1+json"
 
+// CacheVersionsEnvVar is the environment variable that controls how many
+// complypack versions are retained per evaluator-id in the local cache.
+// Values less than 1 are treated as 1. Default is 1 (single-version).
+const CacheVersionsEnvVar = "COMPLYTIME_CACHE_VERSIONS"
+
 // WorkspaceEnvVar is the environment variable name for workspace directory resolution.
 const WorkspaceEnvVar = "COMPLYTIME_WORKSPACE"
 
