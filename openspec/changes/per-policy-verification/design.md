@@ -105,9 +105,23 @@ scoped to a single `complyctl get` invocation (no persistence).
 
 ### D5: Error collection with `errors.Join`
 
-`syncAllPolicies` and `syncAllComplypacks` collect all errors and
-return them via `errors.Join()` (stdlib since Go 1.20). All
-entries are attempted regardless of individual failures.
+Error collection operates at two levels:
+
+- **Within each group**: `syncAllPolicies` and
+  `syncAllComplypacks` collect errors from individual entries
+  and return them via `errors.Join()` (stdlib since Go 1.20).
+  All entries within a group are attempted regardless of
+  individual failures.
+- **Across groups**: `syncAll()` calls both `syncPolicies` and
+  `syncComplypacks` regardless of individual group failures,
+  joining their errors with `errors.Join(policyErr,
+  complypackErr)`. A policy failure does not prevent complypack
+  sync from running.
+
+Each individual entry failure emits a `WARNING` line to stderr
+immediately, giving users real-time feedback before the final
+combined error. The structured logger captures full details for
+`--debug`.
 
 **Alternatives considered:**
 
@@ -116,10 +130,15 @@ entries are attempted regardless of individual failures.
   unreachable should not prevent fetching from others.
 - *Custom multi-error type*: Rejected as unnecessary when stdlib
   `errors.Join` exists and the codebase targets Go 1.25.
+- *Silent collection (no inline warning)*: Rejected because
+  users watching the terminal would see no output during long
+  TUF fetches, then a wall of errors at the end.
 
 **Rationale:** Users get the full picture in one invocation.
 Partially successful fetches are still useful -- cached policies
-from previous runs remain available for scanning.
+from previous runs remain available for scanning. Inline warnings
+provide immediate visibility without waiting for all entries to
+complete.
 
 ### D6: No config version bump
 

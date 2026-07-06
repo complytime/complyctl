@@ -127,11 +127,17 @@ most once per distinct `VerificationConfig` value.
 ### FR-006: Error collection across entries
 
 The system MUST attempt to sync all policy and complypack entries
-even when individual entries fail. All errors MUST be collected
-and reported together after all entries have been attempted. The
-error message MUST identify each failed entry by its effective
-policy ID. Individual errors MUST be unwrappable via
-`errors.Is`/`errors.As`.
+even when individual entries fail. Error collection MUST span
+across both policy and complypack groups: a policy sync failure
+MUST NOT prevent complypack sync from running. All errors MUST
+be collected and reported together after all entries have been
+attempted. The error message MUST identify each failed entry by
+its effective policy ID. Individual errors MUST be unwrappable
+via `errors.Is`/`errors.As`.
+
+Each individual entry failure MUST emit a WARNING line to stderr
+immediately, providing real-time feedback before the final
+combined error summary.
 
 #### Scenario: One policy fails verification, others succeed
 
