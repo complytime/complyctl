@@ -198,7 +198,7 @@
       "package": "cli",
       "function": "getCmd",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 25,
+      "line": 26,
       "complexity": 3,
       "line_coverage": 44.44444444444444,
       "crap": 4.54320987654321
@@ -207,7 +207,7 @@
       "package": "cli",
       "function": "(*getOptions).validate",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 56,
+      "line": 57,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -216,7 +216,7 @@
       "package": "cli",
       "function": "(*getOptions).complete",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 60,
+      "line": 61,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -225,7 +225,7 @@
       "package": "cli",
       "function": "(*getOptions).run",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 69,
+      "line": 70,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -234,7 +234,7 @@
       "package": "cli",
       "function": "(*getOptions).syncAll",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 91,
+      "line": 92,
       "complexity": 2,
       "line_coverage": 66.66666666666667,
       "crap": 2.148148148148148
@@ -243,7 +243,7 @@
       "package": "cli",
       "function": "(*getOptions).syncPolicies",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 98,
+      "line": 99,
       "complexity": 3,
       "line_coverage": 60,
       "crap": 3.576
@@ -252,7 +252,7 @@
       "package": "cli",
       "function": "(*getOptions).syncComplypacks",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 118,
+      "line": 119,
       "complexity": 4,
       "line_coverage": 0,
       "crap": 20,
@@ -262,7 +262,7 @@
       "package": "cli",
       "function": "syncAllPolicies",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 138,
+      "line": 139,
       "complexity": 3,
       "line_coverage": 62.5,
       "crap": 3.474609375
@@ -271,16 +271,16 @@
       "package": "cli",
       "function": "syncSinglePolicy",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 153,
-      "complexity": 4,
-      "line_coverage": 72.22222222222223,
-      "crap": 4.342935528120713
+      "line": 154,
+      "complexity": 5,
+      "line_coverage": 58.333333333333336,
+      "crap": 6.8084490740740735
     },
     {
       "package": "cli",
       "function": "resolveLatestVersion",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 180,
+      "line": 193,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -289,7 +289,7 @@
       "package": "cli",
       "function": "syncAllComplypacks",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 192,
+      "line": 205,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -298,11 +298,20 @@
       "package": "cli",
       "function": "syncSingleComplypack",
       "file": "cmd/complyctl/cli/get.go",
-      "line": 207,
+      "line": 220,
       "complexity": 5,
       "line_coverage": 0,
       "crap": 30,
       "fix_strategy": "add_tests"
+    },
+    {
+      "package": "cli",
+      "function": "invalidateGenerationForComplypack",
+      "file": "cmd/complyctl/cli/get.go",
+      "line": 261,
+      "complexity": 6,
+      "line_coverage": 58.8235294117647,
+      "crap": 8.513331976389171
     },
     {
       "package": "cli",
@@ -358,7 +367,7 @@
       "line": 26,
       "complexity": 4,
       "line_coverage": 41.666666666666664,
-      "crap": 7.175925925925927
+      "crap": 7.1759259259259265
     },
     {
       "package": "cli",
@@ -383,15 +392,33 @@
       "function": "(*listOptions).run",
       "file": "cmd/complyctl/cli/list.go",
       "line": 69,
-      "complexity": 8,
-      "line_coverage": 84,
-      "crap": 8.262144
+      "complexity": 9,
+      "line_coverage": 82.75862068965517,
+      "crap": 9.415146172454795
+    },
+    {
+      "package": "cli",
+      "function": "policyDigestField",
+      "file": "cmd/complyctl/cli/list.go",
+      "line": 120,
+      "complexity": 2,
+      "line_coverage": 100,
+      "crap": 2
+    },
+    {
+      "package": "cli",
+      "function": "abbreviateDigest",
+      "file": "cmd/complyctl/cli/list.go",
+      "line": 131,
+      "complexity": 4,
+      "line_coverage": 100,
+      "crap": 4
     },
     {
       "package": "cli",
       "function": "printGemaraPolicyTable",
       "file": "cmd/complyctl/cli/list.go",
-      "line": 111,
+      "line": 146,
       "complexity": 1,
       "line_coverage": 80,
       "crap": 1.008
@@ -430,7 +457,7 @@
       "line": 48,
       "complexity": 4,
       "line_coverage": 77.77777777777777,
-      "crap": 4.175582990397805
+      "crap": 4.175582990397806
     },
     {
       "package": "cli",
@@ -472,7 +499,7 @@
       "package": "cli",
       "function": "(*lazyLogWriter).SetWorkspace",
       "file": "cmd/complyctl/cli/root.go",
-      "line": 35,
+      "line": 38,
       "complexity": 1,
       "line_coverage": 100,
       "crap": 1
@@ -481,7 +508,7 @@
       "package": "cli",
       "function": "(*lazyLogWriter).Close",
       "file": "cmd/complyctl/cli/root.go",
-      "line": 40,
+      "line": 43,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -490,16 +517,16 @@
       "package": "cli",
       "function": "(*lazyLogWriter).Write",
       "file": "cmd/complyctl/cli/root.go",
-      "line": 47,
+      "line": 50,
       "complexity": 5,
-      "line_coverage": 70.58823529411765,
-      "crap": 5.636067575819254
+      "line_coverage": 88.23529411764706,
+      "crap": 5.0407083248524325
     },
     {
       "package": "cli",
       "function": "init",
       "file": "cmd/complyctl/cli/root.go",
-      "line": 72,
+      "line": 75,
       "complexity": 1,
       "line_coverage": 100,
       "crap": 1
@@ -508,7 +535,7 @@
       "package": "cli",
       "function": "Error",
       "file": "cmd/complyctl/cli/root.go",
-      "line": 78,
+      "line": 81,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -517,34 +544,35 @@
       "package": "cli",
       "function": "enableDebug",
       "file": "cmd/complyctl/cli/root.go",
-      "line": 82,
-      "complexity": 2,
-      "line_coverage": 50,
-      "crap": 2.5
+      "line": 85,
+      "complexity": 5,
+      "line_coverage": 71.42857142857143,
+      "crap": 5.5830903790087465
     },
     {
       "package": "cli",
       "function": "New",
       "file": "cmd/complyctl/cli/root.go",
-      "line": 88,
-      "complexity": 2,
-      "line_coverage": 94.11764705882354,
-      "crap": 2.0008141664970487
+      "line": 100,
+      "complexity": 4,
+      "line_coverage": 91.30434782608695,
+      "crap": 4.010520259718912
     },
     {
       "package": "cli",
       "function": "scanCmd",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 44,
-      "complexity": 6,
-      "line_coverage": 42.10526315789474,
-      "crap": 12.985857996792536
+      "line": 45,
+      "complexity": 9,
+      "line_coverage": 34.61538461538461,
+      "crap": 31.641841147018663,
+      "fix_strategy": "add_tests"
     },
     {
       "package": "cli",
       "function": "completeTargetIDs",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 117,
+      "line": 128,
       "complexity": 5,
       "line_coverage": 91.66666666666667,
       "crap": 5.014467592592593
@@ -553,7 +581,7 @@
       "package": "cli",
       "function": "(*scanOptions).validate",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 137,
+      "line": 148,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -562,7 +590,7 @@
       "package": "cli",
       "function": "(*scanOptions).complete",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 149,
+      "line": 160,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -571,7 +599,7 @@
       "package": "cli",
       "function": "(*scanOptions).run",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 162,
+      "line": 173,
       "complexity": 8,
       "line_coverage": 100,
       "crap": 8
@@ -580,7 +608,7 @@
       "package": "cli",
       "function": "resolveTarget",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 204,
+      "line": 215,
       "complexity": 4,
       "line_coverage": 100,
       "crap": 4
@@ -589,7 +617,7 @@
       "package": "cli",
       "function": "resolvePolicy",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 223,
+      "line": 234,
       "complexity": 9,
       "line_coverage": 100,
       "crap": 9
@@ -598,7 +626,7 @@
       "package": "cli",
       "function": "loadWorkspaceConfig",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 253,
+      "line": 264,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -607,35 +635,17 @@
       "package": "cli",
       "function": "(*scanOptions).scanPolicy",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 261,
+      "line": 272,
       "complexity": 6,
-      "line_coverage": 26.08695652173913,
-      "crap": 20.536697624722606,
+      "line_coverage": 25,
+      "crap": 21.1875,
       "fix_strategy": "add_tests"
-    },
-    {
-      "package": "cli",
-      "function": "(*scanOptions).executeScanPhase",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 304,
-      "complexity": 2,
-      "line_coverage": 0,
-      "crap": 6
-    },
-    {
-      "package": "cli",
-      "function": "(*scanOptions).maybeExport",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 312,
-      "complexity": 3,
-      "line_coverage": 100,
-      "crap": 3
     },
     {
       "package": "cli",
       "function": "resolveVersionAndGraph",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 325,
+      "line": 316,
       "complexity": 3,
       "line_coverage": 60,
       "crap": 3.576
@@ -644,7 +654,7 @@
       "package": "cli",
       "function": "loadProviders",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 342,
+      "line": 333,
       "complexity": 4,
       "line_coverage": 0,
       "crap": 20,
@@ -654,7 +664,7 @@
       "package": "cli",
       "function": "evaluatorIDList",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 358,
+      "line": 349,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -663,7 +673,7 @@
       "package": "cli",
       "function": "targetIDList",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 366,
+      "line": 357,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -672,7 +682,7 @@
       "package": "cli",
       "function": "ensureGenerated",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 374,
+      "line": 365,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -681,7 +691,7 @@
       "package": "cli",
       "function": "runScanAndReport",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 389,
+      "line": 380,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -690,7 +700,7 @@
       "package": "cli",
       "function": "processScanOutput",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 410,
+      "line": 401,
       "complexity": 4,
       "line_coverage": 90,
       "crap": 4.016
@@ -699,7 +709,7 @@
       "package": "cli",
       "function": "reportOperationalWarnings",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 432,
+      "line": 423,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -708,7 +718,7 @@
       "package": "cli",
       "function": "checkOperationalErrors",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 441,
+      "line": 432,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -717,7 +727,7 @@
       "package": "cli",
       "function": "checkNothingAssessed",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 455,
+      "line": 446,
       "complexity": 2,
       "line_coverage": 50,
       "crap": 2.5
@@ -726,7 +736,7 @@
       "package": "cli",
       "function": "buildEvaluators",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 463,
+      "line": 454,
       "complexity": 4,
       "line_coverage": 100,
       "crap": 4
@@ -735,7 +745,7 @@
       "package": "cli",
       "function": "filterTargetByID",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 482,
+      "line": 473,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -744,7 +754,7 @@
       "package": "cli",
       "function": "filterTargetsForPolicy",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 491,
+      "line": 482,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -753,7 +763,7 @@
       "package": "cli",
       "function": "checkGenerationFreshness",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 501,
+      "line": 492,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -762,7 +772,7 @@
       "package": "cli",
       "function": "complypackDigestsByEvaluator",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 517,
+      "line": 508,
       "complexity": 4,
       "line_coverage": 100,
       "crap": 4
@@ -771,7 +781,7 @@
       "package": "cli",
       "function": "needsRegeneration",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 527,
+      "line": 518,
       "complexity": 4,
       "line_coverage": 100,
       "crap": 4
@@ -780,7 +790,7 @@
       "package": "cli",
       "function": "evaluatorArtifactsExist",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 544,
+      "line": 535,
       "complexity": 6,
       "line_coverage": 100,
       "crap": 6
@@ -789,7 +799,7 @@
       "package": "cli",
       "function": "runGeneration",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 559,
+      "line": 550,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -798,7 +808,7 @@
       "package": "cli",
       "function": "generateForAllTargets",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 575,
+      "line": 566,
       "complexity": 5,
       "line_coverage": 36.36363636363637,
       "crap": 11.442524417731029
@@ -807,7 +817,7 @@
       "package": "cli",
       "function": "executeScan",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 595,
+      "line": 586,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -816,7 +826,7 @@
       "package": "cli",
       "function": "scanAllTargets",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 603,
+      "line": 594,
       "complexity": 4,
       "line_coverage": 0,
       "crap": 20,
@@ -826,7 +836,7 @@
       "package": "cli",
       "function": "scanSingleTarget",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 629,
+      "line": 620,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -835,7 +845,7 @@
       "package": "cli",
       "function": "writeScanReports",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 648,
+      "line": 639,
       "complexity": 3,
       "line_coverage": 71.42857142857143,
       "crap": 3.2099125364431487
@@ -844,7 +854,7 @@
       "package": "cli",
       "function": "writeFormatReport",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 662,
+      "line": 653,
       "complexity": 4,
       "line_coverage": 40,
       "crap": 7.4559999999999995
@@ -853,7 +863,7 @@
       "package": "cli",
       "function": "writePrettyReport",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 674,
+      "line": 665,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -862,7 +872,7 @@
       "package": "cli",
       "function": "writeSARIFReport",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 685,
+      "line": 676,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -871,126 +881,16 @@
       "package": "cli",
       "function": "writeOSCALReport",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 694,
+      "line": 685,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
-    },
-    {
-      "package": "cli",
-      "function": "(*scanOptions).runExport",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 705,
-      "complexity": 5,
-      "line_coverage": 16.666666666666668,
-      "crap": 19.467592592592588,
-      "fix_strategy": "add_tests"
-    },
-    {
-      "package": "cli",
-      "function": "authRequired",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 731,
-      "complexity": 2,
-      "line_coverage": 100,
-      "crap": 2
-    },
-    {
-      "package": "cli",
-      "function": "validateAuthCredentials",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 735,
-      "complexity": 3,
-      "line_coverage": 100,
-      "crap": 3
-    },
-    {
-      "package": "cli",
-      "function": "resolveCollectorAuth",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 742,
-      "complexity": 4,
-      "line_coverage": 0,
-      "crap": 20,
-      "fix_strategy": "add_tests"
-    },
-    {
-      "package": "cli",
-      "function": "exportToProviders",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 757,
-      "complexity": 2,
-      "line_coverage": 0,
-      "crap": 6
-    },
-    {
-      "package": "cli",
-      "function": "exportSingleProvider",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 765,
-      "complexity": 3,
-      "line_coverage": 0,
-      "crap": 12
-    },
-    {
-      "package": "cli",
-      "function": "resolveOIDCToken",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 782,
-      "complexity": 2,
-      "line_coverage": 0,
-      "crap": 6
-    },
-    {
-      "package": "cli",
-      "function": "formatExportSummary",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 795,
-      "complexity": 4,
-      "line_coverage": 100,
-      "crap": 4
-    },
-    {
-      "package": "cli",
-      "function": "appendExportRow",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 815,
-      "complexity": 3,
-      "line_coverage": 100,
-      "crap": 3
-    },
-    {
-      "package": "cli",
-      "function": "appendResponseRow",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 829,
-      "complexity": 3,
-      "line_coverage": 85.71428571428571,
-      "crap": 3.0262390670553936
-    },
-    {
-      "package": "cli",
-      "function": "exportResponseStatus",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 842,
-      "complexity": 4,
-      "line_coverage": 100,
-      "crap": 4
-    },
-    {
-      "package": "cli",
-      "function": "countExportFailures",
-      "file": "cmd/complyctl/cli/scan.go",
-      "line": 864,
-      "complexity": 7,
-      "line_coverage": 100,
-      "crap": 7
     },
     {
       "package": "cli",
       "function": "injectWorkspaceIntoTargets",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 885,
+      "line": 698,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -999,7 +899,7 @@
       "package": "cli",
       "function": "extractReqToControlMap",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 896,
+      "line": 709,
       "complexity": 6,
       "line_coverage": 90,
       "crap": 6.036
@@ -1008,7 +908,7 @@
       "package": "cli",
       "function": "extractPlanToReqMap",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 917,
+      "line": 730,
       "complexity": 4,
       "line_coverage": 100,
       "crap": 4
@@ -1017,16 +917,16 @@
       "package": "cli",
       "function": "resolveAssessmentIDs",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 932,
-      "complexity": 3,
+      "line": 747,
+      "complexity": 5,
       "line_coverage": 100,
-      "crap": 3
+      "crap": 5
     },
     {
       "package": "cli",
       "function": "reverseMap",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 942,
+      "line": 763,
       "complexity": 3,
       "line_coverage": 83.33333333333333,
       "crap": 3.0416666666666665
@@ -1035,7 +935,7 @@
       "package": "cli",
       "function": "buildReqToComplypackRef",
       "file": "cmd/complyctl/cli/scan.go",
-      "line": 963,
+      "line": 785,
       "complexity": 11,
       "line_coverage": 82.6086956521739,
       "crap": 11.636475712994166
@@ -1046,8 +946,8 @@
       "file": "cmd/complyctl/cli/version.go",
       "line": 12,
       "complexity": 1,
-      "line_coverage": 50,
-      "crap": 1.125
+      "line_coverage": 100,
+      "crap": 1
     },
     {
       "package": "main",
@@ -1245,7 +1145,7 @@
       "package": "main",
       "function": "(*testEvaluator).Describe",
       "file": "cmd/test-provider/main.go",
-      "line": 38,
+      "line": 37,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -1254,7 +1154,7 @@
       "package": "main",
       "function": "(*testEvaluator).Generate",
       "file": "cmd/test-provider/main.go",
-      "line": 47,
+      "line": 45,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -1263,7 +1163,7 @@
       "package": "main",
       "function": "logComplypackPath",
       "file": "cmd/test-provider/main.go",
-      "line": 61,
+      "line": 59,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -1272,16 +1172,7 @@
       "package": "main",
       "function": "(*testEvaluator).Scan",
       "file": "cmd/test-provider/main.go",
-      "line": 68,
-      "complexity": 2,
-      "line_coverage": 0,
-      "crap": 6
-    },
-    {
-      "package": "main",
-      "function": "(*testEvaluator).Export",
-      "file": "cmd/test-provider/main.go",
-      "line": 97,
+      "line": 66,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -1290,10 +1181,1944 @@
       "package": "main",
       "function": "main",
       "file": "cmd/test-provider/main.go",
-      "line": 109,
+      "line": 95,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "NewConfig",
+      "file": "complytime-providers/cmd/ampel-provider/config/config.go",
+      "line": 28,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "ampelDir",
+      "file": "complytime-providers/cmd/ampel-provider/config/config.go",
+      "line": 33,
+      "complexity": 1,
+      "line_coverage": 100,
+      "crap": 1
+    },
+    {
+      "package": "config",
+      "function": "EnsureDirectories",
+      "file": "complytime-providers/cmd/ampel-provider/config/config.go",
+      "line": 38,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "config",
+      "function": "GranularPolicyDirPath",
+      "file": "complytime-providers/cmd/ampel-provider/config/config.go",
+      "line": 56,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "ResultsDirPath",
+      "file": "complytime-providers/cmd/ampel-provider/config/config.go",
+      "line": 61,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "GeneratedPolicyDirPath",
+      "file": "complytime-providers/cmd/ampel-provider/config/config.go",
+      "line": 66,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "SpecDirPath",
+      "file": "complytime-providers/cmd/ampel-provider/config/config.go",
+      "line": 71,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "convert",
+      "function": "LoadGranularPolicies",
+      "file": "complytime-providers/cmd/ampel-provider/convert/convert.go",
+      "line": 26,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "convert",
+      "function": "skipEntry",
+      "file": "complytime-providers/cmd/ampel-provider/convert/convert.go",
+      "line": 56,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "convert",
+      "function": "loadPolicy",
+      "file": "complytime-providers/cmd/ampel-provider/convert/convert.go",
+      "line": 71,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "convert",
+      "function": "readRootFile",
+      "file": "complytime-providers/cmd/ampel-provider/convert/convert.go",
+      "line": 109,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "convert",
+      "function": "MatchPolicies",
+      "file": "complytime-providers/cmd/ampel-provider/convert/convert.go",
+      "line": 126,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "convert",
+      "function": "MergeToBundle",
+      "file": "complytime-providers/cmd/ampel-provider/convert/convert.go",
+      "line": 155,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "convert",
+      "function": "WritePolicy",
+      "file": "complytime-providers/cmd/ampel-provider/convert/convert.go",
+      "line": 172,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "export",
+      "function": "ReadAndConvert",
+      "file": "complytime-providers/cmd/ampel-provider/export/convert.go",
+      "line": 41,
+      "complexity": 8,
+      "line_coverage": 0,
+      "crap": 72,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "export",
+      "function": "convertResult",
+      "file": "complytime-providers/cmd/ampel-provider/export/convert.go",
+      "line": 74,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "export",
+      "function": "mapResult",
+      "file": "complytime-providers/cmd/ampel-provider/export/convert.go",
+      "line": 109,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "export",
+      "function": "NewEmitter",
+      "file": "complytime-providers/cmd/ampel-provider/export/export.go",
+      "line": 27,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "export",
+      "function": "(*Emitter).Shutdown",
+      "file": "complytime-providers/cmd/ampel-provider/export/export.go",
+      "line": 67,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "intoto",
+      "function": "UnwrapDSSE",
+      "file": "complytime-providers/cmd/ampel-provider/intoto/intoto.go",
+      "line": 18,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "main",
+      "function": "main",
+      "file": "complytime-providers/cmd/ampel-provider/main.go",
+      "line": 10,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "results",
+      "function": "ParseAmpelOutput",
+      "file": "complytime-providers/cmd/ampel-provider/results/results.go",
+      "line": 90,
+      "complexity": 16,
+      "line_coverage": 0,
+      "crap": 272,
+      "fix_strategy": "decompose_and_test"
+    },
+    {
+      "package": "results",
+      "function": "WritePerRepoResult",
+      "file": "complytime-providers/cmd/ampel-provider/results/results.go",
+      "line": 171,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "results",
+      "function": "ToScanResponse",
+      "file": "complytime-providers/cmd/ampel-provider/results/results.go",
+      "line": 196,
+      "complexity": 8,
+      "line_coverage": 0,
+      "crap": 72,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "results",
+      "function": "mapResult",
+      "file": "complytime-providers/cmd/ampel-provider/results/results.go",
+      "line": 256,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "results",
+      "function": "stripControlChars",
+      "file": "complytime-providers/cmd/ampel-provider/results/results.go",
+      "line": 272,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "results",
+      "function": "isPrintableASCII",
+      "file": "complytime-providers/cmd/ampel-provider/results/results.go",
+      "line": 281,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "scan",
+      "function": "(ExecRunner).Run",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 53,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "scan",
+      "function": "(ExecRunner).RunWithEnv",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 59,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "scan",
+      "function": "buildTokenEnv",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 68,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "scan",
+      "function": "WriteSpecFiles",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 89,
+      "complexity": 7,
+      "line_coverage": 0,
+      "crap": 56,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "scan",
+      "function": "ResolveSpecPath",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 132,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "scan",
+      "function": "sanitizeSpecName",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 151,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "scan",
+      "function": "constructSnappyCommand",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 165,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "scan",
+      "function": "constructAmpelVerifyCommand",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 190,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "scan",
+      "function": "extractSubjectHash",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 215,
+      "complexity": 2,
+      "line_coverage": 100,
+      "crap": 2
+    },
+    {
+      "package": "scan",
+      "function": "extractHashFromStatement",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 223,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "scan",
+      "function": "validatePolicyFile",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 243,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "scan",
+      "function": "ScanRepository",
+      "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+      "line": 252,
+      "complexity": 12,
+      "line_coverage": 0,
+      "crap": 156,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "New",
+      "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+      "line": 44,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).Describe",
+      "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+      "line": 49,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).Generate",
+      "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+      "line": 61,
+      "complexity": 9,
+      "line_coverage": 0,
+      "crap": 90,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).Scan",
+      "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+      "line": 128,
+      "complexity": 18,
+      "line_coverage": 0,
+      "crap": 342,
+      "fix_strategy": "decompose_and_test"
+    },
+    {
+      "package": "server",
+      "function": "splitCSV",
+      "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+      "line": 251,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "server",
+      "function": "validateTargetVariables",
+      "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+      "line": 266,
+      "complexity": 11,
+      "line_coverage": 0,
+      "crap": 132,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).Export",
+      "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+      "line": 310,
+      "complexity": 7,
+      "line_coverage": 0,
+      "crap": 56,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "exportErrorMessage",
+      "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+      "line": 363,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "server",
+      "function": "resolvePolicyDir",
+      "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+      "line": 374,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "checkRequiredTools",
+      "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+      "line": 393,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "resolveComplypackPath",
+      "file": "complytime-providers/cmd/ampel-provider/server/unpack.go",
+      "line": 19,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "extractTarGz",
+      "file": "complytime-providers/cmd/ampel-provider/server/unpack.go",
+      "line": 56,
+      "complexity": 17,
+      "line_coverage": 0,
+      "crap": 306,
+      "fix_strategy": "decompose_and_test"
+    },
+    {
+      "package": "server",
+      "function": "writeFileFromTar",
+      "file": "complytime-providers/cmd/ampel-provider/server/unpack.go",
+      "line": 139,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "targets",
+      "function": "ParseRepoURL",
+      "file": "complytime-providers/cmd/ampel-provider/targets/targets.go",
+      "line": 15,
+      "complexity": 9,
+      "line_coverage": 0,
+      "crap": 90,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "targets",
+      "function": "SanitizeRepoURL",
+      "file": "complytime-providers/cmd/ampel-provider/targets/targets.go",
+      "line": 59,
+      "complexity": 7,
+      "line_coverage": 0,
+      "crap": 56,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "targets",
+      "function": "RepoDisplayName",
+      "file": "complytime-providers/cmd/ampel-provider/targets/targets.go",
+      "line": 80,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "toolcheck",
+      "function": "CheckTools",
+      "file": "complytime-providers/cmd/ampel-provider/toolcheck/toolcheck.go",
+      "line": 14,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "toolcheck",
+      "function": "FormatMissingToolsError",
+      "file": "complytime-providers/cmd/ampel-provider/toolcheck/toolcheck.go",
+      "line": 26,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "config",
+      "function": "NewConfig",
+      "file": "complytime-providers/cmd/opa-provider/config/config.go",
+      "line": 31,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "(*Config).OpaDir",
+      "file": "complytime-providers/cmd/opa-provider/config/config.go",
+      "line": 36,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "(*Config).PolicyDirPath",
+      "file": "complytime-providers/cmd/opa-provider/config/config.go",
+      "line": 41,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "(*Config).ReposDirPath",
+      "file": "complytime-providers/cmd/opa-provider/config/config.go",
+      "line": 46,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "(*Config).ResultsDirPath",
+      "file": "complytime-providers/cmd/opa-provider/config/config.go",
+      "line": 51,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "(*Config).GeneratedDirPath",
+      "file": "complytime-providers/cmd/opa-provider/config/config.go",
+      "line": 56,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "(*Config).PolicyDirForBundle",
+      "file": "complytime-providers/cmd/opa-provider/config/config.go",
+      "line": 61,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "(*Config).EnsureDirectories",
+      "file": "complytime-providers/cmd/opa-provider/config/config.go",
+      "line": 69,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "generate",
+      "function": "LoadMapping",
+      "file": "complytime-providers/cmd/opa-provider/generate/mapping.go",
+      "line": 42,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "generate",
+      "function": "validateMapping",
+      "file": "complytime-providers/cmd/opa-provider/generate/mapping.go",
+      "line": 65,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "generate",
+      "function": "MatchRequirements",
+      "file": "complytime-providers/cmd/opa-provider/generate/mapping.go",
+      "line": 91,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "generate",
+      "function": "WriteScanConfig",
+      "file": "complytime-providers/cmd/opa-provider/generate/scanconfig.go",
+      "line": 27,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "generate",
+      "function": "ReadScanConfig",
+      "file": "complytime-providers/cmd/opa-provider/generate/scanconfig.go",
+      "line": 59,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "loader",
+      "function": "(LocalPathLoader).Load",
+      "file": "complytime-providers/cmd/opa-provider/loader/loader.go",
+      "line": 28,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "loader",
+      "function": "(GitLoader).Load",
+      "file": "complytime-providers/cmd/opa-provider/loader/loader.go",
+      "line": 48,
+      "complexity": 7,
+      "line_coverage": 0,
+      "crap": 56,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "loader",
+      "function": "NewRouter",
+      "file": "complytime-providers/cmd/opa-provider/loader/loader.go",
+      "line": 99,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "loader",
+      "function": "(*Router).Load",
+      "file": "complytime-providers/cmd/opa-provider/loader/loader.go",
+      "line": 108,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "loader",
+      "function": "credentialUsername",
+      "file": "complytime-providers/cmd/opa-provider/loader/loader.go",
+      "line": 122,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "loader",
+      "function": "buildCredentialHelperEnv",
+      "file": "complytime-providers/cmd/opa-provider/loader/loader.go",
+      "line": 133,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "main",
+      "function": "main",
+      "file": "complytime-providers/cmd/opa-provider/main.go",
+      "line": 10,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "results",
+      "function": "ParseConftestOutput",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 58,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "results",
+      "function": "buildFinding",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 89,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "results",
+      "function": "extractRequirementID",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 105,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "results",
+      "function": "deriveIDFromQuery",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 119,
+      "complexity": 9,
+      "line_coverage": 0,
+      "crap": 90,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "results",
+      "function": "WritePerTargetResult",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 147,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "results",
+      "function": "ResolveRequirementID",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 174,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "results",
+      "function": "ToScanResponse",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 187,
+      "complexity": 16,
+      "line_coverage": 0,
+      "crap": 272,
+      "fix_strategy": "decompose_and_test"
+    },
+    {
+      "package": "results",
+      "function": "buildSyntheticSteps",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 290,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "results",
+      "function": "mapResult",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 309,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "results",
+      "function": "stripControlChars",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 323,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "results",
+      "function": "truncateField",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 332,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "results",
+      "function": "sanitizeName",
+      "file": "complytime-providers/cmd/opa-provider/results/results.go",
+      "line": 339,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "scan",
+      "function": "(ExecRunner).Run",
+      "file": "complytime-providers/cmd/opa-provider/scan/scan.go",
+      "line": 21,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "scan",
+      "function": "(ExecRunner).RunWithEnv",
+      "file": "complytime-providers/cmd/opa-provider/scan/scan.go",
+      "line": 27,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "scan",
+      "function": "PullBundle",
+      "file": "complytime-providers/cmd/opa-provider/scan/scan.go",
+      "line": 34,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "scan",
+      "function": "constructConftestPullCommand",
+      "file": "complytime-providers/cmd/opa-provider/scan/scan.go",
+      "line": 43,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "scan",
+      "function": "EvalPolicyWithNamespaces",
+      "file": "complytime-providers/cmd/opa-provider/scan/scan.go",
+      "line": 53,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "scan",
+      "function": "constructConftestTestCommandWithNamespaces",
+      "file": "complytime-providers/cmd/opa-provider/scan/scan.go",
+      "line": 71,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "server",
+      "function": "New",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 49,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).Describe",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 66,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).Generate",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 95,
+      "complexity": 10,
+      "line_coverage": 0,
+      "crap": 110,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).resolvePolicyDir",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 180,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "resolveComplypackPath",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 217,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "extractTarGz",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 251,
+      "complexity": 17,
+      "line_coverage": 0,
+      "crap": 306,
+      "fix_strategy": "decompose_and_test"
+    },
+    {
+      "package": "server",
+      "function": "writeFileFromTar",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 334,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).resolveScanPolicyDir",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 359,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "mergeVariables",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 397,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).Scan",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 409,
+      "complexity": 10,
+      "line_coverage": 0,
+      "crap": 110,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).processTarget",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 465,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).processRemoteBranches",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 515,
+      "complexity": 8,
+      "line_coverage": 0,
+      "crap": 72,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).processLocalInput",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 584,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).evalAndParse",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 623,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "splitCSV",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 660,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "server",
+      "function": "validateTargetVariables",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 674,
+      "complexity": 16,
+      "line_coverage": 0,
+      "crap": 272,
+      "fix_strategy": "decompose_and_test"
+    },
+    {
+      "package": "server",
+      "function": "copyVars",
+      "file": "complytime-providers/cmd/opa-provider/server/server.go",
+      "line": 720,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "targets",
+      "function": "ParseRepoURL",
+      "file": "complytime-providers/cmd/opa-provider/targets/targets.go",
+      "line": 17,
+      "complexity": 11,
+      "line_coverage": 0,
+      "crap": 132,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "targets",
+      "function": "SanitizeRepoURL",
+      "file": "complytime-providers/cmd/opa-provider/targets/targets.go",
+      "line": 65,
+      "complexity": 7,
+      "line_coverage": 0,
+      "crap": 56,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "targets",
+      "function": "RepoDisplayName",
+      "file": "complytime-providers/cmd/opa-provider/targets/targets.go",
+      "line": 85,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "targets",
+      "function": "ValidateInputPath",
+      "file": "complytime-providers/cmd/opa-provider/targets/targets.go",
+      "line": 96,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "toolcheck",
+      "function": "CheckTools",
+      "file": "complytime-providers/cmd/opa-provider/toolcheck/toolcheck.go",
+      "line": 16,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "toolcheck",
+      "function": "FormatMissingToolsError",
+      "file": "complytime-providers/cmd/opa-provider/toolcheck/toolcheck.go",
+      "line": 28,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "config",
+      "function": "EnsureDirectories",
+      "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+      "line": 40,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "config",
+      "function": "ResolveDatastream",
+      "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+      "line": 58,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "config",
+      "function": "SanitizeInput",
+      "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+      "line": 80,
+      "complexity": 2,
+      "line_coverage": 100,
+      "crap": 2
+    },
+    {
+      "package": "config",
+      "function": "SanitizePath",
+      "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+      "line": 88,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "config",
+      "function": "IsXMLFile",
+      "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+      "line": 97,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "config",
+      "function": "expandPath",
+      "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+      "line": 116,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "config",
+      "function": "validatePath",
+      "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+      "line": 127,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "config",
+      "function": "ensureDirectory",
+      "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+      "line": 143,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "config",
+      "function": "getDistroIdsAndVersions",
+      "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+      "line": 157,
+      "complexity": 9,
+      "line_coverage": 0,
+      "crap": 90,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "config",
+      "function": "findMatchingDatastream",
+      "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+      "line": 195,
+      "complexity": 10,
+      "line_coverage": 0,
+      "crap": 110,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "export",
+      "function": "ReadAndConvert",
+      "file": "complytime-providers/cmd/openscap-provider/export/convert.go",
+      "line": 20,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "export",
+      "function": "convertRuleResult",
+      "file": "complytime-providers/cmd/openscap-provider/export/convert.go",
+      "line": 45,
+      "complexity": 7,
+      "line_coverage": 0,
+      "crap": 56,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "export",
+      "function": "mapResultStatus",
+      "file": "complytime-providers/cmd/openscap-provider/export/convert.go",
+      "line": 103,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "export",
+      "function": "NewEmitter",
+      "file": "complytime-providers/cmd/openscap-provider/export/export.go",
+      "line": 27,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "export",
+      "function": "(*Emitter).Shutdown",
+      "file": "complytime-providers/cmd/openscap-provider/export/export.go",
+      "line": 67,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "main",
+      "function": "main",
+      "file": "complytime-providers/cmd/openscap-provider/main.go",
+      "line": 10,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "oscap",
+      "function": "shellJoin",
+      "file": "complytime-providers/cmd/openscap-provider/oscap/oscap.go",
+      "line": 17,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "oscap",
+      "function": "executeCommand",
+      "file": "complytime-providers/cmd/openscap-provider/oscap/oscap.go",
+      "line": 21,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "oscap",
+      "function": "constructScanCommand",
+      "file": "complytime-providers/cmd/openscap-provider/oscap/oscap.go",
+      "line": 51,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "oscap",
+      "function": "OscapScan",
+      "file": "complytime-providers/cmd/openscap-provider/oscap/oscap.go",
+      "line": 71,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "oscap",
+      "function": "constructGenerateFixCommand",
+      "file": "complytime-providers/cmd/openscap-provider/oscap/oscap.go",
+      "line": 77,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "oscap",
+      "function": "OscapGenerateFix",
+      "file": "complytime-providers/cmd/openscap-provider/oscap/oscap.go",
+      "line": 93,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "scan",
+      "function": "validateOpenSCAPFiles",
+      "file": "complytime-providers/cmd/openscap-provider/scan/scan.go",
+      "line": 15,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "scan",
+      "function": "ScanSystem",
+      "file": "complytime-providers/cmd/openscap-provider/scan/scan.go",
+      "line": 35,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "New",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 30,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).Describe",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 34,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).Generate",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 43,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "server",
+      "function": "generateArtifacts",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 53,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "server",
+      "function": "resolveProfileAndDatastream",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 66,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "server",
+      "function": "executeGeneration",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 81,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "writeTailoringFile",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 98,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).Scan",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 116,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "runScanAndParseARF",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 133,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "buildAssessmentsFromARF",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 153,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "assessmentFromRuleResult",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 176,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "server",
+      "function": "resolveRuleResult",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 185,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "buildAssessmentLog",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 203,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "mergeVariables",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 235,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "server",
+      "function": "(*ProviderServer).Export",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 248,
+      "complexity": 8,
+      "line_coverage": 0,
+      "crap": 72,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "server",
+      "function": "exportErrorMessage",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 307,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "server",
+      "function": "mapResultStatus",
+      "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+      "line": 314,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "ParseARFFile",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/arf.go",
+      "line": 26,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "xccdf",
+      "function": "IsSkippableResult",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/arf.go",
+      "line": 42,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "xccdf",
+      "function": "FindOVALCheckContentRef",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/arf.go",
+      "line": 48,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "xccdf",
+      "function": "ParseCheck",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/arf.go",
+      "line": 59,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "xccdf",
+      "function": "RuleResultMessage",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/arf.go",
+      "line": 75,
+      "complexity": 8,
+      "line_coverage": 0,
+      "crap": 72,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "loadDataStream",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 41,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "xccdf",
+      "function": "getDsProfileID",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 56,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "getDsRuleID",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 60,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "getDsVarID",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 64,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "getDsElement",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 68,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "xccdf",
+      "function": "getDsElementAttrValue",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 76,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "xccdf",
+      "function": "getDsOptionalAttrValue",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 85,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "xccdf",
+      "function": "getDsElements",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 93,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "xccdf",
+      "function": "getDsProfile",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 100,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "getDsElementTitle",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 104,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "xccdf",
+      "function": "getDsElementDescription",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 112,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "xccdf",
+      "function": "populateProfileInfo",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 120,
+      "complexity": 7,
+      "line_coverage": 0,
+      "crap": 56,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "populateProfileVariables",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 158,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "populateProfileRules",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 186,
+      "complexity": 7,
+      "line_coverage": 0,
+      "crap": 56,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "initProfile",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 218,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "GetDsProfile",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 240,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "GetDsVariablesValues",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 264,
+      "complexity": 10,
+      "line_coverage": 0,
+      "crap": 110,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "getValueFromOption",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 320,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "ResolveDsVariableOptions",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 333,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "xccdf",
+      "function": "GetDsRules",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 344,
+      "complexity": 9,
+      "line_coverage": 0,
+      "crap": 90,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "NewRuleHashTable",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 393,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "newHashTableFromRootAndQuery",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 397,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "newByIdHashTable",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+      "line": 407,
+      "complexity": 2,
+      "line_coverage": 0,
+      "crap": 6
+    },
+    {
+      "package": "xccdf",
+      "function": "removePrefix",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 23,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "getTailoringID",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 27,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "getTailoringExtendedProfileID",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 31,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "getTailoringProfileID",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 36,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "getTailoringProfileTitle",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 41,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "getTailoringVersion",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 45,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "getTailoringBenchmarkHref",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 52,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "validateRuleExistence",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 58,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "xccdf",
+      "function": "validateVariableExistence",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 68,
+      "complexity": 3,
+      "line_coverage": 0,
+      "crap": 12
+    },
+    {
+      "package": "xccdf",
+      "function": "unselectAbsentRules",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 78,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "selectAdditionalRules",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 98,
+      "complexity": 7,
+      "line_coverage": 0,
+      "crap": 56,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "filterValidRules",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 124,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "getTailoringSelections",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 149,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "xccdf",
+      "function": "updateTailoringValues",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 157,
+      "complexity": 8,
+      "line_coverage": 0,
+      "crap": 72,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "getTailoringValues",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 185,
+      "complexity": 6,
+      "line_coverage": 0,
+      "crap": 42,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "getTailoringProfile",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 210,
+      "complexity": 5,
+      "line_coverage": 0,
+      "crap": 30,
+      "fix_strategy": "add_tests"
+    },
+    {
+      "package": "xccdf",
+      "function": "PolicyToXML",
+      "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+      "line": 244,
+      "complexity": 4,
+      "line_coverage": 0,
+      "crap": 20,
+      "fix_strategy": "add_tests"
     },
     {
       "package": "cache",
@@ -1467,7 +3292,7 @@
       "line": 77,
       "complexity": 13,
       "line_coverage": 66.66666666666667,
-      "crap": 19.259259259259252,
+      "crap": 19.259259259259256,
       "fix_strategy": "add_tests"
     },
     {
@@ -1663,7 +3488,7 @@
       "package": "cache",
       "function": "NewSync",
       "file": "internal/cache/sync.go",
-      "line": 49,
+      "line": 50,
       "complexity": 1,
       "line_coverage": 100,
       "crap": 1
@@ -1672,7 +3497,7 @@
       "package": "cache",
       "function": "(*Sync).SyncPolicy",
       "file": "internal/cache/sync.go",
-      "line": 60,
+      "line": 64,
       "complexity": 12,
       "line_coverage": 83.33333333333333,
       "crap": 12.666666666666668
@@ -1690,7 +3515,7 @@
       "package": "complytime",
       "function": "(PolicyEntry).EffectiveID",
       "file": "internal/complytime/config.go",
-      "line": 94,
+      "line": 80,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -1699,7 +3524,7 @@
       "package": "complytime",
       "function": "(PolicyRef).VersionString",
       "file": "internal/complytime/config.go",
-      "line": 139,
+      "line": 125,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -1708,7 +3533,7 @@
       "package": "complytime",
       "function": "ParsePolicyRef",
       "file": "internal/complytime/config.go",
-      "line": 156,
+      "line": 142,
       "complexity": 17,
       "line_coverage": 97.5609756097561,
       "crap": 17.004193206714934,
@@ -1718,7 +3543,7 @@
       "package": "complytime",
       "function": "FindPolicy",
       "file": "internal/complytime/config.go",
-      "line": 239,
+      "line": 225,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -1727,7 +3552,7 @@
       "package": "complytime",
       "function": "PolicyIDs",
       "file": "internal/complytime/config.go",
-      "line": 252,
+      "line": 238,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -1736,7 +3561,7 @@
       "package": "complytime",
       "function": "LoadFrom",
       "file": "internal/complytime/config.go",
-      "line": 262,
+      "line": 248,
       "complexity": 6,
       "line_coverage": 69.23076923076923,
       "crap": 7.048702776513427
@@ -1745,7 +3570,7 @@
       "package": "complytime",
       "function": "validatePolicyRefs",
       "file": "internal/complytime/config.go",
-      "line": 298,
+      "line": 284,
       "complexity": 5,
       "line_coverage": 100,
       "crap": 5
@@ -1754,25 +3579,16 @@
       "package": "complytime",
       "function": "resolveEnvVars",
       "file": "internal/complytime/config.go",
-      "line": 315,
+      "line": 301,
       "complexity": 4,
       "line_coverage": 100,
       "crap": 4
     },
     {
       "package": "complytime",
-      "function": "resolveCollectorEnvVars",
-      "file": "internal/complytime/config.go",
-      "line": 328,
-      "complexity": 5,
-      "line_coverage": 100,
-      "crap": 5
-    },
-    {
-      "package": "complytime",
       "function": "expandEnvRef",
       "file": "internal/complytime/config.go",
-      "line": 350,
+      "line": 316,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -1781,7 +3597,7 @@
       "package": "complytime",
       "function": "SaveTo",
       "file": "internal/complytime/config.go",
-      "line": 367,
+      "line": 333,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -1790,7 +3606,7 @@
       "package": "complytime",
       "function": "Validate",
       "file": "internal/complytime/config.go",
-      "line": 381,
+      "line": 347,
       "complexity": 13,
       "line_coverage": 92.3076923076923,
       "crap": 13.076923076923077
@@ -1799,25 +3615,16 @@
       "package": "complytime",
       "function": "validateEntries",
       "file": "internal/complytime/config.go",
-      "line": 433,
+      "line": 399,
       "complexity": 6,
       "line_coverage": 100,
       "crap": 6
     },
     {
       "package": "complytime",
-      "function": "ExportEnabled",
-      "file": "internal/complytime/consts.go",
-      "line": 41,
-      "complexity": 3,
-      "line_coverage": 0,
-      "crap": 12
-    },
-    {
-      "package": "complytime",
       "function": "WithWorkspaceVar",
       "file": "internal/complytime/consts.go",
-      "line": 90,
+      "line": 75,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -1826,7 +3633,7 @@
       "package": "complytime",
       "function": "FilenameSafe",
       "file": "internal/complytime/consts.go",
-      "line": 109,
+      "line": 94,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -1835,7 +3642,7 @@
       "package": "complytime",
       "function": "ExpandPath",
       "file": "internal/complytime/consts.go",
-      "line": 114,
+      "line": 99,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -1844,7 +3651,7 @@
       "package": "complytime",
       "function": "ResolveCacheDir",
       "file": "internal/complytime/consts.go",
-      "line": 126,
+      "line": 111,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -1853,7 +3660,7 @@
       "package": "complytime",
       "function": "ResolveProviderDir",
       "file": "internal/complytime/consts.go",
-      "line": 135,
+      "line": 120,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -1988,7 +3795,7 @@
       "package": "doctor",
       "function": "CheckConfig",
       "file": "internal/doctor/doctor.go",
-      "line": 96,
+      "line": 95,
       "complexity": 4,
       "line_coverage": 25,
       "crap": 10.75
@@ -1997,7 +3804,7 @@
       "package": "doctor",
       "function": "CheckProviders",
       "file": "internal/doctor/doctor.go",
-      "line": 136,
+      "line": 135,
       "complexity": 8,
       "line_coverage": 0,
       "crap": 72,
@@ -2007,7 +3814,7 @@
       "package": "doctor",
       "function": "CheckPolicyVersions",
       "file": "internal/doctor/doctor.go",
-      "line": 221,
+      "line": 220,
       "complexity": 16,
       "line_coverage": 95.1219512195122,
       "crap": 16.02971518114943,
@@ -2017,7 +3824,7 @@
       "package": "doctor",
       "function": "resolvePinnedFallback",
       "file": "internal/doctor/doctor.go",
-      "line": 327,
+      "line": 326,
       "complexity": 5,
       "line_coverage": 100,
       "crap": 5
@@ -2026,7 +3833,7 @@
       "package": "doctor",
       "function": "CheckCache",
       "file": "internal/doctor/doctor.go",
-      "line": 370,
+      "line": 369,
       "complexity": 5,
       "line_coverage": 90.9090909090909,
       "crap": 5.018782870022539
@@ -2035,7 +3842,7 @@
       "package": "doctor",
       "function": "CheckVariables",
       "file": "internal/doctor/doctor.go",
-      "line": 425,
+      "line": 424,
       "complexity": 35,
       "line_coverage": 93.4065934065934,
       "crap": 35.35112816177905,
@@ -2045,7 +3852,7 @@
       "package": "doctor",
       "function": "CheckPolicyActivePeriod",
       "file": "internal/doctor/doctor.go",
-      "line": 623,
+      "line": 622,
       "complexity": 12,
       "line_coverage": 93.54838709677419,
       "crap": 12.03866939679769
@@ -2054,7 +3861,7 @@
       "package": "doctor",
       "function": "parseDatetime",
       "file": "internal/doctor/doctor.go",
-      "line": 705,
+      "line": 704,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -2063,7 +3870,7 @@
       "package": "doctor",
       "function": "evaluateTimeline",
       "file": "internal/doctor/doctor.go",
-      "line": 714,
+      "line": 713,
       "complexity": 7,
       "line_coverage": 86.66666666666667,
       "crap": 7.116148148148148
@@ -2072,7 +3879,7 @@
       "package": "doctor",
       "function": "countResolved",
       "file": "internal/doctor/doctor.go",
-      "line": 744,
+      "line": 743,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -2081,52 +3888,25 @@
       "package": "doctor",
       "function": "unmappedReason",
       "file": "internal/doctor/doctor.go",
-      "line": 754,
+      "line": 753,
       "complexity": 3,
       "line_coverage": 80,
       "crap": 3.072
     },
     {
       "package": "doctor",
-      "function": "CheckCollector",
-      "file": "internal/doctor/doctor.go",
-      "line": 767,
-      "complexity": 6,
-      "line_coverage": 100,
-      "crap": 6
-    },
-    {
-      "package": "doctor",
       "function": "CheckComplypacks",
       "file": "internal/doctor/doctor.go",
-      "line": 808,
+      "line": 772,
       "complexity": 13,
       "line_coverage": 82.85714285714286,
       "crap": 13.85140524781341
     },
     {
       "package": "doctor",
-      "function": "checkExportEnabled",
-      "file": "internal/doctor/doctor.go",
-      "line": 888,
-      "complexity": 4,
-      "line_coverage": 100,
-      "crap": 4
-    },
-    {
-      "package": "doctor",
-      "function": "checkCollectorAuth",
-      "file": "internal/doctor/doctor.go",
-      "line": 914,
-      "complexity": 4,
-      "line_coverage": 100,
-      "crap": 4
-    },
-    {
-      "package": "doctor",
       "function": "effectiveGlobals",
       "file": "internal/doctor/doctor.go",
-      "line": 939,
+      "line": 852,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -2135,7 +3915,7 @@
       "package": "doctor",
       "function": "joinNames",
       "file": "internal/doctor/doctor.go",
-      "line": 948,
+      "line": 861,
       "complexity": 4,
       "line_coverage": 100,
       "crap": 4
@@ -2466,18 +4246,18 @@
     },
     {
       "package": "output",
-      "function": "nonPassingSortPriority",
+      "function": "sortPriority",
       "file": "internal/output/scan_summary.go",
       "line": 26,
-      "complexity": 5,
-      "line_coverage": 50,
-      "crap": 8.125
+      "complexity": 6,
+      "line_coverage": 71.42857142857143,
+      "crap": 6.839650145772595
     },
     {
       "package": "output",
       "function": "matchingStepMessage",
       "file": "internal/output/scan_summary.go",
-      "line": 44,
+      "line": 46,
       "complexity": 4,
       "line_coverage": 83.33333333333333,
       "crap": 4.074074074074074
@@ -2486,16 +4266,16 @@
       "package": "output",
       "function": "FormatScanSummary",
       "file": "internal/output/scan_summary.go",
-      "line": 59,
-      "complexity": 10,
-      "line_coverage": 89.47368421052632,
-      "crap": 10.116635077999709
+      "line": 63,
+      "complexity": 11,
+      "line_coverage": 95.23809523809524,
+      "crap": 11.013065543677788
     },
     {
       "package": "output",
       "function": "NothingAssessed",
       "file": "internal/output/scan_summary.go",
-      "line": 153,
+      "line": 173,
       "complexity": 4,
       "line_coverage": 100,
       "crap": 4
@@ -2504,7 +4284,7 @@
       "package": "output",
       "function": "FormatOperationalWarnings",
       "file": "internal/output/scan_summary.go",
-      "line": 166,
+      "line": 186,
       "complexity": 4,
       "line_coverage": 100,
       "crap": 4
@@ -2531,7 +4311,7 @@
       "package": "policy",
       "function": "SaveGenerationState",
       "file": "internal/policy/generation_state.go",
-      "line": 31,
+      "line": 34,
       "complexity": 4,
       "line_coverage": 70,
       "crap": 4.432
@@ -2540,7 +4320,7 @@
       "package": "policy",
       "function": "LoadGenerationState",
       "file": "internal/policy/generation_state.go",
-      "line": 51,
+      "line": 54,
       "complexity": 4,
       "line_coverage": 90,
       "crap": 4.016
@@ -2549,7 +4329,7 @@
       "package": "policy",
       "function": "(*GenerationState).IsFresh",
       "file": "internal/policy/generation_state.go",
-      "line": 71,
+      "line": 74,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -2558,7 +4338,7 @@
       "package": "policy",
       "function": "normalizeNilMap",
       "file": "internal/policy/generation_state.go",
-      "line": 78,
+      "line": 81,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -2567,10 +4347,28 @@
       "package": "policy",
       "function": "NewGenerationState",
       "file": "internal/policy/generation_state.go",
-      "line": 86,
+      "line": 89,
       "complexity": 1,
       "line_coverage": 100,
       "crap": 1
+    },
+    {
+      "package": "policy",
+      "function": "InvalidateForEvaluator",
+      "file": "internal/policy/generation_state.go",
+      "line": 107,
+      "complexity": 13,
+      "line_coverage": 80,
+      "crap": 14.351999999999999
+    },
+    {
+      "package": "policy",
+      "function": "RemoveEvaluatorArtifacts",
+      "file": "internal/policy/generation_state.go",
+      "line": 157,
+      "complexity": 3,
+      "line_coverage": 83.33333333333333,
+      "crap": 3.0416666666666665
     },
     {
       "package": "policy",
@@ -2919,9 +4717,27 @@
     },
     {
       "package": "log",
+      "function": "NewTeeWriter",
+      "file": "pkg/log/log.go",
+      "line": 28,
+      "complexity": 1,
+      "line_coverage": 100,
+      "crap": 1
+    },
+    {
+      "package": "log",
+      "function": "(*teeWriter).Write",
+      "file": "pkg/log/log.go",
+      "line": 32,
+      "complexity": 1,
+      "line_coverage": 100,
+      "crap": 1
+    },
+    {
+      "package": "log",
       "function": "defaultOptions",
       "file": "pkg/log/log.go",
-      "line": 27,
+      "line": 48,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -2930,7 +4746,7 @@
       "package": "log",
       "function": "defaultStyles",
       "file": "pkg/log/log.go",
-      "line": 35,
+      "line": 56,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -2939,7 +4755,7 @@
       "package": "log",
       "function": "NewLogger",
       "file": "pkg/log/log.go",
-      "line": 69,
+      "line": 90,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -2948,7 +4764,7 @@
       "package": "log",
       "function": "(*CharmHclog).Log",
       "file": "pkg/log/log.go",
-      "line": 99,
+      "line": 120,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -2957,7 +4773,7 @@
       "package": "log",
       "function": "(*CharmHclog).Trace",
       "file": "pkg/log/log.go",
-      "line": 102,
+      "line": 123,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -2966,7 +4782,7 @@
       "package": "log",
       "function": "(*CharmHclog).Debug",
       "file": "pkg/log/log.go",
-      "line": 105,
+      "line": 126,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -2975,7 +4791,7 @@
       "package": "log",
       "function": "(*CharmHclog).Info",
       "file": "pkg/log/log.go",
-      "line": 108,
+      "line": 129,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -2984,7 +4800,7 @@
       "package": "log",
       "function": "(*CharmHclog).Warn",
       "file": "pkg/log/log.go",
-      "line": 119,
+      "line": 140,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -2993,7 +4809,7 @@
       "package": "log",
       "function": "(*CharmHclog).Error",
       "file": "pkg/log/log.go",
-      "line": 122,
+      "line": 143,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3002,7 +4818,7 @@
       "package": "log",
       "function": "(*CharmHclog).IsTrace",
       "file": "pkg/log/log.go",
-      "line": 127,
+      "line": 148,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3011,7 +4827,7 @@
       "package": "log",
       "function": "(*CharmHclog).IsDebug",
       "file": "pkg/log/log.go",
-      "line": 129,
+      "line": 150,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3020,7 +4836,7 @@
       "package": "log",
       "function": "(*CharmHclog).IsInfo",
       "file": "pkg/log/log.go",
-      "line": 131,
+      "line": 152,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3029,7 +4845,7 @@
       "package": "log",
       "function": "(*CharmHclog).IsWarn",
       "file": "pkg/log/log.go",
-      "line": 133,
+      "line": 154,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3038,7 +4854,7 @@
       "package": "log",
       "function": "(*CharmHclog).IsError",
       "file": "pkg/log/log.go",
-      "line": 135,
+      "line": 156,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3047,7 +4863,7 @@
       "package": "log",
       "function": "(*CharmHclog).ImpliedArgs",
       "file": "pkg/log/log.go",
-      "line": 137,
+      "line": 158,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3056,7 +4872,7 @@
       "package": "log",
       "function": "(*CharmHclog).With",
       "file": "pkg/log/log.go",
-      "line": 139,
+      "line": 160,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3065,7 +4881,7 @@
       "package": "log",
       "function": "(*CharmHclog).Name",
       "file": "pkg/log/log.go",
-      "line": 147,
+      "line": 168,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3074,7 +4890,7 @@
       "package": "log",
       "function": "(*CharmHclog).Named",
       "file": "pkg/log/log.go",
-      "line": 150,
+      "line": 171,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3083,7 +4899,7 @@
       "package": "log",
       "function": "(*CharmHclog).ResetNamed",
       "file": "pkg/log/log.go",
-      "line": 158,
+      "line": 179,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3092,7 +4908,7 @@
       "package": "log",
       "function": "(*CharmHclog).SetLevel",
       "file": "pkg/log/log.go",
-      "line": 166,
+      "line": 187,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3101,7 +4917,7 @@
       "package": "log",
       "function": "(*CharmHclog).GetLevel",
       "file": "pkg/log/log.go",
-      "line": 172,
+      "line": 193,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3110,7 +4926,7 @@
       "package": "log",
       "function": "(*CharmHclog).StandardLogger",
       "file": "pkg/log/log.go",
-      "line": 177,
+      "line": 198,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3119,16 +4935,34 @@
       "package": "log",
       "function": "(*CharmHclog).StandardWriter",
       "file": "pkg/log/log.go",
-      "line": 181,
+      "line": 202,
+      "complexity": 1,
+      "line_coverage": 0,
+      "crap": 2
+    },
+    {
+      "package": "log",
+      "function": "(*CharmHclog).SetColorProfile",
+      "file": "pkg/log/log.go",
+      "line": 207,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
     },
     {
       "package": "provider",
+      "function": "(AssessmentConfiguration).MatchID",
+      "file": "pkg/provider/client.go",
+      "line": 42,
+      "complexity": 2,
+      "line_coverage": 100,
+      "crap": 2
+    },
+    {
+      "package": "provider",
       "function": "(*Client).Close",
       "file": "pkg/provider/client.go",
-      "line": 157,
+      "line": 151,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -3137,7 +4971,7 @@
       "package": "provider",
       "function": "(*Client).Describe",
       "file": "pkg/provider/client.go",
-      "line": 163,
+      "line": 157,
       "complexity": 2,
       "line_coverage": 0,
       "crap": 6
@@ -3146,7 +4980,7 @@
       "package": "provider",
       "function": "(*Client).Generate",
       "file": "pkg/provider/client.go",
-      "line": 181,
+      "line": 174,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -3155,7 +4989,7 @@
       "package": "provider",
       "function": "(*Client).Scan",
       "file": "pkg/provider/client.go",
-      "line": 207,
+      "line": 200,
       "complexity": 5,
       "line_coverage": 0,
       "crap": 30,
@@ -3163,18 +4997,9 @@
     },
     {
       "package": "provider",
-      "function": "(*Client).Export",
-      "file": "pkg/provider/client.go",
-      "line": 249,
-      "complexity": 2,
-      "line_coverage": 0,
-      "crap": 6
-    },
-    {
-      "package": "provider",
       "function": "protoEvidenceToInternal",
       "file": "pkg/provider/client.go",
-      "line": 268,
+      "line": 242,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -3183,7 +5008,7 @@
       "package": "provider",
       "function": "protoResultToInternal",
       "file": "pkg/provider/client.go",
-      "line": 285,
+      "line": 259,
       "complexity": 5,
       "line_coverage": 0,
       "crap": 30,
@@ -3193,7 +5018,7 @@
       "package": "provider",
       "function": "protoConfidenceToInternal",
       "file": "pkg/provider/client.go",
-      "line": 300,
+      "line": 274,
       "complexity": 5,
       "line_coverage": 0,
       "crap": 30,
@@ -3249,7 +5074,7 @@
       "package": "provider",
       "function": "NewManager",
       "file": "pkg/provider/manager.go",
-      "line": 45,
+      "line": 37,
       "complexity": 2,
       "line_coverage": 100,
       "crap": 2
@@ -3258,7 +5083,7 @@
       "package": "provider",
       "function": "(*Manager).LoadProviders",
       "file": "pkg/provider/manager.go",
-      "line": 59,
+      "line": 51,
       "complexity": 6,
       "line_coverage": 22.727272727272727,
       "crap": 22.610443275732532,
@@ -3268,7 +5093,7 @@
       "package": "provider",
       "function": "(*LoadedProvider).GetClient",
       "file": "pkg/provider/manager.go",
-      "line": 101,
+      "line": 92,
       "complexity": 1,
       "line_coverage": 100,
       "crap": 1
@@ -3277,7 +5102,7 @@
       "package": "provider",
       "function": "(*Manager).GetProvider",
       "file": "pkg/provider/manager.go",
-      "line": 105,
+      "line": 96,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -3286,7 +5111,7 @@
       "package": "provider",
       "function": "(*Manager).ListProviders",
       "file": "pkg/provider/manager.go",
-      "line": 117,
+      "line": 108,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -3295,7 +5120,7 @@
       "package": "provider",
       "function": "(*Manager).Cleanup",
       "file": "pkg/provider/manager.go",
-      "line": 130,
+      "line": 121,
       "complexity": 1,
       "line_coverage": 0,
       "crap": 2
@@ -3304,7 +5129,7 @@
       "package": "provider",
       "function": "(*Manager).RouteGenerate",
       "file": "pkg/provider/manager.go",
-      "line": 139,
+      "line": 130,
       "complexity": 8,
       "line_coverage": 85,
       "crap": 8.216
@@ -3313,7 +5138,7 @@
       "package": "provider",
       "function": "(*ScanResult).HasErrors",
       "file": "pkg/provider/manager.go",
-      "line": 193,
+      "line": 184,
       "complexity": 1,
       "line_coverage": 100,
       "crap": 1
@@ -3322,7 +5147,7 @@
       "package": "provider",
       "function": "(*Manager).RouteScan",
       "file": "pkg/provider/manager.go",
-      "line": 205,
+      "line": 196,
       "complexity": 3,
       "line_coverage": 100,
       "crap": 3
@@ -3331,7 +5156,7 @@
       "package": "provider",
       "function": "(*Manager).RouteScanResult",
       "file": "pkg/provider/manager.go",
-      "line": 221,
+      "line": 212,
       "complexity": 6,
       "line_coverage": 100,
       "crap": 6
@@ -3340,35 +5165,16 @@
       "package": "provider",
       "function": "(*Manager).scanErrorMessage",
       "file": "pkg/provider/manager.go",
-      "line": 271,
+      "line": 262,
       "complexity": 2,
       "line_coverage": 75,
       "crap": 2.0625
     },
     {
       "package": "provider",
-      "function": "(*Manager).RouteExport",
-      "file": "pkg/provider/manager.go",
-      "line": 283,
-      "complexity": 3,
-      "line_coverage": 0,
-      "crap": 12
-    },
-    {
-      "package": "provider",
-      "function": "(*Manager).resolveExporter",
-      "file": "pkg/provider/manager.go",
-      "line": 296,
-      "complexity": 4,
-      "line_coverage": 0,
-      "crap": 20,
-      "fix_strategy": "add_tests"
-    },
-    {
-      "package": "provider",
       "function": "errorAssessments",
       "file": "pkg/provider/manager.go",
-      "line": 311,
+      "line": 272,
       "complexity": 1,
       "line_coverage": 100,
       "crap": 1
@@ -3413,7 +5219,7 @@
       "package": "provider",
       "function": "(*grpcServer).Generate",
       "file": "pkg/provider/server.go",
-      "line": 35,
+      "line": 34,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -3422,27 +5228,17 @@
       "package": "provider",
       "function": "(*grpcServer).Scan",
       "file": "pkg/provider/server.go",
-      "line": 61,
-      "complexity": 5,
+      "line": 60,
+      "complexity": 6,
       "line_coverage": 0,
-      "crap": 30,
-      "fix_strategy": "add_tests"
-    },
-    {
-      "package": "provider",
-      "function": "(*grpcServer).Export",
-      "file": "pkg/provider/server.go",
-      "line": 103,
-      "complexity": 4,
-      "line_coverage": 0,
-      "crap": 20,
+      "crap": 42,
       "fix_strategy": "add_tests"
     },
     {
       "package": "provider",
       "function": "internalEvidenceToProto",
       "file": "pkg/provider/server.go",
-      "line": 135,
+      "line": 106,
       "complexity": 3,
       "line_coverage": 0,
       "crap": 12
@@ -3451,7 +5247,7 @@
       "package": "provider",
       "function": "internalResultToProto",
       "file": "pkg/provider/server.go",
-      "line": 152,
+      "line": 123,
       "complexity": 5,
       "line_coverage": 0,
       "crap": 30,
@@ -3461,7 +5257,7 @@
       "package": "provider",
       "function": "internalConfidenceToProto",
       "file": "pkg/provider/server.go",
-      "line": 167,
+      "line": 138,
       "complexity": 5,
       "line_coverage": 0,
       "crap": 30,
@@ -3711,16 +5507,16 @@
     }
   ],
   "summary": {
-    "total_functions": 406,
-    "avg_complexity": 3.5714285714285716,
-    "avg_line_coverage": 50.20927642624636,
-    "avg_crap": 9.800894617994317,
-    "crapload": 55,
+    "total_functions": 595,
+    "avg_complexity": 3.7815126050420167,
+    "avg_line_coverage": 34.108387142238975,
+    "avg_crap": 17.43106756464828,
+    "crapload": 150,
     "crap_threshold": 15,
     "fix_strategy_counts": {
-      "add_tests": 51,
+      "add_tests": 140,
       "decompose": 3,
-      "decompose_and_test": 1
+      "decompose_and_test": 7
     },
     "worst_crap": [
       {
@@ -3734,52 +5530,124 @@
         "fix_strategy": "decompose_and_test"
       },
       {
-        "package": "cli",
-        "function": "promptTargets",
-        "file": "cmd/complyctl/cli/init.go",
-        "line": 153,
-        "complexity": 10,
+        "package": "server",
+        "function": "(*ProviderServer).Scan",
+        "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+        "line": 128,
+        "complexity": 18,
         "line_coverage": 0,
-        "crap": 110,
-        "fix_strategy": "add_tests"
+        "crap": 342,
+        "fix_strategy": "decompose_and_test"
       },
       {
-        "package": "terminal",
-        "function": "ShowPlainTable",
-        "file": "internal/terminal/table.go",
-        "line": 19,
-        "complexity": 10,
+        "package": "server",
+        "function": "extractTarGz",
+        "file": "complytime-providers/cmd/ampel-provider/server/unpack.go",
+        "line": 56,
+        "complexity": 17,
         "line_coverage": 0,
-        "crap": 110,
-        "fix_strategy": "add_tests"
+        "crap": 306,
+        "fix_strategy": "decompose_and_test"
       },
       {
-        "package": "cachetest",
-        "function": "(*MockPolicySource).CopyPolicy",
-        "file": "internal/cache/cachetest/mock_source.go",
-        "line": 73,
-        "complexity": 10,
+        "package": "server",
+        "function": "extractTarGz",
+        "file": "complytime-providers/cmd/opa-provider/server/server.go",
+        "line": 251,
+        "complexity": 17,
         "line_coverage": 0,
-        "crap": 110,
-        "fix_strategy": "add_tests"
+        "crap": 306,
+        "fix_strategy": "decompose_and_test"
       },
       {
-        "package": "main",
-        "function": "main",
-        "file": "cmd/behavioral-report/main.go",
-        "line": 28,
-        "complexity": 9,
+        "package": "results",
+        "function": "ToScanResponse",
+        "file": "complytime-providers/cmd/opa-provider/results/results.go",
+        "line": 187,
+        "complexity": 16,
         "line_coverage": 0,
-        "crap": 90,
-        "fix_strategy": "add_tests"
+        "crap": 272,
+        "fix_strategy": "decompose_and_test"
       }
     ],
     "recommended_actions": [
       {
+        "function": "ScanRepository",
+        "package": "scan",
+        "file": "complytime-providers/cmd/ampel-provider/scan/scan.go",
+        "line": 252,
+        "fix_strategy": "add_tests",
+        "crap": 156,
+        "complexity": 12
+      },
+      {
+        "function": "validateTargetVariables",
+        "package": "server",
+        "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+        "line": 266,
+        "fix_strategy": "add_tests",
+        "crap": 132,
+        "complexity": 11
+      },
+      {
+        "function": "ParseRepoURL",
+        "package": "targets",
+        "file": "complytime-providers/cmd/opa-provider/targets/targets.go",
+        "line": 17,
+        "fix_strategy": "add_tests",
+        "crap": 132,
+        "complexity": 11
+      },
+      {
+        "function": "findMatchingDatastream",
+        "package": "config",
+        "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+        "line": 195,
+        "fix_strategy": "add_tests",
+        "crap": 110,
+        "complexity": 10
+      },
+      {
         "function": "ShowPlainTable",
         "package": "terminal",
         "file": "internal/terminal/table.go",
         "line": 19,
+        "fix_strategy": "add_tests",
+        "crap": 110,
+        "complexity": 10
+      },
+      {
+        "function": "(*MockPolicySource).CopyPolicy",
+        "package": "cachetest",
+        "file": "internal/cache/cachetest/mock_source.go",
+        "line": 73,
+        "fix_strategy": "add_tests",
+        "crap": 110,
+        "complexity": 10
+      },
+      {
+        "function": "(*ProviderServer).Generate",
+        "package": "server",
+        "file": "complytime-providers/cmd/opa-provider/server/server.go",
+        "line": 95,
+        "fix_strategy": "add_tests",
+        "crap": 110,
+        "complexity": 10
+      },
+      {
+        "function": "(*ProviderServer).Scan",
+        "package": "server",
+        "file": "complytime-providers/cmd/opa-provider/server/server.go",
+        "line": 409,
+        "fix_strategy": "add_tests",
+        "crap": 110,
+        "complexity": 10
+      },
+      {
+        "function": "GetDsVariablesValues",
+        "package": "xccdf",
+        "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+        "line": 264,
         "fix_strategy": "add_tests",
         "crap": 110,
         "complexity": 10
@@ -3794,13 +5662,31 @@
         "complexity": 10
       },
       {
-        "function": "(*MockPolicySource).CopyPolicy",
-        "package": "cachetest",
-        "file": "internal/cache/cachetest/mock_source.go",
-        "line": 73,
+        "function": "getDistroIdsAndVersions",
+        "package": "config",
+        "file": "complytime-providers/cmd/openscap-provider/config/config.go",
+        "line": 157,
         "fix_strategy": "add_tests",
-        "crap": 110,
-        "complexity": 10
+        "crap": 90,
+        "complexity": 9
+      },
+      {
+        "function": "GetDsRules",
+        "package": "xccdf",
+        "file": "complytime-providers/cmd/openscap-provider/xccdf/datastream.go",
+        "line": 344,
+        "fix_strategy": "add_tests",
+        "crap": 90,
+        "complexity": 9
+      },
+      {
+        "function": "(*ProviderServer).Generate",
+        "package": "server",
+        "file": "complytime-providers/cmd/ampel-provider/server/server.go",
+        "line": 61,
+        "fix_strategy": "add_tests",
+        "crap": 90,
+        "complexity": 9
       },
       {
         "function": "main",
@@ -3812,148 +5698,58 @@
         "complexity": 9
       },
       {
-        "function": "DigestRecordedInState",
-        "package": "behavioral",
-        "file": "tests/behavioral/supply_chain.go",
-        "line": 50,
+        "function": "ParseRepoURL",
+        "package": "targets",
+        "file": "complytime-providers/cmd/ampel-provider/targets/targets.go",
+        "line": 15,
+        "fix_strategy": "add_tests",
+        "crap": 90,
+        "complexity": 9
+      },
+      {
+        "function": "deriveIDFromQuery",
+        "package": "results",
+        "file": "complytime-providers/cmd/opa-provider/results/results.go",
+        "line": 119,
+        "fix_strategy": "add_tests",
+        "crap": 90,
+        "complexity": 9
+      },
+      {
+        "function": "updateTailoringValues",
+        "package": "xccdf",
+        "file": "complytime-providers/cmd/openscap-provider/xccdf/tailoring.go",
+        "line": 157,
         "fix_strategy": "add_tests",
         "crap": 72,
         "complexity": 8
       },
       {
-        "function": "CheckProviders",
-        "package": "doctor",
-        "file": "internal/doctor/doctor.go",
-        "line": 136,
+        "function": "(*ProviderServer).Export",
+        "package": "server",
+        "file": "complytime-providers/cmd/openscap-provider/server/server.go",
+        "line": 248,
         "fix_strategy": "add_tests",
         "crap": 72,
         "complexity": 8
       },
       {
-        "function": "(*Cache).ListPolicies",
-        "package": "cache",
-        "file": "internal/cache/cache.go",
-        "line": 50,
+        "function": "(*ProviderServer).processRemoteBranches",
+        "package": "server",
+        "file": "complytime-providers/cmd/opa-provider/server/server.go",
+        "line": 515,
         "fix_strategy": "add_tests",
-        "crap": 56,
-        "complexity": 7
+        "crap": 72,
+        "complexity": 8
       },
       {
-        "function": "SignatureVerified",
-        "package": "behavioral",
-        "file": "tests/behavioral/supply_chain.go",
-        "line": 19,
+        "function": "RuleResultMessage",
+        "package": "xccdf",
+        "file": "complytime-providers/cmd/openscap-provider/xccdf/arf.go",
+        "line": 75,
         "fix_strategy": "add_tests",
-        "crap": 56,
-        "complexity": 7
-      },
-      {
-        "function": "InstallTestPlugin",
-        "package": "behavioral",
-        "file": "tests/behavioral/reusable_steps.go",
-        "line": 57,
-        "fix_strategy": "add_tests",
-        "crap": 56,
-        "complexity": 7
-      },
-      {
-        "function": "PluginBinaryIntegrityCheck",
-        "package": "behavioral",
-        "file": "tests/behavioral/plugin_security.go",
-        "line": 67,
-        "fix_strategy": "add_tests",
-        "crap": 56,
-        "complexity": 7
-      },
-      {
-        "function": "OSCALResultProduced",
-        "package": "behavioral",
-        "file": "tests/behavioral/audit.go",
-        "line": 48,
-        "fix_strategy": "add_tests",
-        "crap": 56,
-        "complexity": 7
-      },
-      {
-        "function": "EvaluationLogProduced",
-        "package": "behavioral",
-        "file": "tests/behavioral/audit.go",
-        "line": 17,
-        "fix_strategy": "add_tests",
-        "crap": 42,
-        "complexity": 6
-      },
-      {
-        "function": "HTTPSchemeRejected",
-        "package": "behavioral",
-        "file": "tests/behavioral/transport_security.go",
-        "line": 17,
-        "fix_strategy": "add_tests",
-        "crap": 42,
-        "complexity": 6
-      },
-      {
-        "function": "(*Client).fetchVersion",
-        "package": "registry",
-        "file": "internal/registry/client.go",
-        "line": 118,
-        "fix_strategy": "add_tests",
-        "crap": 42,
-        "complexity": 6
-      },
-      {
-        "function": "registerOCIRoutes",
-        "package": "main",
-        "file": "cmd/mock-oci-registry/main.go",
-        "line": 83,
-        "fix_strategy": "add_tests",
-        "crap": 42,
-        "complexity": 6
-      },
-      {
-        "function": "serveManifest",
-        "package": "main",
-        "file": "cmd/mock-oci-registry/main.go",
-        "line": 161,
-        "fix_strategy": "add_tests",
-        "crap": 42,
-        "complexity": 6
-      },
-      {
-        "function": "UnsetEnvVarFails",
-        "package": "behavioral",
-        "file": "tests/behavioral/credential_protection.go",
-        "line": 17,
-        "fix_strategy": "add_tests",
-        "crap": 30,
-        "complexity": 5
-      },
-      {
-        "function": "internalConfidenceToProto",
-        "package": "provider",
-        "file": "pkg/provider/server.go",
-        "line": 167,
-        "fix_strategy": "add_tests",
-        "crap": 30,
-        "complexity": 5
-      },
-      {
-        "function": "LogCredentialRedaction",
-        "package": "behavioral",
-        "file": "tests/behavioral/log_security.go",
-        "line": 16,
-        "fix_strategy": "add_tests",
-        "crap": 30,
-        "complexity": 5
-      },
-      {
-        "function": "EnvVarResolution",
-        "package": "behavioral",
-        "file": "tests/behavioral/credential_protection.go",
-        "line": 54,
-        "fix_strategy": "add_tests",
-        "crap": 30,
-        "complexity": 5
+        "crap": 72,
+        "complexity": 8
       }
     ],
     "ssa_degraded_packages": [

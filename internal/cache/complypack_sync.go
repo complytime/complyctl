@@ -38,6 +38,19 @@ func NewComplypackSync(complypackCache *ComplypackCache, state *State, source Co
 	}
 }
 
+// cacheExistsForState checks whether the cache directory for a previously
+// synced complypack still exists on disk. Uses the evaluator-id recorded in
+// state to locate the cache via LookupByEvaluatorID. Returns false if the
+// evaluator-id is empty (state predates evaluator-id tracking) or if the
+// cache files are missing.
+func (s *ComplypackSync) cacheExistsForState(ps PolicyState) bool {
+	if ps.EvaluatorID == "" {
+		return false
+	}
+	contentPath, _, err := s.complypackCache.LookupByEvaluatorID(ps.EvaluatorID)
+	return err == nil && contentPath != ""
+}
+
 // SyncComplypack performs incremental synchronization of a complypack artifact.
 // Compares the local cached digest against the remote manifest digest; if they
 // match, sync is skipped. On change, the artifact is fetched into a temporary
@@ -66,18 +79,13 @@ func (s *ComplypackSync) SyncComplypack(ctx context.Context, repository, version
 		version = remoteVersion
 	}
 
-	// Incremental sync check: skip if local digest matches remote.
-	//
-	// Design note: we only check state digest, not whether the cache directory
-	// still exists on disk. The evaluator-id is only known after unpacking the
-	// artifact, so we cannot call LookupByEvaluatorID here (we only have the
-	// repository string at this point). If a user manually deletes the cache
-	// directory but state.json still records a matching digest, this guard will
-	// skip the sync. The user must clear state (or change the digest) to force
-	// a re-fetch. This matches the policy sync pattern where state is the
-	// source of truth for incremental checks.
+	// Incremental sync check: skip only if local digest matches remote AND
+	// the cache directory still exists on disk. The state records the
+	// evaluator-id from the previous unpack, so we can verify cache presence
+	// without re-unpacking. This mirrors the policy sync pattern where
+	// PolicyStoreExists() gates the skip (see sync.go line 85).
 	localState, exists := s.state.GetComplypackState(repository)
-	if exists && localState.Digest == remoteDigest {
+	if exists && localState.Digest == remoteDigest && s.cacheExistsForState(localState) {
 		return false, nil
 	}
 

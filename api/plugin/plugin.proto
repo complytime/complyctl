@@ -190,6 +190,9 @@ message DescribeRequest {
 // DescribeResponse reports plugin identity, health, and declared variable
 // requirements used by doctor diagnostics.
 message DescribeResponse {
+  reserved 6;
+  reserved "supports_export";
+
   // Health status
   bool healthy = 1;
 

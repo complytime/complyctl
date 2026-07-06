@@ -186,9 +186,9 @@ export GITHUB_TOKEN=<your-token>
 
 - A mock OCI registry running on `localhost:8765`, loaded with
   Gemara test catalogs and policies.
-- A test workspace at `~/test-workspace/` with a
-  `complytime.yaml` pre-configured to point at the mock
-  registry.
+- A test workspace at `~/test-workspace/` with
+  `.complytime/complytime.yaml` pre-configured to point at
+  the mock registry.
 
 ### System Packages
 
@@ -319,7 +319,7 @@ The mock OCI registry's `seedFromDirectory()` reads Gemara
 catalog and policy YAML files from the mounted bundles
 directory and serves them as OCI artifacts, exactly like
 the embedded test content. The post-create script adds
-policy entries to `complytime.yaml` pointing at the mock
+policy entries to `.complytime/complytime.yaml` pointing at the mock
 registry (`http://localhost:8765/policies/{name}`), so `complyctl
 get` populates the cache through normal code paths.
 

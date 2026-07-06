@@ -142,7 +142,8 @@ if ! curl -sf "${REGISTRY_URL}/v2/" >/dev/null 2>&1; then
 fi
 echo "  Mock registry ready (PID ${REGISTRY_PID})"
 
-cat > "${WORK_DIR}/complytime.yaml" <<EOF
+mkdir -p "${WORK_DIR}/.complytime"
+cat > "${WORK_DIR}/.complytime/complytime.yaml" <<EOF
 policies:
   - url: ${REGISTRY_URL}/${POLICY_ID}
     id: ${POLICY_ID}

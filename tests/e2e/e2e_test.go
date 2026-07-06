@@ -672,3 +672,51 @@ func TestE2E_ListVerifiedColumn(t *testing.T) {
 	assert.Contains(t, out, "VERIFIED", "list output must include VERIFIED column header")
 	assert.Contains(t, out, testPolicyID)
 }
+
+// TestE2E_DuplicateComplypackEvaluatorID verifies that complyctl get exits
+// non-zero when two complypack entries resolve to the same evaluator-id.
+// Covers FR-001 and FR-002 from the reject-duplicate-evaluator-id spec.
+func TestE2E_DuplicateComplypackEvaluatorID(t *testing.T) {
+	binary := locateBinary(t)
+	srv := startMockRegistry(t)
+	defer srv.Close()
+
+	homeDir := t.TempDir()
+	workDir := t.TempDir()
+	env := buildEnv(homeDir)
+
+	// Configure two complypacks that both resolve to evaluator-id "opa".
+	configYAML := fmt.Sprintf(`policies:
+  - url: %s/nist-800-53-r5
+    id: nist-800-53-r5
+complypacks:
+  - url: %s/complypacks/opa-a
+  - url: %s/complypacks/opa-b
+targets:
+  - id: e2e-target
+    policies:
+      - nist-800-53-r5
+    variables:
+      env: test
+`, srv.URL, srv.URL, srv.URL)
+	configDir := filepath.Join(workDir, ".complytime")
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "complytime.yaml"), []byte(configYAML), 0644))
+
+	cmd := exec.Command(binary, "get")
+	cmd.Dir = workDir
+	cmd.Env = env
+	output, err := cmd.CombinedOutput()
+
+	require.Error(t, err, "get must fail when two complypacks share the same evaluator-id")
+	outStr := string(output)
+	t.Log(outStr)
+	assert.Contains(t, outStr, `duplicate evaluator-id "opa"`,
+		"error must identify the conflicting evaluator-id")
+	assert.Contains(t, outStr, "complypacks/opa-a",
+		"error must list the first conflicting repository")
+	assert.Contains(t, outStr, "complypacks/opa-b",
+		"error must list the second conflicting repository")
+	assert.Contains(t, outStr, "remove one of the conflicting entries",
+		"error must suggest remediation")
+}

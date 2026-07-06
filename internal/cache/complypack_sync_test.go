@@ -216,6 +216,75 @@ func TestComplypackSync_IncrementalSkip(t *testing.T) {
 	assert.Equal(t, "sha256:incremental111", ps.Digest)
 }
 
+// TestComplypackSync_CacheMissing_RefetchesDespiteMatchingDigest verifies that
+// when the cache directory has been deleted but state.json still records a
+// matching digest, SyncComplypack re-fetches the artifact instead of skipping.
+// This is the fix for #649: state/filesystem desynchronization.
+func TestComplypackSync_CacheMissing_RefetchesDespiteMatchingDigest(t *testing.T) {
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+
+	mock := newMockComplypackSource()
+	mock.seedComplypack(
+		"example.com/complypacks/opa-bundle",
+		"io.complytime.opa",
+		"1.0.0",
+		"sha256:cache-missing-test",
+		"opa bundle content for cache-missing test",
+	)
+
+	complypackCache := cache.NewComplypackCache(cacheDir)
+	state, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+
+	// First sync — should fetch and store.
+	fetched, err := syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
+	require.NoError(t, err)
+	assert.True(t, fetched, "first sync should fetch")
+	assert.Equal(t, 1, mock.getCopyCount())
+
+	// Verify cache exists.
+	contentPath, _, err := complypackCache.LookupByEvaluatorID("io.complytime.opa")
+	require.NoError(t, err)
+	assert.NotEmpty(t, contentPath, "cache should exist after first sync")
+
+	// Delete the cache directory to simulate user deletion.
+	complypacksDir := filepath.Join(cacheDir, "complypacks", "io.complytime.opa")
+	require.NoError(t, os.RemoveAll(complypacksDir))
+
+	// Verify cache is gone.
+	contentPath2, _, err := complypackCache.LookupByEvaluatorID("io.complytime.opa")
+	require.NoError(t, err)
+	assert.Empty(t, contentPath2, "cache should be gone after deletion")
+
+	// Reload state — it still records the old digest.
+	state2, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	ps, ok := state2.GetComplypackState("example.com/complypacks/opa-bundle")
+	require.True(t, ok, "state should still record the complypack")
+	assert.Equal(t, "sha256:cache-missing-test", ps.Digest,
+		"state should still have the old digest")
+
+	syncMgr2 := cache.NewComplypackSync(complypackCache, state2, mock)
+
+	// Second sync — same digest, but cache is missing. Should re-fetch.
+	fetched2, err := syncMgr2.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
+	require.NoError(t, err)
+	assert.True(t, fetched2,
+		"sync should re-fetch when cache is missing despite matching digest")
+	assert.Equal(t, 2, mock.getCopyCount(),
+		"CopyComplypack should be called again when cache is missing")
+
+	// Verify cache is restored.
+	contentPath3, _, err := complypackCache.LookupByEvaluatorID("io.complytime.opa")
+	require.NoError(t, err)
+	assert.NotEmpty(t, contentPath3, "cache should be restored after re-fetch")
+	assert.FileExists(t, contentPath3, "content.tar.gz should exist after re-fetch")
+}
+
 // TestComplypackSync_DigestChanged verifies that when the remote digest changes,
 // a re-fetch is triggered and the cache is updated with the new content.
 func TestComplypackSync_DigestChanged(t *testing.T) {

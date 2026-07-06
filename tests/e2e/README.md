@@ -16,6 +16,7 @@ Build tag: `e2e`.
 | `PolicyCache` | OCI layout structure, state.json tracking |
 | `MultiplePolicies` | Multi-policy fetch + list |
 | `ScanDefaultFormat` | No --format = EvaluationLog only |
+| `ScanTargetArg` | Positional target argument with policy inference |
 | `InvalidFormat` | `--format pdf` rejected |
 | `MissingPolicy` | Uncached policy fails with clear message |
 | `MockRegistryOCICompliance` | v2 endpoint, catalog, tags, manifests, 404s |
@@ -24,10 +25,15 @@ Build tag: `e2e`.
 | `Help` | CLI help output structure |
 | `Version` | Version command output |
 | `ListFilterByPolicyID` | `--policy-id` filter on list |
+| `GetSkipVerify` | `--skip-verify` flag accepted, no verification warnings |
+| `ListVerifiedColumn` | VERIFIED column present in list output |
+| `DuplicateComplypackEvaluatorID` | Two complypacks with same evaluator-id → non-zero exit with actionable error |
 
 ## Mock Registry
 
 The in-process mock registry (`helpers_test.go`) implements OCI Distribution Spec v2 endpoints with these seeded policies:
+
+**Policies:**
 
 | Repository | Layers | Tags |
 |:---|:---|:---|
@@ -36,6 +42,15 @@ The in-process mock registry (`helpers_test.go`) implements OCI Distribution Spe
 | `cis-benchmark` | catalog | v2.0.0, latest |
 
 The policy layer uses evaluator ID `test`, which routes to the `complyctl-provider-test` binary.
+
+**Complypacks:**
+
+| Repository | Evaluator ID | Tags |
+|:---|:---|:---|
+| `complypacks/opa-a` | `opa` | v1.0.0, latest |
+| `complypacks/opa-b` | `opa` | v1.0.0, latest |
+
+Both complypack repositories use evaluator ID `opa` (intentional duplicate for `DuplicateComplypackEvaluatorID` testing). Complypack artifacts include a config blob with `evaluator-id` and `version`, a content blob (tar.gz), and the `application/vnd.complypack.artifact.v1` artifact type.
 
 ## Manual Walkthrough
 
@@ -195,5 +210,6 @@ rm ~/.complytime/providers/complyctl-provider-test
 1. Add a `TestE2E_*` function in `e2e_test.go` using helpers from `helpers_test.go`.
 2. Use `startMockRegistry(t)` for an isolated in-process registry per test.
 3. Use `installTestPlugin(t, homeDir)` to deploy the test provider.
-4. Use `runComplytime(t, binary, workDir, env, args...)` to execute commands.
-5. Run: `make test-e2e`
+4. Use `runComplytime(t, binary, workDir, env, args...)` to execute commands (fatals on non-zero exit). For tests expecting failure, use `exec.Command` directly and assert `err != nil`.
+5. To seed complypack artifacts, use the `addComplypackArtifact` closure inside `startMockRegistry`. See `DuplicateComplypackEvaluatorID` for an example.
+6. Run: `make test-e2e`

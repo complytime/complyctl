@@ -472,3 +472,75 @@ func TestMarkdown_ControlsTableShowsAllControls(t *testing.T) {
 	assert.Contains(t, content, "&nbsp;&nbsp;req-2")
 	assert.Contains(t, content, "&nbsp;&nbsp;req-3")
 }
+
+func TestMarkdown_NeedsReviewInFindings(t *testing.T) {
+	outDir := t.TempDir()
+	evalLog := &gemara.EvaluationLog{
+		Metadata: gemara.Metadata{
+			Id:            "nr-policy",
+			GemaraVersion: gemara.SchemaVersion,
+			Author: gemara.Actor{
+				Name: "complytime",
+			},
+		},
+		Result: gemara.NeedsReview,
+		Target: gemara.Resource{Id: "target-nr", Name: "target-nr", Type: gemara.Software},
+		Evaluations: []*gemara.ControlEvaluation{
+			{
+				Name:    "ctrl-review",
+				Result:  gemara.NeedsReview,
+				Message: "human review required",
+				Control: gemara.EntryMapping{ReferenceId: "nr-policy", EntryId: "ctrl-review"},
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement:     gemara.EntryMapping{ReferenceId: "nr-policy", EntryId: "req-review"},
+						Result:          gemara.NeedsReview,
+						Message:         "automated check inconclusive",
+						ConfidenceLevel: gemara.Medium,
+						Recommendation:  "Manual verification needed",
+					},
+				},
+			},
+			{
+				Name:    "ctrl-pass",
+				Result:  gemara.Passed,
+				Message: "ok",
+				Control: gemara.EntryMapping{ReferenceId: "nr-policy", EntryId: "ctrl-pass"},
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{ReferenceId: "nr-policy", EntryId: "req-pass"},
+						Result:      gemara.Passed,
+						Message:     "check passed",
+					},
+				},
+			},
+		},
+	}
+
+	md := output.NewMarkdown("nr-policy", evalLog)
+	path, err := md.Write(outDir)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+
+	// Summary counts table should include Needs Review column with value 1
+	assert.Contains(t, content, "Needs Review")
+	assert.Contains(t, content, "| 1 | 0 | 1 |", "should show 1 passed, 0 failed, 1 needs review")
+
+	// Controls table should show NeedsReview result
+	assert.Contains(t, content, "**ctrl-review**")
+	assert.Contains(t, content, "Needs Review")
+
+	// Findings section should include the NeedsReview finding
+	assert.Contains(t, content, "### Needs Review")
+	assert.Contains(t, content, "#### req-review -- Needs Review")
+	assert.Contains(t, content, "**Control**: ctrl-review")
+	assert.Contains(t, content, "automated check inconclusive")
+	assert.Contains(t, content, "**Confidence**: Medium")
+	assert.Contains(t, content, "**Recommendation**: Manual verification needed")
+
+	// Passed controls should NOT appear in findings
+	assert.NotContains(t, content, "#### req-pass")
+}

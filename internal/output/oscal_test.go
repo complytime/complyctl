@@ -142,6 +142,62 @@ func TestToOSCAL_ProperUUIDs(t *testing.T) {
 	}
 }
 
+func TestToOSCAL_AllResultMappings(t *testing.T) {
+	tests := []struct {
+		name           string
+		result         gemara.Result
+		expectedState  string
+		expectedReason string
+	}{
+		{"passed", gemara.Passed, "satisfied", ""},
+		{"failed", gemara.Failed, "not-satisfied", ""},
+		{"not applicable", gemara.NotApplicable, "satisfied", "not-applicable"},
+		{"unknown", gemara.Unknown, "not-satisfied", "unknown"},
+		{"not run (default)", gemara.NotRun, "not-satisfied", "unknown"},
+		{"needs review (default)", gemara.NeedsReview, "not-satisfied", "unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			outDir := t.TempDir()
+			log := &gemara.EvaluationLog{
+				Metadata: gemara.Metadata{
+					Id:            "test-policy",
+					GemaraVersion: gemara.SchemaVersion,
+					Author:        gemara.Actor{Id: "test", Name: "test", Type: gemara.Software},
+				},
+				Evaluations: []*gemara.ControlEvaluation{{
+					Name:    "ctrl-1",
+					Result:  tt.result,
+					Message: "test",
+					Control: gemara.EntryMapping{ReferenceId: "test-policy", EntryId: "ctrl-1"},
+					AssessmentLogs: []*gemara.AssessmentLog{{
+						Requirement: gemara.EntryMapping{ReferenceId: "test-policy", EntryId: "req-1"},
+						Result:      tt.result,
+						Message:     "test message",
+					}},
+				}},
+			}
+
+			path, err := output.ToOSCAL(log, outDir)
+			require.NoError(t, err)
+
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+
+			var doc oscalTypes.OscalModels
+			require.NoError(t, json.Unmarshal(data, &doc))
+
+			require.NotNil(t, doc.AssessmentResults)
+			require.NotNil(t, doc.AssessmentResults.Results[0].Findings)
+			findings := *doc.AssessmentResults.Results[0].Findings
+			require.Len(t, findings, 1)
+
+			assert.Equal(t, tt.expectedState, findings[0].Target.Status.State, "state mismatch")
+			assert.Equal(t, tt.expectedReason, findings[0].Target.Status.Reason, "reason mismatch")
+		})
+	}
+}
+
 func TestToOSCAL_OutputFileNaming(t *testing.T) {
 	outDir := t.TempDir()
 	log := mockGemaraEvalLog()

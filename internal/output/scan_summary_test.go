@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gemaraproj/go-gemara"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -126,7 +127,21 @@ func TestFormatScanSummary_MissingTargetID(t *testing.T) {
 	output := FormatScanSummary(assessments, assessmentTargets, reqToControl, policyID, targetIDs, true)
 
 	require.Contains(t, output, "1 requirements")
-	assert.Contains(t, output, "-")
+
+	// Verify that the row containing REQ-1 has "-" as its target ID (first field).
+	// A bare Contains(output, "-") is trivially true due to hyphens in other text.
+	lines := strings.Split(output, "\n")
+	var foundFallbackTarget bool
+	for _, line := range lines {
+		if strings.Contains(line, "REQ-1") {
+			fields := strings.Fields(line)
+			if len(fields) > 0 && fields[0] == "-" {
+				foundFallbackTarget = true
+			}
+		}
+	}
+	assert.True(t, foundFallbackTarget,
+		"Row with REQ-1 should have '-' as target ID when assessmentTargets is empty")
 }
 
 func TestFormatOperationalWarnings_Empty(t *testing.T) {
@@ -234,20 +249,21 @@ func TestFormatScanSummary_ControlIDMissing(t *testing.T) {
 
 	output := FormatScanSummary(assessments, assessmentTargets, reqToControl, policyID, targetIDs, true)
 
+	// Verify that the row containing REQ-UNKNOWN has "-" as the control ID
+	// fallback. The table columns are: TARGET ID, REQUIREMENT ID, CONTROL ID, STATUS, MESSAGE.
+	// With strings.Fields the dash appears as a standalone field on that row.
 	lines := strings.Split(output, "\n")
-	var foundDash bool
+	var foundDashControl bool
 	for _, line := range lines {
 		if strings.Contains(line, "REQ-UNKNOWN") && strings.Contains(line, "target1") {
-			parts := strings.Fields(line)
-			for i, part := range parts {
-				if part == "REQ-UNKNOWN" && i+1 < len(parts) && parts[i+1] == "-" {
-					foundDash = true
-					break
-				}
+			fields := strings.Fields(line)
+			// fields[0]=target1, fields[1]=REQ-UNKNOWN, fields[2]=control ID
+			if len(fields) > 2 && fields[2] == "-" {
+				foundDashControl = true
 			}
 		}
 	}
-	assert.True(t, foundDash, "Should show '-' for missing control ID")
+	assert.True(t, foundDashControl, "Should show '-' for missing control ID in the CONTROL ID column")
 }
 
 func TestFormatScanSummary_ShowPassingFalse(t *testing.T) {
@@ -381,6 +397,54 @@ func TestFormatScanSummary_ShowPassingFalse_AllPassed_NoTable(t *testing.T) {
 
 	assert.NotContains(t, output, "TARGET ID")
 	assert.Contains(t, output, "2 requirements: 2 passed, 0 failed, 0 not applicable, 0 skipped, 0 errors")
+}
+
+func TestFormatScanSummary_ErrorResultDefaultBranch(t *testing.T) {
+	// provider.ResultError maps to gemara.Unknown, which hits the default
+	// branch in FormatScanSummary (errCount, StatusError). NeedsReview is
+	// not reachable through provider results alone — it requires gemara
+	// aggregation internals. Sort priority for NeedsReview is covered
+	// directly by TestSortPriority_NeedsReview below.
+	assessments := []provider.AssessmentLog{
+		{
+			RequirementID: "REQ-NR",
+			Steps: []provider.Step{
+				{Result: provider.ResultError, Message: "needs human review"},
+			},
+		},
+		{
+			RequirementID: "REQ-PASS",
+			Steps: []provider.Step{
+				{Result: provider.ResultPassed, Message: "OK"},
+			},
+		},
+	}
+	assessmentTargets := []string{"target1", "target1"}
+	reqToControl := map[string]string{
+		"REQ-NR":   "CTRL-NR",
+		"REQ-PASS": "CTRL-PASS",
+	}
+	policyID := "needs-review-policy"
+	targetIDs := []string{"target1"}
+
+	result := FormatScanSummary(assessments, assessmentTargets, reqToControl, policyID, targetIDs, true)
+
+	assert.Contains(t, result, "REQ-NR")
+	assert.Contains(t, result, "CTRL-NR")
+	assert.Contains(t, result, complytime.StatusError, "Unknown/NeedsReview results should show error emoji")
+	assert.Contains(t, result, "1 errors")
+	assert.Contains(t, result, "1 passed")
+}
+
+func TestSortPriority_NeedsReview(t *testing.T) {
+	// NeedsReview gets priority 3, between Unknown(2) and NotApplicable/NotRun(4).
+	assert.Equal(t, 3, sortPriority(gemara.NeedsReview))
+	assert.Less(t, sortPriority(gemara.Unknown), sortPriority(gemara.NeedsReview),
+		"Unknown should sort before NeedsReview")
+	assert.Less(t, sortPriority(gemara.NeedsReview), sortPriority(gemara.NotApplicable),
+		"NeedsReview should sort before NotApplicable")
+	assert.Less(t, sortPriority(gemara.Failed), sortPriority(gemara.NeedsReview),
+		"Failed should sort before NeedsReview")
 }
 
 func TestFormatScanSummary_AllFailed_ShowPassingTrue(t *testing.T) {

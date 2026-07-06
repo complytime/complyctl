@@ -4,8 +4,11 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -16,6 +19,20 @@ import (
 	"github.com/complytime/complyctl/internal/policy"
 	"github.com/complytime/complyctl/internal/registry"
 )
+
+// verifierBuilder constructs a VerifyFunc from a VerificationConfig.
+// Extracted as a function type so tests can inject a mock that avoids
+// network calls (TUF root fetch, key file reads). Production code uses
+// buildVerifierFromConfig.
+type verifierBuilder func(
+	cfg complytime.VerificationConfig,
+) (cache.VerifyFunc, error)
+
+// defaultVerifierBuilder is the production verifier constructor.
+// Package-level variable allows test override without adding a parameter
+// to every call site — consistent with the codebase's pattern of
+// package-level logger and lw. Tests restore the original in t.Cleanup.
+var defaultVerifierBuilder verifierBuilder = buildVerifierFromConfig
 
 type getOptions struct {
 	*Common
@@ -83,64 +100,140 @@ func (o *getOptions) run(ctx context.Context) error {
 		return err
 	}
 
-	// Build verifier from workspace verification config unless --skip-verify.
-	var syncOpts []cache.SyncOption
+	// When --skip-verify is set, pass nil workspace config and nil cache
+	// so resolveVerifier returns nil for every entry (FR-003).
 	if o.skipVerify {
-		fmt.Fprintln(os.Stderr, "WARNING: signature verification skipped via --skip-verify flag")
-		logger.Warn("Signature verification skipped via --skip-verify flag")
-	} else {
-		var verifyErr error
-		syncOpts, verifyErr = buildVerifierOpts(cfg.Verification)
-		if verifyErr != nil {
-			return verifyErr
-		}
+		fmt.Fprintln(os.Stderr,
+			"WARNING: signature verification skipped "+
+				"via --skip-verify flag")
+		logger.Warn(
+			"Signature verification skipped via --skip-verify flag",
+		)
+		return o.syncAll(ctx, cfg, baseDir, nil, nil)
 	}
 
 	// Chain policy and complypack sync into a single error return.
 	// syncComplypacks is a no-op when no complypacks are configured.
-	return o.syncAll(ctx, cfg, baseDir, syncOpts)
+	// Per-entry verification is resolved inside syncAll (D3).
+	return o.syncAll(ctx, cfg, baseDir, cfg.Verification, nil)
 }
 
-// syncAll runs policy sync followed by complypack sync. Keeping both
-// calls in a single method avoids an extra branch in run() and keeps
-// the CRAP score aligned with the baseline.
-func (o *getOptions) syncAll(ctx context.Context, cfg *complytime.WorkspaceConfig, baseDir string, syncOpts []cache.SyncOption) error {
-	if err := o.syncPolicies(ctx, cfg, syncOpts); err != nil {
-		return err
+// syncAll runs policy sync followed by complypack sync. Creates the
+// verifier cache (D4) shared across all entries within this invocation.
+// wsCfg is nil when --skip-verify is set (FR-003).
+func (o *getOptions) syncAll(
+	ctx context.Context,
+	cfg *complytime.WorkspaceConfig,
+	baseDir string,
+	wsCfg *complytime.VerificationConfig,
+	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+) error {
+	// Lazy-init verifier cache on first call. When --skip-verify
+	// is set both wsCfg and vfCache are nil; resolveVerifier
+	// handles nil cache by skipping the lookup.
+	if wsCfg != nil && vfCache == nil {
+		vfCache = make(
+			map[complytime.VerificationConfig]cache.VerifyFunc,
+		)
 	}
-	return o.syncComplypacks(ctx, cfg, baseDir, syncOpts)
+
+	// Collect errors across both groups so that a policy failure
+	// does not prevent complypack sync (FR-006).
+	policyErr := o.syncPolicies(ctx, cfg, wsCfg, vfCache)
+	complypackErr := o.syncComplypacks(
+		ctx, cfg, baseDir, wsCfg, vfCache,
+	)
+	return errors.Join(policyErr, complypackErr)
 }
 
-// buildVerifierOpts creates SyncOption args from the workspace verification
-// config. Returns (nil, nil) when verification is not configured.
-// Returns an error when verification is configured but verifier construction
-// fails — the user explicitly requested verification, so silent degradation
-// would undermine the security intent. Use --skip-verify to bypass.
-func buildVerifierOpts(vcfg *complytime.VerificationConfig) ([]cache.SyncOption, error) {
-	if !vcfg.IsConfigured() {
-		logger.Debug("Verification skipped: no verification configuration")
+// resolveVerifier determines the effective verifier for a single
+// policy/complypack entry using the resolution priority chain (FR-003,
+// FR-001, FR-002):
+//
+//  1. --skip-verify flag → caller passes nil wsCfg + nil cache
+//  2. entry.SkipVerify   → return nil (no verifier)
+//  3. entry.Verification → build from entry config
+//  4. wsCfg              → build from workspace config
+//  5. nothing configured → return nil (no verifier)
+//
+// The cache (D4) ensures at most one verifier per distinct
+// VerificationConfig within a single complyctl get invocation.
+func resolveVerifier(
+	entry complytime.PolicyEntry,
+	wsCfg *complytime.VerificationConfig,
+	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+) ([]cache.SyncOption, error) {
+	// Entry-level opt-out (FR-002).
+	if entry.SkipVerify {
+		logger.Debug("Verification skipped: entry skip_verify",
+			"policy", entry.EffectiveID())
 		return nil, nil
 	}
 
-	var verifier cache.VerifyFunc
-	var err error
-	if vcfg.Key != "" {
-		verifier, err = cache.NewKeyedVerifier(vcfg.Key)
-	} else {
-		verifier, err = cache.NewKeylessVerifier(vcfg.Issuer, vcfg.Identity)
+	// Determine the effective config: entry-level overrides
+	// workspace-level (D1: standalone blocks, no merging).
+	var effective *complytime.VerificationConfig
+	if entry.Verification != nil && entry.Verification.IsConfigured() {
+		effective = entry.Verification
+	} else if wsCfg != nil && wsCfg.IsConfigured() {
+		effective = wsCfg
 	}
+
+	if effective == nil {
+		logger.Debug("Verification skipped: no config",
+			"policy", entry.EffectiveID())
+		return nil, nil
+	}
+
+	// Cache lookup (D4). A nil cache means --skip-verify was set;
+	// we should not reach here because wsCfg is also nil in that
+	// case, but guard defensively.
+	if vfCache == nil {
+		return nil, nil
+	}
+
+	cfg := *effective
+	if vf, ok := vfCache[cfg]; ok {
+		return []cache.SyncOption{cache.WithVerifier(vf)}, nil
+	}
+
+	// Cache miss — construct a new verifier and store it.
+	vf, err := defaultVerifierBuilder(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("verification configured but initialization failed (use --skip-verify to bypass): %w", err)
+		return nil, fmt.Errorf(
+			"verification configured but initialization failed "+
+				"(use --skip-verify to bypass): %w", err,
+		)
 	}
-	return []cache.SyncOption{cache.WithVerifier(verifier)}, nil
+	vfCache[cfg] = vf
+	return []cache.SyncOption{cache.WithVerifier(vf)}, nil
 }
 
-func (o *getOptions) syncPolicies(ctx context.Context, cfg *complytime.WorkspaceConfig, syncOpts []cache.SyncOption) error {
+// buildVerifierFromConfig constructs a VerifyFunc from a
+// VerificationConfig. This is the production implementation of
+// verifierBuilder — it calls NewKeyedVerifier or NewKeylessVerifier,
+// which perform network I/O (key file read / TUF root fetch).
+func buildVerifierFromConfig(
+	cfg complytime.VerificationConfig,
+) (cache.VerifyFunc, error) {
+	if cfg.Key != "" {
+		return cache.NewKeyedVerifier(cfg.Key)
+	}
+	return cache.NewKeylessVerifier(cfg.Issuer, cfg.Identity)
+}
+
+func (o *getOptions) syncPolicies(
+	ctx context.Context,
+	cfg *complytime.WorkspaceConfig,
+	wsCfg *complytime.VerificationConfig,
+	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+) error {
 	cacheMgr := cache.NewCache(o.cacheDir)
 
 	state, err := cache.LoadState(o.cacheDir)
 	if err != nil {
-		logger.Error("Cache state load failed", "cache_dir", o.cacheDir, "error", err)
+		logger.Error("Cache state load failed",
+			"cache_dir", o.cacheDir, "error", err)
 		return fmt.Errorf("failed to load cache state: %w", err)
 	}
 
@@ -150,19 +243,31 @@ func (o *getOptions) syncPolicies(ctx context.Context, cfg *complytime.Workspace
 		return fmt.Errorf("authentication setup failed: %w", err)
 	}
 
-	return syncAllPolicies(ctx, cacheMgr, state, credFunc, cfg.Policies, syncOpts)
+	return syncAllPolicies(
+		ctx, cacheMgr, state, credFunc,
+		cfg.Policies, wsCfg, vfCache,
+	)
 }
 
-// syncComplypacks fetches complypack artifacts listed in the workspace config.
-// Skips silently when no complypacks are configured.
-func (o *getOptions) syncComplypacks(ctx context.Context, cfg *complytime.WorkspaceConfig, baseDir string, syncOpts []cache.SyncOption) error {
+// syncComplypacks fetches complypack artifacts listed in the workspace
+// config. Skips silently when no complypacks are configured. After sync
+// completes, validates that no two complypack entries resolved to the
+// same evaluator-id.
+func (o *getOptions) syncComplypacks(
+	ctx context.Context,
+	cfg *complytime.WorkspaceConfig,
+	baseDir string,
+	wsCfg *complytime.VerificationConfig,
+	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+) error {
 	if len(cfg.Complypacks) == 0 {
 		return nil
 	}
 
 	state, err := cache.LoadState(o.cacheDir)
 	if err != nil {
-		logger.Error("Cache state load failed", "cache_dir", o.cacheDir, "error", err)
+		logger.Error("Cache state load failed",
+			"cache_dir", o.cacheDir, "error", err)
 		return fmt.Errorf("failed to load cache state: %w", err)
 	}
 
@@ -172,59 +277,122 @@ func (o *getOptions) syncComplypacks(ctx context.Context, cfg *complytime.Worksp
 		return fmt.Errorf("authentication setup failed: %w", err)
 	}
 
-	return syncAllComplypacks(ctx, state, credFunc, cfg.Complypacks, o.cacheDir, baseDir, syncOpts)
+	if err := syncAllComplypacks(
+		ctx, state, credFunc,
+		cfg.Complypacks, o.cacheDir, baseDir,
+		wsCfg, vfCache,
+	); err != nil {
+		return err
+	}
+
+	return validateUniqueEvaluatorIDs(state, cfg.Complypacks)
 }
 
-func syncAllPolicies(ctx context.Context, cacheMgr *cache.Cache, state *cache.State, credFunc auth.CredentialFunc, policies []complytime.PolicyEntry, syncOpts []cache.SyncOption) error {
-	logger.Info("Starting policy synchronization", "policy_count", len(policies))
+// syncAllPolicies iterates all policy entries, resolving per-entry
+// verification and collecting errors (D5: errors.Join). All entries
+// are attempted regardless of individual failures (FR-006).
+func syncAllPolicies(
+	ctx context.Context,
+	cacheMgr *cache.Cache,
+	state *cache.State,
+	credFunc auth.CredentialFunc,
+	policies []complytime.PolicyEntry,
+	wsCfg *complytime.VerificationConfig,
+	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+) error {
+	logger.Info("Starting policy synchronization",
+		"policy_count", len(policies))
 
 	total := len(policies)
+	var errs []error
 	for i, entry := range policies {
-		if err := syncSinglePolicy(ctx, cacheMgr, state, credFunc, entry, i+1, total, syncOpts); err != nil {
-			return err
+		if err := syncSinglePolicy(
+			ctx, cacheMgr, state, credFunc,
+			entry, i+1, total, wsCfg, vfCache,
+		); err != nil {
+			eid := entry.EffectiveID()
+			fmt.Fprintf(os.Stderr,
+				"WARNING: policy %q sync failed: %v\n",
+				eid, err)
+			errs = append(errs, err)
+			continue
 		}
 	}
 
-	logger.Info("Synchronization completed", "synced", total, "total", total)
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	logger.Info("Synchronization completed",
+		"synced", total, "total", total)
 	fmt.Fprintln(os.Stderr, "Synchronization completed.")
 	return nil
 }
 
-func syncSinglePolicy(ctx context.Context, cacheMgr *cache.Cache, state *cache.State, credFunc auth.CredentialFunc, entry complytime.PolicyEntry, index, total int, syncOpts []cache.SyncOption) error {
+func syncSinglePolicy(
+	ctx context.Context,
+	cacheMgr *cache.Cache,
+	state *cache.State,
+	credFunc auth.CredentialFunc,
+	entry complytime.PolicyEntry,
+	index, total int,
+	wsCfg *complytime.VerificationConfig,
+	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+) error {
 	ref, err := complytime.ParsePolicyRef(entry.URL)
 	if err != nil {
-		return fmt.Errorf("invalid policy reference %q: %w", entry.URL, err)
+		return fmt.Errorf("invalid policy reference %q: %w",
+			entry.URL, err)
 	}
 	version := ref.VersionString()
+
+	// Resolve per-entry verification (FR-001, FR-002, FR-003).
+	syncOpts, err := resolveVerifier(entry, wsCfg, vfCache)
+	if err != nil {
+		return fmt.Errorf("policy %s: %w",
+			entry.EffectiveID(), err)
+	}
 
 	client := registry.NewClient(ref.Registry, credFunc)
 	source := cache.NewRegistrySource(client)
 	sync := cache.NewSync(cacheMgr, state, source, syncOpts...)
 
 	if version == "" {
-		version = resolveLatestVersion(ctx, client, ref.Repository, entry.EffectiveID())
+		version = resolveLatestVersion(
+			ctx, client, ref.Repository, entry.EffectiveID(),
+		)
 	}
 
-	fmt.Fprintf(os.Stderr, "Syncing policy %d/%d: %s... ", index, total, entry.EffectiveID())
-	logger.Info("Syncing policy", "policy", ref.Repository, "version", version)
+	fmt.Fprintf(os.Stderr, "Syncing policy %d/%d: %s... ",
+		index, total, entry.EffectiveID())
+	logger.Info("Syncing policy",
+		"policy", ref.Repository, "version", version)
 	fetched, err := sync.SyncPolicy(ctx, ref.Repository, version)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "failed")
-		logger.Error("Policy sync failed", "policy", ref.Repository, "error", err)
+		logger.Error("Policy sync failed",
+			"policy", ref.Repository, "error", err)
 		return err
 	}
 	fmt.Fprintln(os.Stderr, "done")
 
 	if fetched {
 		ps, _ := state.GetPolicyState(ref.Repository)
-		logger.Info("Policy synced", "policy", entry.EffectiveID(), "digest", ps.Digest)
+		logger.Info("Policy synced",
+			"policy", entry.EffectiveID(), "digest", ps.Digest)
 		if !ps.Verified {
-			fmt.Fprintf(os.Stderr, "NOTE: policy %s was fetched without signature verification. "+
-				"Configure verification: in complytime.yaml to enable signature checking.\n", entry.EffectiveID())
-			logger.Warn("Policy not cryptographically verified", "policy", entry.EffectiveID(), "digest", ps.Digest)
+			fmt.Fprintf(os.Stderr,
+				"NOTE: policy %s was fetched without "+
+					"signature verification. Configure "+
+					"verification: in complytime.yaml to "+
+					"enable signature checking.\n",
+				entry.EffectiveID())
+			logger.Warn("Policy not cryptographically verified",
+				"policy", entry.EffectiveID(),
+				"digest", ps.Digest)
 		}
 	} else {
-		logger.Info("Policy synced", "policy", entry.EffectiveID())
+		logger.Info("Policy synced",
+			"policy", entry.EffectiveID())
 	}
 
 	return nil
@@ -242,58 +410,125 @@ func resolveLatestVersion(ctx context.Context, client *registry.Client, reposito
 	return resolvedVersion
 }
 
-func syncAllComplypacks(ctx context.Context, state *cache.State, credFunc auth.CredentialFunc, complypacks []complytime.PolicyEntry, cacheDir, baseDir string, syncOpts []cache.SyncOption) error {
-	logger.Info("Starting complypack synchronization", "complypack_count", len(complypacks))
+// syncAllComplypacks iterates all complypack entries, resolving
+// per-entry verification and collecting errors (D5: errors.Join).
+// All entries are attempted regardless of individual failures (FR-006).
+func syncAllComplypacks(
+	ctx context.Context,
+	state *cache.State,
+	credFunc auth.CredentialFunc,
+	complypacks []complytime.PolicyEntry,
+	cacheDir, baseDir string,
+	wsCfg *complytime.VerificationConfig,
+	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+) error {
+	logger.Info("Starting complypack synchronization",
+		"complypack_count", len(complypacks))
 
 	total := len(complypacks)
+	var errs []error
 	for i, entry := range complypacks {
-		if err := syncSingleComplypack(ctx, state, credFunc, entry, i+1, total, cacheDir, baseDir, syncOpts); err != nil {
-			return err
+		if err := syncSingleComplypack(
+			ctx, state, credFunc,
+			entry, i+1, total, cacheDir, baseDir,
+			wsCfg, vfCache,
+		); err != nil {
+			eid := entry.EffectiveID()
+			fmt.Fprintf(os.Stderr,
+				"WARNING: complypack %q sync failed: %v\n",
+				eid, err)
+			errs = append(errs, err)
+			continue
 		}
 	}
 
-	logger.Info("Complypack synchronization completed", "synced", total, "total", total)
-	fmt.Fprintln(os.Stderr, "Complypack synchronization completed.")
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	logger.Info("Complypack synchronization completed",
+		"synced", total, "total", total)
+	fmt.Fprintln(os.Stderr,
+		"Complypack synchronization completed.")
 	return nil
 }
 
-func syncSingleComplypack(ctx context.Context, state *cache.State, credFunc auth.CredentialFunc, entry complytime.PolicyEntry, index, total int, cacheDir, baseDir string, syncOpts []cache.SyncOption) error {
+func syncSingleComplypack(
+	ctx context.Context,
+	state *cache.State,
+	credFunc auth.CredentialFunc,
+	entry complytime.PolicyEntry,
+	index, total int,
+	cacheDir, baseDir string,
+	wsCfg *complytime.VerificationConfig,
+	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+) error {
 	ref, err := complytime.ParsePolicyRef(entry.URL)
 	if err != nil {
-		return fmt.Errorf("invalid complypack reference %q: %w", entry.URL, err)
+		return fmt.Errorf(
+			"invalid complypack reference %q: %w",
+			entry.URL, err,
+		)
 	}
 	version := ref.VersionString()
+
+	// Resolve per-entry verification (FR-001, FR-002, FR-003).
+	syncOpts, err := resolveVerifier(entry, wsCfg, vfCache)
+	if err != nil {
+		return fmt.Errorf("complypack %s: %w",
+			entry.EffectiveID(), err)
+	}
 
 	client := registry.NewClient(ref.Registry, credFunc)
 	source := cache.NewRegistryComplypackSource(client)
 	complypackCache := cache.NewComplypackCache(cacheDir)
-	cpSync := cache.NewComplypackSync(complypackCache, state, source, syncOpts...)
+	cpSync := cache.NewComplypackSync(
+		complypackCache, state, source, syncOpts...,
+	)
 
 	if version == "" {
-		version = resolveLatestVersion(ctx, client, ref.Repository, entry.EffectiveID())
+		version = resolveLatestVersion(
+			ctx, client, ref.Repository, entry.EffectiveID(),
+		)
 	}
 
-	fmt.Fprintf(os.Stderr, "Syncing complypack %d/%d: %s... ", index, total, entry.EffectiveID())
-	logger.Info("Syncing complypack", "complypack", ref.Repository, "version", version)
-	fetched, err := cpSync.SyncComplypack(ctx, ref.Repository, version)
+	fmt.Fprintf(os.Stderr, "Syncing complypack %d/%d: %s... ",
+		index, total, entry.EffectiveID())
+	logger.Info("Syncing complypack",
+		"complypack", ref.Repository, "version", version)
+	fetched, err := cpSync.SyncComplypack(
+		ctx, ref.Repository, version,
+	)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "failed")
-		logger.Error("Complypack sync failed", "complypack", ref.Repository, "error", err)
-		return fmt.Errorf("failed to sync complypack %s: %w", ref.Repository, err)
+		logger.Error("Complypack sync failed",
+			"complypack", ref.Repository, "error", err)
+		return fmt.Errorf("failed to sync complypack %s: %w",
+			ref.Repository, err)
 	}
 	fmt.Fprintln(os.Stderr, "done")
-	logger.Info("Complypack synced", "complypack", entry.EffectiveID())
+	logger.Info("Complypack synced",
+		"complypack", entry.EffectiveID())
 
-	// Emit unverified warning only when the complypack was freshly fetched
-	// and was NOT verified. Verified complypacks suppress this warning.
+	// Emit unverified warning only when the complypack was freshly
+	// fetched and was NOT verified.
 	if fetched {
-		cpState, exists := state.GetComplypackState(ref.Repository)
+		cpState, exists := state.GetComplypackState(
+			ref.Repository,
+		)
 		if !exists || !cpState.Verified {
-			fmt.Fprintf(os.Stderr, "NOTE: complypack %s was fetched without signature verification. "+
-				"Configure verification: in complytime.yaml to enable signature checking.\n", entry.EffectiveID())
-			logger.Warn("Complypack not cryptographically verified", "complypack", entry.EffectiveID())
+			fmt.Fprintf(os.Stderr,
+				"NOTE: complypack %s was fetched without "+
+					"signature verification. Configure "+
+					"verification: in complytime.yaml to "+
+					"enable signature checking.\n",
+				entry.EffectiveID())
+			logger.Warn(
+				"Complypack not cryptographically verified",
+				"complypack", entry.EffectiveID())
 		}
-		invalidateGenerationForComplypack(state, ref.Repository, baseDir)
+		invalidateGenerationForComplypack(
+			state, ref.Repository, baseDir,
+		)
 	}
 
 	return nil
@@ -326,4 +561,54 @@ func invalidateGenerationForComplypack(state *cache.State, repository, baseDir s
 
 	fmt.Fprintf(os.Stderr, "Complypack %s updated — generation cache invalidated for %s\n", repository, evalID)
 	logger.Info("Generation cache invalidated after complypack update", "repository", repository, "evaluator", evalID)
+}
+
+// validateUniqueEvaluatorIDs checks that no two complypack entries in the
+// workspace config resolved to the same evaluator-id. Evaluator-ids are
+// only known after sync (they come from the complypack's embedded
+// config.json), so this validation runs post-sync.
+//
+// Returns a descriptive error listing all conflicting repositories when
+// duplicates are found. The error causes complyctl get to exit non-zero.
+func validateUniqueEvaluatorIDs(state *cache.State, complypacks []complytime.PolicyEntry) error {
+	// Build evaluator-id → []repository map from state, scoped to the
+	// configured complypack entries.
+	evalToRepos := make(map[string][]string)
+	for _, entry := range complypacks {
+		// ParsePolicyRef cannot fail here: syncAllComplypacks already
+		// validated all entries. Skip safely if it does — the entry
+		// has no state to contribute to conflict detection.
+		ref, err := complytime.ParsePolicyRef(entry.URL)
+		if err != nil {
+			continue
+		}
+		ps, exists := state.GetComplypackState(ref.Repository)
+		if !exists || ps.EvaluatorID == "" {
+			continue
+		}
+		evalToRepos[ps.EvaluatorID] = append(evalToRepos[ps.EvaluatorID], ref.Repository)
+	}
+
+	var conflicts []string
+	for evalID, repos := range evalToRepos {
+		if len(repos) > 1 {
+			sort.Strings(repos)
+			lines := make([]string, 0, len(repos))
+			for _, r := range repos {
+				lines = append(lines, fmt.Sprintf("  - %s", r))
+			}
+			conflicts = append(conflicts, fmt.Sprintf(
+				"duplicate evaluator-id %q found in complypack entries:\n%s",
+				evalID, strings.Join(lines, "\n")))
+		}
+	}
+
+	if len(conflicts) == 0 {
+		return nil
+	}
+
+	sort.Strings(conflicts)
+	return fmt.Errorf(
+		"%s\nremove one of the conflicting entries from complytime.yaml",
+		strings.Join(conflicts, "\n"))
 }

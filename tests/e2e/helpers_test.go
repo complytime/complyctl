@@ -5,6 +5,9 @@
 package e2e
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -20,6 +23,34 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Complypack OCI media types — must match the constants in
+// vendor/github.com/complytime/complypack/pkg/complypack/mediatype.go
+// and cmd/mock-oci-registry/main.go.
+const (
+	complypackArtifactType = "application/vnd.complypack.artifact.v1"
+	complypackConfigType   = "application/vnd.complypack.config.v1+json"
+	complypackContentType  = "application/vnd.complypack.content.v1.tar+gzip"
+)
+
+// buildDummyTarGz creates a minimal in-memory tar.gz archive containing a
+// single file. Used to produce valid complypack content blobs for E2E tests.
+func buildDummyTarGz(name string, content []byte) []byte {
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+
+	_ = tw.WriteHeader(&tar.Header{
+		Name: name,
+		Size: int64(len(content)),
+		Mode: 0o644,
+	})
+	_, _ = tw.Write(content)
+
+	_ = tw.Close()
+	_ = gw.Close()
+	return buf.Bytes()
+}
 
 // testPolicyYAML is a valid Gemara Policy with two assessment-plans bound to
 // the "test" evaluator.  Used by all mock registry seeds.
@@ -158,6 +189,56 @@ func startMockRegistry(t *testing.T) *httptest.Server {
 		repos[repoName] = repo
 	}
 
+	// addComplypackArtifact seeds a ComplyPack OCI artifact with proper
+	// config and artifactType so complypack.Unpack() succeeds after sync.
+	addComplypackArtifact := func(repoName string, tags []string, evaluatorID, version string, content []byte) {
+		repo := &ociRepo{
+			tags:  make(map[string]*ociArtifact),
+			blobs: make(map[string]*ociBlob),
+		}
+
+		configJSON, _ := json.Marshal(map[string]string{
+			"evaluator-id": evaluatorID,
+			"version":      version,
+		})
+		configDigest := ociDigest(configJSON)
+		repo.blobs[configDigest] = &ociBlob{data: configJSON, mediaType: complypackConfigType}
+
+		contentDigest := ociDigest(content)
+		repo.blobs[contentDigest] = &ociBlob{data: content, mediaType: complypackContentType}
+
+		manifest := map[string]interface{}{
+			"schemaVersion": 2,
+			"mediaType":     "application/vnd.oci.image.manifest.v1+json",
+			"artifactType":  complypackArtifactType,
+			"annotations": map[string]string{
+				"complypack.evaluator-id": evaluatorID,
+			},
+			"config": ociDescriptor{
+				MediaType: complypackConfigType,
+				Digest:    configDigest,
+				Size:      int64(len(configJSON)),
+			},
+			"layers": []ociDescriptor{
+				{
+					MediaType: complypackContentType,
+					Digest:    contentDigest,
+					Size:      int64(len(content)),
+				},
+			},
+		}
+		manifestData, _ := json.Marshal(manifest)
+		art := &ociArtifact{
+			manifestBytes:  manifestData,
+			manifestDigest: ociDigest(manifestData),
+		}
+
+		for _, tag := range tags {
+			repo.tags[tag] = art
+		}
+		repos[repoName] = repo
+	}
+
 	// Seed: nist-800-53-r5 with catalog + policy layers
 	addArtifact("nist-800-53-r5", []string{"v1.0.0", "latest"}, []struct {
 		mt   string
@@ -218,6 +299,13 @@ controls:
 `),
 		},
 	})
+
+	// Seed: two complypacks with the SAME evaluator-id ("opa") for
+	// duplicate evaluator-id validation E2E testing.
+	addComplypackArtifact("complypacks/opa-a", []string{"v1.0.0", "latest"},
+		"opa", "1.0.0", buildDummyTarGz("policy_a.rego", []byte("package test_a")))
+	addComplypackArtifact("complypacks/opa-b", []string{"v1.0.0", "latest"},
+		"opa", "1.0.0", buildDummyTarGz("policy_b.rego", []byte("package test_b")))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v2/", func(w http.ResponseWriter, r *http.Request) {

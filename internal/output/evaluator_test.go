@@ -195,6 +195,18 @@ func TestEvaluator_Write(t *testing.T) {
 	require.NoError(t, err)
 	assert.FileExists(t, path)
 	assert.Contains(t, path, "evaluation-log-test-policy-target-1-")
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+
+	assert.Contains(t, content, "result: Passed", "evaluation log should contain the result field")
+	assert.Contains(t, content, "id: test-policy", "evaluation log should contain the policy ID in metadata")
+	assert.Contains(t, content, "id: target-1", "evaluation log should contain the target ID")
+	assert.Contains(t, content, "name: target-1", "evaluation log should contain the target name")
+	assert.Contains(t, content, "entry-id: R1", "evaluation log should contain the requirement entry ID")
+	assert.Contains(t, content, "type: EvaluationLog", "evaluation log should contain the artifact type")
+	assert.Contains(t, content, "steps-executed: 1", "evaluation log should record steps executed")
 }
 
 func TestEvaluator_Write_StepIdentityWithComplypackRef(t *testing.T) {
@@ -367,4 +379,6 @@ func TestEvaluator_Write_StepIdentityEmptyName(t *testing.T) {
 	require.NoError(t, err)
 	content := string(data)
 	assert.NotContains(t, content, "providerStepToGemara")
+	assert.Contains(t, content, "steps:\n    - \"\"",
+		"empty step name should produce an empty-string step identity")
 }

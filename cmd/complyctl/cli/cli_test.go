@@ -304,6 +304,8 @@ func TestScanOptions_Run_TargetSinglePolicyInferred(t *testing.T) {
 	assert.NotContains(t, err.Error(), "specify a target or --policy-id")
 	assert.NotContains(t, err.Error(), "multiple policies")
 	assert.NotContains(t, err.Error(), "not found in complytime.yaml")
+	// Should fail at cache lookup — confirms resolution succeeded.
+	assert.Contains(t, err.Error(), "not in cache")
 }
 
 // TestScanOptions_Run_PolicyIDOnlyBackwardCompat verifies that the existing
@@ -323,6 +325,8 @@ func TestScanOptions_Run_PolicyIDOnlyBackwardCompat(t *testing.T) {
 	// Should NOT contain resolution errors.
 	assert.NotContains(t, err.Error(), "specify a target or --policy-id")
 	assert.NotContains(t, err.Error(), "not found in complytime.yaml")
+	// Should fail at cache lookup — confirms resolution succeeded.
+	assert.Contains(t, err.Error(), "not in cache")
 }
 
 // TestScanOptions_Run_TargetWithPolicyID verifies that specifying both a valid
@@ -343,6 +347,8 @@ func TestScanOptions_Run_TargetWithPolicyID(t *testing.T) {
 	assert.NotContains(t, err.Error(), "specify a target or --policy-id")
 	assert.NotContains(t, err.Error(), "does not reference policy")
 	assert.NotContains(t, err.Error(), "not found in complytime.yaml")
+	// Should fail at cache lookup — confirms resolution succeeded.
+	assert.Contains(t, err.Error(), "not in cache")
 }
 
 func TestFilterTargetByID_Found(t *testing.T) {
@@ -1412,6 +1418,8 @@ func TestScanOptions_Run_WithWorkspaceFlag(t *testing.T) {
 	require.Error(t, err)
 	// Should get past workspace resolution — fail at a later stage (cache).
 	assert.NotContains(t, err.Error(), "failed to load workspace config")
+	// Should fail at cache lookup — confirms workspace resolution succeeded.
+	assert.Contains(t, err.Error(), "not in cache")
 }
 
 func TestGenerateOptions_Run_WithWorkspaceFlag(t *testing.T) {
@@ -1431,6 +1439,8 @@ func TestGenerateOptions_Run_WithWorkspaceFlag(t *testing.T) {
 	err := o.run(context.Background())
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "failed to load workspace config")
+	// Should fail at cache lookup — confirms workspace resolution succeeded.
+	assert.Contains(t, err.Error(), "not in cache")
 }
 
 func TestGetOptions_Run_WithWorkspaceFlag(t *testing.T) {
@@ -1450,6 +1460,8 @@ func TestGetOptions_Run_WithWorkspaceFlag(t *testing.T) {
 	require.Error(t, err)
 	// Should get past workspace resolution — fail at cache/registry stage.
 	assert.NotContains(t, err.Error(), "failed to load workspace config")
+	// Should fail at registry sync — confirms workspace resolution succeeded.
+	assert.Contains(t, err.Error(), "registry")
 }
 
 func TestListOptions_Run_WithWorkspaceFlag(t *testing.T) {
@@ -1725,6 +1737,66 @@ func TestBuildReqToComplypackRef_ResolvesRequirements(t *testing.T) {
 	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:abc123", m["plan-1"])
 	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:abc123", m["plan-2"])
 	assert.Equal(t, "registry.example.com/complypacks/kyverno@sha256:def456", m["req-3"])
+}
+
+// --- validateUniqueEvaluatorIDs tests ---
+
+func TestValidateUniqueEvaluatorIDs_NoDuplicates(t *testing.T) {
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"complypacks/opa":   {EvaluatorID: "opa", Digest: "sha256:aaa"},
+			"complypacks/ampel": {EvaluatorID: "ampel", Digest: "sha256:bbb"},
+		},
+	}
+	complypacks := []complytime.PolicyEntry{
+		{URL: "reg.io/complypacks/opa:v1.0"},
+		{URL: "reg.io/complypacks/ampel:v1.0"},
+	}
+	err := validateUniqueEvaluatorIDs(state, complypacks)
+	assert.NoError(t, err)
+}
+
+func TestValidateUniqueEvaluatorIDs_DuplicateDetected(t *testing.T) {
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"complypacks/opa-a": {EvaluatorID: "opa", Digest: "sha256:aaa"},
+			"complypacks/opa-b": {EvaluatorID: "opa", Digest: "sha256:bbb"},
+		},
+	}
+	complypacks := []complytime.PolicyEntry{
+		{URL: "reg.io/complypacks/opa-a:v1.0"},
+		{URL: "reg.io/complypacks/opa-b:v2.0"},
+	}
+	err := validateUniqueEvaluatorIDs(state, complypacks)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `duplicate evaluator-id "opa"`)
+	assert.Contains(t, err.Error(), "complypacks/opa-a")
+	assert.Contains(t, err.Error(), "complypacks/opa-b")
+	assert.Contains(t, err.Error(), "remove one of the conflicting entries")
+}
+
+func TestValidateUniqueEvaluatorIDs_SingleEntry(t *testing.T) {
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"complypacks/opa": {EvaluatorID: "opa", Digest: "sha256:aaa"},
+		},
+	}
+	complypacks := []complytime.PolicyEntry{
+		{URL: "reg.io/complypacks/opa:v1.0"},
+	}
+	err := validateUniqueEvaluatorIDs(state, complypacks)
+	assert.NoError(t, err)
+}
+
+func TestValidateUniqueEvaluatorIDs_EmptyState(t *testing.T) {
+	state := &cache.State{
+		Complypacks: make(map[string]cache.PolicyState),
+	}
+	complypacks := []complytime.PolicyEntry{
+		{URL: "reg.io/complypacks/opa:v1.0"},
+	}
+	err := validateUniqueEvaluatorIDs(state, complypacks)
+	assert.NoError(t, err)
 }
 
 func TestBuildReqToComplypackRef_SkipsMissingDigest(t *testing.T) {

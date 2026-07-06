@@ -21,7 +21,7 @@
 
 ### Removed
 
-- **BREAKING**: Removed collector export infrastructure (`COMPLYTIME_EXPORT_ENABLED`, `collector:` config block, Export RPC). This was speculative infrastructure added before backend design was finalized. Export functionality will be redesigned and reintroduced when the backend shape is known. Tracking issue needed: "Design and implement evidence export v2 post-backend-finalization". (#606)
+- **BREAKING**: Removed collector export infrastructure (`COMPLYTIME_EXPORT_ENABLED`, `collector:` config block, Export RPC). This was speculative infrastructure added before backend design was finalized. Export functionality will be redesigned and reintroduced when the backend shape is known. (#606)
 
   **Migration**: Users who configured `collector:` in `complytime.yaml` or set `COMPLYTIME_EXPORT_ENABLED=true` should remove these configurations. Export functionality is not available in this release. If you require evidence export to a Beacon collector, remain on the previous version until the redesigned export infrastructure is released.
 
@@ -35,6 +35,16 @@
   cache. `--skip-verify` flag bypasses verification. `complyctl list`
   displays a VERIFIED column. `complyctl doctor` reports verification
   status of cached artifacts. (#643)
+- Per-policy and per-complypack verification configuration: each entry
+  in the `policies` or `complypacks` section of `complytime.yaml` can
+  now declare its own `verification:` block or `skip_verify: true` to
+  override the workspace-level verification default. Workspace-level
+  `verification:` applies to all entries that do not provide their own.
+  When multiple entries fail verification, all entries are still
+  attempted and errors are collected rather than failing on the first
+  error. Verifiers are cached by configuration to avoid redundant
+  construction for entries sharing the same verification settings.
+  (#680)
 - Redesigned markdown report (`--format pretty`) with summary metadata
   table, pass rate, grouped controls table with messages, findings
   section grouped by result type with recommendation and collapsible
@@ -135,3 +145,11 @@
   ensuring output displays meaningful identifiers instead of internal
   plan references. Affects EvaluationLog, OSCAL, SARIF, and Markdown
   output formats.
+- `complyctl get` now detects and rejects duplicate evaluator-ids across
+  complypack entries. Previously, multiple complypacks resolving to the
+  same evaluator-id caused non-deterministic digest selection during
+  scan, leading to unnecessary regeneration or stale artifacts (#647).
+- `complyctl get` now re-fetches complypack artifacts when the cache
+  directory is missing, even if `state.json` records a matching digest.
+  Previously, a deleted cache directory caused the sync to be permanently
+  skipped until the user manually cleared state (#649).

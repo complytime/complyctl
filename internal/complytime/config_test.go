@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1040,4 +1041,282 @@ func TestValidate_VerificationMutuallyExclusive(t *testing.T) {
 	err := complytime.Validate(cfg)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+// Per-entry verification tests (FR-001, FR-002, FR-004)
+
+func TestLoadFrom_PerEntryVerification(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "complytime.yml")
+
+	yamlContent := `policies:
+  - url: registry.com/policies/nist:v1.0
+    id: nist
+    verification:
+      key: "/path/to/vendor.pub"
+  - url: ghcr.io/org/cis:v2.0
+    id: cis
+    skip_verify: true
+  - url: quay.io/org/pci:v3.0
+    id: pci
+    verification:
+      issuer: "https://token.actions.githubusercontent.com"
+      identity: "https://github.com/org/.github/workflows/release.yml@refs/tags/*"
+  - url: registry.com/policies/soc2:v1.0
+    id: soc2
+targets:
+  - id: local
+    policies:
+      - nist
+`
+	require.NoError(t, os.WriteFile(
+		configPath, []byte(yamlContent), 0600,
+	))
+
+	cfg, err := complytime.LoadFrom(configPath)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	require.Len(t, cfg.Policies, 4)
+
+	// Entry with keyed verification
+	require.NotNil(t, cfg.Policies[0].Verification)
+	assert.Equal(t,
+		"/path/to/vendor.pub",
+		cfg.Policies[0].Verification.Key,
+	)
+	assert.False(t, cfg.Policies[0].SkipVerify)
+
+	// Entry with skip_verify
+	assert.Nil(t, cfg.Policies[1].Verification)
+	assert.True(t, cfg.Policies[1].SkipVerify)
+
+	// Entry with keyless verification
+	require.NotNil(t, cfg.Policies[2].Verification)
+	assert.Equal(t,
+		"https://token.actions.githubusercontent.com",
+		cfg.Policies[2].Verification.Issuer,
+	)
+	assert.Equal(t,
+		"https://github.com/org/.github/workflows/release.yml@refs/tags/*",
+		cfg.Policies[2].Verification.Identity,
+	)
+	assert.False(t, cfg.Policies[2].SkipVerify)
+
+	// Entry without new fields (backward compat)
+	assert.Nil(t, cfg.Policies[3].Verification)
+	assert.False(t, cfg.Policies[3].SkipVerify)
+}
+
+func TestValidate_PerEntryVerificationMutualExclusivity(t *testing.T) {
+	cfg := &complytime.WorkspaceConfig{
+		Policies: []complytime.PolicyEntry{
+			{
+				URL:        "registry.com/policies/nist:v1.0",
+				ID:         "nist",
+				SkipVerify: true,
+				Verification: &complytime.VerificationConfig{
+					Key: "/path/to/key.pub",
+				},
+			},
+		},
+		Targets: []complytime.TargetConfig{{
+			ID:       "local",
+			Policies: []string{"nist"},
+		}},
+	}
+	err := complytime.Validate(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+	assert.Contains(t, err.Error(), "nist")
+}
+
+func TestValidate_PerEntryVerificationConfig(t *testing.T) {
+	tests := []struct {
+		name    string
+		entry   complytime.PolicyEntry
+		wantErr string
+	}{
+		{
+			name: "both key and issuer",
+			entry: complytime.PolicyEntry{
+				URL: "registry.com/policies/nist:v1.0",
+				ID:  "nist",
+				Verification: &complytime.VerificationConfig{
+					Key:      "/path/to/key.pub",
+					Issuer:   "https://issuer.example.com",
+					Identity: "user@example.com",
+				},
+			},
+			wantErr: "mutually exclusive",
+		},
+		{
+			name: "issuer without identity",
+			entry: complytime.PolicyEntry{
+				URL: "registry.com/policies/cis:v1.0",
+				ID:  "cis",
+				Verification: &complytime.VerificationConfig{
+					Issuer: "https://issuer.example.com",
+				},
+			},
+			wantErr: "issuer requires identity",
+		},
+		{
+			name: "identity without issuer",
+			entry: complytime.PolicyEntry{
+				URL: "registry.com/policies/pci:v1.0",
+				ID:  "pci",
+				Verification: &complytime.VerificationConfig{
+					Identity: "user@example.com",
+				},
+			},
+			wantErr: "identity requires issuer",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &complytime.WorkspaceConfig{
+				Policies: []complytime.PolicyEntry{tt.entry},
+				Targets: []complytime.TargetConfig{{
+					ID:       "local",
+					Policies: []string{tt.entry.ID},
+				}},
+			}
+			err := complytime.Validate(cfg)
+			require.Error(t, err)
+			// Error must identify the entry
+			assert.Contains(t, err.Error(), tt.entry.ID)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+func TestValidate_PerEntryVerificationBackwardCompat(t *testing.T) {
+	// PolicyEntry without Verification or SkipVerify must pass
+	// validation unchanged — verifies no regressions.
+	cfg := &complytime.WorkspaceConfig{
+		Policies: []complytime.PolicyEntry{
+			{URL: "registry.com/policies/nist:v1.0", ID: "nist"},
+			{URL: "ghcr.io/org/cis:v2.0", ID: "cis"},
+		},
+		Targets: []complytime.TargetConfig{{
+			ID:       "local",
+			Policies: []string{"nist"},
+		}},
+	}
+	assert.NoError(t, complytime.Validate(cfg))
+
+	// Verify fields are zero-valued
+	assert.Nil(t, cfg.Policies[0].Verification)
+	assert.False(t, cfg.Policies[0].SkipVerify)
+	assert.Nil(t, cfg.Policies[1].Verification)
+	assert.False(t, cfg.Policies[1].SkipVerify)
+}
+
+func TestValidate_ValidMixedVerificationConfigs(t *testing.T) {
+	// FR-004 scenario: policies from multiple publishers with
+	// different verification configs all pass validation.
+	cfg := &complytime.WorkspaceConfig{
+		Policies: []complytime.PolicyEntry{
+			{
+				URL: "registry.com/policies/nist:v1.0",
+				ID:  "nist",
+				Verification: &complytime.VerificationConfig{
+					Key: "/path/to/vendor-a.pub",
+				},
+			},
+			{
+				URL: "ghcr.io/org/cis:v2.0",
+				ID:  "cis",
+				Verification: &complytime.VerificationConfig{
+					Issuer:   "https://token.actions.githubusercontent.com",
+					Identity: "https://github.com/org/.github/workflows/release.yml@refs/tags/*",
+				},
+			},
+			{
+				// No entry-level verification — inherits workspace
+				URL: "quay.io/org/pci:v3.0",
+				ID:  "pci",
+			},
+			{
+				// Explicit skip — no verification for this entry
+				URL:        "registry.com/policies/soc2:v1.0",
+				ID:         "soc2",
+				SkipVerify: true,
+			},
+		},
+		Targets: []complytime.TargetConfig{{
+			ID:       "local",
+			Policies: []string{"nist"},
+		}},
+		Verification: &complytime.VerificationConfig{
+			Issuer:   "https://token.actions.githubusercontent.com",
+			Identity: "https://github.com/complytime/complyctl/.github/workflows/release.yml@refs/tags/*",
+		},
+	}
+	assert.NoError(t, complytime.Validate(cfg))
+}
+
+func TestFilenameSafe(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"no slashes", "test-policy", "test-policy"},
+		{"single slash", "org/policy", "org-policy"},
+		{"multiple slashes", "org/sub/policy", "org-sub-policy"},
+		{"empty", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, complytime.FilenameSafe(tt.input))
+		})
+	}
+}
+
+func TestExpandPath(t *testing.T) {
+	t.Run("tilde prefix", func(t *testing.T) {
+		result := complytime.ExpandPath("~/test")
+		assert.NotEqual(t, "~/test", result)
+		assert.True(t, strings.HasSuffix(result, "/test"))
+	})
+	t.Run("no tilde", func(t *testing.T) {
+		assert.Equal(t, "/absolute/path", complytime.ExpandPath("/absolute/path"))
+	})
+	t.Run("relative path", func(t *testing.T) {
+		assert.Equal(t, "relative/path", complytime.ExpandPath("relative/path"))
+	})
+}
+
+func TestResolveCacheDir(t *testing.T) {
+	dir, err := complytime.ResolveCacheDir()
+	require.NoError(t, err)
+	assert.NotEmpty(t, dir)
+	assert.Contains(t, dir, ".complytime")
+}
+
+func TestResolveProviderDir(t *testing.T) {
+	dir, err := complytime.ResolveProviderDir()
+	require.NoError(t, err)
+	assert.NotEmpty(t, dir)
+	assert.Contains(t, dir, ".complytime")
+	assert.Contains(t, dir, "providers")
+}
+
+func TestValidate_DuplicatePolicyInTarget(t *testing.T) {
+	cfg := &complytime.WorkspaceConfig{
+		Version: 1,
+		Policies: []complytime.PolicyEntry{
+			{URL: "registry.com/policies/nist:v1.0", ID: "nist"},
+		},
+		Targets: []complytime.TargetConfig{
+			{
+				ID:       "prod",
+				Policies: []string{"nist", "nist"},
+			},
+		},
+	}
+	err := complytime.Validate(cfg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate policy")
 }
