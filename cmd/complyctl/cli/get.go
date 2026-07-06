@@ -310,6 +310,10 @@ func syncAllPolicies(
 			ctx, cacheMgr, state, credFunc,
 			entry, i+1, total, wsCfg, vfCache,
 		); err != nil {
+			eid := entry.EffectiveID()
+			fmt.Fprintf(os.Stderr,
+				"WARNING: policy %q sync failed: %v\n",
+				eid, err)
 			errs = append(errs, err)
 			continue
 		}
@@ -429,6 +433,10 @@ func syncAllComplypacks(
 			entry, i+1, total, cacheDir, baseDir,
 			wsCfg, vfCache,
 		); err != nil {
+			eid := entry.EffectiveID()
+			fmt.Fprintf(os.Stderr,
+				"WARNING: complypack %q sync failed: %v\n",
+				eid, err)
 			errs = append(errs, err)
 			continue
 		}
