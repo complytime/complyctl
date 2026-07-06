@@ -1,0 +1,43 @@
+title: Acceptance Test Policy
+metadata:
+  id: acceptance-test-policy
+  description: Policy for container-based acceptance testing using the test provider
+  author:
+    id: complytime
+    name: ComplyTime
+    type: Software Assisted
+  mapping-references:
+    - id: acceptance-test-controls
+      title: Acceptance Test Controls
+      version: 1.0.0
+      description: Minimal catalog for acceptance testing
+contacts:
+  responsible:
+    - name: Test Runner
+  accountable:
+    - name: Test Runner
+scope:
+  in:
+    technologies:
+      - testing
+imports:
+  catalogs:
+    - reference-id: acceptance-test-controls
+adherence:
+  evaluation-methods:
+    - type: Behavioral
+      description: Automated acceptance test evaluation
+      executor:
+        id: test
+        name: test-evaluator
+        type: Software
+  assessment-plans:
+    - id: block-force-push
+      requirement-id: block-force-push
+      frequency: on-demand
+      evaluation-methods:
+        - type: Behavioral
+          executor:
+            id: test
+            name: test-evaluator
+            type: Software

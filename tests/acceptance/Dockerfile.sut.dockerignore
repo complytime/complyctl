@@ -1,0 +1,6 @@
+# SUT container only needs pre-built binaries from bin/.
+# Exclude everything else.
+*
+!bin/acceptance.test
+!bin/complyctl
+!bin/complyctl-provider-test

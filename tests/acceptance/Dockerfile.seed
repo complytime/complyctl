@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: Apache-2.0
+# trivy:ignore:DS001 -- test container, intentionally floats on latest UBI
+# trivy:ignore:DS026 -- ephemeral seed container, exits after seeding registry
+# scorecard:pinned-dependencies -- intentionally unpinned; UBI images track latest for errata coverage
+FROM registry.access.redhat.com/ubi10/ubi-minimal:latest
+
+ARG ORAS_VERSION=1.2.2
+# sha256 from https://github.com/oras-project/oras/releases/tag/v1.2.2 checksums.txt
+ARG ORAS_SHA256=bff970346470e5ef888e9f2c0bf7f8ee47283f5a45207d6e7a037da1fb0eae0d
+
+RUN microdnf install -y tar gzip && microdnf clean all
+
+ADD https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz /tmp/oras.tar.gz
+RUN echo "${ORAS_SHA256}  /tmp/oras.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/oras.tar.gz -C /usr/local/bin oras && \
+    rm /tmp/oras.tar.gz && \
+    chmod +x /usr/local/bin/oras
+
+COPY seed.sh /seed.sh
+RUN chmod +x /seed.sh
+
+USER nobody
+ENTRYPOINT ["/seed.sh"]

@@ -382,6 +382,49 @@ After resuming, restart the mock registry manually:
 ./bin/mock-oci-registry &
 ```
 
+## Container-Based Acceptance Tests
+
+The acceptance test suite validates real OCI registry interop using
+a three-container compose stack. Unlike the devcontainer environment,
+acceptance tests are automated and run in CI on every PR.
+
+### Prerequisites
+
+You need `podman-compose` or `docker compose` (v2) and a container
+runtime (`podman` or `docker`).
+
+### Running
+
+```bash
+# Build binaries and run the full acceptance suite
+make test-acceptance
+
+# Specify a different compose command (default: podman-compose)
+make test-acceptance COMPOSE="docker compose"
+
+# Tear down containers and volumes after a failed run
+make test-acceptance-clean
+```
+
+### Architecture
+
+The compose stack (`tests/acceptance/compose.yaml`) runs three
+services under the `lifecycle` profile:
+
+- **zot** -- a real OCI-compliant registry (Project Zot) listening
+  on port 5000 inside the compose network.
+- **seed** -- a short-lived container that uses the `oras` CLI to
+  push Gemara test policies into zot, then exits. The seed service
+  must complete successfully before the SUT starts.
+- **sut** (system under test) -- runs the acceptance test binary
+  (`go test -tags=acceptance ./tests/acceptance/...`) against the
+  live registry. The compose stack exits with the SUT's exit code.
+
+### CI
+
+The `acceptance_test.yml` workflow runs `make test-acceptance` on
+every push and PR using `docker compose`.
+
 ## See Also
 
 - [Quick Start](./QUICK_START.md)

@@ -81,7 +81,9 @@ func initStateMaps(s *State) {
 	}
 }
 
-// SaveState writes the state to state.json in the given cache directory.
+// SaveState atomically writes the state to state.json in the given cache
+// directory. It marshals to a sibling temp file then renames it into place so
+// concurrent readers never observe a truncated or partial write.
 func SaveState(state *State, cacheDir string) error {
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
@@ -94,7 +96,32 @@ func SaveState(state *State, cacheDir string) error {
 		return fmt.Errorf("failed to marshal state: %w", err)
 	}
 
-	if err := os.WriteFile(statePath, data, 0600); err != nil {
+	// Write to a temp file in the same directory so os.Rename is atomic
+	// (same filesystem, POSIX guarantee). This prevents concurrent readers
+	// from observing a truncated file mid-write.
+	tmp, err := os.CreateTemp(cacheDir, ".state-*.json.tmp")
+	if err != nil {
+		return fmt.Errorf("failed to create temp state file: %w", err)
+	}
+	tmpPath := tmp.Name()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("failed to write temp state file %s: %w", tmpPath, err)
+	}
+	if err := tmp.Chmod(0600); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("failed to set permissions on temp state file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("failed to close temp state file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, statePath); err != nil {
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to write state file %s: %w", statePath, err)
 	}
 

@@ -1,0 +1,26 @@
+title: Acceptance Test Controls
+controls:
+  - id: force-push-protection
+    title: Restrict Force Pushes
+    objective: Force pushes to protected branches must be blocked
+    group: source-code
+    assessment-requirements:
+      - id: block-force-push
+        text: Force pushes to protected branches must be blocked
+        applicability:
+          - GitHub repositories
+        state: Active
+    state: Active
+groups:
+  - id: source-code
+    title: Source Code Protection
+    description: Controls for source code repository protection
+metadata:
+  id: acceptance-test-controls
+  type: ControlCatalog
+  gemara-version: 1.0.0
+  description: Minimal catalog for container-based acceptance testing
+  author:
+    id: complytime
+    name: ComplyTime
+    type: Software Assisted

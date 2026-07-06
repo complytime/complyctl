@@ -76,6 +76,10 @@
   error. Verifiers are cached by configuration to avoid redundant
   construction for entries sharing the same verification settings.
   (#680)
+- Container-based acceptance tests (`make test-acceptance`): runs
+  complyctl against a real zot OCI registry in a compose stack,
+  validating OCI artifact interop that in-process mock registries
+  cannot catch (#653)
 - Redesigned markdown report (`--format pretty`) with summary metadata
   table, pass rate, grouped controls table with messages, findings
   section grouped by result type with recommendation and collapsible

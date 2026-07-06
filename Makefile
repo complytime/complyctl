@@ -13,6 +13,18 @@ GO_LD_EXTRAFLAGS := -X github.com/complytime/complyctl/internal/version.version=
 MAN_COMPLYCTL = docs/man/complyctl.md
 MAN_COMPLYCTL_OUTPUT = docs/man/complyctl.1
 
+COMPOSE ?= $(shell command -v podman-compose 2>/dev/null || echo "docker compose")
+
+# Derive CONTAINER_ENGINE from COMPOSE to avoid cross-engine mismatches
+# (e.g. docker compose creates containers, but podman ps cannot see them).
+ifeq ($(findstring docker,$(COMPOSE)),docker)
+CONTAINER_ENGINE ?= docker
+else
+CONTAINER_ENGINE ?= $(shell command -v podman 2>/dev/null || echo docker)
+endif
+
+.DEFAULT_GOAL := help
+
 ##@ Proto
 
 proto: ## generate protobuf code (requires buf)
@@ -62,6 +74,29 @@ test-devcontainer: ## verify devcontainer Containerfile builds
 	@echo "Containerfile builds successfully."
 .PHONY: test-devcontainer
 
+ACCEPTANCE_COMPOSE = $(COMPOSE) -f tests/acceptance/compose.yaml --profile lifecycle
+
+test-acceptance: build build-test-provider build-acceptance-test ## run container-based acceptance tests (requires podman-compose or docker compose)
+	@$(ACCEPTANCE_COMPOSE) up --build -d || { $(ACCEPTANCE_COMPOSE) down -v ; exit 1 ; } ; \
+	sut=$$($(CONTAINER_ENGINE) ps -aq --filter name=sut | head -1) ; \
+	if [ -z "$$sut" ]; then \
+		echo "ERROR: SUT container not found" ; \
+		$(ACCEPTANCE_COMPOSE) down -v ; \
+		exit 1 ; \
+	fi ; \
+	rc=$$($(CONTAINER_ENGINE) wait $$sut) ; \
+	echo "=== seed logs ===" ; \
+	$(ACCEPTANCE_COMPOSE) logs seed 2>&1 || true ; \
+	echo "=== sut logs ===" ; \
+	$(CONTAINER_ENGINE) logs $$sut ; \
+	$(ACCEPTANCE_COMPOSE) down -v ; \
+	exit $$rc
+.PHONY: test-acceptance
+
+test-acceptance-clean: ## tear down acceptance test containers and volumes
+	$(ACCEPTANCE_COMPOSE) down -v --remove-orphans
+.PHONY: test-acceptance-clean
+
 ##@ Compilation
 
 all: clean vendor test-unit build ## compile from scratch
@@ -74,6 +109,10 @@ build: prep-build-dir ## compile
 build-test-provider: prep-build-dir ## build test provider for E2E tests
 	go build -mod=vendor -o $(GO_BUILD_BINDIR)/complyctl-provider-test ./cmd/test-provider
 .PHONY: build-test-provider
+
+build-acceptance-test: prep-build-dir ## compile acceptance test binary
+	go test -c -tags=acceptance -mod=vendor -o $(GO_BUILD_BINDIR)/acceptance.test ./tests/acceptance/
+.PHONY: build-acceptance-test
 
 build-behavioral-report: prep-build-dir ## build behavioral report tool (go test -json -> EvaluationLog + SARIF)
 	go build -mod=vendor -o $(GO_BUILD_BINDIR)/behavioral-report ./cmd/behavioral-report

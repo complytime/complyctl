@@ -112,7 +112,7 @@ func InvalidateForEvaluator(baseDir, evaluatorID string) (warnings []string, _ e
 		if os.IsNotExist(rootErr) {
 			return nil, nil
 		}
-		return nil, rootErr
+		return nil, fmt.Errorf("failed to open generation directory: %w", rootErr)
 	}
 	defer root.Close()
 

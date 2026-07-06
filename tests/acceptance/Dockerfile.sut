@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+
+# Runtime-only container for acceptance tests.
+# All binaries are built locally and injected from bin/.
+# trivy:ignore:DS001 -- test container, intentionally floats on latest UBI
+# trivy:ignore:DS026 -- ephemeral test container, compose healthcheck covers readiness
+# scorecard:pinned-dependencies -- intentionally unpinned; UBI images track latest for errata coverage
+FROM registry.access.redhat.com/ubi10/ubi-minimal:latest
+
+RUN microdnf install -y shadow-utils && microdnf clean all && \
+    useradd -m testuser
+
+COPY bin/acceptance.test /usr/local/bin/acceptance.test
+COPY bin/complyctl /usr/local/bin/complyctl
+COPY bin/complyctl-provider-test \
+     /home/testuser/.complytime/providers/complyctl-provider-test
+
+RUN chown -R testuser:testuser /home/testuser/.complytime && \
+    chmod 755 /home/testuser/.complytime/providers/complyctl-provider-test
+
+USER testuser
+WORKDIR /home/testuser
+
+ENTRYPOINT ["/usr/local/bin/acceptance.test"]
+CMD ["-test.v", "-test.timeout=3m"]

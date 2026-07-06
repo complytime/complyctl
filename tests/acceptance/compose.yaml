@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Container-based acceptance tests for complyctl.
+# Usage: make test-acceptance
+#
+# Architecture:
+#   zot   — real OCI registry (CNCF zot-minimal)
+#   seed  — init container that pushes Gemara testdata into zot via oras CLI
+#   sut   — compiled Go test binary exercising complyctl against zot
+
+services:
+  zot:
+    image: ghcr.io/project-zot/zot-minimal-linux-amd64:v2.1.18@sha256:f1ffb7a5bbddc0feea83646e29c587ecf39b3193733b447749d4c9ead111a395
+    profiles: [lifecycle]
+    volumes:
+      - ./zot-config.json:/etc/zot/config.json:ro
+    command: ["serve", "/etc/zot/config.json"]
+
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile.seed
+    profiles: [lifecycle]
+    depends_on:
+      zot:
+        condition: service_started
+    volumes:
+      - ./testdata:/testdata:ro
+    environment:
+      REGISTRY_URL: "zot:5000"
+
+  sut:
+    build:
+      context: ../../
+      dockerfile: tests/acceptance/Dockerfile.sut
+    profiles: [lifecycle]
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    environment:
+      REGISTRY_URL: "http://zot:5000"
+      TEST_POLICY_ID: "acceptance-test"
+      TEST_TARGET_ID: "acceptance-target"
