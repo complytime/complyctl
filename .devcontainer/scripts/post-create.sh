@@ -92,7 +92,7 @@ echo ">>> Setting up test workspace..."
 mkdir -p "${HOME}/test-workspace/.complytime/ampel/granular-policies"
 
 cp tests/cross-repo/testdata/complytime.yaml \
-    "${HOME}/test-workspace/"
+    "${HOME}/test-workspace/.complytime/"
 
 cp tests/cross-repo/testdata/granular-policies/block-force-push.json \
     "${HOME}/test-workspace/.complytime/ampel/granular-policies/"
@@ -146,7 +146,7 @@ echo "    Test workspace ready at ~/test-workspace/"
 BUNDLES_DIR="${COMPLYCTL_BUNDLES_DIR:-/bundles}"
 if [[ -d "${BUNDLES_DIR}" ]]; then
     echo ">>> [optional] Registering mounted policies from ${BUNDLES_DIR}..."
-    CONFIG_FILE="${HOME}/test-workspace/complytime.yaml"
+    CONFIG_FILE="${HOME}/test-workspace/.complytime/complytime.yaml"
 
     BUNDLE_COUNT=0
     for bundle_dir in "${BUNDLES_DIR}"/*/; do

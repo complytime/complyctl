@@ -185,10 +185,10 @@ echo "  WORK=${WORK_DIR}"
 # Generate workspace config with the correct registry port.
 # The static testdata/complytime.yaml uses port 8765 as default; sed replaces it
 # so the GEMARA_SERVICE_PORT override works end-to-end.
-sed "s|http://localhost:8765|${REGISTRY_URL}|" \
-    "${TESTDATA_DIR}/complytime.yaml" > "${WORK_DIR}/complytime.yaml"
-
 mkdir -p "${WORK_DIR}/.complytime/ampel/granular-policies"
+
+sed "s|http://localhost:8765|${REGISTRY_URL}|" \
+    "${TESTDATA_DIR}/complytime.yaml" > "${WORK_DIR}/.complytime/complytime.yaml"
 cp "${TESTDATA_DIR}/granular-policies/block-force-push.json" \
     "${WORK_DIR}/.complytime/ampel/granular-policies/"
 
