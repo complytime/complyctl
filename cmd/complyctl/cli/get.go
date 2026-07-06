@@ -137,10 +137,13 @@ func (o *getOptions) syncAll(
 		)
 	}
 
-	if err := o.syncPolicies(ctx, cfg, wsCfg, vfCache); err != nil {
-		return err
-	}
-	return o.syncComplypacks(ctx, cfg, baseDir, wsCfg, vfCache)
+	// Collect errors across both groups so that a policy failure
+	// does not prevent complypack sync (FR-006).
+	policyErr := o.syncPolicies(ctx, cfg, wsCfg, vfCache)
+	complypackErr := o.syncComplypacks(
+		ctx, cfg, baseDir, wsCfg, vfCache,
+	)
+	return errors.Join(policyErr, complypackErr)
 }
 
 // resolveVerifier determines the effective verifier for a single
