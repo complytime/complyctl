@@ -28,6 +28,15 @@ Providers are distributed separately via the complytime-providers package.
 %prep
 %goprep -k
 
+# Fedora 43 ships Go 1.25 but go.mod may require Go 1.26+ due to
+# transitive dependency requirements. Lower the directive to the
+# system Go major.minor so rpmbuild succeeds with GOTOOLCHAIN=local.
+# Fedora 43 EOL: 2026-12-09 — remove this block after EOL.
+# Reference: https://packages.fedoraproject.org/pkgs/golang/golang/
+%if 0%{?fedora} == 43
+sed -i 's/^go [0-9].*/go 1.25/' go.mod
+%endif
+
 %build
 BUILD_DATE_GO=$(date -u +'%%Y-%%m-%%dT%%H:%%M:%%SZ')
 
@@ -71,6 +80,9 @@ go test -mod=vendor -race -v ./...
 %dir %{_libexecdir}/%{app_dir}/providers
 
 %changelog
+* Mon Jul 07 2026 Marcus Burghardt <maburgha@redhat.com> - 0.0.8-2
+- Add go.mod compatibility patch for Fedora 43 (Go 1.25)
+
 * Fri Apr 24 2026 Marcus Burghardt <maburgha@redhat.com> - 0.0.8-1
 - Simplify spec for core-only delivery after provider split
 - Remove openscap-provider sub-package (moved to complytime-providers)
