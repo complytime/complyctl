@@ -136,7 +136,12 @@ func (s *ComplypackSync) SyncComplypack(ctx context.Context, repository, version
 		return false, fmt.Errorf("failed to store complypack %s@%s: %w", repository, version, err)
 	}
 
-	s.state.UpdateComplypackStateWithVerification(repository, version, remoteDigest, result.Config.EvaluatorID, verifyResult)
+	// Use result.Config.Version (from the complypack's embedded config.json)
+	// instead of the OCI tag `version` for state tracking. Store() creates
+	// on-disk directories using config.Version (e.g., "1.0.0"), so state
+	// must record the same value to keep state ↔ filesystem consistent.
+	// See: https://github.com/complytime/complyctl/issues/694
+	s.state.UpdateComplypackStateWithVerification(repository, result.Config.Version, remoteDigest, result.Config.EvaluatorID, verifyResult)
 	if err := SaveState(s.state, s.complypackCache.Dir()); err != nil {
 		return false, fmt.Errorf("failed to save state after complypack sync: %w (complypack blobs are valid)", err)
 	}

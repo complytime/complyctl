@@ -59,6 +59,25 @@ func (m *mockComplypackSource) seedComplypack(repository, evaluatorID, version, 
 	m.packs[repository+":"+version] = data
 }
 
+// seedComplypackWithTag registers a complypack where the OCI tag differs from
+// the config version (e.g., tag "v1.0.0" vs config version "1.0.0"). The
+// DefinitionVersion lookup uses the tag for the versioned key, while
+// CopyComplypack packs the artifact with the config version.
+func (m *mockComplypackSource) seedComplypackWithTag(
+	repository, evaluatorID, tag, configVersion, digestStr, content string,
+) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	data := &mockComplypackData{
+		digest:      digestStr,
+		version:     configVersion,
+		evaluatorID: evaluatorID,
+		content:     content,
+	}
+	m.packs[repository] = data
+	m.packs[repository+":"+tag] = data
+}
+
 func (m *mockComplypackSource) DefinitionVersion(_ context.Context, lookupRef string) (string, string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -638,4 +657,83 @@ func (m *brokenUnpackMock) CopyComplypack(_ context.Context, _, tag string, dst 
 		Digest:    "sha256:0000000000000000000000000000000000000000000000000000000000000000",
 		Size:      0,
 	}, nil
+}
+
+// TestComplypackSync_VPrefixedTag_StateMatchesDisk verifies that when the OCI
+// tag uses a "v" prefix (e.g., "v1.0.0") but the complypack's embedded
+// config.json uses bare semver (e.g., "1.0.0"), the state version matches the
+// on-disk directory name (config.Version), not the OCI tag.
+// Regression test for https://github.com/complytime/complyctl/issues/694.
+func TestComplypackSync_VPrefixedTag_StateMatchesDisk(t *testing.T) {
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+
+	mock := newMockComplypackSource()
+	// OCI tag is "v1.0.0" but config.Version is "1.0.0" (no "v" prefix).
+	// seedComplypackWithTag(repo, evaluatorID, tag, configVersion, digest, content)
+	mock.seedComplypackWithTag(
+		"example.com/complypacks/opa-bundle",
+		"io.complytime.opa",
+		"v1.0.0",
+		"1.0.0",
+		"sha256:vprefixed111",
+		"opa bundle with v-prefixed tag",
+	)
+
+	complypackCache := cache.NewComplypackCache(cacheDir)
+	state, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+
+	// Sync with the v-prefixed OCI tag.
+	fetched, err := syncMgr.SyncComplypack(
+		context.Background(),
+		"example.com/complypacks/opa-bundle",
+		"v1.0.0",
+	)
+	require.NoError(t, err)
+	assert.True(t, fetched, "first sync should report a fetch occurred")
+
+	// Verify state records config.Version ("1.0.0"), NOT the OCI tag ("v1.0.0").
+	state2, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	ps, ok := state2.GetComplypackState("example.com/complypacks/opa-bundle")
+	require.True(t, ok, "complypack state should exist after sync")
+	assert.Equal(t, "1.0.0", ps.Version,
+		"state version should match config.Version (on-disk dir), not OCI tag")
+	assert.Equal(t, "sha256:vprefixed111", ps.Digest)
+
+	// Verify on-disk directory uses config.Version ("1.0.0").
+	contentPath, cfg, err := complypackCache.Lookup("io.complytime.opa", "1.0.0")
+	require.NoError(t, err)
+	assert.FileExists(t, contentPath,
+		"cache should exist at config.Version path (1.0.0)")
+	assert.Equal(t, "io.complytime.opa", cfg.EvaluatorID)
+	assert.Equal(t, "1.0.0", cfg.Version)
+
+	// Verify NO directory exists at the OCI tag version ("v1.0.0").
+	vPrefixedDir := filepath.Join(
+		cacheDir, "complypacks", "io.complytime.opa", "v1.0.0",
+	)
+	assert.NoDirExists(t, vPrefixedDir,
+		"directory should NOT exist at OCI tag path (v1.0.0)")
+
+	// Verify incremental skip works: a second sync with the same digest
+	// should be a no-op, confirming state ↔ filesystem consistency.
+	state3, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+	syncMgr2 := cache.NewComplypackSync(complypackCache, state3, mock)
+
+	fetched2, err := syncMgr2.SyncComplypack(
+		context.Background(),
+		"example.com/complypacks/opa-bundle",
+		"v1.0.0",
+	)
+	require.NoError(t, err)
+	assert.False(t, fetched2,
+		"second sync with same digest should skip (incremental)")
+	assert.Equal(t, 1, mock.getCopyCount(),
+		"CopyComplypack should only be called once across both syncs")
 }

@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- `complyctl get` recorded the OCI tag version (e.g., `v1.0.0`) in
+  complypack state instead of the embedded `config.Version` (e.g.,
+  `1.0.0`), causing a mismatch between state tracking and the on-disk
+  cache directory name. (#694)
+
 - `--debug` flag now produces visible output on stderr in addition to
   writing to the log file. Previously, `--debug` only wrote debug
   messages to `.complytime/complyctl.log` with no terminal output.
