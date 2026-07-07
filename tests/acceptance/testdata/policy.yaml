@@ -1,6 +1,8 @@
 title: Acceptance Test Policy
 metadata:
   id: acceptance-test-policy
+  type: Policy
+  gemara-version: 1.3.0
   description: Policy for container-based acceptance testing using the test provider
   author:
     id: complytime
@@ -25,7 +27,9 @@ imports:
     - reference-id: acceptance-test-controls
 adherence:
   evaluation-methods:
-    - type: Behavioral
+    - id: behavioral-eval
+      type: Behavioral
+      mode: Automated
       description: Automated acceptance test evaluation
       executor:
         id: test
@@ -36,7 +40,9 @@ adherence:
       requirement-id: block-force-push
       frequency: on-demand
       evaluation-methods:
-        - type: Behavioral
+        - id: behavioral-eval-plan
+          type: Behavioral
+          mode: Automated
           executor:
             id: test
             name: test-evaluator

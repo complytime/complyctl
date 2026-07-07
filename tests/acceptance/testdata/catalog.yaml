@@ -8,7 +8,7 @@ controls:
       - id: block-force-push
         text: Force pushes to protected branches must be blocked
         applicability:
-          - GitHub repositories
+          - github-repos
         state: Active
     state: Active
 groups:
@@ -18,9 +18,13 @@ groups:
 metadata:
   id: acceptance-test-controls
   type: ControlCatalog
-  gemara-version: 1.0.0
+  gemara-version: 1.3.0
   description: Minimal catalog for container-based acceptance testing
   author:
     id: complytime
     name: ComplyTime
     type: Software Assisted
+  applicability-groups:
+    - id: github-repos
+      title: GitHub Repositories
+      description: Applicable to GitHub-hosted repositories

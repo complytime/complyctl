@@ -170,7 +170,6 @@ complyctl scan --policy-id nist-800-53-r5
 complyctl scan prod --format oscal
 complyctl scan --policy-id nist-800-53-r5 --format pretty
 complyctl scan --policy-id nist-800-53-r5 --format sarif
-
 ```
 
 | Argument / Flag | Short | Description |
