@@ -812,11 +812,11 @@ func unmappedReason(resolver PolicyGraphResolver, resolveFailures int) string {
 	return "evaluator not referenced by any cached policy"
 }
 
-// OrphanedVersion describes a complypack version directory on disk that is
+// orphanedVersion describes a complypack version directory on disk that is
 // not tracked in state.json. When Untracked is true, no state.json exists
 // (or it has no complypack entries), so the version is "untracked" rather
 // than "orphaned" — the distinction drives different doctor messaging.
-type OrphanedVersion struct {
+type orphanedVersion struct {
 	EvaluatorID string
 	Version     string
 	Path        string
@@ -858,7 +858,7 @@ func walkCacheSize(cacheDir string) (int64, error) {
 // directories and cross-references them against state.json complypack entries.
 // When state is nil or has no complypack entries, versions are reported as
 // "untracked" instead of "orphaned" (FR-006).
-func findOrphanedVersions(cacheDir string, state *cache.State) []OrphanedVersion {
+func findOrphanedVersions(cacheDir string, state *cache.State) []orphanedVersion {
 	complypacksDir := filepath.Join(cacheDir, complytime.ComplypacksSubdir)
 	evalEntries, err := os.ReadDir(complypacksDir)
 	if err != nil {
@@ -881,7 +881,7 @@ func findOrphanedVersions(cacheDir string, state *cache.State) []OrphanedVersion
 		}
 	}
 
-	var orphans []OrphanedVersion
+	var orphans []orphanedVersion
 	for _, evalEntry := range evalEntries {
 		if !evalEntry.IsDir() {
 			continue
@@ -902,14 +902,14 @@ func findOrphanedVersions(cacheDir string, state *cache.State) []OrphanedVersion
 				complypacksDir, evaluatorID, version,
 			)
 			if noState {
-				orphans = append(orphans, OrphanedVersion{
+				orphans = append(orphans, orphanedVersion{
 					EvaluatorID: evaluatorID,
 					Version:     version,
 					Path:        vPath,
 					Untracked:   true,
 				})
 			} else if !tracked[evalVersion{evaluatorID, version}] {
-				orphans = append(orphans, OrphanedVersion{
+				orphans = append(orphans, orphanedVersion{
 					EvaluatorID: evaluatorID,
 					Version:     version,
 					Path:        vPath,

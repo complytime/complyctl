@@ -29,7 +29,9 @@ Generate the autocompletion script for the specified shell.
 
 **doctor**
 Run pre-flight diagnostics on the workspace. Checks provider discovery, policy
-cache integrity, configuration validation, and complypack availability.
+cache integrity, configuration validation, and complypack availability. Also
+reports complypack cache disk usage, orphaned versions (on disk but not tracked
+in state.json), and untracked versions (no state.json exists).
 
 **generate**
 Generate policy graph and invoke providers.
@@ -37,7 +39,10 @@ Generate policy graph and invoke providers.
 **get**
 Fetch policies and complypacks from OCI registries into the local cache. When
 complypacks are configured in complytime.yaml, their artifacts are fetched
-alongside policies.
+alongside policies. When switching complypack versions, previously cached
+versions are served from the local cache without a network fetch. The number
+of retained versions per evaluator-id is controlled by the
+**COMPLYTIME_CACHE_VERSIONS** environment variable (default: 1).
 
 **help**
 Display help about any command.
@@ -112,7 +117,10 @@ $ complyctl scan my-target --policy-id my-policy --format pretty
 ```bash
 $ complyctl doctor
 # Run pre-flight diagnostics: provider discovery, cache integrity,
-# configuration validation, and complypack availability
+# configuration validation, complypack availability, and cache health
+
+$ COMPLYTIME_CACHE_VERSIONS=3 complyctl get
+# Retain up to 3 complypack versions per evaluator-id
 ```
 
 ## Listing providers
@@ -131,6 +139,22 @@ $ complyctl providers
 : An operational error occurred. This includes provider failures, invalid configuration, or zero requirements assessed. Reports and summaries are written before the non-zero exit so partial results remain available.
 
 To gate a pipeline on compliance results, parse the scan output (SARIF, OSCAL) with your policy engine rather than relying on the exit code.
+
+# ENVIRONMENT
+
+**COMPLYTIME_CACHE_VERSIONS**
+: Number of complypack versions to retain per evaluator-id in the local cache
+(`~/.complytime/complypacks/`). Default: **1**, preserving single-version
+behavior. Values less than 1 are clamped to 1. Non-integer values produce a
+warning and fall back to the default.
+
+**COMPLYTIME_WORKSPACE**
+: Override the workspace directory used by complyctl. When set, complyctl
+resolves configuration and output paths relative to this directory.
+
+**COMPLYTIME_SHOW_PASSING**
+: When set to **false**, exclude passing controls from the terminal scan
+summary table. Default: **true** (show all controls).
 
 # SEE ALSO
 

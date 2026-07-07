@@ -59,8 +59,12 @@ complyctl doctor
 ```
 
 `doctor` checks whether provider binaries are discovered and
-whether each provider's prerequisites are met. You can also
-list discovered providers directly:
+whether each provider's prerequisites are met. It also reports
+complypack cache health: total disk usage, orphaned versions
+(on disk but not tracked in state.json), and untracked versions
+(no state.json exists), with a suggestion to run `complyctl get`
+to rebuild state. You can also list discovered providers
+directly:
 
 ```bash
 complyctl providers
@@ -148,6 +152,26 @@ complyctl get
 ```
 
 Downloads Gemara policies from the OCI registry into the local cache (`~/.complytime/policies/`). If `complypacks:` entries are configured in `complytime.yaml`, their artifacts are also fetched into `~/.complytime/complypacks/`. Incremental — only fetches new or modified content.
+
+### Complypack cache versioning
+
+By default, complyctl retains one complypack version per evaluator-id. When you switch versions in `complytime.yaml` (e.g., from `:v2.0.0` to `:v1.0.0`), complyctl checks the local cache first and serves the previously cached version without a network fetch. This avoids re-downloads when switching between known versions.
+
+To retain multiple versions simultaneously, set the `COMPLYTIME_CACHE_VERSIONS` environment variable:
+
+```bash
+export COMPLYTIME_CACHE_VERSIONS=3
+complyctl get
+```
+
+| Value | Behavior |
+|-------|----------|
+| Unset or `1` | Default. One version per evaluator-id (current behavior). |
+| `N` (> 1) | Retains up to N versions per evaluator-id. Oldest versions are evicted first. |
+| `0` or negative | Clamped to `1`. |
+| Non-integer | Warning logged, falls back to `1`. |
+
+When a verifier is configured in `complytime.yaml`, local cache hits are re-verified via the registry API before being accepted.
 
 ## Step 5: Verify cache
 
