@@ -5,10 +5,18 @@ package complypack
 import "fmt"
 
 // Config is the ComplyPack OCI artifact configuration.
-// It identifies which evaluator consumes this pack and tracks optional provenance.
+// Embedded in the OCI config layer so consumers can identify the pack
+// and route it to the correct provider without inspecting the content.
 type Config struct {
-	// EvaluatorID identifies the policy evaluator (e.g., "io.complytime.opa").
-	// Required. Used by consumers to dispatch to the correct evaluator plugin.
+	// ID is the globally unique pack identifier using reverse-domain convention
+	// (e.g., "io.complytime.my-controls", "com.acme.appsec").
+	// Required. Survives registry moves and distinguishes packs from different
+	// authors that target the same evaluator.
+	ID string `json:"id"`
+
+	// EvaluatorID identifies the provider plugin that evaluates this pack's
+	// content (e.g., "opa"). Must match the provider's registered ID.
+	// Required. Used by complyctl to dispatch content to the correct provider.
 	EvaluatorID string `json:"evaluator-id"`
 
 	// Version is the ComplyPack artifact version.
@@ -33,6 +41,9 @@ type Provenance struct {
 // Validate checks that required Config fields are present.
 // Returns ErrInvalidConfig if validation fails.
 func (c Config) Validate() error {
+	if c.ID == "" {
+		return fmt.Errorf("%w: id is required", ErrInvalidConfig)
+	}
 	if c.EvaluatorID == "" {
 		return fmt.Errorf("%w: evaluator-id is required", ErrInvalidConfig)
 	}

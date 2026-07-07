@@ -33,6 +33,7 @@ type mockComplypackData struct {
 	digest      string
 	version     string
 	evaluatorID string
+	id          string
 	content     string
 }
 
@@ -51,6 +52,7 @@ func (m *mockComplypackSource) seedComplypack(repository, evaluatorID, version, 
 		digest:      digestStr,
 		version:     version,
 		evaluatorID: evaluatorID,
+		id:          "test-" + evaluatorID,
 		content:     content,
 	}
 	m.packs[repository] = data
@@ -84,6 +86,7 @@ func (m *mockComplypackSource) CopyComplypack(ctx context.Context, repository, t
 	}
 
 	cfg := complypack.Config{
+		ID:          p.id,
 		EvaluatorID: p.evaluatorID,
 		Version:     p.version,
 	}
@@ -407,6 +410,7 @@ func (m *maliciousEvaluatorMock) CopyComplypack(ctx context.Context, repository,
 	// checks for empty fields but does not enforce path safety — that's
 	// the consumer's (complyctl's) responsibility.
 	cfg := complypack.Config{
+		ID:          "evil-pack",
 		EvaluatorID: "../../evil",
 		Version:     "1.0.0",
 	}

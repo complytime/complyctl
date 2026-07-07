@@ -63,6 +63,7 @@ func TestValidatePathComponent_Empty(t *testing.T) {
 // newTestConfig returns a complypack.Config suitable for testing.
 func newTestConfig(evaluatorID, version string) complypack.Config {
 	return complypack.Config{
+		ID:          "test-" + evaluatorID,
 		EvaluatorID: evaluatorID,
 		Version:     version,
 	}

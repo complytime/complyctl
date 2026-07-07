@@ -636,6 +636,7 @@ func TestProviders_WithComplypack(t *testing.T) {
 
 	// Store a complypack for the evaluator-id.
 	cfg := complypack.Config{
+		ID:          "io.complytime.opa-controls",
 		EvaluatorID: "io.complytime.opa",
 		Version:     "1.2.3",
 	}
