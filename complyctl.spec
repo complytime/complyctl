@@ -35,6 +35,7 @@ Providers are distributed separately via the complytime-providers package.
 # Reference: https://packages.fedoraproject.org/pkgs/golang/golang/
 %if 0%{?fedora} == 43
 sed -i 's/^go [0-9].*/go 1.25/' go.mod
+sed -i 's/^## explicit; go 1\.26.*/## explicit; go 1.25/' vendor/modules.txt
 %endif
 
 %build
