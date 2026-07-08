@@ -81,7 +81,7 @@ go test -mod=vendor -race -v ./...
 %dir %{_libexecdir}/%{app_dir}/providers
 
 %changelog
-* Mon Jul 07 2026 Marcus Burghardt <maburgha@redhat.com> - 0.0.8-2
+* Tue Jul 07 2026 Marcus Burghardt <maburgha@redhat.com> - 0.0.8-2
 - Add go.mod compatibility patch for Fedora 43 (Go 1.25)
 
 * Fri Apr 24 2026 Marcus Burghardt <maburgha@redhat.com> - 0.0.8-1
