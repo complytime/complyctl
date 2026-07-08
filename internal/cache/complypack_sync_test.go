@@ -72,6 +72,7 @@ func (m *mockComplypackSource) seedComplypackWithTag(
 		digest:      digestStr,
 		version:     configVersion,
 		evaluatorID: evaluatorID,
+		id:          "test-" + evaluatorID,
 		content:     content,
 	}
 	m.packs[repository] = data
