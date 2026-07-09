@@ -202,28 +202,28 @@ const WorkspaceEnvVar = "COMPLYTIME_WORKSPACE"
 ### ER-001: Workspace Does Not Exist
 
 When workspace path does not exist:
-```
+```text
 workspace directory does not exist: <path>
 ```
 
 ### ER-002: Workspace Not A Directory
 
 When workspace path is a file:
-```
+```text
 workspace path is not a directory: <path>
 ```
 
 ### ER-003: Config Not Found
 
 When config file is not found in either location:
-```
+```text
 config file not found in <baseDir> (checked .complytime/complytime.yaml and complytime.yaml)
 ```
 
 ### ER-004: Invalid Path Resolution
 
 When path resolution fails:
-```
+```text
 failed to resolve workspace path: <error>
 ```
 
@@ -231,7 +231,7 @@ failed to resolve workspace path: <error>
 
 ### DW-001: Legacy Config Location Warning
 
-```
+```text
 WARNING: complytime.yaml found at repository root (legacy location).
 Please move it to .complytime/complytime.yaml for better organization.
 Run: mkdir -p .complytime && mv complytime.yaml .complytime/complytime.yaml

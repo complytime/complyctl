@@ -83,7 +83,7 @@ executed in a clone of that repository.
 - [x] T007 [P] [US2] [providers-repo] Create FMF metadata root at .fmf/version in the complytime-providers repository. Create the directory `.fmf/` and write a single file `version` containing just `1` (no trailing newline or extra content). This enables testing-farm to discover TMT plans. Reference: FR-022.
 
 - [x] T008 [P] [US2] [providers-repo] Create TMT test plan at plans/test-RPM-providers.fmf in the complytime-providers repository. Create the `plans/` directory. The plan validates that both provider binaries are installed at the expected path after RPM installation. Content:
-  ```
+  ```yaml
   summary: Validate complytime-providers RPM sub-packages deliver provider binaries
 
   execute:

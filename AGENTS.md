@@ -81,7 +81,7 @@ make crapload-check     # check for CRAP regressions against baseline
 ### CI Workflow Structure
 
 | Workflow | File | Purpose |
-|----------|------|---------|
+| ---------- | ------ | --------- |
 | CI | `ci_checks.yml` | Standardized CI via org-infra reusable workflow |
 | Unit Test | `unit_test.yml` | Unit tests + buf lint |
 | E2E Test | `e2e_test.yml` | End-to-end tests with mock registry |
@@ -229,19 +229,19 @@ These rules are non-negotiable. Violations are CRITICAL severity.
 
 ### PR Review Commands
 
-| Command | When | Scope |
-|---------|------|-------|
-| `/review-council` | Pre-PR (local) | 5+ Divisor agents |
-| `/review-pr [N]` | Post-PR (GitHub) | Single agent, CI analysis |
+| Command           | When             | Scope                     |
+|-------------------|------------------|---------------------------|
+| `/review-council` | Pre-PR (local)   | 5+ Divisor agents         |
+| `/review-pr [N]`  | Post-PR (GitHub) | Single agent, CI analysis |
 
 ## Specification Workflow
 
 All non-trivial changes MUST be preceded by a spec workflow.
 
-| Tier | Tool | When | Artifacts |
-|------|------|------|-----------|
-| Strategic | Speckit | >= 3 stories, cross-repo | `specs/NNN-*/` |
-| Tactical | OpenSpec | < 3 stories, single-repo | `openspec/changes/*/` |
+| Tier       | Tool     | When                      | Artifacts              |
+|------------|----------|---------------------------|------------------------|
+| Strategic  | Speckit  | >= 3 stories, cross-repo  | `specs/NNN-*/`         |
+| Tactical   | OpenSpec | < 3 stories, single-repo  | `openspec/changes/*/`  |
 
 Pipeline: `constitution → specify → clarify → plan → tasks →
 analyze → checklist → implement`

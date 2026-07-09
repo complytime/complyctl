@@ -24,7 +24,7 @@ Implement continuous CRAP (Change Risk Anti-Pattern) and GazeCRAP monitoring for
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 | Principle | Status | Notes |
-|-----------|--------|-------|
+| ----------- | -------- | ------- |
 | I. Single Source of Truth | PASS | Thresholds stored in single baseline file; CRAP threshold defaults defined once in reusable workflow inputs |
 | II. Simplicity & Isolation | PASS | Separate workflows for PR analysis and event-based metrics publishing; reusable workflow is a single-purpose component |
 | III. Incremental Improvement | PASS | Feature is self-contained; no unrelated changes |
@@ -74,7 +74,7 @@ Makefile                                   # New targets: crapload, crapload-bas
 ### Inputs (with defaults)
 
 | Input | Type | Default | Description |
-|-------|------|---------|-------------|
+| ------- | ------ | --------- | ------------- |
 | `go-version-file` | string | `'./go.mod'` | Path to go.mod for Go version detection |
 | `gaze-version` | string | `'latest'` | Gaze version tag to install |
 | `baseline-file` | string | `'.gaze/baseline.json'` | Path to baseline thresholds file |

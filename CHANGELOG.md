@@ -77,6 +77,38 @@
   the full log file lives. The flag description is updated to
   `"output debug logs to stderr and log file"`. (#614)
 
+- `complyctl scan --format` reports (SARIF, OSCAL, Markdown) now written
+  to `.complytime/scan/` alongside the evaluation log, matching
+  documented behavior. Previously, format reports were written to the
+  workspace root. (#615)
+- Generation freshness detection now tracks complypack digests alongside
+  policy digests. Previously, updating a complypack without changing the
+  policy would skip regeneration, causing providers to use stale
+  artifacts (#583).
+- OCI reference parsing now supports standard `:tag` syntax (e.g.,
+  `registry.com/org/image:v0.4.0`) in addition to the existing `@version`
+  notation for both policies and complypacks. Digest references
+  (`@sha256:...`) are also supported. Invalid OCI references in
+  `complytime.yaml` are now detected at config load time with clear
+  error messages. (#594)
+- `complyctl doctor` now reports invalid policy references in
+  `CheckPolicyActivePeriod` and `CheckComplypacks` as explicit
+  failures instead of silently skipping them. `CheckVariables`
+  now surfaces per-policy resolution errors with specific messages
+  instead of a silent counter. (#600)
+- Scan reports now resolve assessment plan IDs to requirement IDs,
+  ensuring output displays meaningful identifiers instead of internal
+  plan references. Affects EvaluationLog, OSCAL, SARIF, and Markdown
+  output formats.
+- `complyctl get` now detects and rejects duplicate evaluator-ids across
+  complypack entries. Previously, multiple complypacks resolving to the
+  same evaluator-id caused non-deterministic digest selection during
+  scan, leading to unnecessary regeneration or stale artifacts (#647).
+- `complyctl get` now re-fetches complypack artifacts when the cache
+  directory is missing, even if `state.json` records a matching digest.
+  Previously, a deleted cache directory caused the sync to be permanently
+  skipped until the user manually cleared state (#649).
+
 ### Changed
 
 - `complyctl doctor` output redesigned with grouped sections, nested
@@ -95,6 +127,10 @@
   via GitHub Checks API, unreleased commits guard, and idempotent
   annotated tag creation. Concurrency group prevents parallel
   releases. (#560)
+
+- All commands now accept `--workspace` flag to specify workspace directory
+- `NewWorkspace()` function signature changed from `NewWorkspace()` to `NewWorkspace(baseDir string)`
+- Log file and scan output paths are now relative to resolved workspace directory
 
 ### Removed
 
@@ -208,42 +244,4 @@
   when `@version` syntax is detected. `@version` support will be removed
   in a future release. (#600)
 
-### Changed
 
-- All commands now accept `--workspace` flag to specify workspace directory
-- `NewWorkspace()` function signature changed from `NewWorkspace()` to `NewWorkspace(baseDir string)`
-- Log file and scan output paths are now relative to resolved workspace directory
-
-### Fixed
-
-- `complyctl scan --format` reports (SARIF, OSCAL, Markdown) now written
-  to `.complytime/scan/` alongside the evaluation log, matching
-  documented behavior. Previously, format reports were written to the
-  workspace root. (#615)
-- Generation freshness detection now tracks complypack digests alongside
-  policy digests. Previously, updating a complypack without changing the
-  policy would skip regeneration, causing providers to use stale
-  artifacts (#583).
-- OCI reference parsing now supports standard `:tag` syntax (e.g.,
-  `registry.com/org/image:v0.4.0`) in addition to the existing `@version`
-  notation for both policies and complypacks. Digest references
-  (`@sha256:...`) are also supported. Invalid OCI references in
-  `complytime.yaml` are now detected at config load time with clear
-  error messages. (#594)
-- `complyctl doctor` now reports invalid policy references in
-  `CheckPolicyActivePeriod` and `CheckComplypacks` as explicit
-  failures instead of silently skipping them. `CheckVariables`
-  now surfaces per-policy resolution errors with specific messages
-  instead of a silent counter. (#600)
-- Scan reports now resolve assessment plan IDs to requirement IDs,
-  ensuring output displays meaningful identifiers instead of internal
-  plan references. Affects EvaluationLog, OSCAL, SARIF, and Markdown
-  output formats.
-- `complyctl get` now detects and rejects duplicate evaluator-ids across
-  complypack entries. Previously, multiple complypacks resolving to the
-  same evaluator-id caused non-deterministic digest selection during
-  scan, leading to unnecessary regeneration or stale artifacts (#647).
-- `complyctl get` now re-fetches complypack artifacts when the cache
-  directory is missing, even if `state.json` records a matching digest.
-  Previously, a deleted cache directory caused the sync to be permanently
-  skipped until the user manually cleared state (#649).

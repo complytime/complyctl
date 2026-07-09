@@ -8,7 +8,7 @@ A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/
 
 ## Architecture
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────┐
 │  Host                                                            │
 │                                                                  │
@@ -53,7 +53,7 @@ A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/
 **Components:**
 
 | Component | Description |
-|:---|:---|
+| :--- | :--- |
 | **OCI Registry** | Remote store for Gemara policies. Supports two OCI manifest layouts: split-layer (distinct media types per artifact) and Gemara bundle format (single artifact media type with annotation-based differentiation). Both formats are auto-detected and resolved transparently. |
 | **Workspace** | Resolved workspace directory containing `.complytime/complytime.yaml` (or legacy `complytime.yaml` at root). Configurable via `--workspace` flag or `COMPLYTIME_WORKSPACE` env var. Defines which registry, policies, and targets to use. Scan output lands in `.complytime/scan/`. |
 | **Cache** | Local OCI Layout stores under `~/.cache/complytime/policies/`. One store per policy ID. Follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/) (`$XDG_CACHE_HOME`). |
@@ -72,7 +72,7 @@ A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/
 ## CLI Commands
 
 | Command | Description |
-|:---|:---|
+| :--- | :--- |
 | `init` | Create a workspace configuration file |
 | `get` | Fetch new/modified policies from OCI registry and update cache |
 | `list` | List cached Gemara policies |
@@ -82,7 +82,7 @@ A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/
 | `providers` | List discovered scanning providers and their health status |
 | `version` | Print version |
 
-Global flags: 
+Global flags:
 - `--debug` / `-d` — output debug logs
 - `--workspace` / `-w` — workspace directory (project root containing `.complytime/`, defaults to current directory)
 
@@ -141,9 +141,9 @@ complyctl list
 complyctl list --policy-id nist-800-53-r5
 ```
 
-| Flag | Description |
-|:---|:---|
-| `--policy-id` | Filter output to a single policy |
+| Flag          | Description                       |
+|---------------|-----------------------------------|
+| `--policy-id` | Filter output to a single policy  |
 
 ### `generate`
 
@@ -151,9 +151,9 @@ complyctl list --policy-id nist-800-53-r5
 complyctl generate --policy-id nist-800-53-r5
 ```
 
-| Flag | Short | Description |
-|:---|:---|:---|
-| `--policy-id` | `-p` | Policy ID to generate (required) |
+| Flag          | Short | Description                       |
+|---------------|-------|-----------------------------------|
+| `--policy-id` | `-p`  | Policy ID to generate (required)  |
 
 Resolves the policy dependency graph from cache, extracts assessment configurations, applies parameter overrides from `complytime.yaml`, and dispatches to the matching provider via Generate RPC.
 
@@ -176,7 +176,7 @@ complyctl scan --policy-id nist-800-53-r5 --format sarif
 ```
 
 | Argument / Flag | Short | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `[target]` | | Optional target ID to scope the scan (from `complytime.yaml`) |
 | `--policy-id` | `-p` | Policy ID to scan (required when no target is given, or target has multiple policies) |
 | `--format` | `-f` | Output format: `oscal`, `pretty`, `sarif` |
@@ -189,7 +189,7 @@ Output written to `./.complytime/scan/`.
 #### Exit codes
 
 | Exit Code | Meaning |
-|:---|:---|
+| :--- | :--- |
 | `0` | Scan completed -- all targets evaluated (findings, if any, are in the report) |
 | non-zero | Operational error -- one or more targets could not be evaluated, or zero requirements assessed (partial results written before exit) |
 
@@ -234,7 +234,7 @@ targets:
 ```
 
 | Field | Description |
-|:---|:---|
+| :--- | :--- |
 | `policies[].url` | Full OCI reference (registry + repository + optional `:tag`) |
 | `policies[].id` | Optional shortname; if omitted, derived from last path segment of URL |
 | `variables` | Workspace-scoped constants passed to providers via Generate RPC |

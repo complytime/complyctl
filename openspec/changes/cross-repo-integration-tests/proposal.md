@@ -63,7 +63,7 @@ be implemented once this change is merged.
 ## Constitution Alignment
 
 | Principle | Assessment |
-|:----------|:-----------|
+| :---------- | :----------- |
 | I. Single Source of Truth | Test script, fixtures, and CI workflow live in one place (complyctl). No duplication with complytime-providers. |
 | II. Simplicity & Isolation | Minimal test content (1 control, 1 rule). Each test function is isolated and independently verifiable. |
 | III. Incremental Improvement | Scoped to complyctl side only. Providers side is a separate change. |

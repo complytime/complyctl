@@ -172,3 +172,8 @@ The complyctl SDK tagged release (end of Phase 1) is the critical coordination p
 - `api/plugin/` directory and `complyctl.plugin.v1` proto package are NOT renamed (FR-019)
 - `LoadedPlugin` → `LoadedProvider` rename (T003) is optional per data-model.md but included for consistency; confirm with reviewers before implementing
 - Commit after each phase checkpoint; open complyctl PR and complytime-providers PR separately
+
+[US1]: spec.md
+[US2]: spec.md
+[US3]: spec.md
+[US4]: spec.md

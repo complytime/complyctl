@@ -71,12 +71,12 @@ complytime-providers (source RPM)
 
 ## Directory Ownership
 
-| Path                                  | Owned By       | Notes                             |
-|---------------------------------------|----------------|-----------------------------------|
-| `/usr/bin/complyctl`                  | complyctl      | CLI entry point                   |
-| `/usr/share/man/man1/complyctl.1.gz`  | complyctl      | Man page                          |
-| `/usr/libexec/complytime/`           | complyctl      | Parent directory                  |
-| `/usr/libexec/complytime/providers/` | complyctl      | Provider discovery directory      |
+| Path                                        | Owned By                      | Notes                              |
+|---------------------------------------------|-------------------------------|------------------------------------|
+| `/usr/bin/complyctl`                        | complyctl                     | CLI entry point                    |
+| `/usr/share/man/man1/complyctl.1.gz`        | complyctl                     | Man page                           |
+| `/usr/libexec/complytime/`                  | complyctl                     | Parent directory                   |
+| `/usr/libexec/complytime/providers/`        | complyctl                     | Provider discovery directory       |
 | `.../providers/complyctl-provider-openscap` | complytime-providers-openscap | Installed into complyctl-owned dir |
 | `.../providers/complyctl-provider-ampel`    | complytime-providers-ampel    | Installed into complyctl-owned dir |
 
@@ -105,9 +105,9 @@ sub-package RPMs.
 ## CI Target Matrix
 
 | Target                    | COPR Build | Testing Farm | Propose Downstream | Koji Build | Bodhi Update |
-|---------------------------|:---:|:---:|:---:|:---:|:---:|
-| fedora-rawhide-x86_64     | PR  | PR  | release | commit | --     |
-| fedora-43-x86_64          | PR  | PR  | release | commit | commit |
-| fedora-42-x86_64          | PR  | PR  | release | commit | commit |
-| centos-stream-10-x86_64   | PR  | PR  | --      | --     | --     |
-| centos-stream-9-x86_64    | PR  | PR  | --      | --     | --     |
+|---------------------------|:----------:|:------------:|:------------------:|:----------:|:------------:|
+| fedora-rawhide-x86_64     |     PR     |      PR      |      release       |   commit   |      --      |
+| fedora-43-x86_64          |     PR     |      PR      |      release       |   commit   |    commit    |
+| fedora-42-x86_64          |     PR     |      PR      |      release       |   commit   |    commit    |
+| centos-stream-10-x86_64   |     PR     |      PR      |         --         |     --     |      --      |
+| centos-stream-9-x86_64    |     PR     |      PR      |         --         |     --     |      --      |

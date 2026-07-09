@@ -6,7 +6,7 @@
 ## Status Summary
 
 | Phase | Scope | Status |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | 1 | Setup — Legacy removal, dependency updates, proto codegen | **COMPLETE** |
 | 2 | Foundational — Cache, registry, policy resolution, plugin SDK | **COMPLETE** |
 | 3 | US1 — Init, Get, Doctor, List | **COMPLETE** |
@@ -270,7 +270,7 @@
 - [x] T094 Run `go build ./...` — full build green
 - [x] T095 Run `go test ./...` — all tests pass
 - [x] T096 Run `go vet ./...` and `gofmt -l .` — clean
-- [x] T097 Verify no stale references — search for `Pack `, `RegistryConfig`, `policy_ids` in Go source (except `pack.go` data model); zero matches expected
+- [x] T097 Verify no stale references — search for `Pack ` (deliberate space), `RegistryConfig`, `policy_ids` in Go source (except `pack.go` data model); zero matches expected
 
 **Checkpoint**: Behavioral tests, pack data model, PolicyEntry propagated. Full build green. All 001 implementation complete.
 
@@ -311,7 +311,7 @@
 
 ### 8b: Per-Provider Configuration Summary (replaces failures-only output)
 
-- [x] T106 [US1] Refactor `CheckVariables()` in `internal/doctor/doctor.go` — add `verbose bool` parameter. Default mode: per-provider summary line with resolved count + missing count (e.g., `✅ provider/openscap: 3/3 global vars, 2/2 target vars` or `❌ provider/kube-eval: 1/2 global vars — missing workspace`). Verbose mode: append per-key status lines below each provider summary (e.g., `   global: workspace ✅, output_dir ✅`). Keep existing global + target variable validation logic (R51). Returns `[]CheckResult` — one per provider in default mode, additional detail results in verbose mode
+- [x] T106 [US1] Refactor `CheckVariables()` in `internal/doctor/doctor.go` — add `verbose bool` parameter. Default mode: per-provider summary line with resolved count + missing count (e.g., `✅ provider/openscap: 3/3 global vars, 2/2 target vars` or `❌ provider/kube-eval: 1/2 global vars — missing workspace`). Verbose mode: append per-key status lines below each provider summary (e.g., `global: workspace ✅, output_dir ✅`). Keep existing global + target variable validation logic (R51). Returns `[]CheckResult` — one per provider in default mode, additional detail results in verbose mode
 - [x] T107 [US1] Update `Run()` signature in `internal/doctor/doctor.go` — add `verbose bool` parameter. Pass through to `CheckVariables()`. All other checks unaffected by verbose flag
 
 ### 8c: `--verbose` CLI Flag
@@ -476,7 +476,7 @@ Lipgloss universal default, scan results 4-column table, execution plan collapse
 
 Error message consistency ("complytime" → "complyctl"/file name), `get --timeout`, resolver error surfacing. 16 tasks (T226-T241).
 
-### Comply-Packs (Phase 9) — DEFERRED to 002
+### Comply-Packs (Phase 9) — DEFERRED to 002 (detail)
 
 Full pack CLI lifecycle. Separate feature branch.
 

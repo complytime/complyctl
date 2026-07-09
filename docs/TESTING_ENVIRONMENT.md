@@ -172,7 +172,7 @@ export GITHUB_TOKEN=<your-token>
 ### Binaries
 
 | Binary | Location |
-|--------|----------|
+| -------- | ---------- |
 | `complyctl` | `./bin/` |
 | `mock-oci-registry` | `./bin/` |
 | `snappy` | `$GOPATH/bin` |
@@ -266,7 +266,7 @@ Place raw Gemara YAML files in a directory and mount it
 into the devcontainer at `/bundles/` (or set
 `COMPLYCTL_BUNDLES_DIR` to a custom path):
 
-```
+```text
 /bundles/
 └── my-private-policy/
     ├── catalog.yaml
@@ -360,7 +360,7 @@ namespace remaps your host UID to a different UID inside the
 container. This can change file ownership on the host after
 the workspace stops, causing git to refuse operations:
 
-```
+```text
 fatal: detected dubious ownership in repository at '/path/to/complyctl'
 ```
 

@@ -59,7 +59,7 @@ Rationale: Smooth migration path. Users can adopt the new location at their own 
 ### D4: Deprecation warning is informative, not disruptive
 
 When legacy location is detected, print to stderr:
-```
+```text
 WARNING: complytime.yaml found at repository root (legacy location).
 Please move it to .complytime/complytime.yaml for better organization.
 Run: mkdir -p .complytime && mv complytime.yaml .complytime/complytime.yaml
@@ -299,7 +299,7 @@ cmd.PersistentPreRun = func(_ *cobra.Command, _ []string) {
 ## Error Scenarios
 
 | Scenario | Error Message | Exit Code |
-|----------|--------------|-----------|
+| ---------- | -------------- | ----------- |
 | `--workspace /nonexistent` | `workspace directory does not exist: /nonexistent` | 1 |
 | `--workspace /etc/passwd` (file) | `workspace path is not a directory: /etc/passwd` | 1 |
 | Neither config location exists | `config file not found in /path (checked .complytime/complytime.yaml and complytime.yaml)` | 1 |

@@ -9,7 +9,7 @@
 Workspace configuration file (YAML). Single mode using `PolicyEntry` objects (Session 2026-02-25d). No `pack` field, no separate `registry` section — each policy URL is a self-contained OCI reference including its own registry.
 
 | Field | Type | Required | Description |
-|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- |
 | `policies` | `[]PolicyEntry` | Yes (>=1) | Policies to fetch and evaluate. Each entry has a full OCI URL and optional shortname ID |
 | `variables` | `map[string]string` | No | Global variables — workspace-scoped config (e.g., `workspace: ./.complytime/scan`). Passed to providers during Generate RPC (R48, R49) |
 | `targets` | `[]TargetConfig` | No | Systems/environments to scan |
@@ -24,7 +24,7 @@ Workspace configuration file (YAML). Single mode using `PolicyEntry` objects (Se
 ### PolicyEntry (Session 2026-02-25d)
 
 | Field | Type | Required | Description |
-|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- |
 | `url` | `string` | Yes | Full OCI reference including registry (e.g., `registry.com/policies/nist-800-53-r5@v1.0`) |
 | `id` | `string` | No | User-chosen shortname. If omitted, auto-derived from last URL path segment via `EffectiveID()` |
 
@@ -51,7 +51,7 @@ Replaced by `PolicyEntry`. The separate `id` + `version` fields are now a single
 ### TargetConfig
 
 | Field | Type | Required | Description |
-|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- |
 | `id` | `string` | Yes | Target identifier |
 | `policies` | `[]string` | Yes (>=1) | Policy effective IDs applicable to this target (Session 2026-02-25d; was `policy_ids`) |
 | `variables` | `map[string]string` | No | Target variables — per-target runtime config (credentials, profile, kubeconfig) (R48) |
@@ -99,14 +99,14 @@ Local OCI Layout store per policy ID using `oras-go/v2/content/oci`. Each policy
 ### CacheState (`state.json`)
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `last_sync` | `string` (ISO 8601) | Timestamp of last successful sync |
 | `policies` | `map[string]PolicyState` | Per-policy sync state |
 
 ### PolicyState
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `version` | `string` | Cached version tag |
 | `digest` | `string` | OCI manifest digest (SHA256) |
 | `synced_at` | `string` (ISO 8601) | When this policy was last synced |
@@ -118,7 +118,7 @@ Local OCI Layout store per policy ID using `oras-go/v2/content/oci`. Each policy
 In-memory resolved graph of Gemara Layers 1-3 for a specific policy. Supports multi-evaluator routing — each assessment plan's `evaluation-methods[].executor.id` determines which plugin handles that plan's requirements (R32).
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `policy_id` | `string` | Root policy identifier |
 | `version` | `string` | Resolved version |
 | `controls` | `[]gemara.Control` | Layer 2 controls (from `go-gemara`). For OpenSCAP: each XCCDF rule = one Control containing one Assessment Requirement (the testable statement) + guideline-mappings to CIS items (`cis-*` pattern) |
@@ -137,7 +137,7 @@ In-memory resolved graph of Gemara Layers 1-3 for a specific policy. Supports mu
 Configuration extracted from the policy graph and passed to plugins via Generate RPC.
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `plan_id` | `string` | Assessment plan identifier |
 | `requirement_id` | `string` | Requirement identifier |
 | `evaluator_id` | `string` | Target evaluator (maps to plugin) |
@@ -162,7 +162,7 @@ Configuration extracted from the policy graph and passed to plugins via Generate
 Tracks the policy cache digest at generation time for freshness detection (R37). Persisted after `complyctl generate` (or auto-generate within `scan`). Read by `scan` to determine whether to reuse or regenerate.
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `policy_id` | `string` | Policy that was generated |
 | `policy_digest` | `string` | OCI manifest digest (SHA256) at generation time |
 | `generated_at` | `string` (ISO 8601) | When generation occurred |
@@ -182,7 +182,7 @@ Structured plain-text execution plan output after graph resolution and plugin pr
 **ExecutionPlanRow** (one stanza per target-provider combination):
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `target_id` | `string` | Target identifier from workspace config |
 | `provider_id` | `string` | Evaluator/provider identifier from assessment plan |
 | `requirement_count` | `int` | Number of requirements routed to this provider for this target |
@@ -201,7 +201,7 @@ Structured plain-text execution plan output after graph resolution and plugin pr
 Discovered gRPC scanning provider with lifecycle management. No sidecar manifest files — all metadata derived at runtime (R19). User-facing terminology: "scanning provider"; code-level: `plugin.Plugin` (R46).
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `plugin_id` | `string` | Derived from executable name |
 | `evaluator_id` | `string` | `plugin_id` minus `complyctl-provider-` prefix |
 | `path` | `string` | Filesystem path to executable |
@@ -222,14 +222,14 @@ Discovered gRPC scanning provider with lifecycle management. No sidecar manifest
 Gemara Layer 4 output — always produced on scan. Uses `go-gemara` `EvaluationLog` type directly.
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `metadata` | `gemara.Metadata` | Log metadata (title, datetime, actors) |
 | `evaluations` | `[]gemara.ControlEvaluation` | Results grouped by control |
 
 **ControlEvaluation** (one per control):
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `name` | `string` | Control identifier |
 | `result` | `gemara.Result` | Aggregated result for this control |
 | `control` | `gemara.EntryMapping` | Reference to the control (`EntryId` + `ReferenceId` = policy ID) |
@@ -250,7 +250,7 @@ Post-scan report-style output displayed in the terminal after every scan (FR-037
 **ScanSummaryEntry** (one row per non-passing result):
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `requirement_id` | `string` | Requirement identifier from `AssessmentLog.RequirementId` |
 | `control_id` | `string` | Control identifier resolved via `reqToControl` map |
 | `result` | `Result` (enum) | Aggregated assessment outcome (failed, skipped, error only) |
@@ -287,7 +287,7 @@ Pre-flight diagnostics output from `complyctl doctor` (FR-039, R44, R55). Not pe
 **CheckResult** (one per diagnostic check):
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `name` | `string` | Check identifier (e.g., `config`, `provider/{id}`, `policy/{id}`, `registry/{host}`, `variables/{id}`). Config check includes structural validation + target-policy cross-references (R50). Policy checks compare cached vs. remote version (R55). Variables checks validate Describe-declared `required_global_variables` against `config.variables` and `required_target_variables` against relevant `config.targets[].variables` using policy → evaluator → target mapping from cache (R51, R52) |
 | `status` | `CheckStatus` (enum) | `pass`, `fail`, `warn` |
 | `message` | `string` | Human-readable result (e.g., `complytime.yaml valid`, `v1.0.0 (latest)`, `cached v1.0.0, available v1.1.0`) |
@@ -296,7 +296,7 @@ Pre-flight diagnostics output from `complyctl doctor` (FR-039, R44, R55). Not pe
 **CheckStatus** (enum):
 
 | Value | Emoji | Semantic |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `pass` | ✅ | Check passed |
 | `fail` | ❌ | Check failed (blocking) |
 | `warn` | ⚠️ | Check produced a non-blocking warning |
@@ -304,7 +304,7 @@ Pre-flight diagnostics output from `complyctl doctor` (FR-039, R44, R55). Not pe
 **Check categories (R55 updated)**:
 
 | Check | Name Pattern | Blocking | Pass | Warn | Fail |
-|:---|:---|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- | :--- | :--- |
 | Config | `config` | Yes | `complytime.yaml valid` | — | `config not found` / `validation failed` |
 | Provider health | `provider/{id}` | Yes | `healthy (v1.2.0)` | — | `unhealthy` / `Describe failed` |
 | Policy version | `policy/{id}` | No | `v1.0.0 (latest)` | `cached v1.0.0, available v1.1.0 — run complyctl get` | — |
@@ -324,7 +324,7 @@ Pre-flight diagnostics output from `complyctl doctor` (FR-039, R44, R55). Not pe
 ### AssessmentLog (per requirement)
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `requirement_id` | `string` | Evaluated requirement |
 | `steps` | `[]Step` | Ordered execution steps |
 | `message` | `string` | Summary message |
@@ -334,7 +334,7 @@ Pre-flight diagnostics output from `complyctl doctor` (FR-039, R44, R55). Not pe
 ### Step (per assessment step)
 
 | Field | Type | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `name` | `string` | Step name/identifier |
 | `result` | `Result` (enum) | Step outcome |
 | `message` | `string` | Step result message |
@@ -344,7 +344,7 @@ Pre-flight diagnostics output from `complyctl doctor` (FR-039, R44, R55). Not pe
 ### Result (enum)
 
 | Value | Proto | Description |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `unspecified` | `RESULT_UNSPECIFIED` | Default/zero value — result not yet determined |
 | `passed` | `RESULT_PASSED` | Requirement satisfied |
 | `failed` | `RESULT_FAILED` | Requirement not satisfied |
@@ -422,7 +422,7 @@ PackManifest (types in 001 data model only; ALL CLI deferred to 002; R53)
 Pack manifest file (YAML). Declares what a comply-pack contains — developer-owned, immutable after build, ships in the pack. Separate from `complytime.yaml` (runtime config). All pack CLI commands (`pack init`, build, push, pull) deferred to 002. Pack builder is separate from `complyctl` runtime (Session 2026-02-25d). See R53, Session 2026-02-25b.
 
 | Field | Type | Required | Owner | Description |
-|:---|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- | :--- |
 | `id` | `string` | Yes | Developer | Pack identifier (e.g., `fedora-compliance`) |
 | `version` | `string` | Yes | Developer | Semantic version of the pack |
 | `description` | `string` | No | Developer | Human-readable description |
@@ -438,14 +438,14 @@ Pack manifest file (YAML). Declares what a comply-pack contains — developer-ow
 ### PlatformConfig
 
 | Field | Type | Required | Description |
-|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- |
 | `os` | `string` | Yes | Target operating system (e.g., `fedora`) |
 | `datastream` | `string` | No | Absolute path to SCAP datastream XML |
 
 ### PackPolicyEntry
 
 | Field | Type | Required | Description |
-|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- |
 | `url` | `string` | Yes | Full OCI reference (registry + repo + version) |
 | `id` | `string` | Yes | Policy shortname |
 | `profile` | `string` | No | SSG profile name for OpenSCAP evaluator |
@@ -457,7 +457,7 @@ Pack manifest file (YAML). Declares what a comply-pack contains — developer-ow
 ### PackProviderEntry
 
 | Field | Type | Required | Description |
-|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- |
 | `id` | `string` | Yes | Provider/evaluator identifier |
 | `binary` | `string` | Yes | Binary name (e.g., `complyctl-provider-openscap`) |
 | `source` | `string` | No | Build source (`build` for compiled, `bundled` for pre-built) |
@@ -465,7 +465,7 @@ Pack manifest file (YAML). Declares what a comply-pack contains — developer-ow
 ### SystemDependency
 
 | Field | Type | Required | Description |
-|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- |
 | `name` | `string` | Yes | Package name |
 | `check` | `string` | Yes | Shell command to verify installation |
 | `install` | `string` | No | Installation command (for guidance only) |

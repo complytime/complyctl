@@ -13,7 +13,7 @@ installed before `complyctl scan` can run.
 ### Available providers
 
 | Provider | Binary | What it evaluates | Prerequisites |
-|----------|--------|-------------------|---------------|
+| ---------- | -------- | ------------------- | --------------- |
 | [openscap](https://github.com/complytime/complytime-providers/blob/main/cmd/openscap-provider/docs/configuration.md) | `complyctl-provider-openscap` | SCAP policies (CIS, STIG, HIPAA, OSPP, etc.) | `openscap-scanner`, `scap-security-guide` |
 | [ampel](https://github.com/complytime/complytime-providers/tree/main/cmd/ampel-provider) | `complyctl-provider-ampel` | GitHub / GitLab branch protection | `snappy`, `ampel`, `GITHUB_TOKEN` or `GITLAB_TOKEN` |
 | [opa](https://github.com/complytime/complytime-providers/tree/main/cmd/opa-provider) | `complyctl-provider-opa` | OPA/Rego policies via conftest | `conftest`, `git` |
@@ -94,7 +94,7 @@ targets:
 ```
 
 | Section | Purpose |
-|---------|---------|
+| --------- | --------- |
 | `policies` | OCI references to Gemara policy bundles. `id` is a short alias used by targets and for provider routing. |
 | `complypacks` | Optional OCI references to provider-specific content bundles (policies, data files, scripts). Fetched alongside policies during `complyctl get`. |
 | `variables` | Workspace-scoped constants passed to all providers (e.g., custom policy directories). |

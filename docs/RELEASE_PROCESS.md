@@ -90,7 +90,7 @@ fkinit -u <your_fas_id>
 
 #### Fork the repository
 
-Create a fork from https://src.fedoraproject.org/rpms/complyctl
+Create a fork from <https://src.fedoraproject.org/rpms/complyctl>
 
 ```bash
 fedpkg clone --anonymous forks/<your fedora id>/rpms/complyctl
@@ -153,7 +153,7 @@ fedpkg switch-branch rawhide
 fedpkg build
 ```
 - Follow the builds status in the following links:
-    - [Builds Status](https://koji.fedoraproject.org/koji/packageinfo?packageID=42298)
+  - [Builds Status](https://koji.fedoraproject.org/koji/packageinfo?packageID=42298)
 
 ### Submit Fedora updates
 
@@ -169,8 +169,8 @@ The new updates enter in `testing` state and are moved to stable after 7 days, o
 After moving to `stable` state, the update is signed and awaits to be pushed to the repositories by the Release Engineering Team.
 
 Check the package update status in the following links:
-  - [Updates Status](https://bodhi.fedoraproject.org/updates/?packages=complyctl)
-  - [Package Overview](https://src.fedoraproject.org/rpms/complyctl)
+- [Updates Status](https://bodhi.fedoraproject.org/updates/?packages=complyctl)
+- [Package Overview](https://src.fedoraproject.org/rpms/complyctl)
 
 #### Troubleshooting
 

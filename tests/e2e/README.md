@@ -11,7 +11,7 @@ Builds `complyctl` + `complyctl-provider-test`, then runs all e2e tests with an 
 Build tag: `e2e`.
 
 | Test | Validates |
-|:---|:---|
+| :--- | :--- |
 | `FullWorkflow` | get → list → generate → scan (oscal, pretty, sarif) |
 | `PolicyCache` | OCI layout structure, state.json tracking |
 | `MultiplePolicies` | Multi-policy fetch + list |
@@ -36,7 +36,7 @@ The in-process mock registry (`helpers_test.go`) implements OCI Distribution Spe
 **Policies:**
 
 | Repository | Layers | Tags |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `nist-800-53-r5` | catalog + policy | v1.0.0, latest |
 | `policies/nist-800-53-r5` | catalog + policy | v1.0.0, latest |
 | `cis-benchmark` | catalog | v2.0.0, latest |
@@ -46,7 +46,7 @@ The policy layer uses evaluator ID `test`, which routes to the `complyctl-provid
 **Complypacks:**
 
 | Repository | Evaluator ID | Tags |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `complypacks/opa-a` | `opa` | v1.0.0, latest |
 | `complypacks/opa-b` | `opa` | v1.0.0, latest |
 

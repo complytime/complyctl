@@ -61,7 +61,7 @@ Rationale: Clean separation of concerns. `run()` validates inputs and resolves r
 
 In `scanPolicy()`, the target filter must be applied after `ensureGenerated()` but before `executeScanPhase()`. Generation freshness is tracked per-policy (via `GenerationState.PolicyDigest`), not per-target. If we narrow targets before generation, a sequence like:
 
-```
+```bash
 complyctl scan prod --policy-id nist    → generates for prod only
 complyctl scan staging --policy-id nist → skips generation (digest fresh) — staging never generated
 ```

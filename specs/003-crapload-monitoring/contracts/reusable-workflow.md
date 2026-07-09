@@ -9,7 +9,7 @@ GitHub Actions reusable workflow (`workflow_call`)
 ### Inputs
 
 | Input | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
+| ------- | ------ | ---------- | --------- | ------------- |
 | `go-version-file` | string | no | `'./go.mod'` | Path to go.mod for Go version detection |
 | `gaze-version` | string | no | `'latest'` | Gaze version tag to install via `go install` |
 | `baseline-file` | string | no | `'.gaze/baseline.json'` | Path to committed baseline thresholds file |
@@ -24,16 +24,16 @@ GitHub Actions reusable workflow (`workflow_call`)
 
 ### Required Permissions
 
-| Permission | Level | Purpose |
-|------------|-------|---------|
-| `contents` | `read` | Checkout code and read baseline file |
+| Permission   | Level    | Purpose                              |
+|--------------|----------|--------------------------------------|
+| `contents`   | `read`   | Checkout code and read baseline file |
 
 The reusable workflow requires only `contents: read`. PR comment posting is the caller's responsibility, keeping the reusable workflow minimal and avoiding the need to pass `pull-requests: write` tokens across repository boundaries.
 
 ### Outputs
 
 | Output | Type | Description |
-|--------|------|-------------|
+| -------- | ------ | ------------- |
 | `status` | string | `pass` or `fail` |
 | `crapload-count` | number | Number of functions at or above CRAP threshold |
 | `gaze-crapload-count` | number | Number of functions at or above GazeCRAP threshold |
@@ -42,10 +42,10 @@ The reusable workflow requires only `contents: read`. PR comment posting is the 
 
 ### Artifacts
 
-| Artifact | Contents | Always uploaded |
-|----------|----------|-----------------|
-| `crapload-analysis` | `/tmp/crapload-comment-body.md` (markdown comment body) | Yes |
-| `crapload-analysis-detailed` | `/tmp/gaze-report.json`, `/tmp/crapload-current.json` | Only when analysis runs (skipped if no Go changes) |
+| Artifact                      | Contents                                                | Always uploaded                                      |
+|-------------------------------|---------------------------------------------------------|------------------------------------------------------|
+| `crapload-analysis`           | `/tmp/crapload-comment-body.md` (markdown comment body) | Yes                                                  |
+| `crapload-analysis-detailed`  | `/tmp/gaze-report.json`, `/tmp/crapload-current.json`   | Only when analysis runs (skipped if no Go changes)   |
 
 ## Behaviour Contract
 

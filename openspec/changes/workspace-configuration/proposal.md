@@ -36,7 +36,7 @@ This aligns with how other tools work (git uses `.git/`, docker uses `.docker/`,
 ## Constitution Alignment
 
 | Principle | Status | Evidence |
-|-----------|--------|----------|
+| ----------- | -------- | ---------- |
 | I. Autonomous Collaboration | PASS | Workspace resolution happens early in command lifecycle; all subsystems receive resolved paths via dependency injection |
 | II. Composability First | PASS | Workspace resolution is a separate concern from config loading; components receive paths as parameters |
 | III. Observable Quality | PASS | Error messages clearly state which workspace directory failed validation; deprecation warnings guide users to new config location |
@@ -57,7 +57,7 @@ This aligns with how other tools work (git uses `.git/`, docker uses `.docker/`,
 - **Tests**: Unit tests for workspace resolution, config detection, backward compatibility. Integration tests for flag, env var, and legacy config fallback.
 - **Documentation**: Update README.md with `--workspace` flag examples. Add migration guide to CHANGELOG.md. Update AGENTS.md "Recent Changes" section.
 - **Breaking changes**: None. The change is purely additive with backward compatibility.
-- **Deprecation timeline**: 
+- **Deprecation timeline**:
   - Current release: Support both locations, print deprecation warning for root location
   - Future releases: Continue supporting both locations
   - No hard removal date set — will be determined based on user adoption metrics

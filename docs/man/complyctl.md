@@ -18,9 +18,9 @@ Complyctl can be extended to support desired policy engines by the use of provid
 
 Providers communicate with complyctl via gRPC and can be authored using any preferred language. The provider acts as the gRPC server while the complyctl CLI acts as the client. When a complyctl command is run, it invokes the appropriate method served by the provider.
 
-See more about authoring providers at https://github.com/complytime/complytime-providers/blob/main/docs/provider-guide.md.
+See more about authoring providers at <https://github.com/complytime/complytime-providers/blob/main/docs/provider-guide.md>.
 
-Also check the complytime-providers repository at https://github.com/complytime/complytime-providers for provider-specific documentation.
+Also check the complytime-providers repository at <https://github.com/complytime/complytime-providers> for provider-specific documentation.
 
 # COMMANDS
 
@@ -158,9 +158,9 @@ summary table. Default: **true** (show all controls).
 
 # SEE ALSO
 
-See the upstream project at https://github.com/complytime/complyctl for more detailed documentation.
+See the upstream project at <https://github.com/complytime/complyctl> for more detailed documentation.
 
-See the complytime-providers repository at https://github.com/complytime/complytime-providers for provider-specific documentation.
+See the complytime-providers repository at <https://github.com/complytime/complytime-providers> for provider-specific documentation.
 
 # COPYRIGHT
 

@@ -15,22 +15,22 @@ during generate.
 **Fields**:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | ID | string | Policy identifier matching assessment requirement ID (e.g., "BP-1.01") |
 | Meta | AmpelMeta | Policy metadata including description and control references |
 | Tenets | []AmpelTenet | CEL-based verification checks |
 
 **AmpelMeta fields**:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| Description | string | Human-readable policy description |
-| Controls | []Control | Control references (framework, class, id) |
+| Field       | Type       | Description                               |
+|-------------|------------|-------------------------------------------|
+| Description | string     | Human-readable policy description         |
+| Controls    | []Control  | Control references (framework, class, id) |
 
 **AmpelTenet fields**:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | ID | string | Unique tenet identifier within the policy |
 | Code | string | CEL expression for verification |
 | Predicates | PredicateSpec | Attestation types to evaluate |
@@ -55,15 +55,15 @@ Written to `{workspace}/ampel/policy/complytime-ampel-policy.json`.
 **Fields**:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | ID | string | Always "complytime-ampel-policy" |
 | Meta | BundleMeta | Bundle metadata with framework reference |
 | Policies | []AmpelPolicy | Array of matched granular policies |
 
 **BundleMeta fields**:
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field      | Type        | Description                           |
+|------------|-------------|---------------------------------------|
 | Frameworks | []Framework | Single entry: ComplyTime-AMPEL-Policy |
 
 ### 2. TargetRepository
@@ -74,8 +74,8 @@ the workspace configuration file.
 **Fields**:
 
 | Field | Type | Description |
-|-------|------|-------------|
-| URL | string | Repository URL (https://github.com/org/repo) |
+| ------- | ------ | ------------- |
+| URL | string | Repository URL (<https://github.com/org/repo>) |
 | Branches | []string | Branch names to evaluate protection rules on |
 | Specs | []string | Snappy spec file references (e.g., "builtin:github/branch-rules.yaml") |
 
@@ -101,7 +101,7 @@ a JSON file in the workspace.
 **Fields**:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | Repository | string | Repository URL |
 | Branch | string | Branch name evaluated |
 | ScannedAt | time.Time | Timestamp of scan |
@@ -112,7 +112,7 @@ a JSON file in the workspace.
 **Finding fields**:
 
 | Field | Type | Description |
-|-------|------|-------------|
+| ------- | ------ | ------------- |
 | TenetID | string | AMPEL tenet that was evaluated |
 | Title | string | Human-readable rule name |
 | Result | string | "pass" or "fail" |
@@ -133,7 +133,7 @@ override is the `ampel_policy_dir` global variable in
 **Package constants**:
 
 | Constant | Value | Description |
-|----------|-------|-------------|
+| ---------- | ------- | ------------- |
 | PluginDir | "ampel" | Plugin subdirectory under workspace |
 | DefaultGranularPolicyDir | "granular-policies" | Default granular policy source directory |
 | GeneratedPolicyDir | "policy" | Generated policy bundle output directory |
@@ -177,13 +177,13 @@ plugin.ScanResponse (returned to complyctl)
 ## State Transitions
 
 ### Generate Flow
-```
+```text
 No policy → Generate() → Policy file exists in PolicyDir
 Policy exists → Generate() → Policy overwritten with new scope
 ```
 
 ### Scan Flow
-```
+```text
 No results → Scan() → Per-repo result files created + ScanResponse returned
 Results exist → Scan() → Results overwritten + ScanResponse returned
 ```

@@ -127,7 +127,7 @@ Mirrors `go-gemara` `ConfidenceLevel` type (R29). 1:1 mapping — no lossy conve
 The scanning interface protocol distinguishes three variable tiers:
 
 | Tier | Name | RPC | Proto field | Source | Owner |
-|:---|:---|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- | :--- | :--- |
 | 1 | Global variables | Generate | `GenerateRequest.global_variables` | Workspace config top-level `variables` | System admin |
 | 2 | Test variables | Generate | `AssessmentConfiguration.parameters` | Layer 3 Gemara policy | Policy author |
 | 3 | Target variables | Scan | `Target.variables` | Workspace config `targets[].variables` | System admin |
@@ -164,13 +164,13 @@ buf generate
 - Generated code output: `pkg/plugin/api/`
 
 **Setup**:
-1. Install buf: https://buf.build/docs/installation
+1. Install buf: <https://buf.build/docs/installation>
 2. Configure `buf.yaml` and `buf.gen.yaml` in `api/proto/`
 3. Run `buf generate` to generate Go code
 
 **References**:
-- buf documentation: https://buf.build/docs
-- compliance-to-policy-go buf setup: https://github.com/oscal-compass/compliance-to-policy-go/blob/main/buf.yaml
+- buf documentation: <https://buf.build/docs>
+- compliance-to-policy-go buf setup: <https://github.com/oscal-compass/compliance-to-policy-go/blob/main/buf.yaml>
 
 ## Example Plugin Implementation
 

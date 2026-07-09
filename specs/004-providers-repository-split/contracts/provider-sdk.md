@@ -16,7 +16,7 @@ package (renamed from `pkg/plugin/`) published by the complyctl module.
 
 After the terminology rename (`FR-013`, `FR-020`), the central interface lives at:
 
-```
+```go
 import "github.com/complytime/complyctl/pkg/provider"
 ```
 
@@ -63,7 +63,7 @@ These values are stable and MUST NOT change. They are checked during the go-plug
 before any RPC is dispatched. Existing installed provider binaries rely on these values.
 
 | Field | Value | Changeability |
-|---|---|---|
+| --- | --- | --- |
 | `MagicCookieKey` | `"COMPLYCTL_PLUGIN"` | **FROZEN** |
 | `MagicCookieValue` | `"ddff478d-578e-4d9d-8253-35e8ebf548d2"` | **FROZEN** |
 | `ProtocolVersion` | `1` | **FROZEN** |
@@ -82,7 +82,7 @@ before any RPC is dispatched. Existing installed provider binaries rely on these
 
 Provider executables MUST follow the naming convention:
 
-```
+```text
 complyctl-provider-<name>
 ```
 
@@ -109,7 +109,7 @@ changes as part of `FR-014`.
 complyctl discovers provider binaries at runtime by scanning two directories in priority order:
 
 | Priority | Path | Description |
-|---|---|---|
+| --- | --- | --- |
 | 1 (highest) | `~/.complytime/providers/` | User-installed providers |
 | 2 | `/usr/libexec/complytime/providers/` | System-installed providers |
 
@@ -322,7 +322,7 @@ branch (`FR-003`).
 ## 8. Contract Stability Guarantees
 
 | Surface | Stability | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `Provider` interface (Describe, Generate, Scan) | **Stable** | Changes require a new major proto version |
 | `Exporter` interface (Export) | **Stable** | Optional; detected via runtime type assertion |
 | Wire protocol (handshake, gRPC service, proto package) | **Frozen** | `complyctl.plugin.v1` — rename deferred |

@@ -12,7 +12,7 @@ Automates the Red Hat external audit requirement to provide evidence of:
 
 ### Layer 1: Guidance (`rh-workstation-audit-guidance.yaml`)
 - **Framework**: CIS Controls v8
-- **Controls**: 
+- **Controls**:
   - Control 4: Secure Configuration of Enterprise Assets
   - Control 7: Continuous Vulnerability Management
 

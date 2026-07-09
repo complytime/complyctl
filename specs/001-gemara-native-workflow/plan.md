@@ -220,7 +220,7 @@ flowchart TD
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 | Principle | Status | Evidence |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | I. Single Source of Truth | **PASS** | Constants centralized in `internal/complytime/consts.go`. Media type constants (R27). Config in `complytime.yaml`. Three variable tiers each have a single authoritative location (R48). |
 | II. Simplicity & Isolation | **PASS** | Small focused packages: `cache`, `config`, `plugin`, `policy`, `output`, `registry`, `doctor`. Targets-only Scan RPC simplifies proto contract (R47). |
 | III. Incremental Improvement | **PASS** | Scanning provider simplification (manifest/checksum removal) in separate PR scope from auth refactor. |

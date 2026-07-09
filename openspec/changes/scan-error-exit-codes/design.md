@@ -4,7 +4,7 @@ The `bug/scan-proto` commit added `repeated string errors` to `ScanResponse` and
 
 The scan execution chain is:
 
-```
+```text
 scanCmd.RunE → run() → scanPolicy() → executeScanPhase()
   → runScanAndReport() → executeScan() → scanAllTargets()
     → scanSingleTarget() → mgr.RouteScan()
@@ -35,7 +35,7 @@ Errors must propagate from `scanSingleTarget` up to `runScanAndReport` where the
 Exit code semantics:
 
 | Condition | Exit code | Rationale |
-|:--|:--|:--|
+| :-- | :-- | :-- |
 | All targets scanned, all passed | 0 | Clean |
 | All targets scanned, some failed | 0 | Findings are data |
 | Some targets had operational errors | non-zero | Coverage gap |
@@ -55,7 +55,7 @@ Operational errors are printed to stderr as `WARNING:` lines before `FormatScanS
 
 Format:
 
-```
+```text
 WARNING: 2 operational error(s) during scan:
   - target 'staging': clone failed: auth denied
   - target 'dev': missing required tool: conftest

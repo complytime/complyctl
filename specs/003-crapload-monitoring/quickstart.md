@@ -57,11 +57,11 @@ This compares current scores against the committed baseline and reports regressi
 
 ## Interpreting Results
 
-| Score Range | Risk Level | Action |
-|-------------|------------|--------|
-| 0-14        | Safe       | No action needed |
-| 15-29       | Warning    | Consider simplifying or adding tests |
-| 30+         | Dangerous  | Must reduce complexity or improve coverage |
+| Score Range | Risk Level | Action                                      |
+|-------------|------------|---------------------------------------------|
+| 0-14        | Safe       | No action needed                            |
+| 15-29       | Warning    | Consider simplifying or adding tests        |
+| 30+         | Dangerous  | Must reduce complexity or improve coverage  |
 
 ## Common Workflows
 

@@ -54,7 +54,7 @@ ProofWatch/OTEL only in plugins that opt in.
 *GATE: Must pass before implementation. Re-checked post-design.*
 
 | Principle | Status | Evidence |
-|-----------|--------|----------|
+| ----------- | -------- | ---------- |
 | I. Single Source of Truth | PASS | Collector config centralized in `complytime.yaml` `collector` section. No magic strings — endpoint and auth read from config and passed via gRPC. |
 | II. Simplicity & Isolation | PASS | Export logic is a well-isolated post-scan step within `scan.go`, triggered only by `--format otel`. Plugin SDK extension follows existing RouteScan pattern. No OTEL/ProofWatch in complyctl core — isolation between orchestrator and emitter. |
 | III. Incremental Improvement | PASS | Self-contained addition: new proto RPC, SDK extension, format option, config field. No changes to existing scan/generate/doctor logic beyond additive doctor check and the new format path. |
@@ -116,7 +116,7 @@ internal/doctor/
 ### Package Responsibilities
 
 | Package | Change | Responsibility |
-|---------|--------|----------------|
+| --------- | -------- | ---------------- |
 | `api/plugin` | Modified | Proto contract — new `Export` RPC, messages, `supports_export` field |
 | `pkg/plugin` | Modified | Plugin SDK — `RouteExport`, domain types, client/server gRPC mapping |
 | `cmd/complyctl/cli` | Modified | `scan.go` — add `otel` format path: validate collector config, resolve OIDC token, call `RouteExport` on capable plugins after scan, display export summary |
@@ -126,7 +126,7 @@ internal/doctor/
 ### What complyctl Does NOT Own
 
 | Concern | Owner |
-|---------|-------|
+| --------- | ------- |
 | OTLP emission | Plugin (via ProofWatch) |
 | OTEL SDK setup | Plugin |
 | Evidence format | Plugin (GemaraEvidence) |

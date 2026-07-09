@@ -25,7 +25,7 @@ Add a `validateUniqueEvaluatorIDs(state *cache.State, complypacks []complytime.P
 
 ### D3: Error format
 
-```
+```text
 Error: duplicate evaluator-id "opa" found in complypack entries:
   - ghcr.io/org-a/complypack-opa@v1
   - ghcr.io/org-b/complypack-opa@v2

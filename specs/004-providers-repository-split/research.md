@@ -27,7 +27,7 @@
 **Affected identifiers (confirmed by code inspection)**:
 
 | Current | Renamed To | File |
-|---|---|---|
+| --- | --- | --- |
 | `type Plugin interface` | `type Provider interface` | `manager.go` |
 | `type LoadedPlugin struct` | `type LoadedPlugin struct` | `manager.go` _(kept — "Loaded" qualifies a runtime state, not the concept)_ |
 | `func (m *Manager) GetPlugin` | `func (m *Manager) GetProvider` | `manager.go` |
@@ -44,7 +44,7 @@
 Note on `GRPCEvaluatorPlugin`: this type name is referenced as the value type inside `SupportedPlugins`/`SupportedProviders` map and in the `Serve()` function. The embedded `goplugin.Plugin` field is dictated by the `hashicorp/go-plugin` interface and cannot be renamed. The struct name itself (`GRPCEvaluatorPlugin`) may be renamed to `GRPCEvaluatorProvider` since it is our own type, but this is low value.
 
 **Wire values — FROZEN (must not change)**:
-```
+```text
 MagicCookieKey:   "COMPLYCTL_PLUGIN"
 MagicCookieValue: "ddff478d-578e-4d9d-8253-35e8ebf548d2"
 ProtocolVersion:  1
@@ -73,7 +73,7 @@ Binary prefix:    "complyctl-provider-"
 
 **Rationale**: Enforcing a hard sequential gate (tag first, then start) adds unnecessary friction and delays development. Using a `replace` directive locally is idiomatic Go for cross-module development. The merge gate ensures the published repository is never in a broken state.
 
-**Implementation note**: The complyctl SDK release must be taken *after* PR #463 merges (so `Export` RPC is included in the contract) and *after* PR #479 merges (so `ResolveVersion` is included). The tag should be the first release that includes both.
+**Implementation note**: The complyctl SDK release must be taken _after_ PR #463 merges (so `Export` RPC is included in the contract) and _after_ PR #479 merges (so `ResolveVersion` is included). The tag should be the first release that includes both.
 
 **Alternatives considered**:
 - Hard sequential gate (tag first): rejected — adds a synchronization barrier with no safety benefit if `replace` usage is gated at merge time.

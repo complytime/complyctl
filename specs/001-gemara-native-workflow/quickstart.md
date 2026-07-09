@@ -326,7 +326,7 @@ func main() {
 complyctl uses a two-tier output model. Only plugin-communicating commands create a log file (`.complytime/complyctl.log`, truncated per run). go-plugin output is filtered to WARN and above in the log file.
 
 | Tier | Commands | Terminal Output | Log File | Channel |
-|:---|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- | :--- |
 | Progress | `init`, `get` | Real-time per-step status | No | stderr |
 | Summary + log | `generate`, `scan`, `providers`, `doctor` | Tables, execution plans, scan summaries, diagnostics | Yes | stdout |
 | No logging | `version`, `list` | Output only | No | stdout |
@@ -364,7 +364,7 @@ Pack design documentation will be produced in the `002-comply-packs` feature bra
 ## CLI Commands
 
 | Command | Description |
-|:---|:---|
+| :--- | :--- |
 | `init` | Create `complytime.yaml` — prompts for PolicyEntry URLs + optional IDs + targets (Session 2026-02-25d) |
 | `get` | Fetch/sync policies from OCI registry (per-registry clients from PolicyEntry URLs) |
 | `list` | List cached policies (effective IDs + versions, plain text) |

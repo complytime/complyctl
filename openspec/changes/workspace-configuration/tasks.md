@@ -47,7 +47,7 @@
 
 ### Task 2.3: Update scan output path construction
 - [ ] Update `processScanOutput()` in `scan.go` to use baseDir parameter
-- [ ] Change `outDir := filepath.Join(".", complytime.WorkspaceDir, complytime.ScanOutputDir)` 
+- [ ] Change `outDir := filepath.Join(".", complytime.WorkspaceDir, complytime.ScanOutputDir)`
   to `outDir := filepath.Join(baseDir, complytime.WorkspaceDir, complytime.ScanOutputDir)`
 - [ ] Verify `writeScanReports()` receives correct output directory
 

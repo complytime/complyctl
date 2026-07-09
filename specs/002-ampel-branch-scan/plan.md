@@ -40,7 +40,7 @@ already in go.mod
 *GATE: Must pass before Phase 0 research. Re-checked post-design.*
 
 | Principle | Status | Evidence |
-|-----------|--------|----------|
+| ----------- | -------- | ---------- |
 | I. Single Source of Truth | PASS | Plugin configuration defaults (PluginDir, DefaultGranularPolicyDir, GeneratedPolicyDir, DefaultResultsDir) defined as package constants in `config/config.go`. Policy bundle ID centralized. No magic strings. |
 | II. Simplicity & Isolation | PASS | Eight packages with single responsibilities. Each independently testable. Convert package isolated for future Gemara migration — justified by explicit migration plan, not speculative. |
 | III. Incremental Improvement | PASS | Plugin is a self-contained addition under `cmd/ampel-plugin/`. No unrelated changes to existing packages. Superseded tasks (T013, T014) tracked separately. |
@@ -129,7 +129,7 @@ defined responsibility.
 ### Package Responsibilities
 
 | Package | Responsibility | Key Dependency |
-|---------|---------------|----------------|
+| --------- | --------------- | ---------------- |
 | `main` | Plugin registration via `plugin.Serve()` | pkg/plugin |
 | `config` | Workspace path helpers, directory creation | stdlib + hclog |
 | `server` | Implement `plugin.Plugin` (Generate, Scan, Describe), orchestrate other packages | pkg/plugin |

@@ -38,7 +38,7 @@ git commit -m "chore: migrate complytime.yaml to .complytime/ directory"
 ```
 
 Until you migrate, commands will continue to work but will show a deprecation warning:
-```
+```text
 WARNING: complytime.yaml found at repository root (legacy location).
 Please move it to .complytime/complytime.yaml for better organization.
 Run: mkdir -p .complytime && mv complytime.yaml .complytime/complytime.yaml

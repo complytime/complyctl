@@ -125,7 +125,7 @@ per-failure results are added for user visibility.
 ### D5: Deprecation warning message format
 
 **Decision**: Use the format:
-```
+```text
 DEPRECATED: @version notation in policy URL "<raw>".
 Use ":tag" syntax instead (e.g., "registry.com/repo:v1.0").
 @version support will be removed in a future release.

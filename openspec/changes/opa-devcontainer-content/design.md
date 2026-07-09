@@ -14,8 +14,8 @@ OCI artifact seeding in the mock registry
 delivers cached complypack content paths to providers.
 
 PR #538 extended the mock registry with `seedFromDirectory()`
-for serving mounted Gemara YAML files. The OPA provider (PR
-#31 in complytime-providers) implements Generate with
+for serving mounted Gemara YAML files. The OPA provider (PR #31
+in complytime-providers) implements Generate with
 mapping-based Rego namespace filtering via `conftest`.
 
 A companion PR in complytime-providers will update the OPA

@@ -62,7 +62,7 @@
 **Migration scope**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/registry/auth.go` | ~130 lines: `Authenticator` struct, `AuthConfig` interface, `OrasAuthConfig`, `loadDockerCredentials()`, `readDockerConfig()`, `queryCredHelper()`, `resolveInlineAuth()` | ~15 lines: `NewCredentialFunc() auth.CredentialFunc` backed by `credentials.NewStoreFromDocker()` |
 | `internal/registry/client.go` | `auth *Authenticator` field, `GetAuthConfig()` calls | `credFunc auth.CredentialFunc` field, direct `auth.Client{Credential: credFunc}` creation |
 | `get.go`, `generate.go`, etc. | `registry.NewAuthenticator()` | `registry.NewCredentialFunc()` (or inline in `NewClient`) |
@@ -83,7 +83,7 @@
 **Files/packages to remove or gut**:
 
 | Target | Action |
-|:---|:---|
+| :--- | :--- |
 | `cmd/complyctl/cli/plan.go` + test | Delete entirely |
 | `cmd/complyctl/cli/info.go` + test | Delete entirely |
 | `cmd/complyctl/option/common.go` ComplyTime struct | Remove C2P-specific `ToPluginOptions` and `FrameworkID`. Keep `Common` struct and `UserWorkspace` path helpers for directory resolution. Rename `ComplyTime` → `Options` if it no longer has C2P semantics. |
@@ -163,7 +163,7 @@
 **Migration scope**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/cache/cache.go` | Custom `EnsurePolicyDir`, `StoreManifest`, `StoreLayer` (97 lines) | OCI Layout store wrapper: `oci.New(path)`, tag/resolve (≈40 lines) |
 | `internal/cache/sync.go` | Custom temp-dir-rename, `downloadPolicyToDir` (147 lines) | `oras.Copy()` from remote to local store (≈60 lines) |
 | `internal/cache/state.go` | JSON state file (95 lines) | Unchanged — oras tracks blobs but not policy-level metadata |
@@ -196,7 +196,7 @@
 **What was in the manifest**:
 
 | Field | Replacement |
-|:---|:---|
+| :--- | :--- |
 | `evaluator_ids` | Derived from executable filename (`complyctl-provider-X` → evaluator `X`) |
 | `checksum` (SHA256) | Removed (see R20) |
 | `version` | Reported via HealthCheck RPC response |
@@ -217,7 +217,7 @@
 **Rationale — Threat model analysis**:
 
 | Threat | Mitigation by Checksum | Assessment |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | Binary tampering (attacker replaces plugin) | Checksum in manifest detects mismatch | **Ineffective** — manifest and binary share same directory/permissions. Attacker replaces both. |
 | Supply chain attack (compromised download) | Checksum verifies integrity | **Ineffective** — manifest is unsigned YAML, not from a trusted separate channel. |
 | Accidental corruption (bit rot) | Checksum detects corruption | **Marginal** — filesystem integrity already handles this. |
@@ -346,7 +346,7 @@ func NewClient(executablePath string, logger hclog.Logger) (*Client, error)
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `contracts/plugin.proto` | `double confidence = 4` | `ConfidenceLevel confidence = 4` + new enum definition |
 | `pkg/plugin/client.go` | `Confidence float64` | `Confidence ConfidenceLevel` (new type mapping go-gemara enum) |
 | `pkg/plugin/server.go` | `Confidence: a.Confidence` (float64) | `Confidence: a.Confidence` (enum) |
@@ -366,7 +366,7 @@ func NewClient(executablePath string, logger hclog.Logger) (*Client, error)
 **Mapping (code-level — policytype removal)**:
 
 | policytype.Policy field | AssessmentConfiguration equivalent |
-|:---|:---|
+| :--- | :--- |
 | `RuleSet.Rule.ID` | `RequirementID` (1:1 in OpenSCAP; requirement ID = XCCDF rule short name) |
 | `RuleSet.Rule.Parameters[].ID` | Key in `Parameters` map |
 | `RuleSet.Rule.Parameters[].Value` | Value in `Parameters` map |
@@ -375,7 +375,7 @@ func NewClient(executablePath string, logger hclog.Logger) (*Client, error)
 **Conceptual mapping (OSCAP → Gemara, Session 2026-02-25)**:
 
 | OSCAP Concept | Gemara Artifact | Layer |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | XCCDF Rule | Control + Assessment Requirement | Layer 2 (Control Catalog) |
 | OVAL Check | Assessment Plan | Layer 3 (Policy) |
 | CIS ID (`cis-*`) | Guideline-mapping on Control | Layer 2 → Layer 1 |
@@ -395,7 +395,7 @@ func NewClient(executablePath string, logger hclog.Logger) (*Client, error)
 **Data flow**:
 
 | Channel | Source | Lifecycle | RPC | Owner |
-|:---|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- | :--- |
 | Parameters | Layer 3 Gemara policy `assessment-plans.parameters` | `complyctl generate` | `GenerateRequest.configurations[].parameters` | Policy author |
 | Vars | Workspace config `targets[].variables` | `complyctl scan` | `ScanRequest.targets[].variables` | System admin |
 
@@ -413,7 +413,7 @@ func NewClient(executablePath string, logger hclog.Logger) (*Client, error)
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/policy/resolver.go` | Single `EvaluatorID` per policy | Per-assessment `EvaluatorID` from `plan.evaluation-methods[].executor.id` |
 | `internal/policy/assessment.go` | `GroupByEvaluator()` groups by policy-level evaluator | `GroupByEvaluator()` groups by per-assessment evaluator ID |
 | `internal/plugin/manager.go` | One `Generate()` call per policy | N `Generate()` calls per policy (one per evaluator group) |
@@ -446,7 +446,7 @@ func NewClient(executablePath string, logger hclog.Logger) (*Client, error)
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `cmd/complyctl/cli/generate.go` | `generateCmd` (existing) | Stays as `generateCmd`; add digest persistence + execution plan output |
 | `internal/policy/generation_state.go` | (new) | Stores `GenerationState` (policy digest, timestamp, evaluator IDs) |
 | `cmd/complyctl/cli/scan.go` | Calls Scan RPC directly | Checks generation freshness first; auto-generates if needed |
@@ -466,7 +466,7 @@ func NewClient(executablePath string, logger hclog.Logger) (*Client, error)
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/complytime/config.go` | `PluginVariables map[string]string` | `EvaluatorConfig map[string]map[string]string` |
 | `api/plugin/plugin.proto` | `map<string, string> plugin_variables = 1` | `map<string, string> evaluator_config = 1` |
 | `cmd/complyctl/cli/generate.go` | Passes flat map | Looks up `evaluator_config[evaluatorID]` per group |
@@ -509,7 +509,7 @@ Target Scope:
 **Decision**: `generate` persists a `GenerationState` (policy cache digest, timestamp, evaluator IDs used) alongside generated artifacts. `scan` checks this state before executing:
 
 | Condition | Behavior |
-|:---|:---|
+| :--- | :--- |
 | No `GenerationState` exists | Auto-generate (resolve graph, invoke Generate RPC, persist state) |
 | State exists, digest matches current cache | Reuse generated artifacts (skip Generate RPC) |
 | State exists, digest differs (policy updated via `get`) | Warn admin, auto-regenerate, then scan |
@@ -534,7 +534,7 @@ Target Scope:
 **Code impact**:
 
 | Component | Change |
-|:---|:---|
+| :--- | :--- |
 | `internal/policy/generation_state.go` | New file: `GenerationState` struct, `SaveState()`, `LoadState()`, `IsFresh()`. Path: `{workspace}/.complytime/generation/{policy-id}.json` |
 | `cmd/complyctl/cli/generate.go` | After Generate RPC, save `GenerationState` with current policy digest |
 | `cmd/complyctl/cli/scan.go` | Before Scan RPC, check `IsFresh()`: if stale → warn + auto-generate; if missing → auto-generate; if fresh → reuse. `--dry-run` persists state then exits (no Scan RPC) |
@@ -555,7 +555,7 @@ Target Scope:
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `cmd/complyctl/cli/plugins.go` | `text/tabwriter` + `fmt.Fprintf` | `charmbracelet/bubbles/table` + `lipgloss` via `internal/terminal`. Add `--plain` flag |
 | `internal/output/execution_plan.go` | `fmt.Fprintf` with manual column alignment | Two `bubbles/table` instances (Evaluator Routing + Target Scope) rendered via `lipgloss`. Returns styled string |
 | `cmd/complyctl/cli/generate.go` | `fmt.Print(output.FormatExecutionPlan(...))` | Same call, `FormatExecutionPlan` now returns charmbracelet-rendered output |
@@ -578,7 +578,7 @@ Target Scope:
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/policy/resolver.go` `parsePolicyLayer` | 3 format attempts (Gemara → structured → legacy), no error return | 1 format: `gemara.Policy` unmarshal + `extractFromGemaraPolicy`. Returns `(policyLayerResult, error)` |
 | `internal/policy/resolver.go` `ResolvePolicyGraph` | `policyLayer := parsePolicyLayer(...)` (ignores format failures) | `policyLayer, err := parsePolicyLayer(...)` — propagates error to caller |
 | `internal/policy/resolver.go` structured/legacy structs | ~35 lines of inline struct definitions + unmarshal logic | Deleted |
@@ -601,7 +601,7 @@ Target Scope:
 **Code impact**:
 
 | Component | Change |
-|:---|:---|
+| :--- | :--- |
 | `cmd/complyctl/cli/get.go` | Add `fmt.Fprintf(os.Stderr, "Syncing policy %d/%d: %s...\n", i+1, total, policy.ID)` before each `sync.SyncPolicy()` call. Add `fmt.Fprintf(os.Stderr, " done\n")` after success. Replace final `fmt.Println("Synchronization completed.")` with `fmt.Fprintln(os.Stderr, "Synchronization completed.")` |
 | `cmd/complyctl/cli/init.go` | Show config creation status (if applicable), delegate to `get` for sync progress, then show doctor diagnostic results (R52, supersedes R50 ordering) |
 | `cmd/complyctl/cli/root.go` | No structural change — `logger` stays file-only. Log file created lazily on first write via `lazyLogWriter` (Session 2026-02-23f). No terminal notification |
@@ -625,7 +625,7 @@ Target Scope:
 **Code impact**:
 
 | Component | Change |
-|:---|:---|
+| :--- | :--- |
 | `internal/policy/assessment.go` | New function: `ValidateEvaluatorConfig(groups map[string]EvaluatorGroup, configPath string) error`. Iterates groups; if `group.EvaluatorConfig == nil`, returns error naming the evaluator ID and config path |
 | `cmd/complyctl/cli/generate.go` | Add `if err := policy.ValidateEvaluatorConfig(groups, ws.Path()); err != nil { return err }` after `GroupByEvaluator()` |
 | `cmd/complyctl/cli/scan.go` | Same validation call after `GroupByEvaluator()` |
@@ -647,7 +647,7 @@ Target Scope:
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/complytime/consts.go` | (no scan output dir constant) | `const ScanOutputDir = ".complytime/scan"` |
 | `cmd/complyctl/cli/scan.go` | `filepath.Join(".", ".complytime/scan")` | `filepath.Join(".", consts.ScanOutputDir)` |
 | `internal/output/evaluator.go` | (receives `outDir` parameter — no change) | No change (caller passes the constant) |
@@ -668,7 +668,7 @@ Target Scope:
 **Implementation**:
 
 | Component | Change |
-|:---|:---|
+| :--- | :--- |
 | `internal/complytime/consts.go` | Add emoji constants: `StatusPassed = "✅"`, `StatusFailed = "❌"`, `StatusSkipped = "⏭️"`, `StatusError = "⚠️"` |
 | `internal/output/scan_summary.go` | New file: `FormatScanSummary(assessments []plugin.AssessmentLog, reqTitles map[string]string) string` — builds charmbracelet table with 3 columns (Requirement ID, Title, Status emoji), sorts rows by status priority, appends aggregate totals line. Uses `internal/terminal` helpers for consistent styling |
 | `cmd/complyctl/cli/scan.go` | After scan completes (post-`eval.Write()`), call `output.FormatScanSummary()` and print to stdout. The summary table appears after the EvaluationLog is written, before any formatted report |
@@ -676,7 +676,7 @@ Target Scope:
 **Status priority sort order** (highest priority first):
 
 | Priority | Status | Emoji | Semantic |
-|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- |
 | 1 | Failed | ❌ | Requirement not satisfied — immediate action needed |
 | 2 | Error | ⚠️ | Evaluation failed (plugin error) — investigation needed |
 | 3 | Skipped | ⏭️ | Excluded by tailoring — informational |
@@ -700,7 +700,7 @@ Target Scope:
 **Implementation**:
 
 | Component | Change |
-|:---|:---|
+| :--- | :--- |
 | `cmd/complyctl/cli/doctor.go` | New file: `doctorCmd` registered in `root.go`. Calls `doctor.Run()` |
 | `internal/doctor/doctor.go` | New package: `Run(configPath, providerDir, registryURL string) []CheckResult`. Iterates checks, returns pass/fail/warn per check. Each check is an independent function |
 | `internal/doctor/checks.go` | Individual check functions: `CheckConfig()`, `CheckProviders()`, `CheckRegistry()`, `CheckEvaluatorConfig()` |
@@ -709,7 +709,7 @@ Target Scope:
 **Check sequence**:
 
 | Check | Blocking | Pass | Fail | Warn |
-|:---|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- | :--- |
 | Config exists and valid | Yes | `✅ Workspace config valid` | `❌ Config not found at ./complytime.yaml` | — |
 | Providers discovered | Yes | `✅ 2 scanning providers found (openscap, kube-evaluator)` | `❌ No providers found in ~/.complytime/providers/` | — |
 | Provider HealthCheck | Yes | `✅ openscap: healthy (v1.2.0)` | `❌ openscap: unhealthy` | — |
@@ -749,7 +749,7 @@ Target Scope:
 **Implementation**:
 
 | Component | Before (R43) | After (R45) |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/output/scan_summary.go` | `FormatScanSummary()` builds 3-column charmbracelet table (Req ID, Title, Status) | `FormatScanSummary()` builds emoji + message lines for non-passing results, then single-row charmbracelet totals table |
 | Table structure | Multi-row table with all results | Individual lines per non-passing result + one-row totals table |
 | Data source per line | `reqTitles[requirementID]` (catalog title) | `AssessmentLog.Steps[].Message` (provider-authored) |
@@ -773,7 +773,7 @@ Target Scope:
 **Mapping**:
 
 | Before | After (user-facing) | Code-level |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | plugin (the executable) | scanning provider / provider | `plugin.Plugin` interface |
 | plugin system | scanning interface | `pkg/plugin/`, `internal/plugin/` packages |
 | `complyctl plugins` | `complyctl providers` | `cmd/complyctl/cli/providers.go` |
@@ -796,21 +796,21 @@ Target Scope:
 
 **Proto impact**:
 
-| Before | After |
-|:---|:---|
-| `message ScanRequest { repeated Target targets = 1; repeated string requirement_ids = 2; }` | `message ScanRequest { repeated Target targets = 1; }` |
+| Before                                                                                        | After                                                  |
+|-----------------------------------------------------------------------------------------------|--------------------------------------------------------|
+| `message ScanRequest { repeated Target targets = 1; repeated string requirement_ids = 2; }`   | `message ScanRequest { repeated Target targets = 1; }` |
 
 **Code impact**:
 
-| Component | Change |
-|:---|:---|
-| `contracts/plugin.proto` | Remove `repeated string requirement_ids` from `ScanRequest` |
-| `pkg/plugin/client.go` | Remove `RequirementIDs` from `ScanRequest` domain type |
-| `pkg/plugin/server.go` | Update adapter — no requirement_ids mapping |
-| `internal/plugin/manager.go` `RouteScan()` | Remove `reqIDs []string` parameter. Provider receives targets only |
-| `cmd/complyctl/cli/scan.go` | Remove requirement ID collection and passing to `RouteScan()` |
-| `cmd/openscap-plugin/server/server.go` | Remove requirement ID filtering in Scan handler — evaluate all requirements from Generate state |
-| `cmd/test-plugin/main.go` | Update test plugin Scan handler |
+| Component                                   | Change                                                                                          |
+|---------------------------------------------|-------------------------------------------------------------------------------------------------|
+| `contracts/plugin.proto`                    | Remove `repeated string requirement_ids` from `ScanRequest`                                     |
+| `pkg/plugin/client.go`                      | Remove `RequirementIDs` from `ScanRequest` domain type                                          |
+| `pkg/plugin/server.go`                      | Update adapter — no requirement_ids mapping                                                     |
+| `internal/plugin/manager.go` `RouteScan()`  | Remove `reqIDs []string` parameter. Provider receives targets only                              |
+| `cmd/complyctl/cli/scan.go`                 | Remove requirement ID collection and passing to `RouteScan()`                                   |
+| `cmd/openscap-plugin/server/server.go`      | Remove requirement ID filtering in Scan handler — evaluate all requirements from Generate state |
+| `cmd/test-plugin/main.go`                   | Update test plugin Scan handler                                                                 |
 
 **Alternatives considered**:
 - Keep `requirement_ids` for selective re-scanning: The spec does not support selective scanning. If needed later, add an optional filter field — simpler to add than to remove.
@@ -821,7 +821,7 @@ Target Scope:
 **Decision**: Replace `evaluator_config` (a nested map keyed by evaluator ID under PolicyConfig) with a three-tier variable model:
 
 | Tier | Name | Scope | Source | RPC | Owner |
-|:---|:---|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- | :--- | :--- |
 | 1 | Global variables | Workspace | Top-level `variables` in `complytime.yaml` | Generate RPC | System admin |
 | 2 | Target variables | Per-target | `targets[].variables` in `complytime.yaml` | Scan RPC | System admin |
 | 3 | Test variables | Per-requirement | Decomposed Gemara policy assessment plan | Generate RPC | Policy author |
@@ -851,7 +851,7 @@ targets:
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/config/config.go` `PolicyConfig` | `EvaluatorConfig map[string]map[string]string` | Remove `EvaluatorConfig` field |
 | `internal/config/config.go` `WorkspaceConfig` | No top-level variables | Add `Variables map[string]string` |
 | `internal/config/config.go` `TargetConfig` | `Variables map[string]string` (unchanged) | Unchanged — already correct |
@@ -889,7 +889,7 @@ targets:
 **Command separation**:
 
 | Command | Analogy | Responsibility |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `init` | `go mod init` | Create config → get → doctor (errors if config exists, R52) |
 | `get` | `go get -u` | Incremental policy sync from registry |
 | `doctor` | `flutter doctor` | Diagnose environment health (requires policy cache, R52) |
@@ -897,7 +897,7 @@ targets:
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `cmd/complyctl/cli/init.go` | `--config` flag, `ValidateTargetPolicyVersions`, "Validating..." messages | No flags; errors if config exists; calls `getOpts.run()` then `runDoctor()` (R52) |
 | `internal/complytime/config.go` | `Load()` calls `Validate()` internally | `LoadFrom(path)` returns parsed config; callers validate explicitly |
 | `internal/doctor/doctor.go` `CheckConfig` | Calls `complytime.Load()` (basic parse) | Calls `LoadFrom()` + `Validate()` + `ValidateTargetPolicyVersions()` (full validation) |
@@ -917,9 +917,9 @@ targets:
 
 **Proto impact**:
 
-| Before | After |
-|:---|:---|
-| `message HealthCheckResponse { bool healthy = 1; string version = 2; string error_message = 3; }` | `message HealthCheckResponse { bool healthy = 1; string version = 2; string error_message = 3; repeated string required_global_variables = 4; repeated string required_target_variables = 5; }` |
+| Before                                                                                             | After                                                                                                                                                                                           |
+|----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `message HealthCheckResponse { bool healthy = 1; string version = 2; string error_message = 3; }`  | `message HealthCheckResponse { bool healthy = 1; string version = 2; string error_message = 3; repeated string required_global_variables = 4; repeated string required_target_variables = 5; }` |
 
 **Backward compatibility**: Proto3 defaults empty repeated fields to `[]`. Existing providers that don't populate these fields return empty lists — doctor treats them as "no variables required" and passes variable validation. Providers are updated incrementally.
 
@@ -932,7 +932,7 @@ targets:
 **Code impact**:
 
 | Component | Change |
-|:---|:---|
+| :--- | :--- |
 | `contracts/plugin.proto` | Add two fields to `HealthCheckResponse` |
 | `pkg/plugin/client.go` | Add `RequiredGlobalVariables []string` and `RequiredTargetVariables []string` to domain `HealthCheckResponse` type |
 | `pkg/plugin/server.go` | Map new proto fields in adapter |
@@ -962,7 +962,7 @@ targets:
 **Command separation (updated)**:
 
 | Command | Analogy | Responsibility |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `init` | `go mod init` | Create config → get → doctor (errors if config exists) |
 | `get` | `go get -u` | Incremental policy sync from registry |
 | `doctor` | `flutter doctor` | Diagnose environment health (requires policy cache) |
@@ -970,7 +970,7 @@ targets:
 **Code impact**:
 
 | Component | Before (R50) | After (R52) |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `cmd/complyctl/cli/init.go` | Calls `runDoctor()` then `getOpts.run()` | Calls `getOpts.run()` then `runDoctor()` |
 | `cmd/complyctl/cli/doctor.go` | No cache dependency | Check policy cache exists; error if missing with "run `complyctl get` first" guidance |
 | `internal/doctor/doctor.go` | Variable check is existence-only | Variable check resolves policy → evaluator → target mapping from cache |
@@ -989,7 +989,7 @@ targets:
 **`complypack.yaml` schema**:
 
 | Field | Type | Required | Owner | Description |
-|:---|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- | :--- |
 | `id` | `string` | Yes | Developer | Pack identifier (e.g., `fedora-compliance`) |
 | `version` | `string` | Yes | Developer | Semantic version |
 | `description` | `string` | No | Developer | Human-readable description |
@@ -1013,7 +1013,7 @@ targets:
 **Fedora comply-pack inventory** (all Fedora content from ComplianceAsCode/oscal-content):
 
 | Policy ID | Catalog | SSG Profile | Source |
-|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- |
 | `policies/cis-fedora-l1-server` | `cis_fedora` | `cis_server_l1` | `component-definitions/fedora/fedora-cis_fedora-l1_server` |
 | `policies/cis-fedora-l1-workstation` | `cis_fedora` | `cis_workstation_l1` | `component-definitions/fedora/fedora-cis_fedora-l1_workstation` |
 | `policies/cis-fedora-l2-server` | `cis_fedora` | `cis_server_l2` | `component-definitions/fedora/fedora-cis_fedora-l2_server` |
@@ -1027,7 +1027,7 @@ targets:
 **Code impact** (deferred to 002-comply-packs):
 
 | Component | Description |
-|:---|:---|
+| :--- | :--- |
 | `internal/complytime/pack.go` | `PackManifest` struct, `LoadPackManifest()`, `ValidatePackManifest()` |
 | `internal/doctor/doctor.go` | Extend `Run()` to detect and validate `complypack.yaml` alongside `complytime.yaml` |
 | `cmd/complyctl/cli/pack.go` | `pack doctor`, `pack build`, `pack push`, `pack pull` subcommands |
@@ -1049,7 +1049,7 @@ targets:
 **Rationale**:
 
 | Change | Rationale | Constitution |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | Init config-only | Decouples config creation from network (get) and provider ecosystem (doctor). Matches `go mod init` which only creates `go.mod` without fetching dependencies. Each command does one thing. | II (Simplicity), VII (Convention) |
 | Pack init in 001 | Pack developers need to author manifests now. Only the creation command is needed — build/push/pull have their own dependency chain (tarball assembly, OCI push). Minimal scope increase. | III (Incremental) |
 | Dual-mode config | Pack consumers shouldn't duplicate registry URL and policy IDs already in the pack. Pack reference is a single OCI ref. Standalone mode remains for development, testing, and no-pack environments. Mutual exclusion prevents ambiguous config states. | I (Single Source), VII (Convention) |
@@ -1094,7 +1094,7 @@ targets:
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/complytime/config.go` `WorkspaceConfig` | `Registry`, `Policies`, `Targets`, `Variables` | Add `Pack string` field. `Registry`/`Policies` optional in pack mode |
 | `internal/complytime/config.go` `Validate()` | Requires `registry.url` and `policies` | Mutual exclusion check: `pack` XOR (`registry` + `policies`). In pack mode, `registry`/`policies` not required |
 | `cmd/complyctl/cli/init.go` | Composite orchestrator: config → get → doctor | Config-only: prompt for pack ref + targets → save → exit |
@@ -1122,7 +1122,7 @@ targets:
 **Rationale**:
 
 | Change | Rationale | Constitution |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | Version comparison | Reachability probe provides near-zero actionable value — if `get` succeeded, the registry was reachable. Admins need to know *whether their cached policies are current*, not whether the registry responds to HTTP GET. Per-policy staleness is actionable: run `complyctl get` to update. | IV (Code for Humans — actionable output), VII (Convention — staleness check follows `get`-before-`doctor` ordering from R52) |
 | Per-provider config summary | Failures-only output tells admins what's broken but not what's working. A count summary (e.g., `3/3 global vars`) gives confidence that the provider is fully configured without verbose key dumps. `--verbose` provides drill-down for debugging without cluttering default output. | II (Simplicity — default output stays concise), IV (Humans First — admins see completeness at a glance) |
 | `--verbose` scope | Mixing version detail (digests, timestamps) with provider config detail into one flag makes output hard to reason about. Version comparison output is already clear per-policy. `--verbose` focuses on the one area where detail expansion matters most: provider config keys. | II (Simplicity — single-concern flag), III (Incremental — additional `--verbose` expansions can be added later) |
@@ -1130,7 +1130,7 @@ targets:
 **Implementation**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/doctor/doctor.go` `CheckRegistries()` | HTTP GET to `/v2/` per unique registry — reachability probe | `CheckPolicyVersions()` — query latest version per policy from registry; compare against `PolicyState.digest`/`version` in `state.json` |
 | `internal/doctor/doctor.go` `CheckVariables()` | Reports only missing variables (failures) | Reports per-provider summary: `N/M global vars, N/M target vars`. `--verbose` expands to key-level detail |
 | `cmd/complyctl/cli/doctor.go` | No `--verbose` flag | Add `--verbose` bool flag to cobra command. Pass to `doctor.Run()` |
@@ -1171,7 +1171,7 @@ targets:
 **Decision**: Five unit test coverage decisions for three critical packages (`internal/policy/`, `pkg/plugin/discovery.go`, `internal/cache/state.go`) that lacked direct unit tests.
 
 | Decision | Choice | Rationale |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/policy/` test scope | All exported functions with positive + negative cases | Dependency resolution core — `ResolvePolicyGraph`, `GroupByEvaluator`, `parsePolicyLayer`, `ExtractAssessmentConfigs`, generation state `Save/Load/IsFresh` all drive scan correctness |
 | Policy layer test fixtures | Minimal synthetic YAML stubs | Self-contained, no go-gemara fixture dependency. Stubs unmarshal into `gemara.Policy` — upstream shape changes break tests explicitly |
 | Plugin discovery test approach | Real temp directory with mock executables | Tests actual filesystem behavior (permission bits, prefix matching, evaluator ID extraction). Zero production code changes. Constitution II (Simplicity) |
@@ -1181,7 +1181,7 @@ targets:
 **New test files**:
 
 | File | Package | Key Functions | Scenarios |
-|:---|:---|:---|:---|
+| :--- | :--- | :--- | :--- |
 | `internal/policy/resolver_test.go` | `policy_test` | `ResolvePolicyGraph`, `parsePolicyLayer`, `extractFromGemaraPolicy` | Empty/invalid inputs, missing layers, valid synthetic Gemara YAML, multi-evaluator extraction. Uses `PolicyLoader` interface mock |
 | `internal/policy/assessment_test.go` | `policy_test` | `ExtractAssessmentConfigs`, `GroupByEvaluator`, `ValidateGlobalVars` | Single-evaluator shortcut, multi-evaluator routing, empty graph, missing global vars |
 | `internal/policy/loader_test.go` | `policy_test` | `ResolveVersion`, `LoadLayerByMediaType`, `PolicyExists`, `ListCachedPolicies` | Cache miss, version resolution fallback, media type not found |
@@ -1207,7 +1207,7 @@ targets:
 **Decision**: Five UX decisions reshaping terminal output and log file handling.
 
 | Decision | Choice | Rationale |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | Log file location | `.complytime/complyctl.log` | Logs are diagnostic artifacts — same category as scan output. Keeps workspace root clean. Supersedes `./complyctl.log` (Session 2026-02-23f) |
 | Default table rendering | Plain aligned text (podman-style) + emoji | Pipeable, works in all terminals, no ANSI capability assumptions. Supersedes charmbracelet default (R38) |
 | Scan summary totals | Compact inline: `44 ✅  3 ❌  2 ⏭️  1 ⚠️` | Single line, emoji counts, no labels. Matches podman/docker density |
@@ -1223,7 +1223,7 @@ targets:
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/terminal/table.go` | `RenderTable` (lipgloss default), `ShowPlainTable` (--plain) | `ShowPlainTable` becomes primary. `RenderTable` retained for `--pretty`. Default function is `ShowPlainTable` |
 | `cmd/complyctl/cli/providers.go` | `--plain` flag, `RenderTable` default | `--pretty` flag, `ShowPlainTable` default |
 | `cmd/complyctl/cli/list.go` | `RenderTable` default | `ShowPlainTable` default, two columns: POLICY ID + VERSION |
@@ -1244,7 +1244,7 @@ targets:
 **Decision**: Three UX decisions refining output location and discovery command flags.
 
 | Decision | Choice | Rationale |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `--pretty` on discovery commands | Remove from `list` and `providers` | Discovery commands are informational — plain text is the right default. No persona needs styled output for `list` or `providers`. `--pretty` reserved for reporting/summary commands (`scan`, `generate --dry-run`). Reduces flag surface area |
 | `--format` output location | CWD (current working directory) | Formatted reports (OSCAL, SARIF, Markdown) are user-facing deliverables — users expect them in a visible location, not buried in `.complytime/scan/`. EvaluationLog (diagnostic artifact) stays in hidden dir. Terminal summary stays on stdout |
 | EvaluationLog path printing | Always print to terminal | EvaluationLog is always produced. Users need to know where it is for debugging. One line of output, low noise. Deterministic path but worth surfacing |
@@ -1252,7 +1252,7 @@ targets:
 **Output path split**:
 
 | Artifact | Location | Rationale |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | EvaluationLog (always) | `{workspace}/.complytime/scan/` | Diagnostic artifact — hidden dir is appropriate |
 | Formatted report (`--format`) | CWD | User-facing deliverable — visible location expected |
 | Log file | `{workspace}/.complytime/complyctl.log` | Diagnostic — hidden dir (unchanged from R57) |
@@ -1263,7 +1263,7 @@ targets:
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `cmd/complyctl/cli/list.go` | `--pretty` flag, `ShowPlainTable` default | `--pretty` flag removed. `ShowPlainTable` only |
 | `cmd/complyctl/cli/providers.go` | `--pretty` flag, `ShowPlainTable` default | `--pretty` flag removed. `ShowPlainTable` only |
 | `cmd/complyctl/cli/scan.go` | `outDir = ".complytime/scan"` for all output | `outDir` for EvaluationLog stays `.complytime/scan/`. Formatted reports (`--format`) written to `"."` (CWD) |
@@ -1287,7 +1287,7 @@ targets:
 **Decision**: Five interconnected UX decisions replacing the plain-default/`--pretty`-opt-in model with lipgloss-as-universal-default and restructuring scan/generate output.
 
 | Decision | Choice | Rationale |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | Scan results table columns | Requirement ID, Control ID, Status (emoji), Message | Admins need enough context to act on failures without cross-referencing the EvaluationLog. Supersedes FR-037 "no table / ActionError-style" |
 | Default table rendering | Lipgloss-rendered tables with subtle borders as universal default | Current `--pretty` look becomes the only look. Terminal-width-adaptive, cleaner than raw whitespace padding. `--pretty` flag removed from all commands |
 | Report-style layout | Intro text → subtle lipgloss table → conclusion text | Wrapping tables with contextual intro/conclusion provides scannable, professional output. All tabular commands follow this pattern |
@@ -1336,7 +1336,7 @@ Generation completed.
 **Code impact**:
 
 | Component | Before | After |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `internal/terminal/table.go` | `ShowPlainTable` (default), `RenderTable` (--pretty) | `RenderTable` becomes primary (TTY). `ShowPlainTable` fallback (non-TTY). New `RenderReport(intro, headers, rows, conclusion)` function wraps the pattern. TTY detection via `term.IsTerminal(os.Stdout.Fd())` |
 | `internal/output/scan_summary.go` | `FormatScanSummary` returns emoji+message lines + inline totals | `FormatScanSummary` returns report-style: intro text, 4-column table rows (reqID, ctrlID, status, message), conclusion (totals + file paths). Accepts `reqToControl` map for control ID lookup |
 | `internal/output/execution_plan.go` | `FormatExecutionPlan` with two tables + `pretty bool` param | `FormatExecutionPlan` with single table (Target, Provider, Requirements, Status). No `pretty` param — always lipgloss for TTY. `ProviderRoute` and `TargetScope` structs merged into single `ExecutionPlanRow` |

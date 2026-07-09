@@ -1,7 +1,7 @@
-# Tests using Testing Farm 
+# Tests using Testing Farm
 
 [Testing Farm](https://packit.dev/docs/configuration/upstream/tests) is Packit's testing system.
-Test execution is managed by tmt tool. 
+Test execution is managed by tmt tool.
 
 The entry of the testing farm tests is located at [.packit.yaml](../.packit.yaml), in the job named `tests`.
 

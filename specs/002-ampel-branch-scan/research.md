@@ -137,7 +137,7 @@ and reuse of existing libraries. All needed libraries are already
 in `go.mod`:
 
 | Need | Library | Already in go.mod |
-|------|---------|-------------------|
+| ------ | --------- | ------------------- |
 | Plugin framework | pkg/plugin (in-tree) | Yes |
 | Plugin hosting | hashicorp/go-plugin v1.7.0 | Yes |
 | Structured logging | hashicorp/go-hclog v1.6.3 | Yes |

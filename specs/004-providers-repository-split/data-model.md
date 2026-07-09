@@ -14,7 +14,7 @@ This feature does not introduce a new persistent data model. It is a source code
 
 The central entity in the provider SDK is the `Provider` interface (currently named `Plugin`). After migration it lives at `github.com/complytime/complyctl/pkg/provider`.
 
-```
+```text
 Provider (interface)
   ├── Describe(ctx, *DescribeRequest) (*DescribeResponse, error)
   ├── Generate(ctx, *GenerateRequest) (*GenerateResponse, error)
@@ -33,7 +33,7 @@ Provider (interface)
 
 Holds the identity and filesystem path of a discovered provider.
 
-```
+```text
 ProviderInfo
   ├── PluginID       string   → renamed: ProviderID string
   ├── EvaluatorID    string   (unchanged — routes Generate/Scan requests)
@@ -48,7 +48,7 @@ ProviderInfo
 
 The `Manager` orchestrates provider lifecycle and request routing. Stays in `pkg/provider/` after rename.
 
-```
+```text
 Manager
   ├── discovery  *Discovery
   ├── providers  map[string]*LoadedProvider   ← renamed from plugins map[string]*LoadedPlugin
@@ -71,7 +71,7 @@ LoadedProvider (formerly LoadedPlugin)
 
 Scans filesystem directories for provider executables.
 
-```
+```text
 Discovery
   └── providerDir string   ← renamed from pluginDir
 ```
@@ -85,7 +85,7 @@ Discovery
 
 ## Entity: ProviderExecutablePrefix (constant)
 
-```
+```go
 // internal/complytime/consts.go
 const ProviderExecutablePrefix = "complyctl-provider-"   // formerly PluginExecutablePrefix
 ```
@@ -98,7 +98,7 @@ const ProviderExecutablePrefix = "complyctl-provider-"   // formerly PluginExecu
 
 The migration must not change any workspace paths — operators must experience no disruption.
 
-```
+```text
 ~/.complytime/providers/          # user provider directory (discovery)
 /usr/libexec/complytime/providers/ # system provider directory (discovery fallback)
 .complytime/openscap/             # openscap workspace artifacts (unchanged)
@@ -112,7 +112,7 @@ The migration must not change any workspace paths — operators must experience 
 
 The gRPC wire protocol is frozen. No changes to message types, field numbers, or service definition.
 
-```
+```text
 Package:          complyctl.plugin.v1   (UNCHANGED — proto package rename deferred)
 Service:          Plugin
 RPCs:             Generate, Scan, Describe, Export (Export added by PR #463)
@@ -125,7 +125,7 @@ Protocol version: 1
 
 ## Module Boundaries After Migration
 
-```
+```text
 github.com/complytime/complyctl
   └── pkg/provider/          # SDK: Provider interface, Manager, Discovery, gRPC harness
   └── api/plugin/            # Protobuf generated code (package name unchanged)

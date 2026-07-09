@@ -21,7 +21,7 @@ _Impact_:
 - The `cmd/openscap-plugin/server/` and `cmd/ampel-plugin/server/` both gain `Export` stubs — these must be carried into `complytime-providers`.
 - The `otel` output format constant is added to `internal/complytime/consts.go` — this stays in complyctl core, no conflict.
 - The `CollectorConfig` in `internal/complytime/config.go` and the `CheckCollector` in `internal/doctor/doctor.go` are core-only changes — no conflict.
-- **Action**: Ensure the complyctl SDK tagged release used by `complytime-providers` is taken *after* PR #463 merges, so the Export RPC is part of the published contract.
+- **Action**: Ensure the complyctl SDK tagged release used by `complytime-providers` is taken _after_ PR #463 merges, so the Export RPC is part of the published contract.
 
 **PR #479 — `fix: get resolves pinned version instead of defaulting to latest tag`**
 
@@ -52,10 +52,10 @@ _Impact_: No impact on the providers migration scope. The `VersionResolver` inte
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 | Principle | Status | Notes |
-|---|---|---|
+| --- | --- | --- |
 | I. Single Source of Truth | **PASS** | `PluginExecutablePrefix` value preserved unchanged; SDK published once and referenced by version |
 | II. Simplicity & Isolation | **PASS** | Split reduces coupling; each repo has a single concern |
 | III. Incremental Improvement | **PASS** | Scope is tightly bounded to migration + terminology rename; RPM/testing-farm deferred |
