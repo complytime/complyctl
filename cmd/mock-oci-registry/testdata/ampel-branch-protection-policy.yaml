@@ -1,6 +1,8 @@
 title: AMPEL Branch Protection Policy
 metadata:
     id: ampel-branch-protection-policy
+    type: Policy
+    gemara-version: 1.0.0
     description: AMPEL policy for integration testing with complypack support
     author:
         id: complytime
@@ -27,7 +29,9 @@ imports:
         - reference-id: ampel-branch-protection
 adherence:
     evaluation-methods:
-        - type: Behavioral
+        - id: ampel-eval
+          type: Behavioral
+          mode: Automated
           description: Ampel automated branch protection evaluation
           executor:
               id: ampel
@@ -38,6 +42,8 @@ adherence:
           requirement-id: block-force-push
           frequency: on-demand
           evaluation-methods:
-              - type: Behavioral
+              - id: ampel-eval
+                type: Behavioral
+                mode: Automated
                 executor:
                     id: ampel

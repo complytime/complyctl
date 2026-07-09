@@ -1,6 +1,8 @@
 title: Test Branch Protection Policy
 metadata:
     id: test-branch-protection-policy
+    type: Policy
+    gemara-version: 1.0.0
     description: Minimal policy for cross-repo integration testing using the Ampel provider
     author:
         id: complytime
@@ -27,7 +29,9 @@ imports:
         - reference-id: test-branch-protection
 adherence:
     evaluation-methods:
-        - type: Behavioral
+        - id: ampel-eval
+          type: Behavioral
+          mode: Automated
           description: Ampel automated branch protection evaluation
           executor:
               id: ampel
@@ -38,6 +42,8 @@ adherence:
           requirement-id: block-force-push
           frequency: on-demand
           evaluation-methods:
-              - type: Behavioral
+              - id: ampel-eval
+                type: Behavioral
+                mode: Automated
                 executor:
                     id: ampel

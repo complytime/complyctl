@@ -115,6 +115,8 @@ guidelines: []
 title: Test Policy
 metadata:
   id: pol-1
+  type: Policy
+  gemara-version: 1.0.0
   version: "1.0"
 contacts:
   responsible:
@@ -134,7 +136,9 @@ adherence:
       requirement-id: req-1
       frequency: daily
       evaluation-methods:
-        - type: Behavioral
+        - id: openscap-eval
+          type: Behavioral
+          mode: Automated
           executor:
             id: openscap
 `)
@@ -164,6 +168,8 @@ func TestResolvePolicyGraph_MissingOptionalLayers(t *testing.T) {
 title: Minimal Policy
 metadata:
   id: pol-min
+  type: Policy
+  gemara-version: 1.0.0
   version: "1.0"
 contacts:
   responsible:
@@ -183,7 +189,9 @@ adherence:
       requirement-id: req-min
       frequency: weekly
       evaluation-methods:
-        - type: Behavioral
+        - id: kube-eval-method
+          type: Behavioral
+          mode: Automated
           executor:
             id: kube-eval
 `)
@@ -210,6 +218,8 @@ func TestParsePolicyLayer_MissingAssessmentPlans(t *testing.T) {
 title: Empty Adherence
 metadata:
   id: pol-empty
+  type: Policy
+  gemara-version: 1.0.0
   version: "1.0"
 contacts:
   responsible:
@@ -235,6 +245,8 @@ func TestParsePolicyLayer_SingleAssessmentPlan(t *testing.T) {
 title: Single Plan
 metadata:
   id: pol-single
+  type: Policy
+  gemara-version: 1.0.0
   version: "1.0"
 contacts:
   responsible:
@@ -254,7 +266,9 @@ adherence:
       requirement-id: req-1
       frequency: daily
       evaluation-methods:
-        - type: Behavioral
+        - id: openscap-eval
+          type: Behavioral
+          mode: Automated
           executor:
             id: openscap
 `)
@@ -272,6 +286,8 @@ func TestParsePolicyLayer_MultiEvaluator(t *testing.T) {
 title: Multi Evaluator
 metadata:
   id: pol-multi
+  type: Policy
+  gemara-version: 1.0.0
   version: "1.0"
 contacts:
   responsible:
@@ -291,14 +307,18 @@ adherence:
       requirement-id: req-1
       frequency: daily
       evaluation-methods:
-        - type: Behavioral
+        - id: openscap-eval
+          type: Behavioral
+          mode: Automated
           executor:
             id: openscap
     - id: ap-2
       requirement-id: req-2
       frequency: weekly
       evaluation-methods:
-        - type: Behavioral
+        - id: kube-eval-method
+          type: Behavioral
+          mode: Automated
           executor:
             id: kube-eval
 `)
@@ -699,6 +719,8 @@ func validPolicyYAML() []byte {
 title: Test Policy
 metadata:
   id: pol-1
+  type: Policy
+  gemara-version: 1.0.0
   version: "1.0"
 contacts:
   responsible:
@@ -718,7 +740,9 @@ adherence:
       requirement-id: req-1
       frequency: daily
       evaluation-methods:
-        - type: Behavioral
+        - id: openscap-eval
+          type: Behavioral
+          mode: Automated
           executor:
             id: openscap
 `)

@@ -1,6 +1,8 @@
 title: Test OPA Container Security Policy
 metadata:
     id: test-opa-container-security-policy
+    type: Policy
+    gemara-version: 1.0.0
     description: Minimal policy for OPA provider integration testing in the devcontainer
     author:
         id: complytime
@@ -27,7 +29,9 @@ imports:
         - reference-id: test-opa-controls
 adherence:
     evaluation-methods:
-        - type: Behavioral
+        - id: opa-eval
+          type: Behavioral
+          mode: Automated
           description: OPA automated container security evaluation
           executor:
               id: opa
@@ -38,13 +42,17 @@ adherence:
           requirement-id: check-run-as-nonroot
           frequency: on-demand
           evaluation-methods:
-              - type: Behavioral
+              - id: opa-eval
+                type: Behavioral
+                mode: Automated
                 executor:
                     id: opa
         - id: check-resource-limits
           requirement-id: check-resource-limits
           frequency: on-demand
           evaluation-methods:
-              - type: Behavioral
+              - id: opa-eval
+                type: Behavioral
+                mode: Automated
                 executor:
                     id: opa
