@@ -77,7 +77,11 @@ func (o *providersOptions) run(ctx context.Context) error {
 		return nil
 	}
 
-	cc := cache.NewComplypackCache(o.cacheDir, nil)
+	cacheState, stateErr := cache.LoadState(o.cacheDir)
+	if stateErr != nil {
+		cacheState = nil
+	}
+	cc := cache.NewComplypackCache(o.cacheDir, cacheState)
 	rows := buildProviderRows(ctx, providers, o.providerDir, cc)
 	headers := []string{"PROVIDER ID", "PATH", "STATUS", "VERSION", "COMPLYPACK"}
 	terminal.ShowPlainTable(os.Stdout, headers, rows)

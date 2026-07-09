@@ -158,23 +158,31 @@ func (s *State) GetComplypackState(repository string) (PolicyState, bool) {
 // EvaluatorIDToVersion performs a reverse lookup on the Complypacks map,
 // returning the active version for the given evaluator-id. State is keyed
 // by repository, so this iterates all entries to find the matching
-// evaluator-id. Returns ("", false) when the evaluator-id is not found,
-// or when the receiver or Complypacks map is nil/empty.
+// evaluator-id. Returns ("", false, nil) when the evaluator-id is not
+// found, or when the receiver or Complypacks map is nil/empty.
 //
-// Assumes one repository per evaluator-id (current invariant enforced by
-// complyctl get's duplicate evaluator-id rejection). If multiple
-// repositories reference the same evaluator-id, the returned version is
-// non-deterministic (Go map iteration order). If multi-repository-per-
-// evaluator support is needed in the future, this function should accept
-// a repository hint or return all matches.
-func (s *State) EvaluatorIDToVersion(evaluatorID string) (string, bool) {
+// Returns an error if multiple repositories reference the same
+// evaluator-id, since Go map iteration order is non-deterministic and
+// the result would be undefined. This invariant is currently enforced
+// upstream by complyctl get's duplicate evaluator-id rejection.
+func (s *State) EvaluatorIDToVersion(evaluatorID string) (string, bool, error) {
 	if s == nil || len(s.Complypacks) == 0 {
-		return "", false
+		return "", false, nil
 	}
+	var found bool
+	var version string
 	for _, ps := range s.Complypacks {
 		if ps.EvaluatorID == evaluatorID {
-			return ps.Version, true
+			if found {
+				return "", false, fmt.Errorf(
+					"duplicate evaluator-id %q in state: "+
+						"multiple repositories reference the same evaluator",
+					evaluatorID,
+				)
+			}
+			version = ps.Version
+			found = true
 		}
 	}
-	return "", false
+	return version, found, nil
 }

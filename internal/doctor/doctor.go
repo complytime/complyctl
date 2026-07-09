@@ -825,18 +825,35 @@ type orphanedVersion struct {
 
 // walkCacheSize sums file sizes under {cacheDir}/complypacks/ using
 // filepath.WalkDir. Returns 0 if the directory does not exist (FR-007).
+//
+// Symlinks encountered during the walk are skipped to prevent traversal
+// outside the cache directory. The cache root itself may be a symlink
+// (resolved via filepath.EvalSymlinks before walking).
 func walkCacheSize(cacheDir string) (int64, error) {
 	complypacksDir := filepath.Join(cacheDir, complytime.ComplypacksSubdir)
 
+	// Resolve the cache root symlink (if any) so the walk starts from
+	// the real directory, but skip any symlinks found inside it.
+	resolved, resolveErr := filepath.EvalSymlinks(complypacksDir)
+	if resolveErr != nil {
+		if os.IsNotExist(resolveErr) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("failed to resolve complypack cache path: %w", resolveErr)
+	}
+
 	var totalBytes int64
-	err := filepath.WalkDir(complypacksDir, func(_ string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(resolved, func(_ string, d fs.DirEntry, err error) error {
 		if err != nil {
-			// WalkDir passes os.ErrNotExist for the root directory
-			// when it does not exist — return nil to produce 0 bytes.
 			if os.IsNotExist(err) {
 				return filepath.SkipAll
 			}
 			return err
+		}
+		// Skip symlinks inside the cache to prevent traversal outside
+		// the managed directory tree.
+		if d.Type()&fs.ModeSymlink != 0 {
+			return nil
 		}
 		if d.IsDir() {
 			return nil

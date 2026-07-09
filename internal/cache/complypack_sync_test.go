@@ -850,9 +850,9 @@ func TestComplypackSync_VPrefixedTag_StateMatchesDisk(t *testing.T) {
 		"opa bundle with v-prefixed tag",
 	)
 
-	complypackCache := cache.NewComplypackCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
+	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
 	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
 

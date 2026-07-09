@@ -30,7 +30,8 @@ func TestEvaluatorIDToVersion_Found(t *testing.T) {
 		},
 	}
 
-	version, ok := state.EvaluatorIDToVersion("io.complytime.opa")
+	version, ok, err := state.EvaluatorIDToVersion("io.complytime.opa")
+	require.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, "2.0.0", version)
 }
@@ -45,7 +46,8 @@ func TestEvaluatorIDToVersion_NotFound(t *testing.T) {
 		},
 	}
 
-	version, ok := state.EvaluatorIDToVersion("io.complytime.nonexistent")
+	version, ok, err := state.EvaluatorIDToVersion("io.complytime.nonexistent")
+	require.NoError(t, err)
 	assert.False(t, ok)
 	assert.Empty(t, version)
 }
@@ -55,7 +57,8 @@ func TestEvaluatorIDToVersion_EmptyComplypacks(t *testing.T) {
 		Complypacks: map[string]cache.PolicyState{},
 	}
 
-	version, ok := state.EvaluatorIDToVersion("io.complytime.opa")
+	version, ok, err := state.EvaluatorIDToVersion("io.complytime.opa")
+	require.NoError(t, err)
 	assert.False(t, ok)
 	assert.Empty(t, version)
 }
@@ -65,7 +68,8 @@ func TestEvaluatorIDToVersion_NilComplypacks(t *testing.T) {
 		Complypacks: nil,
 	}
 
-	version, ok := state.EvaluatorIDToVersion("io.complytime.opa")
+	version, ok, err := state.EvaluatorIDToVersion("io.complytime.opa")
+	require.NoError(t, err)
 	assert.False(t, ok)
 	assert.Empty(t, version)
 }
@@ -73,9 +77,29 @@ func TestEvaluatorIDToVersion_NilComplypacks(t *testing.T) {
 func TestEvaluatorIDToVersion_NilReceiver(t *testing.T) {
 	var state *cache.State
 
-	version, ok := state.EvaluatorIDToVersion("io.complytime.opa")
+	version, ok, err := state.EvaluatorIDToVersion("io.complytime.opa")
+	require.NoError(t, err)
 	assert.False(t, ok)
 	assert.Empty(t, version)
+}
+
+func TestEvaluatorIDToVersion_DuplicateEvaluatorID(t *testing.T) {
+	state := &cache.State{
+		Complypacks: map[string]cache.PolicyState{
+			"repo/opa-a": {
+				EvaluatorID: "io.complytime.opa",
+				Version:     "1.0.0",
+			},
+			"repo/opa-b": {
+				EvaluatorID: "io.complytime.opa",
+				Version:     "2.0.0",
+			},
+		},
+	}
+
+	_, _, err := state.EvaluatorIDToVersion("io.complytime.opa")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate evaluator-id")
 }
 
 func TestPolicyState_BackwardCompatibility_NoVerifiedField(t *testing.T) {

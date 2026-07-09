@@ -33,18 +33,24 @@ const (
 // ComplypackCache manages cached complypack artifacts under
 // {cacheDir}/complypacks/{evaluator-id}/{version}/.
 type ComplypackCache struct {
-	cacheDir string
-	state    *State
+	cacheDir       string
+	state          *State
+	retentionCount int
 }
 
 // NewComplypackCache creates a ComplypackCache rooted at the given base cache
 // directory (e.g., ~/.complytime). The optional state parameter enables
 // state-driven lookup and retention-aware eviction. When state is nil,
 // both features fall back to filesystem-only behavior (D4).
+//
+// The retention count is read from COMPLYTIME_CACHE_VERSIONS once at
+// construction time to avoid repeated os.Getenv calls and ensure
+// deterministic behavior during the cache's lifetime.
 func NewComplypackCache(cacheDir string, state *State) *ComplypackCache {
 	return &ComplypackCache{
-		cacheDir: cacheDir,
-		state:    state,
+		cacheDir:       cacheDir,
+		state:          state,
+		retentionCount: CacheRetentionCount(),
 	}
 }
 
@@ -135,10 +141,6 @@ func (c *ComplypackCache) Store(config complypack.Config, content io.Reader) (st
 		return "", fmt.Errorf("failed to write config file: %w", err)
 	}
 
-	// Evict old version directories for the same evaluator-id, keeping
-	// up to N versions per the configured retention count (FR-001).
-	evictOldVersions(parentDir, config.Version, CacheRetentionCount(), c.state)
-
 	// Remove any existing final directory before the atomic rename.
 	if err := os.RemoveAll(finalDir); err != nil {
 		return "", fmt.Errorf("failed to remove existing cache directory %s: %w", finalDir, err)
@@ -149,6 +151,13 @@ func (c *ComplypackCache) Store(config complypack.Config, content io.Reader) (st
 		return "", fmt.Errorf("failed to rename temporary directory to %s: %w", finalDir, err)
 	}
 	cleanup = false // Rename succeeded; don't remove the final directory.
+
+	// Evict old version directories for the same evaluator-id, keeping
+	// up to N versions per the configured retention count (FR-001).
+	// Eviction runs after the successful Rename to prevent data loss:
+	// if Rename fails, old versions are preserved and the temp dir is
+	// cleaned up by the deferred cleanup.
+	evictOldVersions(parentDir, config.Version, c.retentionCount, c.state)
 
 	return filepath.Join(finalDir, complypackContentFile), nil
 }
@@ -355,7 +364,14 @@ func (c *ComplypackCache) LookupByEvaluatorID(evaluatorID string) (string, *comp
 	// State-driven lookup: resolve the active version from state and
 	// delegate to Lookup for deterministic resolution (D4, FR-005).
 	if c.state != nil {
-		if version, ok := c.state.EvaluatorIDToVersion(evaluatorID); ok {
+		version, ok, lookupErr := c.state.EvaluatorIDToVersion(evaluatorID)
+		if lookupErr != nil {
+			return "", nil, fmt.Errorf(
+				"state lookup failed for evaluator %s: %w",
+				evaluatorID, lookupErr,
+			)
+		}
+		if ok {
 			contentPath, cfg, err := c.Lookup(evaluatorID, version)
 			if err == nil && contentPath != "" {
 				return contentPath, cfg, nil

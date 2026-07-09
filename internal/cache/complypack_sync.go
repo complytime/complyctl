@@ -70,8 +70,18 @@ func (s *ComplypackSync) SyncComplypack(ctx context.Context, repository, version
 
 	remoteDigest, remoteVersion, err := s.source.DefinitionVersion(ctx, lookupRef)
 	if err != nil {
+		// Registry unreachable: attempt to serve from local cache
+		// before failing. If the repository has a cached entry with
+		// existing content on disk, the user can continue working
+		// offline with previously fetched data (FR-004).
+		localState, exists := s.state.GetComplypackState(repository)
+		if exists && s.cacheExistsForState(localState) {
+			log.Warn("registry unreachable, serving from local cache",
+				"repository", repository, "error", err)
+			return false, nil
+		}
 		return false, fmt.Errorf(
-			"complypack %s: registry unreachable: %w (cached data may still be available)",
+			"complypack %s: registry unreachable: %w",
 			repository, err,
 		)
 	}
@@ -214,6 +224,11 @@ func (s *ComplypackSync) tryLocalCacheHit(
 	}
 
 	// Update state to reflect the version switch and persist.
+	// remoteDigest (not local content digest) is intentional: state
+	// tracks the registry manifest digest so that the incremental sync
+	// check (localState.Digest == remoteDigest) can skip redundant
+	// fetches on subsequent runs. Using a local content digest would
+	// cause a permanent mismatch and force re-fetches every time.
 	s.state.UpdateComplypackStateWithVerification(
 		repository, version, remoteDigest,
 		localState.EvaluatorID, verifyResult,
