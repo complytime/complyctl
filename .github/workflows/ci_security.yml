@@ -8,20 +8,24 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: read
-  actions: none
-  id-token: none
-  security-events: none
-  packages: none
+  contents: read        # read repository contents
+  actions: none         # explicitly deny actions write access at workflow level
+  id-token: none        # explicitly deny OIDC token access at workflow level
+  security-events: none # explicitly deny security-events write at workflow level
+  packages: none        # explicitly deny package registry write access
 
 jobs:
   call_reusable_vuln_scan:
     name: OSV-Scanner
     permissions:
-      contents: read
-      actions: read
-      security-events: write
+      contents: read          # check out repository code
+      actions: read           # required to upload SARIF file to CodeQL (https://github.com/github/codeql-action/issues/2117)
+      security-events: write  # upload SARIF results to the security tab
     uses: complytime/org-infra/.github/workflows/reusable_vuln_scan.yml@638b2037394ca0f0b860a135c7c27dce75fd3c03 # v0.5.0
     with:
       # OSV focuses on known CVEs in dependencies; Trivy adds broader coverage
@@ -30,7 +34,7 @@ jobs:
   call_reusable_security:
     name: OpenSSF Scorecards
     permissions:
-      contents: read
-      id-token: write
-      security-events: write
+      contents: read          # check out repository code
+      id-token: write         # access GitHub OIDC token to verify result authenticity when publishing
+      security-events: write  # upload SARIF results to the security tab
     uses: complytime/org-infra/.github/workflows/reusable_security.yml@638b2037394ca0f0b860a135c7c27dce75fd3c03 # v0.5.0

@@ -5,15 +5,21 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false # push-to-main only two-job pipeline; coverage artifact must reach SonarCloud
+
 permissions:
-  contents: none
-  issues: none
-  pull-requests: none
+  contents: none       # explicitly deny content write access; jobs use least-privilege overrides
+  issues: none         # explicitly deny issue write access
+  pull-requests: none  # explicitly deny PR write access at workflow level
 
 jobs:
   generate-coverage:
     name: Generate Coverage Report
     runs-on: ubuntu-latest
+    permissions:
+      contents: read # check out repository code
     steps:
       - name: Check out
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -30,8 +36,8 @@ jobs:
   sonarqube:
     name: SonarCloud Analysis
     permissions:
-      contents: read
-      pull-requests: read
+      contents: read       # check out repository code
+      pull-requests: read  # read PR metadata for SonarCloud PR decoration
     needs: generate-coverage
     uses: complytime/org-infra/.github/workflows/reusable_sonarqube.yml@638b2037394ca0f0b860a135c7c27dce75fd3c03 # v0.5.0
     with:

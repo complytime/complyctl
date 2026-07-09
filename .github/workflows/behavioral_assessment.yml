@@ -5,16 +5,21 @@ on:
         branches:
             - main
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: false # push-to-main only; SARIF uploads must complete
+
 permissions:
-    contents: read
+    contents: read # read repository contents
 
 jobs:
     behavioral-assessment:
+        name: Behavioral Assessment
         runs-on: ubuntu-latest
         permissions:
-            contents: read
-            actions: read
-            security-events: write
+            contents: read          # check out repository code
+            actions: read           # required to upload SARIF to CodeQL (https://github.com/github/codeql-action/issues/2117)
+            security-events: write  # upload SARIF results to the security tab
         steps:
             - name: Checkout code
               uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

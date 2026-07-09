@@ -17,7 +17,7 @@ on:
     - cron: '0 0 * * *'
 
 permissions:
-  contents: none
+  contents: none # explicitly deny all content write access; jobs use least-privilege overrides
 
 jobs:
   call_reusable_compliance:

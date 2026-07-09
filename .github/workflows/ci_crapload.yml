@@ -12,16 +12,19 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: read
-  pull-requests: write
+  contents: read # read repository to check out code
 
 jobs:
   crapload:
     name: CRAP Load Analysis
     uses: complytime/org-infra/.github/workflows/reusable_crapload_analysis.yml@638b2037394ca0f0b860a135c7c27dce75fd3c03 # v0.5.0
     permissions:
-      contents: read
+      contents: read # check out repository code
 
   post-comment:
     name: Post PR Comment
@@ -29,7 +32,7 @@ jobs:
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      pull-requests: write # post CRAP analysis comment on the PR
     steps:
       - name: Download comment body
         id: download

@@ -17,9 +17,15 @@ on:
       - main
 
 permissions:
-  contents: read
-  issues: none
-  pull-requests: none
+  contents: read # read repository contents
+  issues: none   # explicitly deny issue write access
+  pull-requests: none # explicitly deny PR write access at workflow level
+
+concurrency:
+  # Scope to PR number so concurrent pushes on different PRs run independently.
+  # cancel-in-progress: false protects the auto-merge step from mid-flight cancellation.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: false
 
 env:
   MIN_RELEASE_AGE_HOURS: 24
@@ -39,12 +45,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: [call_deps_reviewer, call_dependabot_reviewer]
     permissions:
-      issues: read
-      pull-requests: write  # Necessary to write a comment
+      issues: read          # read issue metadata for PR comment lookup
+      pull-requests: write  # write PR comment with review summary
     steps:
       - name: Comment from Dependabot Reviewer
-        uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5.0.0
         env:
+          GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          PR_NUMBER: "${{ github.event.pull_request.number }}"
+          GH_REPO: "${{ github.repository }}"
+          RUN_ID: "${{ github.run_id }}"
           REVIEW_CONCLUSION: ${{ needs.call_deps_reviewer.outputs.review_conclusion }}
           RISK_LEVEL: ${{ needs.call_dependabot_reviewer.outputs.risk_level }}
           UPDATES_COUNT: ${{ needs.call_dependabot_reviewer.outputs.updates_count }}
@@ -52,32 +61,84 @@ jobs:
           DEP_VERSION: ${{ needs.call_dependabot_reviewer.outputs.dep_version }}
           RELEASE_AGE_HOURS: ${{ needs.call_dependabot_reviewer.outputs.release_age_hours }}
           IS_ORG_OWNED: ${{ needs.call_dependabot_reviewer.outputs.is_org_owned }}
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          edit-mode: replace
-          body: |
-            🤖 **Standardized Dependabot Review Summary** 🤖
+          MIN_RELEASE_AGE_HOURS: ${{ env.MIN_RELEASE_AGE_HOURS }}
+        run: |
+          MARKER="<!-- dependabot-review-marker -->"
 
-            This PR was processed by the organization's reusable CI pipeline.
+          # Sanitize attacker-controlled values (dep name/version from PR branch)
+          # to only allow characters valid in a package name before embedding in body.
+          DEP_NAME_SAFE=$(printf '%s' "$DEP_NAME" | tr -cd 'a-zA-Z0-9._/-')
+          DEP_VERSION_SAFE=$(printf '%s' "$DEP_VERSION" | tr -cd 'a-zA-Z0-9._-')
 
-            | Criterion | Status | Detail |
-            |-----------|--------|--------|
-            | **Dependencies Review** | **${{ env.REVIEW_CONCLUSION }}** | [View logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
-            | **Calculated Risk** | **${{ env.RISK_LEVEL }}** | `${{ env.DEP_NAME }}` v${{ env.DEP_VERSION }} |
-            | **Release Age** | **${{ (env.RELEASE_AGE_HOURS == '-1' || env.RELEASE_AGE_HOURS == '') && 'unknown' || format('{0}h', env.RELEASE_AGE_HOURS) }}** | ${{ (env.RELEASE_AGE_HOURS == '-1' || env.RELEASE_AGE_HOURS == '') && 'Release date unavailable — manual review required' || format('Released {0} hours ago', env.RELEASE_AGE_HOURS) }} |
-            | **Ownership** | **${{ env.IS_ORG_OWNED == 'true' && 'org-owned' || 'third-party' }}** | ${{ env.IS_ORG_OWNED == 'true' && 'Same organization — trusted source' || 'External dependency' }} |
-            | **Dependency Usage** | ${{ env.UPDATES_COUNT == '0' && 'unavailable' || format('{0} repos', env.UPDATES_COUNT) }} | Informational only — does not affect approval |
+          if [ "$IS_ORG_OWNED" = "true" ] && [ "$RISK_LEVEL" != "high" ] && [ "$REVIEW_CONCLUSION" = "success" ]; then
+            AUTO_APPROVAL="Approved + auto-merge requested (org-owned)"
+          elif [ "$RISK_LEVEL" != "high" ] && [ "$REVIEW_CONCLUSION" = "success" ] && [ "$RELEASE_AGE_HOURS" != "-1" ] && [ -n "$RELEASE_AGE_HOURS" ] && [ "$RELEASE_AGE_HOURS" -ge "$MIN_RELEASE_AGE_HOURS" ]; then
+            AUTO_APPROVAL="Approved"
+          else
+            AUTO_APPROVAL="Manual review required"
+          fi
 
-            **Auto-approval:** ${{ (env.IS_ORG_OWNED == 'true' && env.RISK_LEVEL != 'high' && env.REVIEW_CONCLUSION == 'success') && '✅ Approved + auto-merge requested (org-owned)' || (env.RISK_LEVEL != 'high' && env.REVIEW_CONCLUSION == 'success' && env.RELEASE_AGE_HOURS != '-1' && fromJSON(env.RELEASE_AGE_HOURS) >= fromJSON(env.MIN_RELEASE_AGE_HOURS)) && '✅ Approved' || '⏳ Manual review required' }}
+          if [ "$RELEASE_AGE_HOURS" = "-1" ] || [ -z "$RELEASE_AGE_HOURS" ]; then
+            AGE_DISPLAY="unknown"
+            AGE_DETAIL="Release date unavailable — manual review required"
+          else
+            AGE_DISPLAY="${RELEASE_AGE_HOURS}h"
+            AGE_DETAIL="Released ${RELEASE_AGE_HOURS} hours ago"
+          fi
 
-            ---
+          if [ "$IS_ORG_OWNED" = "true" ]; then
+            OWNERSHIP_DISPLAY="org-owned"
+            OWNERSHIP_DETAIL="Same organization — trusted source"
+          else
+            OWNERSHIP_DISPLAY="third-party"
+            OWNERSHIP_DETAIL="External dependency"
+          fi
 
-            Maintainer check list:
-            1. Ensure the PR passed all CI tests (required status checks).
-            2. Investigate failures for Major updates or any manual review requirement.
-            3. Don't overlook breaking changes and changelog information.
-            4. If the scorecard value is low, consider to contribute to make it higher. Everybody wins!
-            5. Be diligent. When in doubt, ask another maintainer for additional review.
+          if [ "$UPDATES_COUNT" = "0" ]; then
+            USAGE_DISPLAY="unavailable"
+          else
+            USAGE_DISPLAY="${UPDATES_COUNT} repos"
+          fi
+
+          BODY="${MARKER}
+          ## Standardized Dependabot Review Summary
+
+          This PR was processed by the organization's reusable CI pipeline.
+
+          | Criterion | Status | Detail |
+          |-----------|--------|--------|
+          | **Dependencies Review** | **${REVIEW_CONCLUSION}** | [View logs](https://github.com/${GH_REPO}/actions/runs/${RUN_ID}) |
+          | **Calculated Risk** | **${RISK_LEVEL}** | \`${DEP_NAME_SAFE}\` v${DEP_VERSION_SAFE} |
+          | **Release Age** | **${AGE_DISPLAY}** | ${AGE_DETAIL} |
+          | **Ownership** | **${OWNERSHIP_DISPLAY}** | ${OWNERSHIP_DETAIL} |
+          | **Dependency Usage** | ${USAGE_DISPLAY} | Informational only — does not affect approval |
+
+          **Auto-approval:** ${AUTO_APPROVAL}
+
+          ---
+
+          Maintainer check list:
+          1. Ensure the PR passed all CI tests (required status checks).
+          2. Investigate failures for Major updates or any manual review requirement.
+          3. Don't overlook breaking changes and changelog information.
+          4. If the scorecard value is low, consider to contribute to make it higher. Everybody wins!
+          5. Be diligent. When in doubt, ask another maintainer for additional review."
+
+          # Find existing comment with marker; --paginate ensures all comments are searched.
+          # Use --arg to pass the marker safely into the jq expression (avoids injection).
+          # $marker below is a jq variable (via --arg), not a shell variable.
+          # shellcheck disable=SC2016
+          EXISTING_ID=$(gh api --paginate "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
+            --jq --arg marker "$MARKER" '.[] | select(.body | contains($marker)) | .id' \
+            | head -n1)
+
+          # Validate that EXISTING_ID is a pure integer before using it in a URL path.
+          if [ -n "$EXISTING_ID" ] && printf '%s' "$EXISTING_ID" | grep -qE '^[0-9]+$'; then
+            gh api --method PATCH "repos/${GH_REPO}/issues/comments/${EXISTING_ID}" \
+              -f body="$BODY"
+          else
+            gh issue comment "$PR_NUMBER" --repo "$GH_REPO" --body "$BODY"
+          fi
 
   approve_dependabot_prs:
     name: Dependabot Auto-approve
@@ -130,9 +191,11 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          PR_NUMBER: "${{ github.event.pull_request.number }}"
+          GH_REPO: "${{ github.repository }}"
         run: |
           echo "Enabling auto-merge for org-owned dependency..."
-          gh pr merge "${{ github.event.pull_request.number }}" \
+          gh pr merge "$PR_NUMBER" \
             --auto --squash \
-            --repo "${{ github.repository }}"
+            --repo "$GH_REPO"
           echo "Auto-merge enabled successfully."

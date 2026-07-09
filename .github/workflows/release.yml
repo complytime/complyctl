@@ -20,8 +20,8 @@ on:
                 type: string
 
 permissions:
-    contents: none
-    id-token: none
+    contents: none  # explicitly deny content write access; jobs use least-privilege overrides
+    id-token: none  # explicitly deny OIDC token access at workflow level
 
 concurrency:
     group: release-${{ github.ref }}
@@ -32,8 +32,8 @@ jobs:
         name: Preflight
         runs-on: ubuntu-latest
         permissions:
-            contents: write
-            checks: read
+            contents: write # create annotated git tag and push to repository
+            checks: read    # read CI check status to verify all checks passed
         timeout-minutes: 10
         env:
             RELEASE_TAG: ${{ inputs.tag }}
@@ -43,6 +43,17 @@ jobs:
               uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
               with:
                   fetch-depth: 0
+                  persist-credentials: false
+
+            - name: Configure git credentials
+              # Explicitly inject the GITHUB_TOKEN into the remote URL so that
+              # git push and git ls-remote can authenticate without storing the
+              # credential in the Actions artifact (which persist-credentials: false prevents).
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  git remote set-url origin \
+                    "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
             # Accepts vMAJOR.MINOR.PATCH with optional
             # pre-release suffix (e.g., v1.0.0-beta.0).
@@ -81,11 +92,10 @@ jobs:
                   fi
                   echo "Version ordering valid: $RELEASE_TAG > $LATEST"
 
-            # Check names are derived from the job keys in
-            # unit_test.yml, e2e_test.yml, and
-            # integration_test.yml. If those workflow job
-            # names change, update the REQUIRED_CHECKS
-            # array below to match.
+            # Check names match the job keys in unit_test.yml,
+            # e2e_test.yml, and integration_test.yml. Do not add
+            # `name:` overrides to those jobs — it changes the
+            # check-run name and breaks branch protection rules.
             - name: Verify CI passed on HEAD
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -150,8 +160,8 @@ jobs:
         needs: preflight
 
         permissions:
-            contents: write
-            id-token: write
+            contents: write # upload release artifacts and create GitHub release
+            id-token: write # access GitHub OIDC token for cosign keyless signing
 
         steps:
             - name: Checkout Code

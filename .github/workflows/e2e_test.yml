@@ -9,8 +9,12 @@ on:
             - opened
             - synchronize
 
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
 permissions:
-    contents: read
+    contents: read # read repository contents to check out code
 
 jobs:
     e2e-test:

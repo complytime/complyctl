@@ -112,7 +112,7 @@ clean:
 ##@ Testing
 
 test-unit:
-	go test -race -v -coverprofile=coverage.out ./...
+	go test -mod=vendor -race -v -coverprofile=coverage.out ./...
 .PHONY: test-unit
 
 sanity: vendor format vet ## ensure code is ready for commit

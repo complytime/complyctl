@@ -5,17 +5,17 @@ on:
     - cron: '0 0 * * *'
 
 permissions:
-  contents: read
-  actions: none
-  id-token: none
-  security-events: none
+  contents: read      # read repository contents
+  actions: none       # explicitly deny actions write access at workflow level
+  id-token: none      # explicitly deny OIDC token access at workflow level
+  security-events: none # explicitly deny security-events write at workflow level
 
 jobs:
   call_reusable_scheduled:
     name: OSV-Scanner and Scorecards
     permissions:
-      contents: read
-      actions: read           # Required to upload SARIF file to CodeQL. See: https://github.com/github/codeql-action/issues/2117
-      security-events: write  # Require writing security events to upload SARIF file to security tab
-      id-token: write         # Needed to access GitHub's OIDC token which verifies the authenticity of the result when publishing it.
+      contents: read          # check out repository code
+      actions: read           # required to upload SARIF file to CodeQL (https://github.com/github/codeql-action/issues/2117)
+      security-events: write  # upload SARIF results to the security tab
+      id-token: write         # access GitHub OIDC token to verify result authenticity when publishing
     uses: complytime/org-infra/.github/workflows/reusable_scheduled.yml@638b2037394ca0f0b860a135c7c27dce75fd3c03 # v0.5.0
