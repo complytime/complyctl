@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/internal/output"
 )
 
@@ -120,6 +121,8 @@ func TestMarkdown_Write(t *testing.T) {
 	assert.Contains(t, content, "**ctrl-2**")
 	assert.Contains(t, content, "req-1")
 	assert.Contains(t, content, "req-2")
+	assert.Contains(t, content, complytime.StatusPassed+" Passed",
+		"Controls table should contain emoji status indicators")
 	assert.Contains(t, content, "## Findings")
 }
 
@@ -219,6 +222,8 @@ func TestMarkdown_FindingsWithRecommendationAndEvidence(t *testing.T) {
 	require.NoError(t, err)
 	content := string(data)
 
+	assert.Contains(t, content, "### "+complytime.StatusFailed+" Failed",
+		"findings group header should have emoji prefix")
 	assert.Contains(t, content, "#### req-2 -- Failed")
 	assert.Contains(t, content, "**Control**: ctrl-2")
 	assert.Contains(t, content, "cert validity exceeds 397 days")
@@ -272,10 +277,10 @@ func TestMarkdown_FindingsSortOrder(t *testing.T) {
 	require.NoError(t, err)
 	content := string(data)
 
-	failedIdx := strings.Index(content, "### Failed")
-	notApplicableIdx := strings.Index(content, "### Not Applicable")
-	require.Greater(t, failedIdx, 0, "expected Failed heading in findings")
-	require.Greater(t, notApplicableIdx, 0, "expected Not Applicable heading in findings")
+	failedIdx := strings.Index(content, "### "+complytime.StatusFailed+" Failed")
+	notApplicableIdx := strings.Index(content, "### "+complytime.StatusSkipped+" Not Applicable")
+	require.Greater(t, failedIdx, 0, "expected Failed heading with emoji in findings")
+	require.Greater(t, notApplicableIdx, 0, "expected Not Applicable heading with emoji in findings")
 	assert.Less(t, failedIdx, notApplicableIdx,
 		"Failed findings should appear before Not Applicable")
 }
@@ -293,6 +298,10 @@ func TestMarkdown_PassRate(t *testing.T) {
 	content := string(data)
 
 	assert.Contains(t, content, "50% pass rate (1/2 applicable)")
+	assert.Contains(t, content, complytime.StatusPassed+" Passed",
+		"counts table header should have emoji prefix")
+	assert.Contains(t, content, complytime.StatusFailed+" Failed",
+		"counts table header should have emoji prefix")
 }
 
 func TestMarkdown_EmbedEvaluationLog_MissingFile(t *testing.T) {
@@ -414,6 +423,8 @@ func TestMarkdown_ConfidenceLevelShown(t *testing.T) {
 	assert.Contains(t, content, "**Confidence**: Low")
 	assert.Contains(t, content, "**Confidence**: High")
 	assert.NotContains(t, content, "**Confidence**: Undetermined")
+	assert.Contains(t, content, "### "+complytime.StatusFailed+" Failed",
+		"findings group header should have emoji prefix")
 }
 
 func TestMarkdown_ToolAttribution(t *testing.T) {
@@ -471,6 +482,230 @@ func TestMarkdown_ControlsTableShowsAllControls(t *testing.T) {
 	assert.Contains(t, content, "&nbsp;&nbsp;req-1")
 	assert.Contains(t, content, "&nbsp;&nbsp;req-2")
 	assert.Contains(t, content, "&nbsp;&nbsp;req-3")
+	assert.Contains(t, content, complytime.StatusPassed+" Passed",
+		"passed control should have emoji prefix")
+	assert.Contains(t, content, complytime.StatusFailed+" Failed",
+		"failed control should have emoji prefix")
+	assert.Contains(t, content, complytime.StatusSkipped+" Not Applicable",
+		"not applicable control should have emoji prefix")
+}
+
+func TestMarkdown_ControlsTableStatusIndicators(t *testing.T) {
+	outDir := t.TempDir()
+	log := &gemara.EvaluationLog{
+		Metadata: gemara.Metadata{Id: "pol"},
+		Result:   gemara.Failed,
+		Evaluations: []*gemara.ControlEvaluation{
+			{
+				Name:   "ctrl-pass",
+				Result: gemara.Passed,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-pass"},
+						Result:      gemara.Passed,
+						Message:     "ok",
+					},
+				},
+			},
+			{
+				Name:   "ctrl-fail",
+				Result: gemara.Failed,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-fail"},
+						Result:      gemara.Failed,
+						Message:     "bad",
+					},
+				},
+			},
+			{
+				Name:   "ctrl-na",
+				Result: gemara.NotApplicable,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-na"},
+						Result:      gemara.NotApplicable,
+						Message:     "n/a",
+					},
+				},
+			},
+			{
+				Name:   "ctrl-mixed",
+				Result: gemara.Failed,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-notrun"},
+						Result:      gemara.NotRun,
+						Message:     "skipped",
+					},
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-unknown"},
+						Result:      gemara.Unknown,
+						Message:     "unknown",
+					},
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-review"},
+						Result:      gemara.NeedsReview,
+						Message:     "needs review",
+					},
+				},
+			},
+		},
+	}
+	md := output.NewMarkdown("pol", log)
+
+	path, err := md.Write(outDir)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+
+	// Extract the Controls table section for positional specificity.
+	controlsStart := strings.Index(content, "## Controls")
+	findingsStart := strings.Index(content, "## Findings")
+	require.Greater(t, controlsStart, 0, "expected ## Controls section")
+	require.Greater(t, findingsStart, controlsStart, "expected ## Findings after ## Controls")
+	controlsSection := content[controlsStart:findingsStart]
+
+	// Control rows: emoji prefixed in bold Result column
+	assert.Contains(t, controlsSection, "**"+complytime.StatusPassed+" Passed**",
+		"Passed control should display ✅ Passed in Controls table")
+	assert.Contains(t, controlsSection, "**"+complytime.StatusFailed+" Failed**",
+		"Failed control should display ❌ Failed in Controls table")
+	assert.Contains(t, controlsSection, "**"+complytime.StatusSkipped+" Not Applicable**",
+		"Not Applicable control should display ⏭️ Not Applicable in Controls table")
+
+	// Requirement sub-rows: emoji prefixed in Result column
+	assert.Contains(t, controlsSection, complytime.StatusPassed+" Passed",
+		"Passed requirement should display ✅ Passed in Controls table")
+	assert.Contains(t, controlsSection, complytime.StatusFailed+" Failed",
+		"Failed requirement should display ❌ Failed in Controls table")
+	assert.Contains(t, controlsSection, complytime.StatusSkipped+" Not Applicable",
+		"Not Applicable requirement should display ⏭️ Not Applicable in Controls table")
+	assert.Contains(t, controlsSection, complytime.StatusSkipped+" Not Run",
+		"Not Run requirement should display ⏭️ Not Run in Controls table")
+	assert.Contains(t, controlsSection, complytime.StatusError+" Unknown",
+		"Unknown requirement should display ⚠️ Unknown in Controls table")
+	assert.Contains(t, controlsSection, complytime.StatusError+" Needs Review",
+		"Needs Review requirement should display ⚠️ Needs Review in Controls table")
+}
+
+func TestMarkdown_SummaryCountsTableHeaders(t *testing.T) {
+	outDir := t.TempDir()
+	log := mockGemaraEvalLogWithFindings()
+	md := output.NewMarkdown("test-policy", log)
+
+	path, err := md.Write(outDir)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+
+	// Extract the summary section (before ## Controls) for positional specificity.
+	controlsStart := strings.Index(content, "## Controls")
+	require.Greater(t, controlsStart, 0, "expected ## Controls section")
+	summarySection := content[:controlsStart]
+
+	assert.Contains(t, summarySection, complytime.StatusPassed+" Passed",
+		"counts table header should have ✅ Passed")
+	assert.Contains(t, summarySection, complytime.StatusFailed+" Failed",
+		"counts table header should have ❌ Failed")
+	assert.Contains(t, summarySection, complytime.StatusError+" Needs Review",
+		"counts table header should have ⚠️ Needs Review")
+	assert.Contains(t, summarySection, complytime.StatusError+" Unknown",
+		"counts table header should have ⚠️ Unknown")
+	assert.Contains(t, summarySection, complytime.StatusSkipped+" N/A",
+		"counts table header should have ⏭️ N/A")
+	assert.Contains(t, summarySection, complytime.StatusSkipped+" Not Run",
+		"counts table header should have ⏭️ Not Run")
+	assert.Contains(t, summarySection, "| Total |",
+		"Total header should remain without emoji prefix")
+}
+
+func TestMarkdown_FindingsGroupHeaderEmoji(t *testing.T) {
+	outDir := t.TempDir()
+	log := &gemara.EvaluationLog{
+		Metadata: gemara.Metadata{Id: "pol"},
+		Result:   gemara.Failed,
+		Evaluations: []*gemara.ControlEvaluation{
+			{
+				Name:   "ctrl-1",
+				Result: gemara.Failed,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-fail"},
+						Result:      gemara.Failed,
+						Message:     "failed",
+					},
+				},
+			},
+			{
+				Name:   "ctrl-2",
+				Result: gemara.NeedsReview,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-review"},
+						Result:      gemara.NeedsReview,
+						Message:     "needs review",
+					},
+				},
+			},
+			{
+				Name:   "ctrl-3",
+				Result: gemara.NotApplicable,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-na"},
+						Result:      gemara.NotApplicable,
+						Message:     "not applicable",
+					},
+				},
+			},
+			{
+				Name:   "ctrl-4",
+				Result: gemara.Unknown,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-unknown"},
+						Result:      gemara.Unknown,
+						Message:     "unknown",
+					},
+				},
+			},
+			{
+				Name:   "ctrl-5",
+				Result: gemara.NotRun,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-notrun"},
+						Result:      gemara.NotRun,
+						Message:     "not run",
+					},
+				},
+			},
+		},
+	}
+	md := output.NewMarkdown("pol", log)
+
+	path, err := md.Write(outDir)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+
+	assert.Contains(t, content, "### "+complytime.StatusFailed+" Failed",
+		"Failed findings group should have ❌ emoji")
+	assert.Contains(t, content, "### "+complytime.StatusError+" Unknown",
+		"Unknown findings group should have ⚠️ emoji")
+	assert.Contains(t, content, "### "+complytime.StatusError+" Needs Review",
+		"Needs Review findings group should have ⚠️ emoji")
+	assert.Contains(t, content, "### "+complytime.StatusSkipped+" Not Applicable",
+		"Not Applicable findings group should have ⏭️ emoji")
+	assert.Contains(t, content, "### "+complytime.StatusSkipped+" Not Run",
+		"Not Run findings group should have ⏭️ emoji")
 }
 
 func TestMarkdown_NeedsReviewInFindings(t *testing.T) {
@@ -533,8 +768,8 @@ func TestMarkdown_NeedsReviewInFindings(t *testing.T) {
 	assert.Contains(t, content, "**ctrl-review**")
 	assert.Contains(t, content, "Needs Review")
 
-	// Findings section should include the NeedsReview finding
-	assert.Contains(t, content, "### Needs Review")
+	// Findings section should include the NeedsReview finding with emoji
+	assert.Contains(t, content, "### "+complytime.StatusError+" Needs Review")
 	assert.Contains(t, content, "#### req-review -- Needs Review")
 	assert.Contains(t, content, "**Control**: ctrl-review")
 	assert.Contains(t, content, "automated check inconclusive")

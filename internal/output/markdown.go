@@ -39,6 +39,22 @@ func (m *Markdown) SetEmbedEvaluationLog(path string) {
 	m.evaluationLog = path
 }
 
+// resultEmoji maps a gemara.Result to its corresponding status emoji constant.
+func resultEmoji(r gemara.Result) string {
+	switch r {
+	case gemara.Passed:
+		return complytime.StatusPassed
+	case gemara.Failed:
+		return complytime.StatusFailed
+	case gemara.NotApplicable, gemara.NotRun:
+		return complytime.StatusSkipped
+	case gemara.Unknown, gemara.NeedsReview:
+		return complytime.StatusError
+	default:
+		return complytime.StatusError
+	}
+}
+
 type summaryCounts struct {
 	passed        int
 	failed        int
@@ -172,7 +188,9 @@ func (m *Markdown) writeSummary(sb *strings.Builder, now time.Time) {
 	fmt.Fprintf(sb, "**Overall: %s -- %d%% pass rate (%d/%d applicable)**\n\n",
 		m.evalLog.Result.String(), passRate, counts.passed, applicable)
 
-	fmt.Fprintf(sb, "| Passed | Failed | Needs Review | Unknown | N/A | Not Run | Total |\n")
+	fmt.Fprintf(sb, "| %s Passed | %s Failed | %s Needs Review | %s Unknown | %s N/A | %s Not Run | Total |\n",
+		complytime.StatusPassed, complytime.StatusFailed, complytime.StatusError,
+		complytime.StatusError, complytime.StatusSkipped, complytime.StatusSkipped)
 	fmt.Fprintf(sb, "|--------|--------|--------------|---------|-----|---------|-------|\n")
 	fmt.Fprintf(sb, "| %d | %d | %d | %d | %d | %d | %d |\n\n",
 		counts.passed, counts.failed, counts.needsReview,
@@ -185,10 +203,11 @@ func (m *Markdown) writeControlsTable(sb *strings.Builder) {
 	fmt.Fprintf(sb, "|-----------------------|--------|---------|\n")
 
 	for _, ce := range m.evalLog.Evaluations {
-		fmt.Fprintf(sb, "| **%s** | **%s** | %s |\n", ce.Name, ce.Result.String(), ce.Message)
+		fmt.Fprintf(sb, "| **%s** | **%s %s** | %s |\n",
+			ce.Name, resultEmoji(ce.Result), ce.Result.String(), ce.Message)
 		for _, al := range ce.AssessmentLogs {
-			fmt.Fprintf(sb, "| &nbsp;&nbsp;%s | %s | |\n",
-				al.Requirement.EntryId, al.Result.String())
+			fmt.Fprintf(sb, "| &nbsp;&nbsp;%s | %s %s | |\n",
+				al.Requirement.EntryId, resultEmoji(al.Result), al.Result.String())
 		}
 	}
 	sb.WriteString("\n")
@@ -210,7 +229,7 @@ func (m *Markdown) writeFindings(sb *strings.Builder) {
 		if firstGroup || f.result != currentResult {
 			currentResult = f.result
 			firstGroup = false
-			fmt.Fprintf(sb, "### %s\n\n", currentResult.String())
+			fmt.Fprintf(sb, "### %s %s\n\n", resultEmoji(currentResult), currentResult.String())
 		}
 
 		fmt.Fprintf(sb, "#### %s -- %s\n\n", f.requirementID, f.result.String())
