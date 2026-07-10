@@ -87,7 +87,7 @@ func (m *MockPolicySource) DefinitionVersion(_ context.Context, lookupRef string
 
 	p, ok := m.policies[lookupRef]
 	if !ok {
-		return "", "", fmt.Errorf("%w", registry.ErrVersionNotFound)
+		return "", "", fmt.Errorf("policy %s: %w", lookupRef, registry.ErrVersionNotFound)
 	}
 	return p.digest, p.version, nil
 }
@@ -186,7 +186,7 @@ func (m *MockBundlePolicySource) DefinitionVersion(_ context.Context, lookupRef 
 	defer m.mu.RUnlock()
 	p, ok := m.policies[lookupRef]
 	if !ok {
-		return "", "", fmt.Errorf("policy %s not found", lookupRef)
+		return "", "", fmt.Errorf("policy %s: %w", lookupRef, registry.ErrVersionNotFound)
 	}
 	return p.digest, p.version, nil
 }

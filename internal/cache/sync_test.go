@@ -289,14 +289,13 @@ func TestSync_ConcurrentDifferentPolicies(t *testing.T) {
 		require.NoError(t, err, "worker %d: final state must load without error", workerID)
 
 		ps, ok := finalState.GetPolicyState(policyID)
-		if ok {
-			assert.NotEmpty(t, ps.Digest, "%s must have a digest", policyID)
-			assert.NotEmpty(t, ps.Version, "%s must have a version", policyID)
+		require.True(t, ok, "worker %d: policy %s must be in state after successful sync", workerID, policyID)
+		assert.NotEmpty(t, ps.Digest, "%s must have a digest", policyID)
+		assert.NotEmpty(t, ps.Version, "%s must have a version", policyID)
 
-			storePath := r.cacheMgr.PolicyStorePath(policyID)
-			assert.FileExists(t, filepath.Join(storePath, "oci-layout"),
-				"%s OCI layout marker must exist", policyID)
-		}
+		storePath := r.cacheMgr.PolicyStorePath(policyID)
+		assert.FileExists(t, filepath.Join(storePath, "oci-layout"),
+			"%s OCI layout marker must exist", policyID)
 	}
 }
 
@@ -371,9 +370,8 @@ func TestSync_ConcurrentMixedFailures(t *testing.T) {
 		require.NoError(t, err, "worker %d: final state must load without error", workerID)
 
 		ps, ok := finalState.GetPolicyState(policyID)
-		if ok {
-			assert.NotEmpty(t, ps.Digest, "%s must have a digest", policyID)
-		}
+		require.True(t, ok, "worker %d: policy %s must be in state after successful sync", workerID, policyID)
+		assert.NotEmpty(t, ps.Digest, "%s must have a digest", policyID)
 	}
 }
 

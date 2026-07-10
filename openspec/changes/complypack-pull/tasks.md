@@ -49,7 +49,7 @@
   - `TestComplypackSync_IncrementalSkip` -- first sync succeeds, second sync with same digest is a no-op
   - `TestComplypackSync_DigestChanged` -- second sync with different digest triggers re-fetch
   - `TestComplypackSync_InvalidEvaluatorID` -- malicious evaluator-id is rejected during store
-  - `TestComplypackSync_UnsignedWarning` -- verify warning is logged for unsigned artifacts
+  - ~~`TestComplypackSync_UnsignedWarning`~~ -- superseded: warning is the CLI layer's responsibility (see `cmd/complyctl/cli/get.go`); the sync layer does not emit warnings
 
 ## 5. Extend protobuf with complypack content path
 

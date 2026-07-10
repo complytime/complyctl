@@ -1,5 +1,5 @@
 # Use LF line endings
 * text eol=lf
 
-# Ignore vendored material
-vendor/**/* -text
+# Vendor directory is machine-managed (go mod vendor)
+vendor/** linguist-generated -diff -text
