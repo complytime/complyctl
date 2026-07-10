@@ -1,4 +1,5 @@
 # Use LF line endings
 * text eol=lf
-# Tells Git to treat the file as a binary file, which prevents any line ending conversions.
-vendor/** -text
+
+# Ignore vendored material
+vendor/**/* -text

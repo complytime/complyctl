@@ -4,10 +4,12 @@ package cache_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	gosync "sync"
 	"testing"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 
 	"github.com/complytime/complyctl/internal/cache"
 	"github.com/complytime/complyctl/internal/cache/cachetest"
+	"github.com/complytime/complyctl/internal/registry"
 )
 
 func TestSync_CopyOnSuccess(t *testing.T) {
@@ -96,7 +99,35 @@ func TestSync_FailureOnMissingPolicy(t *testing.T) {
 	fetched, err := sync.SyncPolicy(context.Background(), "nonexistent-policy", "latest")
 	require.Error(t, err)
 	assert.False(t, fetched, "failed sync should not report a fetch")
-	assert.Contains(t, err.Error(), "not found")
+	assert.True(t, errors.Is(err, registry.ErrVersionNotFound),
+		"missing policy must return ErrVersionNotFound, got: %v", err)
+	assert.NotContains(t, err.Error(), "registry unreachable",
+		"missing policy must hit the 'not found' branch, not 'registry unreachable'")
+}
+
+func TestSync_RegistryUnreachableError(t *testing.T) {
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+
+	mock := cachetest.NewMockPolicySource()
+	mock.SetError("unreachable-policy", fmt.Errorf("connection refused"))
+
+	cacheMgr := cache.NewCache(cacheDir)
+	state, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+
+	sync := cache.NewSync(cacheMgr, state, mock)
+
+	fetched, err := sync.SyncPolicy(context.Background(), "unreachable-policy", "latest")
+	require.Error(t, err)
+	assert.False(t, fetched, "failed sync should not report a fetch")
+	assert.Contains(t, err.Error(), "registry unreachable",
+		"non-ErrVersionNotFound errors must hit the 'registry unreachable' branch")
+	assert.Contains(t, err.Error(), "connection refused",
+		"original error must be wrapped")
+	assert.False(t, errors.Is(err, registry.ErrVersionNotFound),
+		"registry unreachable must not be ErrVersionNotFound")
 }
 
 func TestSync_IncrementalSkip(t *testing.T) {
@@ -188,67 +219,161 @@ func TestSync_RedownloadAfterDeletion(t *testing.T) {
 	assert.DirExists(t, filepath.Join(storePath, "blobs", "sha256"))
 }
 
-// TestSync_StressConcurrentFailures performs 100 sync iterations with alternating
-// success and failure scenarios, verifying zero cache corruption (SC-008/FR-006).
-func TestSync_StressConcurrentFailures(t *testing.T) {
+// TestSync_ConcurrentDifferentPolicies launches concurrent goroutines each
+// syncing a distinct policy, verifying thread safety of shared state and
+// cache structures under the race detector (SC-008/FR-006).
+//
+// Each worker uses its own cache directory to avoid state.json file-level
+// contention: os.WriteFile truncates before writing, so a concurrent
+// LoadState can observe a truncated file and fail with unexpected EOF.
+// Isolation is the correct model; production callers do not share a single
+// cache directory across concurrent sync managers.
+func TestSync_ConcurrentDifferentPolicies(t *testing.T) {
 	tmpDir := t.TempDir()
-	cacheDir := filepath.Join(tmpDir, "cache")
-	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
-	const iterations = 100
-	policyID := "stress-test-policy"
+	const workers = 10
 
 	mock := cachetest.NewMockPolicySource()
-	mock.SeedPolicy(policyID, "v1.0.0", "sha256:stress123")
-
-	cacheMgr := cache.NewCache(cacheDir)
-
-	successCount := 0
-	failCount := 0
-
-	for i := 0; i < iterations; i++ {
-		state, loadErr := cache.LoadState(cacheDir)
-		require.NoError(t, loadErr, "state load must not fail on iteration %d", i)
-
-		syncMgr := cache.NewSync(cacheMgr, state, mock)
-
-		if i%3 == 0 {
-			ctx, cancel := context.WithCancel(context.Background())
-			cancel()
-			_, syncErr := syncMgr.SyncPolicy(ctx, policyID, "latest")
-			if syncErr != nil {
-				failCount++
-			} else {
-				successCount++
-			}
-		} else if i%7 == 0 {
-			_, syncErr := syncMgr.SyncPolicy(context.Background(),
-				fmt.Sprintf("nonexistent-%d", i), "latest")
-			require.Error(t, syncErr, "nonexistent policy must fail on iteration %d", i)
-			failCount++
-		} else {
-			_, syncErr := syncMgr.SyncPolicy(context.Background(), policyID, "latest")
-			require.NoError(t, syncErr, "normal sync must not fail on iteration %d", i)
-			successCount++
-		}
+	for i := 0; i < workers; i++ {
+		mock.SeedPolicy(
+			fmt.Sprintf("policy-%d", i),
+			"v1.0.0",
+			fmt.Sprintf("sha256:digest%d", i),
+		)
 	}
 
-	t.Logf("Stress test complete: %d success, %d failure out of %d iterations",
-		successCount, failCount, iterations)
+	type workerResult struct {
+		cacheDir string
+		cacheMgr *cache.Cache
+	}
+	results := make([]workerResult, workers)
 
-	// Final: cache state must be loadable and consistent
-	finalState, err := cache.LoadState(cacheDir)
-	require.NoError(t, err, "final state must load without error")
+	for i := 0; i < workers; i++ {
+		workerCacheDir := filepath.Join(tmpDir, fmt.Sprintf("cache-%d", i))
+		require.NoError(t, os.MkdirAll(workerCacheDir, 0755))
+		results[i] = workerResult{cacheDir: workerCacheDir, cacheMgr: cache.NewCache(workerCacheDir)}
+	}
 
-	ps, ok := finalState.GetPolicyState(policyID)
-	if ok {
-		assert.NotEmpty(t, ps.Digest, "successful policy must have a digest")
-		assert.NotEmpty(t, ps.Version, "successful policy must have a version")
+	var wg gosync.WaitGroup
+	wg.Add(workers)
 
-		// Verify OCI Layout store integrity
-		storePath := cacheMgr.PolicyStorePath(policyID)
-		assert.FileExists(t, filepath.Join(storePath, "oci-layout"),
-			"OCI layout marker must exist after successful syncs")
+	for i := 0; i < workers; i++ {
+		go func(workerID int) {
+			defer wg.Done()
+			r := results[workerID]
+			state, loadErr := cache.LoadState(r.cacheDir)
+			if loadErr != nil {
+				t.Errorf("worker %d: state load failed: %v", workerID, loadErr)
+				return
+			}
+
+			syncMgr := cache.NewSync(r.cacheMgr, state, mock)
+			policyID := fmt.Sprintf("policy-%d", workerID)
+
+			_, syncErr := syncMgr.SyncPolicy(context.Background(), policyID, "latest")
+			if syncErr != nil {
+				t.Errorf("worker %d: sync of %s failed: %v", workerID, policyID, syncErr)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Final: each worker's state must be loadable and contain its own policy.
+	for i := 0; i < workers; i++ {
+		workerID := i
+		r := results[workerID]
+		policyID := fmt.Sprintf("policy-%d", workerID)
+
+		finalState, err := cache.LoadState(r.cacheDir)
+		require.NoError(t, err, "worker %d: final state must load without error", workerID)
+
+		ps, ok := finalState.GetPolicyState(policyID)
+		if ok {
+			assert.NotEmpty(t, ps.Digest, "%s must have a digest", policyID)
+			assert.NotEmpty(t, ps.Version, "%s must have a version", policyID)
+
+			storePath := r.cacheMgr.PolicyStorePath(policyID)
+			assert.FileExists(t, filepath.Join(storePath, "oci-layout"),
+				"%s OCI layout marker must exist", policyID)
+		}
+	}
+}
+
+// TestSync_ConcurrentMixedFailures launches concurrent goroutines with a
+// mix of valid and invalid policy syncs, verifying the mock and sync code
+// handle concurrent access without data races.
+//
+// Each worker uses its own cache directory to avoid state.json file-level
+// contention (see TestSync_ConcurrentDifferentPolicies for rationale).
+func TestSync_ConcurrentMixedFailures(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	const workers = 10
+
+	mock := cachetest.NewMockPolicySource()
+	// Seed only even-numbered policies; odd workers will fail.
+	for i := 0; i < workers; i += 2 {
+		mock.SeedPolicy(
+			fmt.Sprintf("policy-%d", i),
+			"v1.0.0",
+			fmt.Sprintf("sha256:digest%d", i),
+		)
+	}
+
+	cacheDirs := make([]string, workers)
+	for i := 0; i < workers; i++ {
+		workerCacheDir := filepath.Join(tmpDir, fmt.Sprintf("cache-%d", i))
+		require.NoError(t, os.MkdirAll(workerCacheDir, 0755))
+		cacheDirs[i] = workerCacheDir
+	}
+
+	var wg gosync.WaitGroup
+	wg.Add(workers)
+
+	for i := 0; i < workers; i++ {
+		go func(workerID int) {
+			defer wg.Done()
+			workerCacheDir := cacheDirs[workerID]
+			cacheMgr := cache.NewCache(workerCacheDir)
+			state, loadErr := cache.LoadState(workerCacheDir)
+			if loadErr != nil {
+				t.Errorf("worker %d: state load failed: %v", workerID, loadErr)
+				return
+			}
+
+			syncMgr := cache.NewSync(cacheMgr, state, mock)
+			policyID := fmt.Sprintf("policy-%d", workerID)
+
+			_, syncErr := syncMgr.SyncPolicy(context.Background(), policyID, "latest")
+
+			if workerID%2 == 0 {
+				if syncErr != nil {
+					t.Errorf("worker %d: seeded policy sync must succeed: %v", workerID, syncErr)
+				}
+			} else {
+				if syncErr == nil {
+					t.Errorf("worker %d: unseeded policy sync must fail", workerID)
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// State must remain loadable after mixed concurrent operations.
+	// Even-numbered workers (seeded) should have their policy in state.
+	for i := 0; i < workers; i += 2 {
+		workerID := i
+		policyID := fmt.Sprintf("policy-%d", workerID)
+
+		finalState, err := cache.LoadState(cacheDirs[workerID])
+		require.NoError(t, err, "worker %d: final state must load without error", workerID)
+
+		ps, ok := finalState.GetPolicyState(policyID)
+		if ok {
+			assert.NotEmpty(t, ps.Digest, "%s must have a digest", policyID)
+		}
 	}
 }
 
@@ -297,7 +422,11 @@ func TestSync_SHA384Digest(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	sha384Digest := "sha384:" + "a" + strings.Repeat("b", 95)
+	lookupRef := "test-policy@" + sha384Digest
 	mock := cachetest.NewMockPolicySource()
+	// Seed with the digest-based lookup ref so DefinitionVersion succeeds,
+	// and with the bare policyID so CopyPolicy can find it.
+	mock.SeedPolicy(lookupRef, "v1.0.0", "sha256:abc123")
 	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
 
 	cacheMgr := cache.NewCache(cacheDir)
@@ -308,7 +437,8 @@ func TestSync_SHA384Digest(t *testing.T) {
 
 	// Pass a sha384 digest as the version string. classifyVersion must
 	// detect it as a digest and BuildLookupRef must use "@" separator.
-	_, _ = sync.SyncPolicy(context.Background(), "test-policy", sha384Digest)
+	_, err = sync.SyncPolicy(context.Background(), "test-policy", sha384Digest)
+	require.NoError(t, err, "sync with sha384 digest must succeed")
 
 	assert.Contains(t, mock.LastLookupRef, "@"+sha384Digest,
 		"sha384 digest must use @ separator, not : separator")

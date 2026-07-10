@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -15,6 +16,9 @@ import (
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	ocistore "oras.land/oras-go/v2/content/oci"
+	"oras.land/oras-go/v2/errdef"
+
+	"github.com/complytime/complyctl/internal/registry"
 )
 
 // MockPolicySource provides an in-memory mock for testing sync operations.
@@ -23,6 +27,7 @@ import (
 type MockPolicySource struct {
 	mu            sync.RWMutex
 	policies      map[string]*mockPolicyData
+	errors        map[string]error
 	LastLookupRef string
 }
 
@@ -35,7 +40,18 @@ type mockPolicyData struct {
 func NewMockPolicySource() *MockPolicySource {
 	return &MockPolicySource{
 		policies: make(map[string]*mockPolicyData),
+		errors:   make(map[string]error),
 	}
+}
+
+// SetError injects a custom error for a specific policy lookup. When set,
+// DefinitionVersion returns this error instead of performing the normal
+// lookup. This allows tests to simulate arbitrary registry failures
+// (e.g., network errors) distinct from the "not found" path.
+func (m *MockPolicySource) SetError(policyID string, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.errors[policyID] = err
 }
 
 // SeedPolicy adds a mock policy for testing. The policy is registered under
@@ -54,6 +70,9 @@ func (m *MockPolicySource) SeedPolicy(policyID, version, digestStr string) {
 
 // DefinitionVersion returns digest and version for a mock policy.
 // The lookupRef is recorded in LastLookupRef for test assertions.
+// If SetError was called for the lookupRef, the injected error is
+// returned. If the policy is not seeded, registry.ErrVersionNotFound
+// is returned, matching real registry behavior.
 func (m *MockPolicySource) DefinitionVersion(_ context.Context, lookupRef string) (string, string, error) {
 	m.mu.Lock()
 	m.LastLookupRef = lookupRef
@@ -61,9 +80,14 @@ func (m *MockPolicySource) DefinitionVersion(_ context.Context, lookupRef string
 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	if injected, ok := m.errors[lookupRef]; ok {
+		return "", "", injected
+	}
+
 	p, ok := m.policies[lookupRef]
 	if !ok {
-		return "", "", fmt.Errorf("policy %s not found", lookupRef)
+		return "", "", fmt.Errorf("%w", registry.ErrVersionNotFound)
 	}
 	return p.digest, p.version, nil
 }
@@ -75,7 +99,7 @@ func (m *MockPolicySource) CopyPolicy(ctx context.Context, policyID, tag string,
 	_, ok := m.policies[policyID]
 	m.mu.RUnlock()
 	if !ok {
-		return ocispec.Descriptor{}, fmt.Errorf("policy %s not found in mock source", policyID)
+		return ocispec.Descriptor{}, fmt.Errorf("policy %s: %w", policyID, registry.ErrVersionNotFound)
 	}
 
 	configData := []byte("{}")
@@ -195,8 +219,5 @@ func (m *MockBundlePolicySource) CopyPolicy(ctx context.Context, policyID, tag s
 }
 
 func isDuplicateErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	return err.Error() == "already exists"
+	return errors.Is(err, errdef.ErrAlreadyExists)
 }

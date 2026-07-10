@@ -306,6 +306,9 @@ func TestComplypackSync_LocalCacheHit_WithVerifier(t *testing.T) {
 // a valid complypack artifact is created via complypack.Pack() in the mock source,
 // synced through ComplypackSync, and the resulting cache contains the expected
 // content.tar.gz and config.json files.
+//
+// Note: the sync layer does not perform signature verification. Unsigned-artifact
+// warnings are the CLI layer's responsibility (see get.go).
 func TestComplypackSync_FetchAndStore(t *testing.T) {
 	tmpDir := t.TempDir()
 	cacheDir := filepath.Join(tmpDir, "cache")
@@ -613,52 +616,6 @@ func (m *maliciousEvaluatorMock) CopyComplypack(ctx context.Context, repository,
 	}
 
 	return desc, nil
-}
-
-// TestComplypackSync_UnsignedWarning verifies that the sync pipeline completes
-// successfully for an unsigned artifact. Signature verification warnings are
-// logged in get.go (the CLI layer), not in the sync pipeline itself. This test
-// confirms the end-to-end sync works without signature verification options.
-func TestComplypackSync_UnsignedWarning(t *testing.T) {
-	tmpDir := t.TempDir()
-	cacheDir := filepath.Join(tmpDir, "cache")
-	require.NoError(t, os.MkdirAll(cacheDir, 0755))
-
-	mock := newMockComplypackSource()
-	// No signing options — artifact is unsigned.
-	mock.seedComplypack(
-		"example.com/complypacks/unsigned-pack",
-		"io.complytime.unsigned",
-		"2.0.0",
-		"sha256:unsigned999",
-		"unsigned policy content",
-	)
-
-	state, err := cache.LoadState(cacheDir)
-	require.NoError(t, err)
-	complypackCache := cache.NewComplypackCache(cacheDir, state)
-
-	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
-
-	// Sync should succeed — no signature verification in the sync layer.
-	fetched, err := syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/unsigned-pack", "2.0.0")
-	require.NoError(t, err, "unsigned complypack should sync successfully")
-	assert.True(t, fetched, "first sync should report a fetch occurred")
-
-	// Verify the artifact was cached correctly.
-	state2, err := cache.LoadState(cacheDir)
-	require.NoError(t, err)
-	ps, ok := state2.GetComplypackState("example.com/complypacks/unsigned-pack")
-	assert.True(t, ok, "complypack state should exist")
-	assert.Equal(t, "sha256:unsigned999", ps.Digest)
-	assert.Equal(t, "2.0.0", ps.Version)
-
-	// Verify cache files exist.
-	contentPath, cfg, err := complypackCache.Lookup("io.complytime.unsigned", "2.0.0")
-	require.NoError(t, err)
-	assert.FileExists(t, contentPath)
-	assert.Equal(t, "io.complytime.unsigned", cfg.EvaluatorID)
-	assert.Equal(t, "2.0.0", cfg.Version)
 }
 
 // TestComplypackSync_EmptyVersion_ResolvesToRemote verifies that when version
