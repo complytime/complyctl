@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Added
+
+- `complyctl list` now displays EVALUATOR and CONTROLS columns
+  showing the evaluator type and control count for each cached
+  policy. Metadata is sourced from cached state populated during
+  `complyctl get`. Pre-existing caches show "-" until re-fetched.
+  (#506)
+
+- `complyctl get` now prints a post-sync summary to stderr after
+  fetching a policy, showing the policy title, evaluator, control
+  count, and assessment count. The summary appears only for freshly
+  fetched policies. (#506)
+
+- `PolicyState` in `state.json` gains `policy_title`,
+  `policy_evaluator`, `control_count`, and `assessment_count` fields
+  populated at sync time. Backward compatible via `omitempty` JSON
+  tags. (#506)
+
 ### Fixed
 
 - `complyctl get` recorded the OCI tag version (e.g., `v1.0.0`) in

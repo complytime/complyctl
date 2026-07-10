@@ -20,8 +20,11 @@ type State struct {
 	Complypacks map[string]PolicyState `json:"complypacks,omitempty"`
 }
 
-// PolicyState holds version, digest, verification status, and timestamp for
-// a single cached policy or complypack.
+// PolicyState holds version, digest, verification status, timestamp, and
+// display-oriented metadata for a single cached policy or complypack.
+// The metadata fields (PolicyTitle, PolicyEvaluator, ControlCount,
+// AssessmentCount) are populated at sync time by ExtractPolicyMetadata
+// and are used by the list and get commands for display purposes.
 type PolicyState struct {
 	Version        string    `json:"version"`
 	Digest         string    `json:"digest"`
@@ -31,6 +34,12 @@ type PolicyState struct {
 	SignerIdentity string    `json:"signer_identity,omitempty"`
 	Issuer         string    `json:"issuer,omitempty"`
 	VerifiedAt     time.Time `json:"verified_at,omitempty"`
+
+	// Display-oriented metadata extracted from Gemara policy YAML.
+	PolicyTitle     string `json:"policy_title,omitempty"`
+	PolicyEvaluator string `json:"policy_evaluator,omitempty"`
+	ControlCount    int    `json:"control_count,omitempty"`
+	AssessmentCount int    `json:"assessment_count,omitempty"`
 }
 
 // LoadState reads and parses the state.json file from the given cache directory.
@@ -185,4 +194,22 @@ func (s *State) EvaluatorIDToVersion(evaluatorID string) (string, bool, error) {
 		}
 	}
 	return version, found, nil
+}
+
+// SetPolicyMetadata updates display-oriented metadata fields on an
+// existing PolicyState entry without overwriting sync fields. No-ops
+// when the repository key does not exist in the Policies map.
+func (s *State) SetPolicyMetadata(
+	repository, title, evaluator string,
+	controls, assessments int,
+) {
+	ps, exists := s.Policies[repository]
+	if !exists {
+		return
+	}
+	ps.PolicyTitle = title
+	ps.PolicyEvaluator = evaluator
+	ps.ControlCount = controls
+	ps.AssessmentCount = assessments
+	s.Policies[repository] = ps
 }

@@ -245,7 +245,7 @@ func (o *getOptions) syncPolicies(
 
 	return syncAllPolicies(
 		ctx, cacheMgr, state, credFunc,
-		cfg.Policies, wsCfg, vfCache,
+		cfg.Policies, wsCfg, vfCache, o.cacheDir,
 	)
 }
 
@@ -291,6 +291,8 @@ func (o *getOptions) syncComplypacks(
 // syncAllPolicies iterates all policy entries, resolving per-entry
 // verification and collecting errors (D5: errors.Join). All entries
 // are attempted regardless of individual failures (FR-006).
+// Creates a policy.Resolver once (D9) and passes it to each
+// syncSinglePolicy call for metadata extraction.
 func syncAllPolicies(
 	ctx context.Context,
 	cacheMgr *cache.Cache,
@@ -299,9 +301,15 @@ func syncAllPolicies(
 	policies []complytime.PolicyEntry,
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+	cacheDir string,
 ) error {
 	logger.Info("Starting policy synchronization",
 		"policy_count", len(policies))
+
+	// Create resolver once per invocation (D9) for metadata
+	// extraction in syncSinglePolicy.
+	loader := policy.NewLoader(cacheMgr)
+	resolver := policy.NewResolver(loader)
 
 	total := len(policies)
 	var errs []error
@@ -309,6 +317,7 @@ func syncAllPolicies(
 		if err := syncSinglePolicy(
 			ctx, cacheMgr, state, credFunc,
 			entry, i+1, total, wsCfg, vfCache,
+			resolver, cacheDir,
 		); err != nil {
 			eid := entry.EffectiveID()
 			fmt.Fprintf(os.Stderr,
@@ -337,6 +346,8 @@ func syncSinglePolicy(
 	index, total int,
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+	resolver *policy.Resolver,
+	cacheDir string,
 ) error {
 	ref, err := complytime.ParsePolicyRef(entry.URL)
 	if err != nil {
@@ -395,7 +406,85 @@ func syncSinglePolicy(
 			"policy", entry.EffectiveID())
 	}
 
+	// Extract and cache metadata after sync (D7 ordering).
+	// Needed for fresh fetches or upgrade backfill (D8).
+	// Use hasMetadata() (not just PolicyEvaluator=="") to
+	// avoid redundant re-extraction for multi-evaluator
+	// policies where PolicyEvaluator is intentionally empty.
+	extractMetadata := fetched
+	if !fetched {
+		ps, _ := state.GetPolicyState(ref.Repository)
+		if !hasMetadata(ps) {
+			extractMetadata = true
+		}
+	}
+
+	if extractMetadata {
+		meta, metaErr := resolver.ExtractPolicyMetadata(
+			ref.Repository, version,
+		)
+		if metaErr != nil {
+			// D5: metadata extraction failure is non-fatal.
+			logger.Warn(
+				"Failed to extract policy metadata",
+				"policy", entry.EffectiveID(),
+				"error", metaErr,
+			)
+		} else {
+			state.SetPolicyMetadata(
+				ref.Repository,
+				meta.Title,
+				meta.EvaluatorID,
+				meta.ControlCount,
+				meta.AssessmentCount,
+			)
+			if saveErr := cache.SaveState(
+				state, cacheDir,
+			); saveErr != nil {
+				logger.Warn(
+					"Failed to save metadata state",
+					"policy", entry.EffectiveID(),
+					"error", saveErr,
+				)
+			}
+			summary := formatPolicySummary(meta)
+			if summary != "" {
+				fmt.Fprint(os.Stderr, summary)
+			}
+		}
+	}
+
 	return nil
+}
+
+// formatPolicySummary builds a human-readable summary string from
+// extracted policy metadata. Returns empty string when no meaningful
+// content is available to display.
+func formatPolicySummary(meta policy.PolicyMetadata) string {
+	var sb strings.Builder
+
+	// Build the "Policy:" line based on available fields.
+	hasTitle := meta.Title != ""
+	hasEval := meta.EvaluatorID != ""
+	switch {
+	case hasTitle && hasEval:
+		fmt.Fprintf(&sb, "  Policy: %s (%s)\n",
+			meta.Title, meta.EvaluatorID)
+	case hasTitle:
+		fmt.Fprintf(&sb, "  Policy: %s\n", meta.Title)
+	case hasEval:
+		fmt.Fprintf(&sb, "  Policy: %s\n", meta.EvaluatorID)
+	}
+
+	// Always print counts when we have metadata to show.
+	if hasTitle || hasEval ||
+		meta.ControlCount > 0 || meta.AssessmentCount > 0 {
+		fmt.Fprintf(&sb,
+			"  Controls: %d | Assessments: %d\n",
+			meta.ControlCount, meta.AssessmentCount)
+	}
+
+	return sb.String()
 }
 
 func resolveLatestVersion(ctx context.Context, client *registry.Client, repository, policyID string) string {

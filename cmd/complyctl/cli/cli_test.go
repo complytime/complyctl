@@ -609,13 +609,346 @@ func TestListOptions_Run_UncachedPolicyShowsDash(t *testing.T) {
 
 	output := buf.String()
 	assert.Contains(t, output, "DIGEST")
-	// Should show "-" for digest when uncached. Version column also shows "-".
+	// Should show "-" for digest when uncached. Version, evaluator,
+	// controls, and digest columns all show "-".
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	require.GreaterOrEqual(t, len(lines), 2, "should have header + at least one data row")
 	dataRow := lines[1]
-	// Count occurrences of "-" in the data row (version, digest = 2)
+	// Count occurrences of "-" in the data row
+	// (version, evaluator, controls, digest = 4 minimum)
 	dashCount := strings.Count(dataRow, "-")
-	assert.GreaterOrEqual(t, dashCount, 2, "uncached policy should show '-' for version and digest")
+	assert.GreaterOrEqual(t, dashCount, 4,
+		"uncached policy should show '-' for version, evaluator, controls, and digest")
+}
+
+func TestListOptions_Run_ColumnOrder(t *testing.T) {
+	chdirTemp(t)
+	writeWorkspaceConfig(t, minimalConfig)
+
+	cacheDir := t.TempDir()
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"policies/test-policy": {
+				Version:         "v1.0",
+				Digest:          "sha256:9f86d081884c7d65",
+				PolicyEvaluator: "openscap",
+				ControlCount:    42,
+			},
+		},
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
+
+	var buf bytes.Buffer
+	o := &listOptions{
+		Common:   &Common{Output: Output{Out: &buf}},
+		cacheDir: cacheDir,
+	}
+	err := o.run(context.Background())
+	require.NoError(t, err)
+
+	output := buf.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	require.GreaterOrEqual(t, len(lines), 1, "should have header row")
+	header := lines[0]
+
+	// Verify column order: POLICY ID, VERSION, EVALUATOR, CONTROLS,
+	// DIGEST, VERIFIED per spec requirement.
+	versionIdx := strings.Index(header, "VERSION")
+	evaluatorIdx := strings.Index(header, "EVALUATOR")
+	controlsIdx := strings.Index(header, "CONTROLS")
+	digestIdx := strings.Index(header, "DIGEST")
+	assert.Greater(t, evaluatorIdx, versionIdx,
+		"EVALUATOR must appear after VERSION")
+	assert.Greater(t, controlsIdx, evaluatorIdx,
+		"CONTROLS must appear after EVALUATOR")
+	assert.Greater(t, digestIdx, controlsIdx,
+		"DIGEST must appear after CONTROLS")
+}
+
+func TestListOptions_Run_ShowsMetadata(t *testing.T) {
+	chdirTemp(t)
+	writeWorkspaceConfig(t, minimalConfig)
+
+	cacheDir := t.TempDir()
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"policies/test-policy": {
+				Version:         "v1.0",
+				Digest:          "sha256:9f86d081884c7d65",
+				PolicyEvaluator: "openscap",
+				ControlCount:    42,
+			},
+		},
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
+
+	var buf bytes.Buffer
+	o := &listOptions{
+		Common:   &Common{Output: Output{Out: &buf}},
+		cacheDir: cacheDir,
+	}
+	err := o.run(context.Background())
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "EVALUATOR")
+	assert.Contains(t, output, "CONTROLS")
+	assert.Contains(t, output, "openscap")
+	assert.Contains(t, output, "42")
+}
+
+func TestListOptions_Run_NoMetadataShowsDash(t *testing.T) {
+	chdirTemp(t)
+	writeWorkspaceConfig(t, minimalConfig)
+
+	cacheDir := t.TempDir()
+	// Simulate pre-upgrade cache: policy state exists but no metadata
+	// fields are populated (all zero values).
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"policies/test-policy": {
+				Version: "v1.0",
+				Digest:  "sha256:9f86d081884c7d65",
+			},
+		},
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
+
+	var buf bytes.Buffer
+	o := &listOptions{
+		Common:   &Common{Output: Output{Out: &buf}},
+		cacheDir: cacheDir,
+	}
+	err := o.run(context.Background())
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "EVALUATOR")
+	assert.Contains(t, output, "CONTROLS")
+	// Data row should show "-" for evaluator and controls since
+	// no metadata fields are populated.
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	require.GreaterOrEqual(t, len(lines), 2)
+	dataRow := lines[1]
+	// The data row should NOT contain "openscap" or numeric controls.
+	assert.NotContains(t, dataRow, "openscap")
+}
+
+// multiPolicyListConfig has two policies for list --policy-id filter tests.
+const multiPolicyListConfig = `policies:
+  - url: registry.example.com/policies/nist-policy:v1.0
+    id: nist-policy
+  - url: registry.example.com/policies/cis-policy:v2.0
+    id: cis-policy
+targets:
+  - id: local
+    policies:
+      - nist-policy
+    variables:
+      profile: test
+`
+
+func TestListOptions_Run_PolicyIDFilter(t *testing.T) {
+	chdirTemp(t)
+	writeWorkspaceConfig(t, multiPolicyListConfig)
+
+	cacheDir := t.TempDir()
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"policies/nist-policy": {
+				Version:         "v1.0",
+				Digest:          "sha256:aaa111222333",
+				PolicyEvaluator: "openscap",
+				ControlCount:    100,
+			},
+			"policies/cis-policy": {
+				Version:         "v2.0",
+				Digest:          "sha256:bbb444555666",
+				PolicyEvaluator: "opa",
+				ControlCount:    50,
+			},
+		},
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
+
+	var buf bytes.Buffer
+	o := &listOptions{
+		Common:   &Common{Output: Output{Out: &buf}},
+		cacheDir: cacheDir,
+		policyID: "cis-policy",
+	}
+	err := o.run(context.Background())
+	require.NoError(t, err)
+
+	output := buf.String()
+	// Only cis-policy should appear.
+	assert.Contains(t, output, "cis-policy")
+	assert.Contains(t, output, "opa")
+	assert.Contains(t, output, "50")
+	// nist-policy should NOT appear.
+	assert.NotContains(t, output, "nist-policy")
+	assert.NotContains(t, output, "openscap")
+}
+
+func TestListOptions_Run_MultiEvaluatorShowsDash(t *testing.T) {
+	chdirTemp(t)
+	writeWorkspaceConfig(t, minimalConfig)
+
+	cacheDir := t.TempDir()
+	// Multi-evaluator policy: PolicyEvaluator is empty but
+	// ControlCount is populated (metadata exists).
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"policies/test-policy": {
+				Version:      "v1.0",
+				Digest:       "sha256:9f86d081884c7d65",
+				PolicyTitle:  "Multi-Eval Policy",
+				ControlCount: 25,
+			},
+		},
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
+
+	var buf bytes.Buffer
+	o := &listOptions{
+		Common:   &Common{Output: Output{Out: &buf}},
+		cacheDir: cacheDir,
+	}
+	err := o.run(context.Background())
+	require.NoError(t, err)
+
+	output := buf.String()
+	// Controls should show "25" since metadata exists.
+	assert.Contains(t, output, "25")
+	// The data row should show "-" for evaluator (multi-evaluator).
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	require.GreaterOrEqual(t, len(lines), 2)
+}
+
+func TestListOptions_Run_ZeroControlsWithMetadata(t *testing.T) {
+	chdirTemp(t)
+	writeWorkspaceConfig(t, minimalConfig)
+
+	cacheDir := t.TempDir()
+	// Valid metadata with zero controls — should show "0", not "-".
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"policies/test-policy": {
+				Version:         "v1.0",
+				Digest:          "sha256:9f86d081884c7d65",
+				PolicyEvaluator: "opa",
+				ControlCount:    0,
+			},
+		},
+	}
+	require.NoError(t, cache.SaveState(state, cacheDir))
+
+	var buf bytes.Buffer
+	o := &listOptions{
+		Common:   &Common{Output: Output{Out: &buf}},
+		cacheDir: cacheDir,
+	}
+	err := o.run(context.Background())
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "opa")
+	// Should show "0" for controls, not "-", because metadata exists
+	// (PolicyEvaluator is non-empty).
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	require.GreaterOrEqual(t, len(lines), 2)
+	dataRow := lines[1]
+	assert.Contains(t, dataRow, "0")
+}
+
+func TestPolicyMetadataFields_NoPolicyState(t *testing.T) {
+	state := &cache.State{
+		Policies: make(map[string]cache.PolicyState),
+	}
+	eval, ctrl := policyMetadataFields(state, "nonexistent")
+	assert.Equal(t, "-", eval)
+	assert.Equal(t, "-", ctrl)
+}
+
+func TestPolicyMetadataFields_NoMetadata(t *testing.T) {
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"repo": {Version: "v1.0", Digest: "sha256:abc"},
+		},
+	}
+	eval, ctrl := policyMetadataFields(state, "repo")
+	assert.Equal(t, "-", eval)
+	assert.Equal(t, "-", ctrl)
+}
+
+func TestPolicyMetadataFields_WithEvaluator(t *testing.T) {
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"repo": {
+				Version:         "v1.0",
+				PolicyEvaluator: "openscap",
+				ControlCount:    42,
+			},
+		},
+	}
+	eval, ctrl := policyMetadataFields(state, "repo")
+	assert.Equal(t, "openscap", eval)
+	assert.Equal(t, "42", ctrl)
+}
+
+func TestPolicyMetadataFields_MultiEvaluator(t *testing.T) {
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"repo": {
+				Version:      "v1.0",
+				PolicyTitle:  "Multi-Eval",
+				ControlCount: 10,
+			},
+		},
+	}
+	eval, ctrl := policyMetadataFields(state, "repo")
+	assert.Equal(t, "-", eval)
+	assert.Equal(t, "10", ctrl)
+}
+
+func TestPolicyMetadataFields_ZeroControlsWithEvaluator(t *testing.T) {
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"repo": {
+				Version:         "v1.0",
+				PolicyEvaluator: "opa",
+				ControlCount:    0,
+			},
+		},
+	}
+	eval, ctrl := policyMetadataFields(state, "repo")
+	assert.Equal(t, "opa", eval)
+	assert.Equal(t, "0", ctrl)
+}
+
+func TestHasMetadata_AllZero(t *testing.T) {
+	ps := cache.PolicyState{Version: "v1.0", Digest: "sha256:abc"}
+	assert.False(t, hasMetadata(ps))
+}
+
+func TestHasMetadata_TitleOnly(t *testing.T) {
+	ps := cache.PolicyState{PolicyTitle: "My Policy"}
+	assert.True(t, hasMetadata(ps))
+}
+
+func TestHasMetadata_EvaluatorOnly(t *testing.T) {
+	ps := cache.PolicyState{PolicyEvaluator: "opa"}
+	assert.True(t, hasMetadata(ps))
+}
+
+func TestHasMetadata_ControlCountOnly(t *testing.T) {
+	ps := cache.PolicyState{ControlCount: 5}
+	assert.True(t, hasMetadata(ps))
+}
+
+func TestHasMetadata_AssessmentCountOnly(t *testing.T) {
+	ps := cache.PolicyState{AssessmentCount: 3}
+	assert.True(t, hasMetadata(ps))
 }
 
 func TestAbbreviateDigest(t *testing.T) {
@@ -2193,4 +2526,82 @@ func TestEnableDebug_NoColor(t *testing.T) {
 	// Verify no ANSI escape sequences (ESC [ = \x1b[).
 	assert.NotContains(t, output.String(), "\x1b[",
 		"output should not contain ANSI escape sequences when NO_COLOR is set")
+}
+
+// --- formatPolicySummary tests ---
+
+func TestFormatPolicySummary_TitleAndEvaluator(t *testing.T) {
+	meta := policy.PolicyMetadata{
+		Title:           "CIS Fedora Linux",
+		EvaluatorID:     "openscap",
+		ControlCount:    42,
+		AssessmentCount: 38,
+	}
+	result := formatPolicySummary(meta)
+	assert.Contains(t, result, "Policy: CIS Fedora Linux (openscap)")
+	assert.Contains(t, result, "Controls: 42 | Assessments: 38")
+}
+
+func TestFormatPolicySummary_TitleOnly(t *testing.T) {
+	meta := policy.PolicyMetadata{
+		Title:           "Multi-Evaluator Policy",
+		EvaluatorID:     "",
+		ControlCount:    10,
+		AssessmentCount: 5,
+	}
+	result := formatPolicySummary(meta)
+	assert.Contains(t, result, "Policy: Multi-Evaluator Policy")
+	assert.NotContains(t, result, "()")
+	assert.Contains(t, result, "Controls: 10 | Assessments: 5")
+}
+
+func TestFormatPolicySummary_EvaluatorOnly(t *testing.T) {
+	meta := policy.PolicyMetadata{
+		Title:           "",
+		EvaluatorID:     "opa",
+		ControlCount:    7,
+		AssessmentCount: 3,
+	}
+	result := formatPolicySummary(meta)
+	assert.Contains(t, result, "Policy: opa")
+	assert.NotContains(t, result, "(opa)")
+	assert.Contains(t, result, "Controls: 7 | Assessments: 3")
+}
+
+func TestFormatPolicySummary_BothEmpty(t *testing.T) {
+	meta := policy.PolicyMetadata{
+		Title:           "",
+		EvaluatorID:     "",
+		ControlCount:    0,
+		AssessmentCount: 0,
+	}
+	result := formatPolicySummary(meta)
+	assert.Empty(t, result,
+		"should return empty string when no metadata is available")
+}
+
+func TestFormatPolicySummary_ZeroCounts(t *testing.T) {
+	meta := policy.PolicyMetadata{
+		Title:           "Empty Policy",
+		EvaluatorID:     "ampel",
+		ControlCount:    0,
+		AssessmentCount: 0,
+	}
+	result := formatPolicySummary(meta)
+	assert.Contains(t, result, "Policy: Empty Policy (ampel)")
+	assert.Contains(t, result, "Controls: 0 | Assessments: 0")
+}
+
+func TestFormatPolicySummary_CountsOnlyNoTitleNoEval(t *testing.T) {
+	// Edge case: counts are non-zero but title and evaluator
+	// are empty. Should still show the counts line.
+	meta := policy.PolicyMetadata{
+		Title:           "",
+		EvaluatorID:     "",
+		ControlCount:    5,
+		AssessmentCount: 3,
+	}
+	result := formatPolicySummary(meta)
+	assert.Contains(t, result, "Controls: 5 | Assessments: 3")
+	assert.NotContains(t, result, "Policy:")
 }

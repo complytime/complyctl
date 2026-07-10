@@ -714,6 +714,300 @@ guidelines: []
 	assert.Equal(t, "guide-parsed", graph.Guidelines[0].Parsed.Metadata.Id)
 }
 
+// --- ExtractPolicyMetadata tests ---
+
+func TestResolver_ExtractPolicyMetadata_EmptyPolicyID(t *testing.T) {
+	r := NewResolver(newMockLoader())
+	_, err := r.ExtractPolicyMetadata("", "v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "policy ID cannot be empty")
+}
+
+func TestResolver_ExtractPolicyMetadata_EmptyVersion(t *testing.T) {
+	r := NewResolver(newMockLoader())
+	_, err := r.ExtractPolicyMetadata("test-policy", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "version cannot be empty")
+}
+
+func TestResolver_ExtractPolicyMetadata_PolicyNotInCache(t *testing.T) {
+	r := NewResolver(newMockLoader())
+	_, err := r.ExtractPolicyMetadata("missing-policy", "v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "policy not found")
+}
+
+func TestResolver_ExtractPolicyMetadata_DetectShapeError(t *testing.T) {
+	ml := newMockLoader()
+	ml.exists["shape-err/v1"] = true
+	ml.bundleShapeErr["shape-err/v1"] = fmt.Errorf(
+		"corrupt manifest")
+
+	r := NewResolver(ml)
+	_, err := r.ExtractPolicyMetadata("shape-err", "v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(),
+		"failed to detect manifest shape")
+	assert.Contains(t, err.Error(), "corrupt manifest")
+}
+
+func TestResolver_ExtractPolicyMetadata_BundleMissingPolicyArtifact(
+	t *testing.T,
+) {
+	ml := newMockLoader()
+	ml.exists["no-policy/v1"] = true
+	ml.bundleShape["no-policy/v1"] = true
+	ml.bundleFiles["no-policy/v1"] = map[string][]byte{
+		"ControlCatalog": validCatalogYAML(),
+	}
+
+	r := NewResolver(ml)
+	_, err := r.ExtractPolicyMetadata("no-policy", "v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(),
+		"missing required Policy artifact")
+}
+
+func TestResolver_ExtractPolicyMetadata_BundleInvalidCatalog(
+	t *testing.T,
+) {
+	ml := newMockLoader()
+	ml.exists["bad-cat/v1"] = true
+	ml.bundleShape["bad-cat/v1"] = true
+	ml.bundleFiles["bad-cat/v1"] = map[string][]byte{
+		"Policy":         validPolicyYAML(),
+		"ControlCatalog": []byte("{not: valid: catalog: [}"),
+	}
+
+	r := NewResolver(ml)
+	_, err := r.ExtractPolicyMetadata("bad-cat", "v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(),
+		"catalog layer is not valid Gemara")
+}
+
+func TestResolver_ExtractPolicyMetadata_SplitPolicyLoadError(
+	t *testing.T,
+) {
+	ml := newMockLoader()
+	ml.exists["split-err/v1"] = true
+	// bundleShape defaults to false (split-layer).
+	// No policy layer registered -> LoadLayerByMediaType fails.
+
+	r := NewResolver(ml)
+	_, err := r.ExtractPolicyMetadata("split-err", "v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(),
+		"failed to load policy layer")
+}
+
+func TestResolver_ExtractPolicyMetadata_SplitMissingCatalog(
+	t *testing.T,
+) {
+	ml := newMockLoader()
+	ml.exists["split-nocat/v1"] = true
+	// bundleShape defaults to false (split-layer).
+	policyMediaType := "application/vnd.gemara.policy.v1+yaml"
+	ml.layers["split-nocat/v1/"+policyMediaType] = validPolicyYAML()
+	// No catalog layer registered -> catalog load fails silently.
+
+	r := NewResolver(ml)
+	meta, err := r.ExtractPolicyMetadata("split-nocat", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, "Test Policy", meta.Title)
+	assert.Equal(t, "openscap", meta.EvaluatorID)
+	assert.Equal(t, 0, meta.ControlCount,
+		"missing catalog should yield zero controls")
+	assert.Equal(t, 1, meta.AssessmentCount)
+}
+
+func TestResolver_ExtractPolicyMetadata_BundleFormat(t *testing.T) {
+	ml := newMockLoader()
+	ml.exists["bundle-meta/v1"] = true
+	ml.bundleShape["bundle-meta/v1"] = true
+	ml.bundleFiles["bundle-meta/v1"] = map[string][]byte{
+		"Policy":         validPolicyYAML(),
+		"ControlCatalog": validCatalogYAML(),
+	}
+
+	r := NewResolver(ml)
+	meta, err := r.ExtractPolicyMetadata("bundle-meta", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, "Test Policy", meta.Title)
+	assert.Equal(t, "openscap", meta.EvaluatorID)
+	assert.Equal(t, 2, meta.ControlCount)
+	assert.Equal(t, 1, meta.AssessmentCount)
+}
+
+func TestResolver_ExtractPolicyMetadata_SplitLayer(t *testing.T) {
+	ml := newMockLoader()
+	ml.exists["split-meta/v1"] = true
+	// bundleShape defaults to false (split-layer)
+
+	policyMediaType := "application/vnd.gemara.policy.v1+yaml"
+	catalogMediaType := "application/vnd.gemara.catalog.v1+yaml"
+
+	ml.layers["split-meta/v1/"+policyMediaType] = validPolicyYAML()
+	ml.layers["split-meta/v1/"+catalogMediaType] = validCatalogYAML()
+
+	r := NewResolver(ml)
+	meta, err := r.ExtractPolicyMetadata("split-meta", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, "Test Policy", meta.Title)
+	assert.Equal(t, "openscap", meta.EvaluatorID)
+	assert.Equal(t, 2, meta.ControlCount)
+	assert.Equal(t, 1, meta.AssessmentCount)
+}
+
+func TestResolver_ExtractPolicyMetadata_MissingCatalog(t *testing.T) {
+	ml := newMockLoader()
+	ml.exists["no-catalog/v1"] = true
+	ml.bundleShape["no-catalog/v1"] = true
+	ml.bundleFiles["no-catalog/v1"] = map[string][]byte{
+		"Policy": validPolicyYAML(),
+	}
+
+	r := NewResolver(ml)
+	meta, err := r.ExtractPolicyMetadata("no-catalog", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, "Test Policy", meta.Title)
+	assert.Equal(t, "openscap", meta.EvaluatorID)
+	assert.Equal(t, 0, meta.ControlCount)
+	assert.Equal(t, 1, meta.AssessmentCount)
+}
+
+func TestResolver_ExtractPolicyMetadata_MultiEvaluator(t *testing.T) {
+	multiEvalPolicy := []byte(`
+title: Multi Evaluator Policy
+metadata:
+  id: pol-multi
+  version: "1.0"
+contacts:
+  responsible:
+    - name: team-a
+  accountable:
+    - name: team-b
+scope:
+  in:
+    technologies:
+      - linux
+imports:
+  catalogs:
+    - reference-id: cat-1
+adherence:
+  assessment-plans:
+    - id: ap-1
+      requirement-id: req-1
+      frequency: daily
+      evaluation-methods:
+        - type: Behavioral
+          executor:
+            id: openscap
+    - id: ap-2
+      requirement-id: req-2
+      frequency: weekly
+      evaluation-methods:
+        - type: Behavioral
+          executor:
+            id: opa
+`)
+
+	ml := newMockLoader()
+	ml.exists["multi-eval/v1"] = true
+	ml.bundleShape["multi-eval/v1"] = true
+	ml.bundleFiles["multi-eval/v1"] = map[string][]byte{
+		"Policy": multiEvalPolicy,
+	}
+
+	r := NewResolver(ml)
+	meta, err := r.ExtractPolicyMetadata("multi-eval", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, "Multi Evaluator Policy", meta.Title)
+	assert.Empty(t, meta.EvaluatorID,
+		"multi-evaluator policy should have empty EvaluatorID")
+	assert.Equal(t, 2, meta.AssessmentCount)
+}
+
+func TestResolver_ExtractPolicyMetadata_EmptyTitle(t *testing.T) {
+	emptyTitlePolicy := []byte(`
+title: ""
+metadata:
+  id: pol-notitle
+  version: "1.0"
+contacts:
+  responsible:
+    - name: team-a
+  accountable:
+    - name: team-b
+scope:
+  in:
+    technologies:
+      - linux
+imports:
+  catalogs:
+    - reference-id: cat-1
+adherence:
+  assessment-plans:
+    - id: ap-1
+      requirement-id: req-1
+      frequency: daily
+      evaluation-methods:
+        - type: Behavioral
+          executor:
+            id: ampel
+`)
+
+	ml := newMockLoader()
+	ml.exists["empty-title/v1"] = true
+	ml.bundleShape["empty-title/v1"] = true
+	ml.bundleFiles["empty-title/v1"] = map[string][]byte{
+		"Policy": emptyTitlePolicy,
+	}
+
+	r := NewResolver(ml)
+	meta, err := r.ExtractPolicyMetadata("empty-title", "v1")
+	require.NoError(t, err)
+	assert.Empty(t, meta.Title)
+	assert.Equal(t, "ampel", meta.EvaluatorID)
+	assert.Equal(t, 1, meta.AssessmentCount)
+}
+
+func TestResolver_ExtractPolicyMetadata_ParseError(t *testing.T) {
+	ml := newMockLoader()
+	ml.exists["bad-yaml/v1"] = true
+	ml.bundleShape["bad-yaml/v1"] = true
+	ml.bundleFiles["bad-yaml/v1"] = map[string][]byte{
+		"Policy": []byte("{not: valid: yaml: [}"),
+	}
+
+	r := NewResolver(ml)
+	_, err := r.ExtractPolicyMetadata("bad-yaml", "v1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not valid Gemara Policy YAML")
+}
+
+func validCatalogYAML() []byte {
+	return []byte(`
+title: Test Catalog
+metadata:
+  id: cat-1
+  version: "1.0"
+controls:
+  - id: ctrl-1
+    title: First Control
+    objective: Test objective 1
+    assessment-requirements:
+      - id: ar-1
+        description: Check first
+  - id: ctrl-2
+    title: Second Control
+    objective: Test objective 2
+    assessment-requirements:
+      - id: ar-2
+        description: Check second
+`)
+}
+
 func validPolicyYAML() []byte {
 	return []byte(`
 title: Test Policy

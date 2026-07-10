@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -107,12 +108,51 @@ func (o *listOptions) run(_ context.Context) error {
 			versionStr = "-"
 		}
 
+		evaluatorStr, controlsStr := policyMetadataFields(
+			state, ref.Repository,
+		)
 		digestStr := policyDigestField(state, ref.Repository)
 		verifiedStr := verificationStatus(state, ref.Repository)
-		rows = append(rows, []string{eid, versionStr, digestStr, verifiedStr})
+		rows = append(rows, []string{
+			eid, versionStr, evaluatorStr, controlsStr,
+			digestStr, verifiedStr,
+		})
 	}
 
 	return printGemaraPolicyTable(o.Out, rows)
+}
+
+// policyMetadataFields returns the EVALUATOR and CONTROLS column
+// values for a policy from the cache state. Returns "-" for both
+// when the policy has no cached state or metadata has not been
+// populated (pre-upgrade cache without metadata fields).
+func policyMetadataFields(
+	state *cache.State, repository string,
+) (evaluator, controls string) {
+	ps, ok := state.GetPolicyState(repository)
+	if !ok {
+		return "-", "-"
+	}
+	if !hasMetadata(ps) {
+		return "-", "-"
+	}
+	evaluator = ps.PolicyEvaluator
+	if evaluator == "" {
+		evaluator = "-"
+	}
+	controls = strconv.Itoa(ps.ControlCount)
+	return evaluator, controls
+}
+
+// hasMetadata returns true when any display-oriented metadata field
+// on the PolicyState has been populated. This distinguishes a
+// pre-upgrade cache (all zero values) from a policy that was synced
+// with metadata extraction.
+func hasMetadata(ps cache.PolicyState) bool {
+	return ps.PolicyTitle != "" ||
+		ps.PolicyEvaluator != "" ||
+		ps.ControlCount > 0 ||
+		ps.AssessmentCount > 0
 }
 
 // policyDigestField returns the abbreviated digest for a policy from the
@@ -146,7 +186,10 @@ func abbreviateDigest(dgst string) string {
 func printGemaraPolicyTable(w io.Writer, rows [][]string) error {
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i][0] < rows[j][0] })
 
-	headers := []string{"POLICY ID", "VERSION", "DIGEST", "VERIFIED"}
+	headers := []string{
+		"POLICY ID", "VERSION", "EVALUATOR", "CONTROLS",
+		"DIGEST", "VERIFIED",
+	}
 	terminal.ShowPlainTable(w, headers, rows)
 	return nil
 }

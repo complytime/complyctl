@@ -57,6 +57,17 @@ type PolicyTimeline struct {
 	EnforcementNotes string
 }
 
+// PolicyMetadata holds display-oriented metadata extracted from a
+// cached Gemara policy, suitable for CLI summary and list output.
+// EvaluatorID maps to PolicyState.PolicyEvaluator when persisted
+// (not PolicyState.EvaluatorID, which is reserved for complypacks).
+type PolicyMetadata struct {
+	Title           string
+	EvaluatorID     string
+	ControlCount    int
+	AssessmentCount int
+}
+
 // PolicyLoader abstracts the Loader methods used by Resolver, enabling
 // mock injection for unit tests without coupling to OCI store internals.
 type PolicyLoader interface {
@@ -83,6 +94,130 @@ func NewResolver(loader PolicyLoader) *Resolver {
 // version. Empty configVersion resolves to the latest cached tag.
 func (r *Resolver) ResolveVersion(policyID, configVersion string) (string, error) {
 	return r.loader.ResolveVersion(policyID, configVersion)
+}
+
+// ExtractPolicyMetadata extracts display-oriented metadata from a
+// cached policy without building a full DependencyGraph. The policyID
+// parameter is the OCI repository path (cache key), following the
+// same convention as ResolvePolicyGraph.
+func (r *Resolver) ExtractPolicyMetadata(
+	policyID, version string,
+) (PolicyMetadata, error) {
+	if policyID == "" {
+		return PolicyMetadata{}, fmt.Errorf(
+			"policy ID cannot be empty")
+	}
+	if version == "" {
+		return PolicyMetadata{}, fmt.Errorf(
+			"version cannot be empty")
+	}
+	if !r.loader.PolicyExists(policyID, version) {
+		return PolicyMetadata{}, fmt.Errorf(
+			"policy not found: %s@%s", policyID, version)
+	}
+
+	isBundle, detectErr := r.loader.DetectManifestShape(
+		policyID, version)
+	if detectErr != nil {
+		return PolicyMetadata{}, fmt.Errorf(
+			"failed to detect manifest shape for %s@%s: %w",
+			policyID, version, detectErr)
+	}
+
+	if isBundle {
+		return r.extractBundleMetadata(policyID, version)
+	}
+	return r.extractSplitMetadata(policyID, version)
+}
+
+// extractBundleMetadata extracts metadata from a Gemara bundle-format
+// policy. Parses only the Policy and ControlCatalog artifacts —
+// guidance is not needed for display metadata.
+func (r *Resolver) extractBundleMetadata(
+	policyID, version string,
+) (PolicyMetadata, error) {
+	files, err := r.loader.LoadBundleFiles(policyID, version)
+	if err != nil {
+		return PolicyMetadata{}, fmt.Errorf(
+			"bundle unpack failed for %s@%s: %w",
+			policyID, version, err)
+	}
+
+	policyData, ok := files["Policy"]
+	if !ok {
+		return PolicyMetadata{}, fmt.Errorf(
+			"bundle for %s@%s: missing required Policy artifact",
+			policyID, version)
+	}
+
+	policyResult, parseErr := parsePolicyLayer(
+		policyID, policyData)
+	if parseErr != nil {
+		return PolicyMetadata{}, fmt.Errorf(
+			"failed to parse policy layer for %s: %w",
+			policyID, parseErr)
+	}
+
+	meta := PolicyMetadata{
+		Title:           policyResult.Title,
+		EvaluatorID:     policyResult.EvaluatorID,
+		AssessmentCount: len(policyResult.Assessments),
+	}
+
+	if catalogData, catalogOK := files["ControlCatalog"]; catalogOK {
+		catalog, catErr := parseControlCatalog(catalogData)
+		if catErr != nil {
+			return PolicyMetadata{}, fmt.Errorf(
+				"policy %s: catalog layer is not valid Gemara: %w",
+				policyID, catErr)
+		}
+		meta.ControlCount = len(catalog.Controls)
+	}
+
+	return meta, nil
+}
+
+// extractSplitMetadata extracts metadata from a split-layer format
+// policy. Parses only the Policy and ControlCatalog layers —
+// guidance is not needed for display metadata.
+func (r *Resolver) extractSplitMetadata(
+	policyID, version string,
+) (PolicyMetadata, error) {
+	policyData, policyLoadErr := r.loader.LoadLayerByMediaType(
+		policyID, version, complytime.MediaTypePolicy)
+	if policyLoadErr != nil {
+		return PolicyMetadata{}, fmt.Errorf(
+			"failed to load policy layer for %s@%s: %w",
+			policyID, version, policyLoadErr)
+	}
+
+	policyResult, parseErr := parsePolicyLayer(
+		policyID, policyData)
+	if parseErr != nil {
+		return PolicyMetadata{}, fmt.Errorf(
+			"failed to parse policy layer for %s: %w",
+			policyID, parseErr)
+	}
+
+	meta := PolicyMetadata{
+		Title:           policyResult.Title,
+		EvaluatorID:     policyResult.EvaluatorID,
+		AssessmentCount: len(policyResult.Assessments),
+	}
+
+	catalogData, catalogLoadErr := r.loader.LoadLayerByMediaType(
+		policyID, version, complytime.MediaTypeCatalog)
+	if catalogLoadErr == nil {
+		catalog, catErr := parseControlCatalog(catalogData)
+		if catErr != nil {
+			return PolicyMetadata{}, fmt.Errorf(
+				"policy %s: catalog layer is not valid Gemara: %w",
+				policyID, catErr)
+		}
+		meta.ControlCount = len(catalog.Controls)
+	}
+
+	return meta, nil
 }
 
 // ResolvePolicyGraph builds a DependencyGraph from cached OCI layers.
@@ -238,6 +373,7 @@ func parseGuidanceCatalog(data []byte) (*gemara.GuidanceCatalog, error) {
 }
 
 type policyLayerResult struct {
+	Title       string
 	EvaluatorID string
 	Assessments []Assessment
 	Timeline    *PolicyTimeline
@@ -306,6 +442,7 @@ func extractFromGemaraPolicy(p *gemara.Policy) policyLayerResult {
 	}
 
 	return policyLayerResult{
+		Title:       p.Title,
 		EvaluatorID: resultEvalID,
 		Assessments: assessments,
 		Timeline:    timeline,
