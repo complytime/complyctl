@@ -245,7 +245,7 @@ func (o *getOptions) syncPolicies(
 
 	return syncAllPolicies(
 		ctx, cacheMgr, state, credFunc,
-		cfg.Policies, wsCfg, vfCache, o.cacheDir,
+		cfg.Policies, wsCfg, vfCache,
 	)
 }
 
@@ -301,7 +301,6 @@ func syncAllPolicies(
 	policies []complytime.PolicyEntry,
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
-	cacheDir string,
 ) error {
 	logger.Info("Starting policy synchronization",
 		"policy_count", len(policies))
@@ -317,7 +316,7 @@ func syncAllPolicies(
 		if err := syncSinglePolicy(
 			ctx, cacheMgr, state, credFunc,
 			entry, i+1, total, wsCfg, vfCache,
-			resolver, cacheDir,
+			resolver,
 		); err != nil {
 			eid := entry.EffectiveID()
 			fmt.Fprintf(os.Stderr,
@@ -326,6 +325,15 @@ func syncAllPolicies(
 			errs = append(errs, err)
 			continue
 		}
+	}
+
+	// Batch-flush metadata state after all policies are synced,
+	// rather than writing to disk per-policy.
+	if saveErr := cache.SaveState(
+		state, cacheMgr.Dir(),
+	); saveErr != nil {
+		logger.Warn("Failed to save metadata state",
+			"error", saveErr)
 	}
 
 	if len(errs) > 0 {
@@ -347,7 +355,6 @@ func syncSinglePolicy(
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
 	resolver *policy.Resolver,
-	cacheDir string,
 ) error {
 	ref, err := complytime.ParsePolicyRef(entry.URL)
 	if err != nil {
@@ -408,20 +415,19 @@ func syncSinglePolicy(
 
 	// Extract and cache metadata after sync (D7 ordering).
 	// Needed for fresh fetches or upgrade backfill (D8).
-	// Use hasMetadata() (not just PolicyEvaluator=="") to
-	// avoid redundant re-extraction for multi-evaluator
-	// policies where PolicyEvaluator is intentionally empty.
-	extractMetadata := fetched
-	if !fetched {
-		ps, _ := state.GetPolicyState(ref.Repository)
-		if !hasMetadata(ps) {
-			extractMetadata = true
-		}
-	}
+	// hasMetadata() (not just PolicyEvaluator=="") avoids redundant
+	// re-extraction for multi-evaluator policies where PolicyEvaluator
+	// is intentionally empty.
+	ps, _ := state.GetPolicyState(ref.Repository)
+	extractMetadata := fetched || !hasMetadata(ps)
 
 	if extractMetadata {
+		// Use the concrete version SyncPolicy persisted, not the config
+		// tag: a ":latest" pin is stored under the resolved version, so
+		// extracting by "latest" would fail store.Resolve() and silently
+		// drop all metadata.
 		meta, metaErr := resolver.ExtractPolicyMetadata(
-			ref.Repository, version,
+			ref.Repository, ps.Version,
 		)
 		if metaErr != nil {
 			// D5: metadata extraction failure is non-fatal.
@@ -438,15 +444,6 @@ func syncSinglePolicy(
 				meta.ControlCount,
 				meta.AssessmentCount,
 			)
-			if saveErr := cache.SaveState(
-				state, cacheDir,
-			); saveErr != nil {
-				logger.Warn(
-					"Failed to save metadata state",
-					"policy", entry.EffectiveID(),
-					"error", saveErr,
-				)
-			}
 			summary := formatPolicySummary(meta)
 			if summary != "" {
 				fmt.Fprint(os.Stderr, summary)

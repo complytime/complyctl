@@ -77,6 +77,7 @@ gha-creds-*.json
 # Runtime data under .uf/ (databases, caches, locks, logs)
 .uf/workflows/
 .uf/artifacts/
+.uf/feedback/
 .uf/dewey/graph.db
 .uf/dewey/graph.db-shm
 .uf/dewey/graph.db-wal

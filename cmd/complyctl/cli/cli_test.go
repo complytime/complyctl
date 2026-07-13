@@ -573,7 +573,7 @@ func TestListOptions_Run_ShowsDigestColumn(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version: "v1.0",
-				Digest:  "sha256:9f86d081884c7d65",
+				Digest:  "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 			},
 		},
 	}
@@ -630,7 +630,7 @@ func TestListOptions_Run_ColumnOrder(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version:         "v1.0",
-				Digest:          "sha256:9f86d081884c7d65",
+				Digest:          "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 				PolicyEvaluator: "openscap",
 				ControlCount:    42,
 			},
@@ -674,7 +674,7 @@ func TestListOptions_Run_ShowsMetadata(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version:         "v1.0",
-				Digest:          "sha256:9f86d081884c7d65",
+				Digest:          "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 				PolicyEvaluator: "openscap",
 				ControlCount:    42,
 			},
@@ -708,7 +708,7 @@ func TestListOptions_Run_NoMetadataShowsDash(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version: "v1.0",
-				Digest:  "sha256:9f86d081884c7d65",
+				Digest:  "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 			},
 		},
 	}
@@ -757,13 +757,13 @@ func TestListOptions_Run_PolicyIDFilter(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/nist-policy": {
 				Version:         "v1.0",
-				Digest:          "sha256:aaa111222333",
+				Digest:          "sha256:aaa111222333444555666777888999000aaabbbcccdddeeefff0001112223334",
 				PolicyEvaluator: "openscap",
 				ControlCount:    100,
 			},
 			"policies/cis-policy": {
 				Version:         "v2.0",
-				Digest:          "sha256:bbb444555666",
+				Digest:          "sha256:bbb444555666777888999000aaabbbcccdddeeefff0001112223344556677889",
 				PolicyEvaluator: "opa",
 				ControlCount:    50,
 			},
@@ -801,7 +801,7 @@ func TestListOptions_Run_MultiEvaluatorShowsDash(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version:      "v1.0",
-				Digest:       "sha256:9f86d081884c7d65",
+				Digest:       "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 				PolicyTitle:  "Multi-Eval Policy",
 				ControlCount: 25,
 			},
@@ -823,6 +823,19 @@ func TestListOptions_Run_MultiEvaluatorShowsDash(t *testing.T) {
 	// The data row should show "-" for evaluator (multi-evaluator).
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	require.GreaterOrEqual(t, len(lines), 2)
+	dataRow := lines[1]
+	// Parse the EVALUATOR column position from the header and
+	// verify the data row has "-" in that position.
+	header := lines[0]
+	evalIdx := strings.Index(header, "EVALUATOR")
+	require.GreaterOrEqual(t, evalIdx, 0,
+		"header must contain EVALUATOR column")
+	ctrlIdx := strings.Index(header, "CONTROLS")
+	require.Greater(t, ctrlIdx, evalIdx)
+	evalField := strings.TrimSpace(
+		dataRow[evalIdx:ctrlIdx])
+	assert.Equal(t, "-", evalField,
+		"multi-evaluator policy should show '-' for evaluator")
 }
 
 func TestListOptions_Run_ZeroControlsWithMetadata(t *testing.T) {
@@ -835,7 +848,7 @@ func TestListOptions_Run_ZeroControlsWithMetadata(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version:         "v1.0",
-				Digest:          "sha256:9f86d081884c7d65",
+				Digest:          "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 				PolicyEvaluator: "opa",
 				ControlCount:    0,
 			},
@@ -873,7 +886,7 @@ func TestPolicyMetadataFields_NoPolicyState(t *testing.T) {
 func TestPolicyMetadataFields_NoMetadata(t *testing.T) {
 	state := &cache.State{
 		Policies: map[string]cache.PolicyState{
-			"repo": {Version: "v1.0", Digest: "sha256:abc"},
+			"repo": {Version: "v1.0", Digest: "sha256:abc123def4567890123456789012345678901234567890123456789012340000"},
 		},
 	}
 	eval, ctrl := policyMetadataFields(state, "repo")
@@ -927,7 +940,7 @@ func TestPolicyMetadataFields_ZeroControlsWithEvaluator(t *testing.T) {
 }
 
 func TestHasMetadata_AllZero(t *testing.T) {
-	ps := cache.PolicyState{Version: "v1.0", Digest: "sha256:abc"}
+	ps := cache.PolicyState{Version: "v1.0", Digest: "sha256:abc123def4567890123456789012345678901234567890123456789012340000"}
 	assert.False(t, hasMetadata(ps))
 }
 

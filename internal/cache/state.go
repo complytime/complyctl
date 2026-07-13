@@ -38,8 +38,8 @@ type PolicyState struct {
 	// Display-oriented metadata extracted from Gemara policy YAML.
 	PolicyTitle     string `json:"policy_title,omitempty"`
 	PolicyEvaluator string `json:"policy_evaluator,omitempty"`
-	ControlCount    int    `json:"control_count,omitempty"`
-	AssessmentCount int    `json:"assessment_count,omitempty"`
+	ControlCount    int    `json:"control_count"`
+	AssessmentCount int    `json:"assessment_count"`
 }
 
 // LoadState reads and parses the state.json file from the given cache directory.

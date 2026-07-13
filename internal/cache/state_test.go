@@ -179,12 +179,10 @@ func TestPolicyState_JSONBackwardCompatibility(t *testing.T) {
 }
 
 func TestPolicyState_JSONRoundTrip_ZeroControlCount(t *testing.T) {
-	// Verify that ControlCount:0 with omitempty survives a
-	// JSON round-trip. Since omitempty omits zero-value ints,
-	// the field will be absent from the JSON, and unmarshalling
-	// will produce 0 (Go zero value). This confirms the display
-	// logic can safely treat 0 as "no controls" when other
-	// metadata is present.
+	// Verify that ControlCount:0 survives a JSON round-trip.
+	// Without omitempty the field is explicitly serialized as 0,
+	// so "metadata extracted with 0 controls" is distinguishable
+	// from "metadata never extracted" after deserialization.
 	original := cache.PolicyState{
 		Version:         "v1.0.0",
 		Digest:          "sha256:abc",
@@ -197,8 +195,8 @@ func TestPolicyState_JSONRoundTrip_ZeroControlCount(t *testing.T) {
 	data, err := json.Marshal(original)
 	require.NoError(t, err)
 
-	// Confirm control_count is omitted from JSON.
-	assert.NotContains(t, string(data), "control_count")
+	// Confirm control_count is present in JSON (explicit zero).
+	assert.Contains(t, string(data), `"control_count":0`)
 
 	var roundTripped cache.PolicyState
 	err = json.Unmarshal(data, &roundTripped)

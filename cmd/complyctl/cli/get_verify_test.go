@@ -351,7 +351,7 @@ func TestSyncAllPolicies_AllSucceed(t *testing.T) {
 
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
-		stubCredFunc, nil, nil, vfCache, cacheDir,
+		stubCredFunc, nil, nil, vfCache,
 	)
 	assert.NoError(t, err)
 }
@@ -376,7 +376,7 @@ func TestSyncAllPolicies_ErrorCollection(t *testing.T) {
 
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
-		stubCredFunc, policies, nil, vfCache, cacheDir,
+		stubCredFunc, policies, nil, vfCache,
 	)
 	require.Error(t, err)
 
@@ -409,7 +409,7 @@ func TestSyncAllPolicies_PartialFailure(t *testing.T) {
 
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
-		stubCredFunc, policies, nil, vfCache, cacheDir,
+		stubCredFunc, policies, nil, vfCache,
 	)
 	require.Error(t, err)
 
@@ -433,7 +433,7 @@ func TestSyncAllPolicies_ErrorsUnwrappable(t *testing.T) {
 
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
-		stubCredFunc, policies, nil, vfCache, cacheDir,
+		stubCredFunc, policies, nil, vfCache,
 	)
 	require.Error(t, err)
 
@@ -594,7 +594,6 @@ func TestSyncAllPolicies_VerificationError(t *testing.T) {
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
 		stubCredFunc, policies, wsCfg, vfCache,
-		cacheDir,
 	)
 	require.Error(t, err)
 
@@ -825,7 +824,6 @@ func TestSyncAllPolicies_SelectiveVerificationError(
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
 		stubCredFunc, policies, wsCfg, vfCache,
-		cacheDir,
 	)
 	require.Error(t, err)
 
