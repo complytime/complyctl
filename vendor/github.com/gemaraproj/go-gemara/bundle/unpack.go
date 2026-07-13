@@ -66,7 +66,10 @@ func Unpack(ctx context.Context, target oras.ReadOnlyTarget, ref string) (*Bundl
 		case roleImport:
 			b.Imports = append(b.Imports, f)
 		default:
-			b.Files = append(b.Files, f)
+			if b.Source.Name != "" {
+				return nil, fmt.Errorf("bundle contains multiple source artifacts; expected exactly one")
+			}
+			b.Source = f
 		}
 	}
 
