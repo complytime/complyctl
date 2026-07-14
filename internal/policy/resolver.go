@@ -5,6 +5,8 @@ package policy
 import (
 	"fmt"
 
+	"github.com/charmbracelet/log"
+
 	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/gemaraproj/go-gemara"
 	"github.com/goccy/go-yaml"
@@ -207,7 +209,14 @@ func (r *Resolver) extractSplitMetadata(
 
 	catalogData, catalogLoadErr := r.loader.LoadLayerByMediaType(
 		policyID, version, complytime.MediaTypeCatalog)
-	if catalogLoadErr == nil {
+	if catalogLoadErr != nil {
+		// Catalog layer unavailable — could be genuinely absent or
+		// corrupted after sync. Log a warning so the user knows the
+		// control count may be inaccurate rather than silently
+		// defaulting to zero.
+		log.Warn("catalog layer unavailable, control count will be 0",
+			"policy", policyID, "error", catalogLoadErr)
+	} else {
 		catalog, catErr := parseControlCatalog(catalogData)
 		if catErr != nil {
 			return PolicyMetadata{}, fmt.Errorf(

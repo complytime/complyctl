@@ -809,7 +809,8 @@ func TestResolver_ExtractPolicyMetadata_SplitMissingCatalog(
 	// bundleShape defaults to false (split-layer).
 	policyMediaType := "application/vnd.gemara.policy.v1+yaml"
 	ml.layers["split-nocat/v1/"+policyMediaType] = validPolicyYAML()
-	// No catalog layer registered -> catalog load fails silently.
+	// No catalog layer registered -> catalog load fails with a
+	// warning log; ControlCount defaults to 0.
 
 	r := NewResolver(ml)
 	meta, err := r.ExtractPolicyMetadata("split-nocat", "v1")
