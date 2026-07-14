@@ -151,7 +151,7 @@ func FormatScanSummary(assessments []provider.AssessmentLog, assessmentTargets [
 	headers := []string{"TARGET ID", "REQUIREMENT ID", "CONTROL ID", "STATUS", "MESSAGE"}
 	var rows [][]string
 	for _, e := range entries {
-		rows = append(rows, []string{e.targetID, e.requirementID, e.controlID, e.emoji, e.message})
+		rows = append(rows, []string{e.targetID, e.requirementID, e.controlID, e.emoji + " " + e.result.String(), e.message})
 	}
 
 	conclusion := fmt.Sprintf("%d requirements: %d passed, %d failed, %d not applicable, %d skipped, %d errors",

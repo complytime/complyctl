@@ -370,12 +370,12 @@ func TestFormatScanSummary_PassingWithEmptyMessage(t *testing.T) {
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		if strings.Contains(line, complytime.StatusPassed) {
-			// After the status emoji, only whitespace should remain (empty message)
+			// After the status text, only whitespace should remain (empty message)
 			parts := strings.Fields(line)
-			// Fields: target1, REQ-1, CTRL-1, emoji — no message field
+			// Fields: target1, REQ-1, CTRL-1, emoji, result text — no message field
 			lastField := parts[len(parts)-1]
-			assert.Equal(t, complytime.StatusPassed, lastField,
-				"StatusPassed emoji should be the last non-empty field when message is empty")
+			assert.Equal(t, "Passed", lastField,
+				"result text should be the last non-empty field when message is empty")
 		}
 	}
 }
