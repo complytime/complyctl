@@ -4,28 +4,33 @@ The release process values simplicity and automation in order to provide better 
 
 ## Process Description
 
-Release artifacts are orchestrated by [GoReleaser](https://goreleaser.com/), which is configured in [.goreleaser.yaml](https://github.com/complytime/complyctl/blob/main/.goreleaser.yaml)
+complyctl uses the org-wide release infrastructure from [org-infra](https://github.com/complytime/org-infra). The [release workflow](https://github.com/complytime/complyctl/blob/main/.github/workflows/release.yml) delegates to two reusable workflows:
 
-There is a [Workflow](https://github.com/complytime/complyctl/blob/main/.github/workflows/release.yml) created specifically for releases. This workflow is triggered manually by a project maintainer when a new release is ready to be published.
+1. **Preflight** (`reusable_release_preflight.yml`) -- validates semver format, tag uniqueness (with re-run resilience), semver ordering, CI check status, and unreleased commits before creating an annotated tag.
+2. **GoReleaser** (`reusable_release_goreleaser.yml`) -- builds release artifacts via [GoReleaser](https://goreleaser.com/) with cosign signatures and SBOMs.
 
-This workflow needs to be associated with a [Tag](https://github.com/complytime/complyctl/tags) for the corresponding release. If the tag is not already available, a project maintainer can create it. Here is an example to create the tag `v0.0.8`:
+GoReleaser is configured in [.goreleaser.yaml](https://github.com/complytime/complyctl/blob/main/.goreleaser.yaml).
 
-```bash
-git remote -v
-...
-upstream	https://github.com/complytime/complyctl.git (push)
-```
+### Creating a Release
 
-```bash
-git tag v0.0.8
-git push upstream v0.0.8
-```
+To create a release, a project maintainer triggers the workflow manually:
 
-Once the automation is finished without issues, the release is available in [releases page](https://github.com/complytime/complyctl/releases)
+1. Navigate to **Actions** > **Release** > **Run workflow**
+2. Enter the tag (e.g., `v1.2.3`) -- must be a valid semver greater than the latest existing tag
+3. The preflight job validates all conditions and creates the annotated tag automatically
+4. The release job builds and publishes artifacts to the [releases page](https://github.com/complytime/complyctl/releases)
+
+> **Note:** Tags are created automatically by the preflight job. Do not create tags manually.
+
+### Re-runs
+
+If the release job fails after the tag is created, re-running the workflow with the same tag is safe. The preflight detects the existing tag at HEAD and skips tag creation.
+
+For the full release process reference, see the [org-infra release process](https://github.com/complytime/org-infra/blob/main/docs/RELEASE_PROCESS.md).
 
 ## Tests
 
-Tests relevant for releases are incorporated in CI tests for every PR.
+Tests relevant for releases are incorporated in CI tests for every PR. The preflight job verifies that the following CI checks have passed on HEAD before allowing a release: `unit-test`, `e2e-test`, `integration-test`.
 
 ## Cadence
 
