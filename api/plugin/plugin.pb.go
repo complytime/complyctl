@@ -84,15 +84,41 @@ func (ConfidenceLevel) EnumDescriptor() ([]byte, []int) {
 	return file_plugin_proto_rawDescGZIP(), []int{0}
 }
 
-// Result represents the outcome of a check
+// Result represents the outcome of a single assessment step.
+// Each value maps to a specific Gemara result state used in
+// downstream report generation (OSCAL, SARIF, Markdown).
 type Result int32
 
 const (
+	// RESULT_UNSPECIFIED indicates the step was never executed.
+	// Use when a requirement exists in the assessment plan but
+	// the provider did not attempt evaluation (e.g., missing
+	// configuration, unsupported check type).
+	// Maps to Gemara NotRun.
 	Result_RESULT_UNSPECIFIED Result = 0
-	Result_RESULT_PASSED      Result = 1
-	Result_RESULT_FAILED      Result = 2
-	Result_RESULT_SKIPPED     Result = 3
-	Result_RESULT_ERROR       Result = 4
+	// RESULT_PASSED indicates the requirement was evaluated and met.
+	// The target satisfies the compliance requirement.
+	// Maps to Gemara Passed.
+	Result_RESULT_PASSED Result = 1
+	// RESULT_FAILED indicates the requirement was evaluated and not met.
+	// The target does not satisfy the compliance requirement.
+	// Maps to Gemara Failed.
+	Result_RESULT_FAILED Result = 2
+	// RESULT_SKIPPED indicates the requirement was evaluated but does
+	// not apply to the target (e.g., a server-only rule scanned against
+	// a container, or an OS-specific check on a different OS).
+	// Providers MUST report not-applicable results using this value
+	// with an AssessmentLog entry rather than silently omitting them.
+	// Omitting not-applicable results prevents complyctl from
+	// distinguishing "nothing ran" from "ran but did not apply."
+	// Maps to Gemara NotApplicable.
+	Result_RESULT_SKIPPED Result = 3
+	// RESULT_ERROR indicates the evaluation could not complete due to
+	// a tool or configuration error (e.g., scanner crash, missing
+	// binary, malformed policy). This is distinct from RESULT_FAILED:
+	// the compliance posture is unknown, not negative.
+	// Maps to Gemara Unknown.
+	Result_RESULT_ERROR Result = 4
 )
 
 // Enum value maps for Result.
