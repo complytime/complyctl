@@ -16,7 +16,7 @@ permissions:
 jobs:
   call_reusable_ci:
     name: Standardized CI
-    uses: complytime/org-infra/.github/workflows/reusable_ci.yml@638b2037394ca0f0b860a135c7c27dce75fd3c03 # v0.5.0
+    uses: complytime/org-infra/.github/workflows/reusable_ci.yml@aff4817ed6f0364e7f899bfb63ec6db42e69fde2 # v0.6.0
     permissions:
       contents: read
       issues: read

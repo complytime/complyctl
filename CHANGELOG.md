@@ -50,6 +50,11 @@
 
 ### Added
 
+- Emoji status indicators in markdown report (`--format pretty`): Controls
+  table rows, summary counts headers, and findings group headers now display
+  emoji prefixes (`✅`, `❌`, `⏭️`, `⚠️`) matching the terminal scan
+  summary. Makes the report directly usable as a GitHub Actions Step Summary
+  via `cat report-*.md >> $GITHUB_STEP_SUMMARY` (#697)
 - Complypack cache version management: `COMPLYTIME_CACHE_VERSIONS`
   environment variable configures how many complypack versions to
   retain per evaluator-id in the local cache (default: 1, preserving
