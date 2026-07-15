@@ -13,24 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// resolveExpectedCacheDir returns the expected XDG cache directory for
-// the test environment. Tests that need to assert on warning content
-// use this to derive the platform-correct path.
-func resolveExpectedCacheDir(t *testing.T) string {
-	t.Helper()
-	dir, err := ResolveCacheDir()
-	require.NoError(t, err)
-	return dir
-}
-
-// resolveExpectedDataDir returns the expected XDG data directory for
-// the test environment.
-func resolveExpectedDataDir(t *testing.T) string {
-	t.Helper()
-	dir, err := ResolveDataDir()
-	require.NoError(t, err)
-	return dir
-}
 
 func TestCheckLegacyDir_LegacyExistsXDGAbsent_Warns(t *testing.T) {
 	homeDir := t.TempDir()
