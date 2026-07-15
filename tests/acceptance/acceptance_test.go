@@ -80,7 +80,7 @@ func TestAcceptance_OCILifecycle(t *testing.T) {
 
 	homeDir, err := os.UserHomeDir()
 	require.NoError(t, err)
-	cacheDir := filepath.Join(homeDir, ".complytime", "policies")
+	cacheDir := filepath.Join(homeDir, ".cache", "complytime", "policies")
 	assert.DirExists(t, cacheDir, "policy cache directory must exist after get")
 
 	// doctor: verify all checks pass

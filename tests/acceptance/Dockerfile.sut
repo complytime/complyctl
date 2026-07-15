@@ -13,10 +13,10 @@ RUN microdnf install -y shadow-utils && microdnf clean all && \
 COPY bin/acceptance.test /usr/local/bin/acceptance.test
 COPY bin/complyctl /usr/local/bin/complyctl
 COPY bin/complyctl-provider-test \
-     /home/testuser/.complytime/providers/complyctl-provider-test
+     /home/testuser/.local/share/complytime/providers/complyctl-provider-test
 
-RUN chown -R testuser:testuser /home/testuser/.complytime && \
-    chmod 755 /home/testuser/.complytime/providers/complyctl-provider-test
+RUN chown -R testuser:testuser /home/testuser/.local && \
+    chmod 755 /home/testuser/.local/share/complytime/providers/complyctl-provider-test
 
 USER testuser
 WORKDIR /home/testuser
