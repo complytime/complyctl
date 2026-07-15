@@ -791,6 +791,9 @@ func resolveAssessmentIDs(assessments []provider.AssessmentLog, planToReq map[st
 		if reqID, ok := planToReq[matchID]; ok {
 			assessments[i].RequirementID = reqID
 		} else if assessments[i].RequirementID == "" {
+			logger.Warn("unresolved assessment ID",
+				"matchID", matchID,
+				"hint", "provider returned an ID not found in the policy graph")
 			assessments[i].RequirementID = matchID
 		}
 	}

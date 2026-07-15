@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gemaraproj/go-gemara"
+	"github.com/hashicorp/go-hclog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,6 +24,7 @@ import (
 	"github.com/complytime/complyctl/internal/policy"
 	"github.com/complytime/complyctl/internal/terminal"
 	"github.com/complytime/complyctl/internal/version"
+	"github.com/complytime/complyctl/pkg/log"
 	"github.com/complytime/complyctl/pkg/provider"
 	"github.com/complytime/complypack/pkg/complypack"
 )
@@ -1279,6 +1281,63 @@ func TestResolveAssessmentIDs_AllReplaced(t *testing.T) {
 	resolveAssessmentIDs(assessments, planToReq)
 	assert.Equal(t, "req-1", assessments[0].RequirementID)
 	assert.Equal(t, "req-2", assessments[1].RequirementID)
+}
+
+func TestResolveAssessmentIDs_LogsWarningForUnresolved(t *testing.T) {
+	saveLogger(t)
+
+	var buf bytes.Buffer
+	logger = log.NewLogger(&buf)
+	logger.SetLevel(hclog.Warn)
+
+	assessments := []provider.AssessmentLog{
+		{PlanID: "unknown-plan-id"},
+	}
+	planToReq := map[string]string{"ap-1": "req-1"}
+	resolveAssessmentIDs(assessments, planToReq)
+
+	output := buf.String()
+	assert.Contains(t, output, "unknown-plan-id")
+	assert.Contains(t, output, "unresolved assessment ID")
+	// Verify fallback still copies matchID to RequirementID
+	assert.Equal(t, "unknown-plan-id", assessments[0].RequirementID)
+}
+
+func TestResolveAssessmentIDs_NoWarningWhenResolved(t *testing.T) {
+	saveLogger(t)
+
+	var buf bytes.Buffer
+	logger = log.NewLogger(&buf)
+	logger.SetLevel(hclog.Warn)
+
+	assessments := []provider.AssessmentLog{
+		{PlanID: "ap-1"},
+	}
+	planToReq := map[string]string{"ap-1": "req-1"}
+	resolveAssessmentIDs(assessments, planToReq)
+
+	output := buf.String()
+	assert.NotContains(t, output, "unresolved")
+}
+
+func TestResolveAssessmentIDs_NoWarningWhenRequirementIDPresent(t *testing.T) {
+	saveLogger(t)
+
+	var buf bytes.Buffer
+	logger = log.NewLogger(&buf)
+	logger.SetLevel(hclog.Warn)
+
+	// When RequirementID is already set, the else-if branch is skipped,
+	// so no warning should fire even if PlanID is unresolvable.
+	assessments := []provider.AssessmentLog{
+		{PlanID: "unknown", RequirementID: "already-set"},
+	}
+	planToReq := map[string]string{"ap-1": "req-1"}
+	resolveAssessmentIDs(assessments, planToReq)
+
+	output := buf.String()
+	assert.NotContains(t, output, "unresolved")
+	assert.Equal(t, "already-set", assessments[0].RequirementID)
 }
 
 // --- extractReqToControlMap tests ---
