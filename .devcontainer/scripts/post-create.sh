@@ -73,12 +73,13 @@ echo ">>> Building complytime-providers..."
 make -C "${PROVIDERS_TMP}/complytime-providers" build
 
 echo ">>> Installing provider binaries..."
-mkdir -p "${HOME}/.complytime/providers"
+PROVIDER_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/complytime/providers"
+mkdir -p "${PROVIDER_DIR}"
 for provider in ampel openscap opa; do
     binary="complyctl-provider-${provider}"
     src="${PROVIDERS_TMP}/complytime-providers/bin/${binary}"
     if [[ -f "${src}" ]]; then
-        cp "${src}" "${HOME}/.complytime/providers/"
+        cp "${src}" "${PROVIDER_DIR}/"
         echo "    Installed ${binary}"
     else
         echo "    WARNING: ${binary} not found in build output, skipping."

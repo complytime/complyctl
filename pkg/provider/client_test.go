@@ -93,7 +93,7 @@ func TestMockClient_Scan_NoGenerate(t *testing.T) {
 func TestMockClient_Generate_ComplypackPathPopulated(t *testing.T) {
 	mock := newMockClient()
 
-	complypackPath := "/home/user/.complytime/complypacks/io.complytime.opa/1.0.0/content.tar.gz"
+	complypackPath := "/home/user/.cache/complytime/complypacks/io.complytime.opa/1.0.0/content.tar.gz"
 	req := &provider.GenerateRequest{
 		Configuration: []provider.AssessmentConfiguration{
 			{PlanID: "plan-1", RequirementID: "req-1", Parameters: map[string]string{"key": "value"}},

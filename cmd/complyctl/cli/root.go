@@ -147,6 +147,7 @@ func New() *cobra.Command {
 			)
 			fmt.Fprintf(os.Stderr, "Debug log: %s\n", logPath)
 		}
+		complytime.CheckLegacyDir(os.Stderr)
 	}
 	cmd.PersistentPostRun = func(_ *cobra.Command, _ []string) {
 		_ = lw.Close()

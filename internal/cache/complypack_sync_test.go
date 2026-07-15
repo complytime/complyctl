@@ -159,7 +159,7 @@ func TestComplypackSync_LocalCacheHit(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 	cpCache := cache.NewComplypackCache(cacheDir, state)
-	syncMgr := cache.NewComplypackSync(cpCache, state, mock)
+	syncMgr := cache.NewComplypackSync(cpCache, state, mock, cacheDir)
 
 	fetched, err := syncMgr.SyncComplypack(context.Background(), repository, "1.0.0")
 	require.NoError(t, err)
@@ -171,7 +171,7 @@ func TestComplypackSync_LocalCacheHit(t *testing.T) {
 	state2, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 	cpCache2 := cache.NewComplypackCache(cacheDir, state2)
-	syncMgr2 := cache.NewComplypackSync(cpCache2, state2, mock)
+	syncMgr2 := cache.NewComplypackSync(cpCache2, state2, mock, cacheDir)
 
 	fetched2, err := syncMgr2.SyncComplypack(context.Background(), repository, "2.0.0")
 	require.NoError(t, err)
@@ -184,7 +184,7 @@ func TestComplypackSync_LocalCacheHit(t *testing.T) {
 	state3, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 	cpCache3 := cache.NewComplypackCache(cacheDir, state3)
-	syncMgr3 := cache.NewComplypackSync(cpCache3, state3, mock)
+	syncMgr3 := cache.NewComplypackSync(cpCache3, state3, mock, cacheDir)
 
 	fetched3, err := syncMgr3.SyncComplypack(context.Background(), repository, "1.0.0")
 	require.NoError(t, err)
@@ -220,7 +220,7 @@ func TestComplypackSync_LocalCacheMiss_CorruptedContent(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 	cpCache := cache.NewComplypackCache(cacheDir, state)
-	syncMgr := cache.NewComplypackSync(cpCache, state, mock)
+	syncMgr := cache.NewComplypackSync(cpCache, state, mock, cacheDir)
 
 	_, err = syncMgr.SyncComplypack(context.Background(), repository, "2.0.0")
 	require.NoError(t, err)
@@ -236,7 +236,7 @@ func TestComplypackSync_LocalCacheMiss_CorruptedContent(t *testing.T) {
 	state2, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 	cpCache2 := cache.NewComplypackCache(cacheDir, state2)
-	syncMgr2 := cache.NewComplypackSync(cpCache2, state2, mock)
+	syncMgr2 := cache.NewComplypackSync(cpCache2, state2, mock, cacheDir)
 
 	fetched, err := syncMgr2.SyncComplypack(context.Background(), repository, "1.0.0")
 	require.NoError(t, err)
@@ -264,7 +264,7 @@ func TestComplypackSync_LocalCacheHit_WithVerifier(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 	cpCache := cache.NewComplypackCache(cacheDir, state)
-	syncMgr := cache.NewComplypackSync(cpCache, state, mock)
+	syncMgr := cache.NewComplypackSync(cpCache, state, mock, cacheDir)
 
 	_, err = syncMgr.SyncComplypack(context.Background(), repository, "1.0.0")
 	require.NoError(t, err)
@@ -274,7 +274,7 @@ func TestComplypackSync_LocalCacheHit_WithVerifier(t *testing.T) {
 	state2, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 	cpCache2 := cache.NewComplypackCache(cacheDir, state2)
-	syncMgr2 := cache.NewComplypackSync(cpCache2, state2, mock)
+	syncMgr2 := cache.NewComplypackSync(cpCache2, state2, mock, cacheDir)
 
 	_, err = syncMgr2.SyncComplypack(context.Background(), repository, "2.0.0")
 	require.NoError(t, err)
@@ -292,7 +292,7 @@ func TestComplypackSync_LocalCacheHit_WithVerifier(t *testing.T) {
 	}
 
 	syncMgr3 := cache.NewComplypackSync(
-		cpCache3, state3, mock,
+		cpCache3, state3, mock, cacheDir,
 		cache.WithVerifier(mockVerifier),
 	)
 
@@ -327,7 +327,7 @@ func TestComplypackSync_FetchAndStore(t *testing.T) {
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock, cacheDir)
 
 	fetched, err := syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
 	require.NoError(t, err)
@@ -378,7 +378,7 @@ func TestComplypackSync_IncrementalSkip(t *testing.T) {
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock, cacheDir)
 
 	// First sync — should fetch and store.
 	fetched, err := syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
@@ -391,7 +391,7 @@ func TestComplypackSync_IncrementalSkip(t *testing.T) {
 	require.NoError(t, err)
 
 	complypackCache2 := cache.NewComplypackCache(cacheDir, state2)
-	syncMgr2 := cache.NewComplypackSync(complypackCache2, state2, mock)
+	syncMgr2 := cache.NewComplypackSync(complypackCache2, state2, mock, cacheDir)
 
 	// Second sync with same digest — should be a no-op.
 	fetched2, err := syncMgr2.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
@@ -430,7 +430,7 @@ func TestComplypackSync_CacheMissing_RefetchesDespiteMatchingDigest(t *testing.T
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock, cacheDir)
 
 	// First sync — should fetch and store.
 	fetched, err := syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
@@ -461,7 +461,7 @@ func TestComplypackSync_CacheMissing_RefetchesDespiteMatchingDigest(t *testing.T
 		"state should still have the old digest")
 
 	complypackCache2 := cache.NewComplypackCache(cacheDir, state2)
-	syncMgr2 := cache.NewComplypackSync(complypackCache2, state2, mock)
+	syncMgr2 := cache.NewComplypackSync(complypackCache2, state2, mock, cacheDir)
 
 	// Second sync — same digest, but cache is missing. Should re-fetch.
 	fetched2, err := syncMgr2.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
@@ -498,7 +498,7 @@ func TestComplypackSync_DigestChanged(t *testing.T) {
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock, cacheDir)
 
 	// First sync.
 	fetched, err := syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
@@ -520,7 +520,7 @@ func TestComplypackSync_DigestChanged(t *testing.T) {
 	require.NoError(t, err)
 
 	complypackCache2 := cache.NewComplypackCache(cacheDir, state2)
-	syncMgr2 := cache.NewComplypackSync(complypackCache2, state2, mock)
+	syncMgr2 := cache.NewComplypackSync(complypackCache2, state2, mock, cacheDir)
 
 	// Second sync — digest changed, should re-fetch.
 	fetched2, err := syncMgr2.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
@@ -565,7 +565,7 @@ func TestComplypackSync_InvalidEvaluatorID(t *testing.T) {
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, maliciousMock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, maliciousMock, cacheDir)
 
 	_, err = syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/evil", "1.0.0")
 	require.Error(t, err, "sync should fail for malicious evaluator-id")
@@ -639,7 +639,7 @@ func TestComplypackSync_EmptyVersion_ResolvesToRemote(t *testing.T) {
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock, cacheDir)
 
 	// Pass empty version — should resolve to "3.2.1" from the remote.
 	fetched, err := syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/resolve-empty", "")
@@ -685,7 +685,7 @@ func TestComplypackSync_LatestVersion_ResolvesToRemote(t *testing.T) {
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock, cacheDir)
 
 	// Pass "latest" — should resolve to "5.0.0" from the remote.
 	fetched, err := syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/resolve-latest", "latest")
@@ -722,7 +722,7 @@ func TestComplypackSync_EmptyRepository(t *testing.T) {
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock, cacheDir)
 
 	_, err = syncMgr.SyncComplypack(context.Background(), "", "1.0.0")
 	require.Error(t, err, "empty repository should return an error")
@@ -752,7 +752,7 @@ func TestComplypackSync_UnpackFailure(t *testing.T) {
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, brokenMock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, brokenMock, cacheDir)
 
 	_, err = syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/broken", "1.0.0")
 	require.Error(t, err, "unpack failure should return an error")
@@ -811,7 +811,7 @@ func TestComplypackSync_VPrefixedTag_StateMatchesDisk(t *testing.T) {
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock, cacheDir)
 
 	// Sync with the v-prefixed OCI tag.
 	fetched, err := syncMgr.SyncComplypack(
@@ -850,7 +850,7 @@ func TestComplypackSync_VPrefixedTag_StateMatchesDisk(t *testing.T) {
 	// should be a no-op, confirming state ↔ filesystem consistency.
 	state3, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
-	syncMgr2 := cache.NewComplypackSync(complypackCache, state3, mock)
+	syncMgr2 := cache.NewComplypackSync(complypackCache, state3, mock, cacheDir)
 
 	fetched2, err := syncMgr2.SyncComplypack(
 		context.Background(),

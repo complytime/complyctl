@@ -69,8 +69,8 @@ make mock-registry
 ### Step 2: Install test provider
 
 ```bash
-mkdir -p ~/.complytime/providers
-cp bin/complyctl-provider-test ~/.complytime/providers/
+mkdir -p ~/.local/share/complytime/providers
+cp bin/complyctl-provider-test ~/.local/share/complytime/providers/
 ```
 
 The test provider responds to all RPCs (Describe, Generate, Scan) with predefined pass results. Evaluator ID: `test`.
@@ -102,8 +102,8 @@ bin/complyctl get
 **Verify:**
 
 ```bash
-ls ~/.complytime/policies/nist-800-53-r5/
-cat ~/.complytime/state.json | jq .
+ls ~/.cache/complytime/policies/nist-800-53-r5/
+cat ~/.local/share/complytime/state.json | jq .
 ```
 
 Expected: `oci-layout` file exists, state.json contains policy digest and version.
@@ -192,7 +192,7 @@ bin/complyctl scan --policy-id nist-800-53-r5 --format pdf
 # Expected: error containing "invalid format"
 
 # Missing policy (without running get)
-rm -rf ~/.complytime/policies
+rm -rf ~/.cache/complytime/policies
 bin/complyctl scan --policy-id nonexistent
 # Expected: error containing "not in cache"
 ```
@@ -201,8 +201,8 @@ bin/complyctl scan --policy-id nonexistent
 
 ```bash
 rm -rf .complytime/scan complytime.yaml
-rm -rf ~/.complytime/policies ~/.complytime/state.json
-rm ~/.complytime/providers/complyctl-provider-test
+rm -rf ~/.cache/complytime/policies ~/.local/share/complytime/state.json
+rm ~/.local/share/complytime/providers/complyctl-provider-test
 ```
 
 ## Adding New Tests

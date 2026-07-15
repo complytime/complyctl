@@ -288,7 +288,9 @@ packages organized by domain responsibility.
   `Generate`, and `Scan` RPCs.
 - **OCI-native caching**: Policies are fetched from OCI registries
   using `oras-go` and stored as local OCI Layouts under
-  `~/.complytime/policies/` with digest-based incremental sync.
+  `~/.cache/complytime/policies/` (XDG cache) with digest-based
+  incremental sync. Persistent data (`state.json`, providers) lives
+  under `~/.local/share/complytime/` (XDG data).
 - **Policy resolution**: The `internal/policy/` package resolves
   Gemara policy dependency graphs, extracts assessment configs,
   and applies parameter overrides from `complytime.yaml`.
@@ -302,6 +304,7 @@ packages organized by domain responsibility.
 <!-- MANUAL ADDITIONS END -->
 
 ## Recent Changes
+- xdg-base-directory: **BREAKING** — User-scoped paths now follow the XDG Base Directory Specification; cache (policies, complypacks) moves from `~/.complytime/` to `~/.cache/complytime/` (`$XDG_CACHE_HOME`); data (providers, `state.json`) moves to `~/.local/share/complytime/` (`$XDG_DATA_HOME`); `ResolveCacheDir()`/`ResolveDataDir()`/`ResolveProviderDir()` in `internal/complytime/consts.go` provide cross-platform resolution with env var overrides; `CheckLegacyDir()` in `internal/complytime/legacy.go` prints deprecation warning with manual migration guidance when legacy `~/.complytime/` exists; workspace-local `.complytime/` unchanged; implements ADR-0016 and aligns with complypack#127 (#734)
 - adopt-org-infra-release-workflows: `release.yml` replaced inline preflight + GoReleaser jobs (~184 lines) with two org-infra reusable workflow calls (`reusable_release_preflight.yml` + `reusable_release_goreleaser.yml`); smart re-run detection replaces tag uniqueness check that blocked re-runs; semver-aware Python comparator replaces `sort -V` pre-release ordering inversion; file-based CI check discovery via `ci_checks` override (`["unit-test", "e2e-test", "integration-test"]`); `docs/RELEASE_PROCESS.md` restructured to reference org-wide release process and document automated tag creation; fixes #654 (re-run blocking + sort -V), #655 (docs, hardening, recovery follow-ups) (#699)
 - ci-step-summary-report: Emoji status indicators added to `--format pretty` markdown report; `resultEmoji()` helper maps `gemara.Result` to `complytime.Status*` constants; `writeControlsTable()` prefixes Result column with emoji for control and requirement rows; `writeSummary()` prefixes counts table headers with emoji; `writeFindings()` prefixes group headers with emoji; report now directly usable as GitHub Actions Step Summary via `cat report-*.md >> $GITHUB_STEP_SUMMARY` (#697)
 - complypack-cache-versioning: `COMPLYTIME_CACHE_VERSIONS` env var configures retention count (default 1) for complypack cache versions per evaluator-id; `NewComplypackCache()` gains `*State` parameter for state-driven lookup and timestamp-based eviction ordering; `evictOldVersions()` becomes retention-count-aware (orphaned dirs first, then oldest by `LastUpdated`); `LookupByEvaluatorID()` resolves from state.json with directory-scan fallback; `SyncComplypack()` checks local cache before remote fetch with re-verification when verifier is configured, returns `(true, nil)` for cache hits to trigger generation invalidation; `EvaluatorIDToVersion()` reverse lookup on `*State`; `CacheRetentionCount()` in `internal/cache/retention.go`; `CheckComplypacks()` extended with `walkCacheSize()` and `findOrphanedVersions()` for cache health reporting; `complyctl doctor` reports cache size and orphaned/untracked versions (#676)

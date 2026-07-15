@@ -49,7 +49,7 @@ func (o *initOptions) run() error {
 	}
 
 	if err := workspace.EnsureDir(); err != nil {
-		return fmt.Errorf("failed to create .complytime directory: %w", err)
+		return fmt.Errorf("failed to create %s directory: %w", complytime.WorkspaceDir, err)
 	}
 
 	policies := promptPolicies()

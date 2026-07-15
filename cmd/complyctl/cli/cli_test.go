@@ -454,7 +454,7 @@ func TestGenerateForAllTargets_EmptyGroups(t *testing.T) {
 	cacheDir := t.TempDir()
 	groups := map[string]policy.EvaluatorGroup{}
 	targets := []complytime.TargetConfig{{ID: "local"}}
-	available, err := generateForAllTargets(context.Background(), cacheDir, nil, groups, targets, nil)
+	available, err := generateForAllTargets(context.Background(), cacheDir, cacheDir, nil, groups, targets, nil)
 	assert.NoError(t, err)
 	assert.Empty(t, available)
 }
@@ -479,7 +479,7 @@ func TestGenerateForAllTargets_CorruptState(t *testing.T) {
 	groups := map[string]policy.EvaluatorGroup{}
 	targets := []complytime.TargetConfig{{ID: "local"}}
 	available, err := generateForAllTargets(
-		context.Background(), cacheDir, nil, groups, targets, nil,
+		context.Background(), cacheDir, cacheDir, nil, groups, targets, nil,
 	)
 
 	w.Close()
@@ -539,9 +539,11 @@ targets:
 
 func TestListOptions_Run_NoWorkspace(t *testing.T) {
 	chdirTemp(t)
+	tmpDir := t.TempDir()
 	o := &listOptions{
 		Common:   &Common{Output: Output{Out: &bytes.Buffer{}}},
-		cacheDir: t.TempDir(),
+		cacheDir: tmpDir,
+		dataDir:  tmpDir,
 	}
 	err := o.run(context.Background())
 	require.Error(t, err)
@@ -551,10 +553,12 @@ func TestListOptions_Run_NoWorkspace(t *testing.T) {
 func TestListOptions_Run_ValidWorkspace(t *testing.T) {
 	chdirTemp(t)
 	writeWorkspaceConfig(t, minimalConfig)
+	tmpDir := t.TempDir()
 	var buf bytes.Buffer
 	o := &listOptions{
 		Common:   &Common{Output: Output{Out: &buf}},
-		cacheDir: t.TempDir(),
+		cacheDir: tmpDir,
+		dataDir:  tmpDir,
 	}
 	err := o.run(context.Background())
 	require.NoError(t, err)
@@ -583,6 +587,7 @@ func TestListOptions_Run_ShowsDigestColumn(t *testing.T) {
 	o := &listOptions{
 		Common:   &Common{Output: Output{Out: &buf}},
 		cacheDir: cacheDir,
+		dataDir:  cacheDir,
 	}
 	err := o.run(context.Background())
 	require.NoError(t, err)
@@ -603,6 +608,7 @@ func TestListOptions_Run_UncachedPolicyShowsDash(t *testing.T) {
 	o := &listOptions{
 		Common:   &Common{Output: Output{Out: &buf}},
 		cacheDir: cacheDir,
+		dataDir:  cacheDir,
 	}
 	err := o.run(context.Background())
 	require.NoError(t, err)
@@ -642,6 +648,7 @@ func TestListOptions_Run_ColumnOrder(t *testing.T) {
 	o := &listOptions{
 		Common:   &Common{Output: Output{Out: &buf}},
 		cacheDir: cacheDir,
+		dataDir:  cacheDir,
 	}
 	err := o.run(context.Background())
 	require.NoError(t, err)
@@ -686,6 +693,7 @@ func TestListOptions_Run_ShowsMetadata(t *testing.T) {
 	o := &listOptions{
 		Common:   &Common{Output: Output{Out: &buf}},
 		cacheDir: cacheDir,
+		dataDir:  cacheDir,
 	}
 	err := o.run(context.Background())
 	require.NoError(t, err)
@@ -718,6 +726,7 @@ func TestListOptions_Run_NoMetadataShowsDash(t *testing.T) {
 	o := &listOptions{
 		Common:   &Common{Output: Output{Out: &buf}},
 		cacheDir: cacheDir,
+		dataDir:  cacheDir,
 	}
 	err := o.run(context.Background())
 	require.NoError(t, err)
@@ -775,6 +784,7 @@ func TestListOptions_Run_PolicyIDFilter(t *testing.T) {
 	o := &listOptions{
 		Common:   &Common{Output: Output{Out: &buf}},
 		cacheDir: cacheDir,
+		dataDir:  cacheDir,
 		policyID: "cis-policy",
 	}
 	err := o.run(context.Background())
@@ -813,6 +823,7 @@ func TestListOptions_Run_MultiEvaluatorShowsDash(t *testing.T) {
 	o := &listOptions{
 		Common:   &Common{Output: Output{Out: &buf}},
 		cacheDir: cacheDir,
+		dataDir:  cacheDir,
 	}
 	err := o.run(context.Background())
 	require.NoError(t, err)
@@ -860,6 +871,7 @@ func TestListOptions_Run_ZeroControlsWithMetadata(t *testing.T) {
 	o := &listOptions{
 		Common:   &Common{Output: Output{Out: &buf}},
 		cacheDir: cacheDir,
+		dataDir:  cacheDir,
 	}
 	err := o.run(context.Background())
 	require.NoError(t, err)
@@ -997,10 +1009,12 @@ func TestInitOptions_Run_AlreadyExists(t *testing.T) {
 // --- providersOptions tests ---
 
 func TestProvidersOptions_Run_EmptyProviderDir(t *testing.T) {
+	tmpDir := t.TempDir()
 	o := &providersOptions{
 		Common:      &Common{},
 		providerDir: t.TempDir(),
-		cacheDir:    t.TempDir(),
+		cacheDir:    tmpDir,
+		dataDir:     tmpDir,
 	}
 	err := o.run(context.Background())
 	require.NoError(t, err)
@@ -1852,10 +1866,12 @@ func TestListOptions_Run_WithWorkspaceFlag(t *testing.T) {
 		filepath.Join(configDir, "complytime.yaml"),
 		[]byte(minimalConfig), 0o600))
 
+	tmpDir := t.TempDir()
 	var buf bytes.Buffer
 	o := &listOptions{
 		Common:   &Common{Workspace: dir, Output: Output{Out: &buf}},
-		cacheDir: t.TempDir(),
+		cacheDir: tmpDir,
+		dataDir:  tmpDir,
 	}
 	err := o.run(context.Background())
 	require.NoError(t, err)
@@ -1974,10 +1990,12 @@ func TestGetOptions_Run_InvalidWorkspacePath(t *testing.T) {
 }
 
 func TestListOptions_Run_InvalidWorkspacePath(t *testing.T) {
+	tmpDir := t.TempDir()
 	var buf bytes.Buffer
 	o := &listOptions{
 		Common:   &Common{Workspace: "/nonexistent/path/xyz123", Output: Output{Out: &buf}},
-		cacheDir: t.TempDir(),
+		cacheDir: tmpDir,
+		dataDir:  tmpDir,
 	}
 	err := o.run(context.Background())
 	require.Error(t, err)

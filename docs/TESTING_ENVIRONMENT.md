@@ -178,9 +178,9 @@ export GITHUB_TOKEN=<your-token>
 | `snappy` | `$GOPATH/bin` |
 | `ampel` | `$GOPATH/bin` |
 | `conftest` | `$GOPATH/bin` |
-| `complyctl-provider-ampel` | `~/.complytime/providers/` |
-| `complyctl-provider-openscap` | `~/.complytime/providers/` |
-| `complyctl-provider-opa` | `~/.complytime/providers/` |
+| `complyctl-provider-ampel` | `~/.local/share/complytime/providers/` |
+| `complyctl-provider-openscap` | `~/.local/share/complytime/providers/` |
+| `complyctl-provider-opa` | `~/.local/share/complytime/providers/` |
 
 ### Test Content
 
@@ -242,7 +242,7 @@ complyctl scan --policy-id test-opa-k8s
 ```
 
 Note: The OPA provider requires the `complyctl-provider-opa`
-binary in `~/.complytime/providers/` (installed by the
+binary in `~/.local/share/complytime/providers/` (installed by the
 post-create script from `complytime-providers`).
 
 For OPA complypacks, `complytime-mapping.json` entries use the

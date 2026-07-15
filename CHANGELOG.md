@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+### Changed
+
+- **BREAKING**: User-scoped paths now follow the
+  [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/)
+  instead of the previous `~/.complytime/` layout. New default paths on Linux:
+  - **Cache** (`$XDG_CACHE_HOME/complytime/`): `~/.cache/complytime/` — policies,
+    complypacks
+  - **Data** (`$XDG_DATA_HOME/complytime/`): `~/.local/share/complytime/` —
+    providers, `state.json`
+
+  Workspace-local `.complytime/` (config, scan output, logs) is **unchanged**.
+
+  **Migration**: On first run, complyctl automatically detects the legacy
+  `~/.complytime/` directory and migrates files to the new XDG locations. To
+  migrate manually:
+  ```bash
+  # Copy data files (state, providers)
+  mkdir -p ~/.local/share/complytime
+  cp ~/.complytime/state.json ~/.local/share/complytime/
+  cp -r ~/.complytime/providers ~/.local/share/complytime/
+
+  # Copy cache files (policies, complypacks)
+  mkdir -p ~/.cache/complytime
+  cp -r ~/.complytime/policies ~/.cache/complytime/
+  cp -r ~/.complytime/complypacks ~/.cache/complytime/
+
+  # Remove legacy directory after verifying migration
+  rm -rf ~/.complytime
+  ```
+
+  **Downgrade note**: Downgrading to a pre-XDG version requires manually moving
+  files back to `~/.complytime/`.
+
+  Implements [ADR-0016](https://github.com/complytime/complytime/pull/41) and
+  aligns with [complypack#127](https://github.com/complytime/complypack/pull/127).
+  (#734)
+
 ### Added
 
 - `complyctl list` now displays EVALUATOR and CONTROLS columns

@@ -86,6 +86,11 @@ func runDoctor(baseDir string, verbose bool) error {
 		return fmt.Errorf("failed to resolve cache directory: %w", err)
 	}
 
+	dataDir, err := complytime.ResolveDataDir()
+	if err != nil {
+		return fmt.Errorf("failed to resolve data directory: %w", err)
+	}
+
 	ws := complytime.NewWorkspace(baseDir)
 	configPath := ws.Path()
 	var cfg *complytime.WorkspaceConfig
@@ -101,7 +106,7 @@ func runDoctor(baseDir string, verbose bool) error {
 
 	versionResolver := &registryVersionResolver{timeout: 5 * time.Second}
 
-	results := doctor.Run(cfg, configPath, providerDir, cacheDir, resolver, versionResolver, verbose, logger)
+	results := doctor.Run(cfg, configPath, providerDir, cacheDir, dataDir, resolver, versionResolver, verbose, logger)
 	return printDiagnostics(results)
 }
 

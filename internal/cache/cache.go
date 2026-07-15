@@ -11,7 +11,8 @@ import (
 	"oras.land/oras-go/v2/content/oci"
 )
 
-// Cache manages per-policy OCI Layout stores under ~/.complytime/policies/{policy-id}/.
+// Cache manages per-policy OCI Layout stores under the XDG cache directory
+// (default ~/.cache/complytime/policies/{policy-id}/).
 type Cache struct {
 	cacheDir string
 }
@@ -29,7 +30,7 @@ func (c *Cache) PolicyStorePath(policyID string) string {
 // NewPolicyStore creates or opens an OCI Layout store for the given policy ID.
 func (c *Cache) NewPolicyStore(policyID string) (*oci.Store, error) {
 	storePath := c.PolicyStorePath(policyID)
-	if err := os.MkdirAll(storePath, 0755); err != nil {
+	if err := os.MkdirAll(storePath, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create policy store directory %s: %w", storePath, err)
 	}
 

@@ -42,10 +42,10 @@ type PolicyState struct {
 	AssessmentCount int    `json:"assessment_count"`
 }
 
-// LoadState reads and parses the state.json file from the given cache directory.
+// LoadState reads and parses the state.json file from the given base directory.
 // Returns a fresh State with empty maps if the file does not exist.
-func LoadState(cacheDir string) (*State, error) {
-	statePath := filepath.Join(cacheDir, complytime.StateFileName)
+func LoadState(baseDir string) (*State, error) {
+	statePath := filepath.Join(baseDir, complytime.StateFileName)
 
 	data, err := os.ReadFile(statePath)
 	if err != nil {
@@ -81,15 +81,17 @@ func initStateMaps(s *State) {
 	}
 }
 
-// SaveState atomically writes the state to state.json in the given cache
+// SaveState atomically writes the state to state.json in the given base
 // directory. It marshals to a sibling temp file then renames it into place so
-// concurrent readers never observe a truncated or partial write.
-func SaveState(state *State, cacheDir string) error {
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
-		return fmt.Errorf("failed to create cache directory: %w", err)
+// concurrent readers never observe a truncated or partial write. The directory
+// is created with 0700 permissions (user-only access) since state.json resides
+// in the XDG data directory.
+func SaveState(state *State, baseDir string) error {
+	if err := os.MkdirAll(baseDir, 0700); err != nil {
+		return fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	statePath := filepath.Join(cacheDir, complytime.StateFileName)
+	statePath := filepath.Join(baseDir, complytime.StateFileName)
 
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
@@ -99,7 +101,7 @@ func SaveState(state *State, cacheDir string) error {
 	// Write to a temp file in the same directory so os.Rename is atomic
 	// (same filesystem, POSIX guarantee). This prevents concurrent readers
 	// from observing a truncated file mid-write.
-	tmp, err := os.CreateTemp(cacheDir, ".state-*.json.tmp")
+	tmp, err := os.CreateTemp(baseDir, ".state-*.json.tmp")
 	if err != nil {
 		return fmt.Errorf("failed to create temp state file: %w", err)
 	}

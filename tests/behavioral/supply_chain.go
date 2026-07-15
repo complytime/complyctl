@@ -31,7 +31,7 @@ func SignatureVerified(payload any) (gemara.Result, string, gemara.ConfidenceLev
 		return gemara.Passed, "policy content signature verified for " + ctx.PolicyID, gemara.High
 	}
 
-	stateFile := filepath.Join(ctx.HomeDir, ".complytime", "state.json")
+	stateFile := filepath.Join(dataDir(ctx.HomeDir), "state.json")
 	data, stateErr := os.ReadFile(stateFile)
 	if stateErr == nil {
 		if strings.Contains(string(data), "signature") {
@@ -53,7 +53,7 @@ func DigestRecordedInState(payload any) (gemara.Result, string, gemara.Confidenc
 		return result, msg, conf
 	}
 
-	stateFile := filepath.Join(ctx.HomeDir, ".complytime", "state.json")
+	stateFile := filepath.Join(dataDir(ctx.HomeDir), "state.json")
 	data, err := os.ReadFile(stateFile)
 	if err != nil {
 		return gemara.Failed, "state.json not found after get: " + err.Error(), gemara.High
@@ -90,7 +90,7 @@ func OCILayoutExists(payload any) (gemara.Result, string, gemara.ConfidenceLevel
 		return result, msg, conf
 	}
 
-	storePath := filepath.Join(ctx.HomeDir, ".complytime", "policies", ctx.PolicyID)
+	storePath := filepath.Join(cacheDir(ctx.HomeDir), "policies", ctx.PolicyID)
 	if _, err := os.Stat(storePath); err != nil {
 		return gemara.Failed, "policy cache directory does not exist: " + storePath, gemara.High
 	}

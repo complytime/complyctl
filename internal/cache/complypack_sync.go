@@ -21,12 +21,14 @@ type ComplypackSync struct {
 	state           *State
 	source          ComplypackSource
 	verifier        VerifyFunc
+	dataDir         string
 }
 
 // NewComplypackSync creates a ComplypackSync that orchestrates the
-// fetch-unpack-store pipeline for complypack artifacts. SyncOption args
+// fetch-unpack-store pipeline for complypack artifacts. dataDir is the
+// XDG data directory where state.json is persisted. SyncOption args
 // configure optional behavior such as signature verification.
-func NewComplypackSync(complypackCache *ComplypackCache, state *State, source ComplypackSource, opts ...SyncOption) *ComplypackSync {
+func NewComplypackSync(complypackCache *ComplypackCache, state *State, source ComplypackSource, dataDir string, opts ...SyncOption) *ComplypackSync {
 	cfg := &syncConfig{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -36,6 +38,7 @@ func NewComplypackSync(complypackCache *ComplypackCache, state *State, source Co
 		state:           state,
 		source:          source,
 		verifier:        cfg.verifier,
+		dataDir:         dataDir,
 	}
 }
 
@@ -185,7 +188,7 @@ func (s *ComplypackSync) SyncComplypack(ctx context.Context, repository, version
 	// must record the same value to keep state ↔ filesystem consistent.
 	// See: https://github.com/complytime/complyctl/issues/694
 	s.state.UpdateComplypackStateWithVerification(repository, result.Config.Version, remoteDigest, result.Config.EvaluatorID, verifyResult)
-	if err := SaveState(s.state, s.complypackCache.Dir()); err != nil {
+	if err := SaveState(s.state, s.dataDir); err != nil {
 		return false, fmt.Errorf("failed to save state after complypack sync: %w (complypack blobs are valid)", err)
 	}
 
@@ -233,7 +236,7 @@ func (s *ComplypackSync) tryLocalCacheHit(
 		repository, version, remoteDigest,
 		localState.EvaluatorID, verifyResult,
 	)
-	if err := SaveState(s.state, s.complypackCache.Dir()); err != nil {
+	if err := SaveState(s.state, s.dataDir); err != nil {
 		return false, err
 	}
 

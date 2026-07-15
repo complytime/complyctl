@@ -122,8 +122,11 @@ TEST_HOME="$(mktemp -d)"
 WORK_DIR="$(mktemp -d)"
 export HOME="${TEST_HOME}"
 
-mkdir -p "${TEST_HOME}/.complytime/providers"
-cp "${TEST_PLUGIN}" "${TEST_HOME}/.complytime/providers/complyctl-provider-ampel"
+PROVIDER_DIR="${TEST_HOME}/.local/share/complytime/providers"
+CACHE_DIR="${TEST_HOME}/.cache/complytime"
+mkdir -p "${PROVIDER_DIR}"
+mkdir -p "${CACHE_DIR}"
+cp "${TEST_PLUGIN}" "${PROVIDER_DIR}/complyctl-provider-ampel"
 echo "  HOME=${TEST_HOME}"
 echo "  WORK=${WORK_DIR}"
 
@@ -170,9 +173,9 @@ OUT="$(run_complyctl get)"
 echo "${OUT}"
 assert_contains "get: sync completed" "${OUT}" "Synchronization completed."
 assert_file_exists "get: oci-layout exists" \
-    "${TEST_HOME}/.complytime/policies/policies/test-branch-protection/oci-layout" >/dev/null
+    "${TEST_HOME}/.cache/complytime/policies/policies/test-branch-protection/oci-layout" >/dev/null
 assert_file_exists "get: state.json exists" \
-    "${TEST_HOME}/.complytime/state.json" >/dev/null
+    "${TEST_HOME}/.local/share/complytime/state.json" >/dev/null
 
 echo ""
 echo "=== list ==="

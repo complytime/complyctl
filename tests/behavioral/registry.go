@@ -256,11 +256,15 @@ func writeRegistryError(w http.ResponseWriter, status int, code, message string)
 }
 
 // BuildEnv creates an isolated environment with a custom HOME directory.
+// XDG env vars are cleared so the CLI falls back to HOME-relative defaults:
+// cache → $HOME/.cache/complytime, data → $HOME/.local/share/complytime.
 func BuildEnv(homeDir string) []string {
 	env := os.Environ()
 	filtered := make([]string, 0, len(env))
 	for _, e := range env {
-		if strings.HasPrefix(e, "HOME=") {
+		if strings.HasPrefix(e, "HOME=") ||
+			strings.HasPrefix(e, "XDG_CACHE_HOME=") ||
+			strings.HasPrefix(e, "XDG_DATA_HOME=") {
 			continue
 		}
 		filtered = append(filtered, e)

@@ -144,7 +144,7 @@ To gate a pipeline on compliance results, parse the scan output (SARIF, OSCAL) w
 
 **COMPLYTIME_CACHE_VERSIONS**
 : Number of complypack versions to retain per evaluator-id in the local cache
-(`~/.complytime/complypacks/`). Default: **1**, preserving single-version
+(`~/.cache/complytime/complypacks/`). Default: **1**, preserving single-version
 behavior. Values less than 1 are clamped to 1. Non-integer values produce a
 warning and fall back to the default.
 

@@ -1292,14 +1292,14 @@ func TestResolveCacheDir(t *testing.T) {
 	dir, err := complytime.ResolveCacheDir()
 	require.NoError(t, err)
 	assert.NotEmpty(t, dir)
-	assert.Contains(t, dir, ".complytime")
+	assert.Contains(t, dir, "complytime")
 }
 
 func TestResolveProviderDir(t *testing.T) {
 	dir, err := complytime.ResolveProviderDir()
 	require.NoError(t, err)
 	assert.NotEmpty(t, dir)
-	assert.Contains(t, dir, ".complytime")
+	assert.Contains(t, dir, "complytime")
 	assert.Contains(t, dir, "providers")
 }
 

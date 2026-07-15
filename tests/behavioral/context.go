@@ -5,6 +5,7 @@ package behavioral
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/gemaraproj/go-gemara"
 )
@@ -40,4 +41,16 @@ func verifyContext(payload any) (*BehavioralContext, gemara.Result, string, gema
 			gemara.Undetermined
 	}
 	return ctx, 0, "", 0
+}
+
+// cacheDir returns the XDG cache directory for a given home:
+// $HOME/.cache/complytime (Linux default when XDG_CACHE_HOME is unset).
+func cacheDir(homeDir string) string {
+	return filepath.Join(homeDir, ".cache", "complytime")
+}
+
+// dataDir returns the XDG data directory for a given home:
+// $HOME/.local/share/complytime (Linux default when XDG_DATA_HOME is unset).
+func dataDir(homeDir string) string {
+	return filepath.Join(homeDir, ".local", "share", "complytime")
 }

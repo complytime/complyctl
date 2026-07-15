@@ -1117,7 +1117,7 @@ func TestCheckComplypacks_AllPresent(t *testing.T) {
 
 	seedComplypackCache(t, tmpDir, "openscap", "v1.0.0")
 
-	results := CheckComplypacks(cfg, tmpDir, resolver)
+	results := CheckComplypacks(cfg, tmpDir, tmpDir, resolver)
 	require.GreaterOrEqual(t, len(results), 1)
 
 	foundPass := false
@@ -1153,7 +1153,8 @@ func TestCheckComplypacks_Missing(t *testing.T) {
 		EvaluatorID: "openscap",
 	}
 
-	results := CheckComplypacks(cfg, tmpDir, resolver)
+	// Do NOT seed the cache — complypack is missing.
+	results := CheckComplypacks(cfg, tmpDir, tmpDir, resolver)
 	require.GreaterOrEqual(t, len(results), 1)
 
 	foundMissing := false
@@ -1293,7 +1294,7 @@ func TestFindOrphanedVersions_UntrackedWithEmptyState(t *testing.T) {
 }
 
 func TestCheckComplypacks_NilConfig(t *testing.T) {
-	results := CheckComplypacks(nil, "/tmp", newMockPolicyGraphResolver())
+	results := CheckComplypacks(nil, "/tmp", "/tmp", newMockPolicyGraphResolver())
 	assert.Nil(t, results)
 }
 
@@ -1303,7 +1304,7 @@ func TestCheckComplypacks_NoComplypacks(t *testing.T) {
 			{URL: "reg.io/policies/nist:v1.0.0"},
 		},
 	}
-	results := CheckComplypacks(cfg, "/tmp", newMockPolicyGraphResolver())
+	results := CheckComplypacks(cfg, "/tmp", "/tmp", newMockPolicyGraphResolver())
 	assert.Nil(t, results)
 }
 
@@ -1321,7 +1322,7 @@ func TestCheckComplypacks_InvalidPolicyRef(t *testing.T) {
 
 	resolver := newMockPolicyGraphResolver()
 
-	results := CheckComplypacks(cfg, tmpDir, resolver)
+	results := CheckComplypacks(cfg, tmpDir, tmpDir, resolver)
 	require.GreaterOrEqual(t, len(results), 1)
 
 	foundFail := false
@@ -1332,4 +1333,84 @@ func TestCheckComplypacks_InvalidPolicyRef(t *testing.T) {
 		}
 	}
 	assert.True(t, foundFail, "expected a StatusFail result for invalid policy reference")
+}
+
+// --- CheckDirectoryLayout Tests ---
+
+func TestCheckDirectoryLayout_BothDirsAccessible(t *testing.T) {
+	cacheDir := t.TempDir()
+	dataDir := t.TempDir()
+
+	result := CheckDirectoryLayout(cacheDir, dataDir)
+	assert.Equal(t, StatusPass, result.Status)
+	assert.Equal(t, "directory-layout", result.Name)
+	assert.Contains(t, result.Message, "XDG directory layout valid")
+}
+
+func TestCheckDirectoryLayout_CacheDirMissing(t *testing.T) {
+	dataDir := t.TempDir()
+
+	result := CheckDirectoryLayout("/nonexistent/cache/dir", dataDir)
+	assert.Equal(t, StatusWarn, result.Status)
+	assert.Equal(t, "directory-layout", result.Name)
+	assert.Contains(t, result.Message, "cache directory does not exist")
+}
+
+func TestCheckDirectoryLayout_DataDirMissing(t *testing.T) {
+	cacheDir := t.TempDir()
+
+	result := CheckDirectoryLayout(cacheDir, "/nonexistent/data/dir")
+	assert.Equal(t, StatusWarn, result.Status)
+	assert.Equal(t, "directory-layout", result.Name)
+	assert.Contains(t, result.Message, "data directory does not exist")
+	assert.Contains(t, result.Message, "run complyctl get to initialize")
+}
+
+func TestCheckDirectoryLayout_MisplacedStateJSON(t *testing.T) {
+	cacheDir := t.TempDir()
+	dataDir := t.TempDir()
+
+	// Place state.json in cache dir but NOT in data dir.
+	cacheStatePath := filepath.Join(cacheDir, complytime.StateFileName)
+	require.NoError(t, os.WriteFile(cacheStatePath, []byte(`{"policies":{}}`), 0600))
+
+	result := CheckDirectoryLayout(cacheDir, dataDir)
+	assert.Equal(t, StatusWarn, result.Status)
+	assert.Equal(t, "directory-layout", result.Name)
+	assert.Contains(t, result.Message, "state.json found in cache directory")
+	assert.Contains(t, result.Message, "move it with: mv")
+}
+
+func TestCheckDirectoryLayout_StateInBothDirs(t *testing.T) {
+	cacheDir := t.TempDir()
+	dataDir := t.TempDir()
+
+	// Place state.json in both directories — not a misplacement warning.
+	require.NoError(t, os.WriteFile(
+		filepath.Join(cacheDir, complytime.StateFileName),
+		[]byte(`{"policies":{}}`), 0600,
+	))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dataDir, complytime.StateFileName),
+		[]byte(`{"policies":{}}`), 0600,
+	))
+
+	result := CheckDirectoryLayout(cacheDir, dataDir)
+	assert.Equal(t, StatusPass, result.Status)
+	assert.Contains(t, result.Message, "XDG directory layout valid")
+}
+
+func TestCheckDirectoryLayout_StateOnlyInDataDir(t *testing.T) {
+	cacheDir := t.TempDir()
+	dataDir := t.TempDir()
+
+	// Place state.json only in data dir — correct layout.
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dataDir, complytime.StateFileName),
+		[]byte(`{"policies":{}}`), 0600,
+	))
+
+	result := CheckDirectoryLayout(cacheDir, dataDir)
+	assert.Equal(t, StatusPass, result.Status)
+	assert.Contains(t, result.Message, "XDG directory layout valid")
 }

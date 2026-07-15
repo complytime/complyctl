@@ -39,7 +39,7 @@ func EvaluatorMismatchRejected(payload any) (gemara.Result, string, gemara.Confi
 		return result, msg, conf
 	}
 
-	providerDir := filepath.Join(ctx.HomeDir, ".complytime", "providers")
+	providerDir := filepath.Join(dataDir(ctx.HomeDir), "providers")
 	oldPath := filepath.Join(providerDir, "complyctl-provider-test")
 	newPath := filepath.Join(providerDir, "complyctl-provider-other")
 	if err := os.Rename(oldPath, newPath); err != nil {
@@ -70,7 +70,7 @@ func PluginBinaryIntegrityCheck(payload any) (gemara.Result, string, gemara.Conf
 		return result, msg, conf
 	}
 
-	providerDir := filepath.Join(ctx.HomeDir, ".complytime", "providers")
+	providerDir := filepath.Join(dataDir(ctx.HomeDir), "providers")
 	providerPath := filepath.Join(providerDir, "complyctl-provider-test")
 	data, err := os.ReadFile(providerPath)
 	if err != nil {

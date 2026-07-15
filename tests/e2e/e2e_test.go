@@ -56,11 +56,11 @@ func TestE2E_FullWorkflow(t *testing.T) {
 		t.Log(out)
 		assert.Contains(t, out, "Synchronization completed.")
 
-		cacheDir := filepath.Join(homeDir, ".complytime", "policies", testPolicyID)
-		assert.DirExists(t, cacheDir, "policy cache directory must exist after get")
-		assert.FileExists(t, filepath.Join(cacheDir, "oci-layout"), "OCI layout marker required")
+		policyCacheDir := filepath.Join(cacheDir(homeDir), "policies", testPolicyID)
+		assert.DirExists(t, policyCacheDir, "policy cache directory must exist after get")
+		assert.FileExists(t, filepath.Join(policyCacheDir, "oci-layout"), "OCI layout marker required")
 
-		stateFile := filepath.Join(homeDir, ".complytime", "state.json")
+		stateFile := filepath.Join(dataDir(homeDir), "state.json")
 		assert.FileExists(t, stateFile, "state.json must track synced policies")
 
 		stateData, err := os.ReadFile(stateFile)
@@ -170,11 +170,11 @@ func TestE2E_PolicyCache(t *testing.T) {
 
 	runComplytime(t, binary, workDir, env, "get")
 
-	storePath := filepath.Join(homeDir, ".complytime", "policies", testPolicyID)
+	storePath := filepath.Join(cacheDir(homeDir), "policies", testPolicyID)
 	assert.DirExists(t, storePath)
 	assert.FileExists(t, filepath.Join(storePath, "oci-layout"))
 
-	stateFile := filepath.Join(homeDir, ".complytime", "state.json")
+	stateFile := filepath.Join(dataDir(homeDir), "state.json")
 	stateData, err := os.ReadFile(stateFile)
 	require.NoError(t, err)
 
@@ -228,7 +228,7 @@ targets:
 
 	// Both policies must have OCI layout in cache
 	for _, pid := range []string{"nist-800-53-r5", "cis-benchmark"} {
-		storePath := filepath.Join(homeDir, ".complytime", "policies", pid)
+		storePath := filepath.Join(cacheDir(homeDir), "policies", pid)
 		assert.DirExists(t, storePath, "%s cache dir must exist", pid)
 		assert.FileExists(t, filepath.Join(storePath, "oci-layout"), "%s must have oci-layout", pid)
 	}
@@ -546,7 +546,7 @@ func TestE2E_NestedPolicyID(t *testing.T) {
 		t.Log(out)
 		assert.Contains(t, out, "Synchronization completed.")
 
-		storePath := filepath.Join(homeDir, ".complytime", "policies", "policies", "nist-800-53-r5")
+		storePath := filepath.Join(cacheDir(homeDir), "policies", "policies", "nist-800-53-r5")
 		assert.DirExists(t, storePath, "nested cache directory must exist")
 		assert.FileExists(t, filepath.Join(storePath, "oci-layout"))
 	})

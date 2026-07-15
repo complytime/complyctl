@@ -461,6 +461,7 @@ func findRepoRoot(t *testing.T) string {
 
 // installTestPlugin copies the test provider binary into the provider directory
 // for the given home directory, matching the complyctl-provider-* naming convention.
+// Provider dir follows XDG: ~/.local/share/complytime/providers
 func installTestPlugin(t *testing.T, homeDir string) {
 	t.Helper()
 	root := findRepoRoot(t)
@@ -469,7 +470,7 @@ func installTestPlugin(t *testing.T, homeDir string) {
 		t.Fatalf("test provider binary not found at %s — run 'make build-test-provider' first", srcBinary)
 	}
 
-	providerDir := filepath.Join(homeDir, ".complytime", "providers")
+	providerDir := filepath.Join(dataDir(homeDir), "providers")
 	require.NoError(t, os.MkdirAll(providerDir, 0755))
 
 	dstBinary := filepath.Join(providerDir, "complyctl-provider-test")
@@ -509,16 +510,32 @@ func copyWorkspaceConfig(t *testing.T, srcDir, dstDir string) {
 }
 
 // buildEnv creates an isolated environment with a custom HOME directory.
+// XDG env vars are cleared so the CLI falls back to HOME-relative defaults:
+// cache → $HOME/.cache/complytime, data → $HOME/.local/share/complytime.
 func buildEnv(homeDir string) []string {
 	env := os.Environ()
 	filtered := make([]string, 0, len(env))
 	for _, e := range env {
-		if strings.HasPrefix(e, "HOME=") {
+		if strings.HasPrefix(e, "HOME=") ||
+			strings.HasPrefix(e, "XDG_CACHE_HOME=") ||
+			strings.HasPrefix(e, "XDG_DATA_HOME=") {
 			continue
 		}
 		filtered = append(filtered, e)
 	}
 	return append(filtered, "HOME="+homeDir)
+}
+
+// cacheDir returns the XDG cache directory for a given home:
+// $HOME/.cache/complytime (Linux default when XDG_CACHE_HOME is unset).
+func cacheDir(homeDir string) string {
+	return filepath.Join(homeDir, ".cache", "complytime")
+}
+
+// dataDir returns the XDG data directory for a given home:
+// $HOME/.local/share/complytime (Linux default when XDG_DATA_HOME is unset).
+func dataDir(homeDir string) string {
+	return filepath.Join(homeDir, ".local", "share", "complytime")
 }
 
 // runComplytime executes the complyctl binary with given args and returns combined output.

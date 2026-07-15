@@ -175,10 +175,13 @@ TEST_HOME="$(mktemp -d)"
 WORK_DIR="$(mktemp -d)"
 export HOME="${TEST_HOME}"
 
-# Install provider binaries into the isolated home
-mkdir -p "${TEST_HOME}/.complytime/providers"
-cp "${PROVIDER_BINARY}" "${TEST_HOME}/.complytime/providers/"
-cp "${OPA_PROVIDER_BINARY}" "${TEST_HOME}/.complytime/providers/"
+# Install provider binaries into the isolated home (XDG data directory)
+PROVIDER_DIR="${TEST_HOME}/.local/share/complytime/providers"
+CACHE_DIR="${TEST_HOME}/.cache/complytime"
+mkdir -p "${PROVIDER_DIR}"
+mkdir -p "${CACHE_DIR}"
+cp "${PROVIDER_BINARY}" "${PROVIDER_DIR}/"
+cp "${OPA_PROVIDER_BINARY}" "${PROVIDER_DIR}/"
 echo "  HOME=${TEST_HOME}"
 echo "  WORK=${WORK_DIR}"
 
@@ -237,9 +240,9 @@ test_get() {
     echo "${out}" | sanitize_output
     assert_contains "get: sync completed" "${out}" "Synchronization completed."
     assert_file_exists "get: oci-layout exists" \
-        "${TEST_HOME}/.complytime/policies/policies/test-branch-protection/oci-layout"
+        "${TEST_HOME}/.cache/complytime/policies/policies/test-branch-protection/oci-layout"
     assert_file_exists "get: state.json exists" \
-        "${TEST_HOME}/.complytime/state.json"
+        "${TEST_HOME}/.local/share/complytime/state.json"
 }
 
 # --- test_generate ---
@@ -321,17 +324,17 @@ test_get_opa() {
     # test_get already ran complyctl get which pulls all policies and complypacks.
     # Verify OPA-specific artifacts were fetched.
     assert_file_exists "get opa: oci-layout exists" \
-        "${TEST_HOME}/.complytime/policies/policies/test-opa-policy/oci-layout"
+        "${TEST_HOME}/.cache/complytime/policies/policies/test-opa-policy/oci-layout"
 
     # Complypack cache uses evaluator-id/version/ structure.
     # Find any content.tar.gz under the opa evaluator directory.
     local complypack_match
-    complypack_match=$(find "${TEST_HOME}/.complytime/complypacks/opa/" \
+    complypack_match=$(find "${TEST_HOME}/.cache/complytime/complypacks/opa/" \
         -name "content.tar.gz" -print -quit 2>/dev/null) || true
     if [[ -n "${complypack_match}" && -s "${complypack_match}" ]]; then
         pass "get opa: complypack cached"
     else
-        fail "get opa: complypack cached: no content.tar.gz under complypacks/opa/"
+        fail "get opa: complypack cached: no content.tar.gz under .cache/complytime/complypacks/opa/"
     fi
 }
 

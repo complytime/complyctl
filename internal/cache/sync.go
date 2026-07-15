@@ -61,11 +61,13 @@ type Sync struct {
 	state    *State
 	source   PolicySource
 	verifier VerifyFunc
+	dataDir  string
 }
 
 // NewSync creates a Sync that orchestrates remote-to-local policy transfer.
+// dataDir is the XDG data directory where state.json is persisted.
 // SyncOption args configure optional behavior such as signature verification.
-func NewSync(cache *Cache, state *State, source PolicySource, opts ...SyncOption) *Sync {
+func NewSync(cache *Cache, state *State, source PolicySource, dataDir string, opts ...SyncOption) *Sync {
 	cfg := &syncConfig{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -75,6 +77,7 @@ func NewSync(cache *Cache, state *State, source PolicySource, opts ...SyncOption
 		state:    state,
 		source:   source,
 		verifier: cfg.verifier,
+		dataDir:  dataDir,
 	}
 }
 
@@ -132,7 +135,7 @@ func (s *Sync) SyncPolicy(ctx context.Context, policyID, version string) (bool, 
 	}
 
 	s.state.UpdatePolicyStateWithVerification(policyID, version, remoteDigest, verifyResult)
-	if err := SaveState(s.state, s.cache.Dir()); err != nil {
+	if err := SaveState(s.state, s.dataDir); err != nil {
 		return false, fmt.Errorf("failed to save state after sync: %w (policy blobs are valid)", err)
 	}
 

@@ -3,17 +3,19 @@
 package complytime
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
 
-const stateSubdir = ".complytime"
+const xdgAppName = "complytime"
 const providerSubdir = "providers"
 
 // WorkspaceDir is the workspace-local directory for all complyctl artifacts
-// (generation state, scan output). Separate from the global ~/.complytime/ cache.
+// (generation state, scan output). Separate from the user-level XDG cache and data directories.
 const WorkspaceDir = ".complytime"
 
 const StateFileName = "state.json"
@@ -112,20 +114,60 @@ func ExpandPath(path string) string {
 	return path
 }
 
-// ResolveCacheDir returns the absolute path to the cache directory.
-func ResolveCacheDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
+// ResolveDataDir returns the absolute path to the user data directory
+// following the XDG Base Directory Specification. It checks $XDG_DATA_HOME
+// first (ignoring empty or relative values per the spec), then falls back
+// to platform-specific defaults: ~/.local/share on Linux,
+// ~/Library/Application Support on macOS, %LocalAppData% on Windows.
+func ResolveDataDir() (string, error) {
+	if xdgData := os.Getenv("XDG_DATA_HOME"); xdgData != "" && filepath.IsAbs(xdgData) {
+		return filepath.Join(xdgData, xdgAppName), nil
 	}
-	return filepath.Join(homeDir, stateSubdir), nil
+
+	// Platform-specific fallback for the data base directory.
+	switch runtime.GOOS {
+	case "darwin":
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve data dir: %w", err)
+		}
+		return filepath.Join(homeDir, "Library", "Application Support", xdgAppName), nil
+	case "windows":
+		// Windows does not distinguish cache from data under %LocalAppData%.
+		// os.UserCacheDir() returns %LocalAppData%, which serves as the
+		// conventional base for both cache and persistent application data.
+		base, err := os.UserCacheDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve data dir: %w", err)
+		}
+		return filepath.Join(base, xdgAppName), nil
+	default:
+		// Linux and other Unix-like systems: $HOME/.local/share
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve data dir: %w", err)
+		}
+		return filepath.Join(homeDir, ".local", "share", xdgAppName), nil
+	}
 }
 
-// ResolveProviderDir returns the absolute path to the provider directory.
-func ResolveProviderDir() (string, error) {
-	homeDir, err := os.UserHomeDir()
+// ResolveCacheDir returns the absolute path to the cache directory
+// using os.UserCacheDir (which respects $XDG_CACHE_HOME on Linux,
+// ~/Library/Caches on macOS, and %LocalAppData% on Windows).
+func ResolveCacheDir() (string, error) {
+	cacheBase, err := os.UserCacheDir()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("resolve cache dir: %w", err)
 	}
-	return filepath.Join(homeDir, stateSubdir, providerSubdir), nil
+	return filepath.Join(cacheBase, xdgAppName), nil
+}
+
+// ResolveProviderDir returns the absolute path to the provider directory
+// within the user data directory.
+func ResolveProviderDir() (string, error) {
+	dataDir, err := ResolveDataDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve provider dir: %w", err)
+	}
+	return filepath.Join(dataDir, providerSubdir), nil
 }

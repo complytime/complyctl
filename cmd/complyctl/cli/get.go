@@ -38,6 +38,7 @@ type getOptions struct {
 	*Common
 	timeout    time.Duration
 	cacheDir   string
+	dataDir    string
 	skipVerify bool
 }
 
@@ -82,6 +83,10 @@ func (o *getOptions) complete() error {
 	o.cacheDir, err = complytime.ResolveCacheDir()
 	if err != nil {
 		return fmt.Errorf("failed to resolve cache directory: %w", err)
+	}
+	o.dataDir, err = complytime.ResolveDataDir()
+	if err != nil {
+		return fmt.Errorf("failed to resolve data directory: %w", err)
 	}
 	return nil
 }
@@ -230,10 +235,10 @@ func (o *getOptions) syncPolicies(
 ) error {
 	cacheMgr := cache.NewCache(o.cacheDir)
 
-	state, err := cache.LoadState(o.cacheDir)
+	state, err := cache.LoadState(o.dataDir)
 	if err != nil {
 		logger.Error("Cache state load failed",
-			"cache_dir", o.cacheDir, "error", err)
+			"data_dir", o.dataDir, "error", err)
 		return fmt.Errorf("failed to load cache state: %w", err)
 	}
 
@@ -245,7 +250,7 @@ func (o *getOptions) syncPolicies(
 
 	return syncAllPolicies(
 		ctx, cacheMgr, state, credFunc,
-		cfg.Policies, wsCfg, vfCache,
+		cfg.Policies, o.dataDir, wsCfg, vfCache,
 	)
 }
 
@@ -264,10 +269,10 @@ func (o *getOptions) syncComplypacks(
 		return nil
 	}
 
-	state, err := cache.LoadState(o.cacheDir)
+	state, err := cache.LoadState(o.dataDir)
 	if err != nil {
 		logger.Error("Cache state load failed",
-			"cache_dir", o.cacheDir, "error", err)
+			"data_dir", o.dataDir, "error", err)
 		return fmt.Errorf("failed to load cache state: %w", err)
 	}
 
@@ -279,7 +284,7 @@ func (o *getOptions) syncComplypacks(
 
 	if err := syncAllComplypacks(
 		ctx, state, credFunc,
-		cfg.Complypacks, o.cacheDir, baseDir,
+		cfg.Complypacks, o.cacheDir, o.dataDir, baseDir,
 		wsCfg, vfCache,
 	); err != nil {
 		return err
@@ -299,6 +304,7 @@ func syncAllPolicies(
 	state *cache.State,
 	credFunc auth.CredentialFunc,
 	policies []complytime.PolicyEntry,
+	dataDir string,
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
 ) error {
@@ -315,7 +321,7 @@ func syncAllPolicies(
 	for i, entry := range policies {
 		if err := syncSinglePolicy(
 			ctx, cacheMgr, state, credFunc,
-			entry, i+1, total, wsCfg, vfCache,
+			entry, i+1, total, dataDir, wsCfg, vfCache,
 			resolver,
 		); err != nil {
 			eid := entry.EffectiveID()
@@ -330,7 +336,7 @@ func syncAllPolicies(
 	// Batch-flush metadata state after all policies are synced,
 	// rather than writing to disk per-policy.
 	if saveErr := cache.SaveState(
-		state, cacheMgr.Dir(),
+		state, dataDir,
 	); saveErr != nil {
 		logger.Warn("Failed to save metadata state",
 			"error", saveErr)
@@ -352,6 +358,7 @@ func syncSinglePolicy(
 	credFunc auth.CredentialFunc,
 	entry complytime.PolicyEntry,
 	index, total int,
+	dataDir string,
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
 	resolver *policy.Resolver,
@@ -372,7 +379,7 @@ func syncSinglePolicy(
 
 	client := registry.NewClient(ref.Registry, credFunc)
 	source := cache.NewRegistrySource(client)
-	sync := cache.NewSync(cacheMgr, state, source, syncOpts...)
+	sync := cache.NewSync(cacheMgr, state, source, dataDir, syncOpts...)
 
 	if version == "" {
 		version = resolveLatestVersion(
@@ -504,7 +511,7 @@ func syncAllComplypacks(
 	state *cache.State,
 	credFunc auth.CredentialFunc,
 	complypacks []complytime.PolicyEntry,
-	cacheDir, baseDir string,
+	cacheDir, dataDir, baseDir string,
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
 ) error {
@@ -516,7 +523,7 @@ func syncAllComplypacks(
 	for i, entry := range complypacks {
 		if err := syncSingleComplypack(
 			ctx, state, credFunc,
-			entry, i+1, total, cacheDir, baseDir,
+			entry, i+1, total, cacheDir, dataDir, baseDir,
 			wsCfg, vfCache,
 		); err != nil {
 			eid := entry.EffectiveID()
@@ -544,7 +551,7 @@ func syncSingleComplypack(
 	credFunc auth.CredentialFunc,
 	entry complytime.PolicyEntry,
 	index, total int,
-	cacheDir, baseDir string,
+	cacheDir, dataDir, baseDir string,
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
 ) error {
@@ -568,7 +575,7 @@ func syncSingleComplypack(
 	source := cache.NewRegistryComplypackSource(client)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 	cpSync := cache.NewComplypackSync(
-		complypackCache, state, source, syncOpts...,
+		complypackCache, state, source, dataDir, syncOpts...,
 	)
 
 	if version == "" {

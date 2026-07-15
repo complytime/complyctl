@@ -74,28 +74,30 @@ const registryTimeout = 5 * time.Second
 // hclog.Logger used for provider manager and go-plugin client logging.
 // When verbose is true, CheckVariables expands per-provider variable detail
 // to show individual key status (R55).
-// cacheBaseDir is the root cache directory (~/.complytime) where state.json
-// resides. policiesCacheDir is the policies subdirectory used by CheckCache.
+// cacheDir is the root cache directory (e.g. ~/.cache/complytime on Linux) where
+// policy blobs reside. dataDir is the XDG data directory (e.g. ~/.local/share/complytime
+// on Linux) where state.json is persisted.
 // See FR-039, R44, R51, R52, R55: specs/001-gemara-native-workflow/spec.md
-func Run(cfg *complytime.WorkspaceConfig, configPath, providerDir, cacheDir string, resolver PolicyGraphResolver, versionResolver VersionResolver, verbose bool, providerLogger hclog.Logger) []CheckResult {
+func Run(cfg *complytime.WorkspaceConfig, configPath, providerDir, cacheDir, dataDir string, resolver PolicyGraphResolver, versionResolver VersionResolver, verbose bool, providerLogger hclog.Logger) []CheckResult {
 	policiesCacheDir := filepath.Join(cacheDir, complytime.PoliciesSubdir)
 	var results []CheckResult
 	results = append(results, CheckConfig(configPath))
 	providerResults, healthData := CheckProviders(providerDir, providerLogger)
 	results = append(results, providerResults...)
 	results = append(results, CheckCache(policiesCacheDir))
-	results = append(results, CheckPolicyVersions(cfg, cacheDir, versionResolver)...)
+	results = append(results, CheckPolicyVersions(cfg, dataDir, versionResolver)...)
 	results = append(results, CheckPolicyActivePeriod(cfg, resolver, verbose)...)
 	results = append(results, CheckVariables(cfg, healthData, resolver, verbose)...)
-	results = append(results, CheckComplypacks(cfg, cacheDir, resolver)...)
-	results = append(results, CheckVerification(cacheDir))
+	results = append(results, CheckComplypacks(cfg, cacheDir, dataDir, resolver)...)
+	results = append(results, CheckVerification(dataDir))
+	results = append(results, CheckDirectoryLayout(cacheDir, dataDir))
 	return results
 }
 
 // CheckVerification reports the signature verification status of cached
 // artifacts. Warns when unverified artifacts are present.
-func CheckVerification(cacheDir string) CheckResult {
-	state, err := cache.LoadState(cacheDir)
+func CheckVerification(dataDir string) CheckResult {
+	state, err := cache.LoadState(dataDir)
 	if err != nil {
 		return CheckResult{
 			Name:    "verification",
@@ -139,6 +141,67 @@ func CheckVerification(cacheDir string) CheckResult {
 		Name:    "verification",
 		Status:  StatusWarn,
 		Message: fmt.Sprintf("%d/%d cached artifacts unverified (configure verification: in complytime.yaml)", unverified, total),
+	}
+}
+
+// CheckDirectoryLayout verifies that the XDG cache and data directories are
+// accessible and that state.json is located in the data directory (not the
+// cache directory). A misplaced state.json in the cache directory indicates
+// a pre-XDG layout that should be migrated.
+func CheckDirectoryLayout(cacheDir, dataDir string) CheckResult {
+	// Verify the cache directory is accessible.
+	if _, err := os.Stat(cacheDir); err != nil {
+		if os.IsNotExist(err) {
+			return CheckResult{
+				Name:    "directory-layout",
+				Status:  StatusWarn,
+				Message: fmt.Sprintf("cache directory does not exist: %s", cacheDir),
+			}
+		}
+		return CheckResult{
+			Name:    "directory-layout",
+			Status:  StatusWarn,
+			Message: fmt.Sprintf("cache directory not accessible: %v", err),
+		}
+	}
+
+	// Verify the data directory is accessible.
+	if _, err := os.Stat(dataDir); err != nil {
+		if os.IsNotExist(err) {
+			return CheckResult{
+				Name:    "directory-layout",
+				Status:  StatusWarn,
+				Message: fmt.Sprintf("data directory does not exist: %s — run complyctl get to initialize", dataDir),
+			}
+		}
+		return CheckResult{
+			Name:    "directory-layout",
+			Status:  StatusWarn,
+			Message: fmt.Sprintf("data directory not accessible: %v", err),
+		}
+	}
+
+	// Check for misplaced state.json: present in cache dir but not in data dir.
+	cacheStatePath := filepath.Join(cacheDir, complytime.StateFileName)
+	dataStatePath := filepath.Join(dataDir, complytime.StateFileName)
+	_, cacheErr := os.Stat(cacheStatePath)
+	_, dataErr := os.Stat(dataStatePath)
+
+	if cacheErr == nil && os.IsNotExist(dataErr) {
+		return CheckResult{
+			Name:   "directory-layout",
+			Status: StatusWarn,
+			Message: fmt.Sprintf(
+				"state.json found in cache directory (%s) but not in data directory (%s) — move it with: mv %s %s",
+				cacheDir, dataDir, cacheStatePath, dataStatePath,
+			),
+		}
+	}
+
+	return CheckResult{
+		Name:    "directory-layout",
+		Status:  StatusPass,
+		Message: "XDG directory layout valid",
 	}
 }
 
@@ -269,7 +332,7 @@ func CheckProviders(providerDir string, providerLogger hclog.Logger) ([]CheckRes
 // per unreachable registry — policies from that registry get no staleness
 // line. Supersedes CheckRegistries (R55).
 // See FR-039, R55: specs/001-gemara-native-workflow/spec.md
-func CheckPolicyVersions(cfg *complytime.WorkspaceConfig, cacheDir string, versionResolver VersionResolver) []CheckResult {
+func CheckPolicyVersions(cfg *complytime.WorkspaceConfig, dataDir string, versionResolver VersionResolver) []CheckResult {
 	if cfg == nil || len(cfg.Policies) == 0 {
 		return nil
 	}
@@ -278,7 +341,7 @@ func CheckPolicyVersions(cfg *complytime.WorkspaceConfig, cacheDir string, versi
 		return nil
 	}
 
-	state, err := cache.LoadState(cacheDir)
+	state, err := cache.LoadState(dataDir)
 	if err != nil {
 		return []CheckResult{{
 			Name:     "policy",
@@ -970,7 +1033,7 @@ func formatBytes(bytes int64) string {
 //
 // Additionally reports cache size (FR-007) and orphaned/untracked version
 // directories (FR-006) by loading state.json internally.
-func CheckComplypacks(cfg *complytime.WorkspaceConfig, cacheDir string, resolver PolicyGraphResolver) []CheckResult {
+func CheckComplypacks(cfg *complytime.WorkspaceConfig, cacheDir, dataDir string, resolver PolicyGraphResolver) []CheckResult {
 	if cfg == nil || len(cfg.Complypacks) == 0 {
 		return nil
 	}
@@ -981,10 +1044,11 @@ func CheckComplypacks(cfg *complytime.WorkspaceConfig, cacheDir string, resolver
 
 	var results []CheckResult
 
-	// Load state once for both state-driven lookup and orphan detection.
-	// Graceful degradation: if state cannot be loaded, pass nil to the
-	// cache (falls back to directory scan) and skip orphan detection.
-	cacheState, cacheStateErr := cache.LoadState(cacheDir)
+	// Load state from the data directory for state-driven lookup and
+	// orphan detection. Graceful degradation: if state cannot be loaded,
+	// pass nil to the cache (falls back to directory scan) and skip
+	// orphan detection.
+	cacheState, cacheStateErr := cache.LoadState(dataDir)
 	if cacheStateErr != nil {
 		results = append(results, CheckResult{
 			Name:     "complypacks/state",

@@ -69,7 +69,7 @@ func InstallTestPlugin(payload any) (gemara.Result, string, gemara.ConfidenceLev
 			gemara.Undetermined
 	}
 
-	providerDir := filepath.Join(ctx.HomeDir, ".complytime", "providers")
+	providerDir := filepath.Join(dataDir(ctx.HomeDir), "providers")
 	if err := os.MkdirAll(providerDir, 0755); err != nil {
 		return gemara.Unknown, "failed to create provider dir: " + err.Error(), gemara.Undetermined
 	}

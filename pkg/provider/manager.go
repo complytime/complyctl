@@ -6,10 +6,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/hashicorp/go-hclog"
 	goplugin "github.com/hashicorp/go-plugin"
+
+	"github.com/complytime/complyctl/internal/complytime"
 )
 
 const describeTimeout = 30 * time.Second
@@ -264,7 +267,7 @@ func (m *Manager) scanErrorMessage(providerID string, scanErr error, ctx context
 	if ctx.Err() == context.DeadlineExceeded {
 		msg += "\n\nThe scan exceeded the deadline." +
 			"\n  - Increase the timeout: complyctl scan --timeout 15m ..." +
-			"\n  - Check .complytime/complyctl.log"
+			"\n  - Check " + filepath.Join(complytime.WorkspaceDir, complytime.LogFileName)
 	}
 	return msg
 }

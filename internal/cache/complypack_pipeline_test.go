@@ -49,7 +49,7 @@ func TestComplypackPipeline_SyncLookupGenerate(t *testing.T) {
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock, cacheDir)
 	_, err = syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/test-bundle", "1.0.0")
 	require.NoError(t, err, "complypack sync should succeed")
 
@@ -188,7 +188,7 @@ func TestComplypackPipeline_MultipleEvaluators(t *testing.T) {
 	require.NoError(t, err)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 
-	syncMgr := cache.NewComplypackSync(complypackCache, state, mock)
+	syncMgr := cache.NewComplypackSync(complypackCache, state, mock, cacheDir)
 
 	_, err = syncMgr.SyncComplypack(context.Background(), "example.com/complypacks/opa-bundle", "1.0.0")
 	require.NoError(t, err)

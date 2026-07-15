@@ -30,6 +30,7 @@ type scanOptions struct {
 	format      string
 	timeout     time.Duration
 	cacheDir    string
+	dataDir     string
 	providerDir string
 }
 
@@ -162,6 +163,10 @@ func (o *scanOptions) complete() error {
 	o.cacheDir, err = complytime.ResolveCacheDir()
 	if err != nil {
 		return fmt.Errorf("failed to resolve cache directory: %w", err)
+	}
+	o.dataDir, err = complytime.ResolveDataDir()
+	if err != nil {
+		return fmt.Errorf("failed to resolve data directory: %w", err)
 	}
 	o.providerDir, err = complytime.ResolveProviderDir()
 	if err != nil {
@@ -297,7 +302,7 @@ func (o *scanOptions) scanPolicy(ctx context.Context, cfg *complytime.WorkspaceC
 	// Generation runs for ALL targets referencing the policy (per D7:
 	// generation freshness is policy-scoped, not target-scoped). Narrowing
 	// before generation would silently skip targets that were never generated.
-	if err := ensureGenerated(ctx, o.cacheDir, baseDir, mgr, groups, policyTargets, cfg.Variables, ref.Repository, eid, evaluatorIDs); err != nil {
+	if err := ensureGenerated(ctx, o.cacheDir, o.dataDir, baseDir, mgr, groups, policyTargets, cfg.Variables, ref.Repository, eid, evaluatorIDs); err != nil {
 		return err
 	}
 
@@ -309,7 +314,7 @@ func (o *scanOptions) scanPolicy(ctx context.Context, cfg *complytime.WorkspaceC
 	targetIDs := targetIDList(policyTargets)
 	fmt.Println(output.FormatPreScanSummary(len(assessmentConfigs), evaluatorIDs, targetIDs))
 
-	reqToComplypackRef := buildReqToComplypackRef(o.cacheDir, groups)
+	reqToComplypackRef := buildReqToComplypackRef(o.dataDir, groups)
 	return runScanAndReport(ctx, o.format, mgr, groups, reqToComplypackRef, policyTargets, ref.Repository, eid, graph, targetIDs, baseDir, o.showPassing)
 }
 
@@ -362,8 +367,8 @@ func targetIDList(targets []complytime.TargetConfig) []string {
 	return ids
 }
 
-func ensureGenerated(ctx context.Context, cacheDir, baseDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, configVars map[string]string, repository, eid string, evaluatorIDs []string) error {
-	needsGenerate, policyDigest, cpDigests, err := checkGenerationFreshness(cacheDir, baseDir, repository, eid)
+func ensureGenerated(ctx context.Context, cacheDir, dataDir, baseDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, configVars map[string]string, repository, eid string, evaluatorIDs []string) error {
+	needsGenerate, policyDigest, cpDigests, err := checkGenerationFreshness(dataDir, baseDir, repository, eid)
 	if err != nil {
 		return err
 	}
@@ -371,7 +376,7 @@ func ensureGenerated(ctx context.Context, cacheDir, baseDir string, mgr *provide
 		return nil
 	}
 	globalVars := complytime.WithWorkspaceVar(configVars, baseDir)
-	return runGeneration(ctx, cacheDir, baseDir, mgr, groups, policyTargets, globalVars, repository, policyDigest, evaluatorIDs, cpDigests)
+	return runGeneration(ctx, cacheDir, dataDir, baseDir, mgr, groups, policyTargets, globalVars, repository, policyDigest, evaluatorIDs, cpDigests)
 }
 
 // runScanAndReport executes the scan across all targets and processes the
@@ -489,8 +494,8 @@ func filterTargetsForPolicy(targets []complytime.TargetConfig, policyID string) 
 	return result
 }
 
-func checkGenerationFreshness(cacheDir, baseDir, repository, eid string) (needsGenerate bool, digest string, complypackDigests map[string]string, err error) {
-	cacheState, err := cache.LoadState(cacheDir)
+func checkGenerationFreshness(dataDir, baseDir, repository, eid string) (needsGenerate bool, digest string, complypackDigests map[string]string, err error) {
+	cacheState, err := cache.LoadState(dataDir)
 	if err != nil {
 		return false, "", nil, fmt.Errorf("failed to load cache state: %w", err)
 	}
@@ -560,12 +565,12 @@ func evaluatorArtifactsExist(baseDir string, evaluatorIDs []string) bool {
 	return true
 }
 
-func runGeneration(ctx context.Context, cacheDir, baseDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string, repository, policyDigest string, evaluatorIDs []string, complypackDigests map[string]string) error {
+func runGeneration(ctx context.Context, cacheDir, dataDir, baseDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string, repository, policyDigest string, evaluatorIDs []string, complypackDigests map[string]string) error {
 	genSpin := terminal.NewSpinner("Generating policy artifacts...")
 	genSpin.Start()
 	defer genSpin.Stop()
 
-	availableEvaluators, err := generateForAllTargets(ctx, cacheDir, mgr, groups, policyTargets, globalVars)
+	availableEvaluators, err := generateForAllTargets(ctx, cacheDir, dataDir, mgr, groups, policyTargets, globalVars)
 	if err != nil {
 		return err
 	}
@@ -581,8 +586,8 @@ func runGeneration(ctx context.Context, cacheDir, baseDir string, mgr *provider.
 // generateForAllTargets invokes providers for each evaluator/target combination.
 // It returns the list of evaluator-ids that had complypack content available
 // (non-empty content path from LookupByEvaluatorID).
-func generateForAllTargets(ctx context.Context, cacheDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string) ([]string, error) {
-	cacheState, stateErr := cache.LoadState(cacheDir)
+func generateForAllTargets(ctx context.Context, cacheDir, dataDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string) ([]string, error) {
+	cacheState, stateErr := cache.LoadState(dataDir)
 	if stateErr != nil {
 		// Degrade gracefully: a corrupt state.json should not block
 		// scanning when the complypack content on disk is valid.
@@ -815,12 +820,12 @@ func reverseMap(m map[string]string) map[string]string {
 // RequirementID. Resolving the chain here keeps the Evaluator free of
 // evaluator-ID routing concerns and makes it easier to change selection
 // logic later (e.g., per-requirement complypack selection).
-func buildReqToComplypackRef(cacheDir string, groups map[string]policy.EvaluatorGroup) map[string]string {
+func buildReqToComplypackRef(dataDir string, groups map[string]policy.EvaluatorGroup) map[string]string {
 	m := make(map[string]string)
 	if len(groups) == 0 {
 		return m
 	}
-	state, err := cache.LoadState(cacheDir)
+	state, err := cache.LoadState(dataDir)
 	if err != nil {
 		logger.Debug("failed to load cache state for complypack ref resolution", "error", err)
 		return m

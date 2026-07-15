@@ -23,6 +23,6 @@ runs:
 
         - name: Install test provider
           run: |
-              mkdir -p ~/.complytime/providers
-              cp bin/complytime-providers-test ~/.complytime/providers/
+              mkdir -p "${XDG_DATA_HOME:-$HOME/.local/share}/complytime/providers"
+              cp bin/complytime-providers-test "${XDG_DATA_HOME:-$HOME/.local/share}/complytime/providers/"
           shell: bash

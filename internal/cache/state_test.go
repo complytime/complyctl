@@ -256,6 +256,75 @@ func TestState_SetPolicyMetadata_PreservesSyncFields(t *testing.T) {
 	assert.Equal(t, 5, ps.AssessmentCount)
 }
 
+// TestSaveState_StateSeparation verifies that SaveState writes state.json
+// to the data directory and not to the cache directory. This is regression
+// protection for FR-004 "State survives cache clear": clearing the cache
+// directory must not destroy state.json.
+func TestSaveState_StateSeparation(t *testing.T) {
+	cacheDir := t.TempDir()
+	dataDir := t.TempDir()
+
+	state := &cache.State{
+		Policies: map[string]cache.PolicyState{
+			"example.com/policies/test": {
+				Version: "v1.0.0",
+				Digest:  "sha256:abc123",
+			},
+		},
+		Complypacks: make(map[string]cache.PolicyState),
+	}
+
+	// Save state to the data directory (not the cache directory).
+	err := cache.SaveState(state, dataDir)
+	require.NoError(t, err)
+
+	// state.json MUST exist in the data directory.
+	dataStatePath := filepath.Join(dataDir, "state.json")
+	_, err = os.Stat(dataStatePath)
+	require.NoError(t, err, "state.json must exist in the data directory")
+
+	// state.json MUST NOT exist in the cache directory.
+	cacheStatePath := filepath.Join(cacheDir, "state.json")
+	_, err = os.Stat(cacheStatePath)
+	require.True(t, os.IsNotExist(err), "state.json must not exist in the cache directory")
+
+	// Verify the saved state can be loaded back from the data directory.
+	loaded, err := cache.LoadState(dataDir)
+	require.NoError(t, err)
+	ps, exists := loaded.GetPolicyState("example.com/policies/test")
+	require.True(t, exists)
+	assert.Equal(t, "v1.0.0", ps.Version)
+	assert.Equal(t, "sha256:abc123", ps.Digest)
+}
+
+// TestSaveState_DirectoryPermissions verifies that SaveState creates the
+// data directory with 0700 permissions (user-only access) per XDG Base
+// Directory security requirements.
+func TestSaveState_DirectoryPermissions(t *testing.T) {
+	baseDir := t.TempDir()
+	nestedDir := filepath.Join(baseDir, "xdg-data", "complytime")
+
+	state := &cache.State{
+		Policies:    map[string]cache.PolicyState{},
+		Complypacks: map[string]cache.PolicyState{},
+	}
+
+	err := cache.SaveState(state, nestedDir)
+	require.NoError(t, err)
+
+	// Verify the created directory has 0700 permissions.
+	info, err := os.Stat(nestedDir)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0700), info.Mode().Perm(),
+		"data directory must have 0700 permissions")
+
+	// Also verify state.json was written with 0600 permissions.
+	stateInfo, err := os.Stat(filepath.Join(nestedDir, "state.json"))
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0600), stateInfo.Mode().Perm(),
+		"state.json must have 0600 permissions")
+}
+
 func TestState_SetPolicyMetadata_NoOpForMissingKey(t *testing.T) {
 	state := &cache.State{
 		Policies: map[string]cache.PolicyState{

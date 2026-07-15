@@ -22,6 +22,7 @@ type listOptions struct {
 	*Common
 	policyID string
 	cacheDir string
+	dataDir  string
 }
 
 func listCmd(common *Common) *cobra.Command {
@@ -64,6 +65,10 @@ func (o *listOptions) complete() error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve cache directory: %w", err)
 	}
+	o.dataDir, err = complytime.ResolveDataDir()
+	if err != nil {
+		return fmt.Errorf("failed to resolve data directory: %w", err)
+	}
 	return nil
 }
 
@@ -82,7 +87,7 @@ func (o *listOptions) run(_ context.Context) error {
 	cacheMgr := cache.NewCache(o.cacheDir)
 	loader := policy.NewLoader(cacheMgr)
 
-	state, err := cache.LoadState(o.cacheDir)
+	state, err := cache.LoadState(o.dataDir)
 	if err != nil {
 		return fmt.Errorf("failed to load cache state: %w", err)
 	}

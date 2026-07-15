@@ -22,7 +22,7 @@ Pre-built Linux binaries are available from the
 [complytime-providers releases](https://github.com/complytime/complytime-providers/releases/latest)
 page. To build from source, see the
 [complytime-providers README](https://github.com/complytime/complytime-providers#install).
-Provider binaries go in `~/.complytime/providers/`.
+Provider binaries go in `~/.local/share/complytime/providers/`.
 
 See the [Provider Guide](https://github.com/complytime/complytime-providers/blob/main/docs/provider-guide.md) for authoring new providers.
 
@@ -151,7 +151,7 @@ Available policy bundles are listed in the [complytime-policies usage guide](htt
 complyctl get
 ```
 
-Downloads Gemara policies from the OCI registry into the local cache (`~/.complytime/policies/`). If `complypacks:` entries are configured in `complytime.yaml`, their artifacts are also fetched into `~/.complytime/complypacks/`. Incremental — only fetches new or modified content.
+Downloads Gemara policies from the OCI registry into the local cache (`~/.cache/complytime/policies/`). If `complypacks:` entries are configured in `complytime.yaml`, their artifacts are also fetched into `~/.cache/complytime/complypacks/`. Incremental — only fetches new or modified content.
 
 ### Complypack cache versioning
 

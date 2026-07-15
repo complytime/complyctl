@@ -20,6 +20,7 @@ type providersOptions struct {
 	*Common
 	providerDir string
 	cacheDir    string
+	dataDir     string
 }
 
 func providersCmd(common *Common) *cobra.Command {
@@ -57,6 +58,10 @@ func (o *providersOptions) complete() error {
 			return fmt.Errorf("failed to resolve cache directory: %w", err)
 		}
 	}
+	o.dataDir, err = complytime.ResolveDataDir()
+	if err != nil {
+		return fmt.Errorf("failed to resolve data directory: %w", err)
+	}
 	return nil
 }
 
@@ -77,7 +82,7 @@ func (o *providersOptions) run(ctx context.Context) error {
 		return nil
 	}
 
-	cacheState, stateErr := cache.LoadState(o.cacheDir)
+	cacheState, stateErr := cache.LoadState(o.dataDir)
 	if stateErr != nil {
 		cacheState = nil
 	}

@@ -33,7 +33,7 @@ func TestSync_CopyOnSuccess(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
 
 	fetched, err := sync.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func TestSync_CopyOnSuccess_PinnedVersion(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
 
 	fetched, err := sync.SyncPolicy(context.Background(), "test-policy", "v1.0.0")
 	require.NoError(t, err)
@@ -94,7 +94,7 @@ func TestSync_FailureOnMissingPolicy(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
 
 	fetched, err := sync.SyncPolicy(context.Background(), "nonexistent-policy", "latest")
 	require.Error(t, err)
@@ -117,7 +117,7 @@ func TestSync_RegistryUnreachableError(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
 
 	fetched, err := sync.SyncPolicy(context.Background(), "unreachable-policy", "latest")
 	require.Error(t, err)
@@ -142,7 +142,7 @@ func TestSync_IncrementalSkip(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
 
 	// First sync
 	fetched, err := sync.SyncPolicy(context.Background(), "test-policy", "latest")
@@ -156,7 +156,7 @@ func TestSync_IncrementalSkip(t *testing.T) {
 	originalDigest := ps.Digest
 
 	// Second sync with same digest — should be no-op (FR-004)
-	sync2 := cache.NewSync(cacheMgr, state2, mock)
+	sync2 := cache.NewSync(cacheMgr, state2, mock, cacheDir)
 	fetched2, err := sync2.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)
 	assert.False(t, fetched2, "incremental skip should not report a fetch")
@@ -176,7 +176,7 @@ func TestSync_EmptyPolicyID(t *testing.T) {
 	cacheMgr := cache.NewCache(cacheDir)
 	state, _ := cache.LoadState(cacheDir)
 
-	sync := cache.NewSync(cacheMgr, state, mock)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
 	fetched, err := sync.SyncPolicy(context.Background(), "", "latest")
 	require.Error(t, err)
 	assert.False(t, fetched, "empty policy ID should not report a fetch")
@@ -195,7 +195,7 @@ func TestSync_RedownloadAfterDeletion(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
 
 	fetched, err := sync.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)
@@ -209,7 +209,7 @@ func TestSync_RedownloadAfterDeletion(t *testing.T) {
 
 	state2, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
-	sync2 := cache.NewSync(cacheMgr, state2, mock)
+	sync2 := cache.NewSync(cacheMgr, state2, mock, cacheDir)
 
 	fetched2, err := sync2.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)
@@ -267,7 +267,7 @@ func TestSync_ConcurrentDifferentPolicies(t *testing.T) {
 				return
 			}
 
-			syncMgr := cache.NewSync(r.cacheMgr, state, mock)
+			syncMgr := cache.NewSync(r.cacheMgr, state, mock, r.cacheDir)
 			policyID := fmt.Sprintf("policy-%d", workerID)
 
 			_, syncErr := syncMgr.SyncPolicy(context.Background(), policyID, "latest")
@@ -341,7 +341,7 @@ func TestSync_ConcurrentMixedFailures(t *testing.T) {
 				return
 			}
 
-			syncMgr := cache.NewSync(cacheMgr, state, mock)
+			syncMgr := cache.NewSync(cacheMgr, state, mock, workerCacheDir)
 			policyID := fmt.Sprintf("policy-%d", workerID)
 
 			_, syncErr := syncMgr.SyncPolicy(context.Background(), policyID, "latest")
@@ -431,7 +431,7 @@ func TestSync_SHA384Digest(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
 
 	// Pass a sha384 digest as the version string. classifyVersion must
 	// detect it as a digest and BuildLookupRef must use "@" separator.
@@ -472,7 +472,7 @@ func TestSync_VerificationFailure_AbortsCopy(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cache.WithVerifier(failVerifier))
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, cache.WithVerifier(failVerifier))
 
 	_, err = sync.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.Error(t, err)
@@ -508,7 +508,7 @@ func TestSync_VerificationSuccess_RecordsMetadata(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cache.WithVerifier(successVerifier))
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, cache.WithVerifier(successVerifier))
 
 	_, err = sync.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)
@@ -535,7 +535,7 @@ func TestSync_NilVerifier_SkipsVerification(t *testing.T) {
 	require.NoError(t, err)
 
 	// No WithVerifier option — verification disabled
-	sync := cache.NewSync(cacheMgr, state, mock)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
 
 	_, err = sync.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)

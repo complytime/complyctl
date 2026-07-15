@@ -26,15 +26,17 @@ A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/
 │                                 │                     │          │
 │                                 ▼                     ▼          │
 │                       ┌──────────────┐    ┌────────────────┐     │
-│                       │    Cache     │    │   Providers    │     │
+│                       │    Cache     │    │     Data       │     │
 │                       │              │    │                │     │
-│                       │ ~/.complytime│    │ ~/.complytime/ │     │
-│                       │  /policies/  │    │  providers/    │     │
-│                       │  state.json  │    │                │     │
-│                       │              │    │ complyctl-     │     │
-│                       │ OCI Layout   │    │  provider-*    │     │
-│                       │ per policy   │    │                │     │
-│                       └──────────────┘    │ gRPC: Describe │     │
+│                       │ ~/.cache/    │    │ ~/.local/share │     │
+│                       │  complytime/ │    │  /complytime/  │     │
+│                       │  policies/   │    │  providers/    │     │
+│                       │              │    │  state.json    │     │
+│                       │ OCI Layout   │    │                │     │
+│                       │ per policy   │    │ complyctl-     │     │
+│                       └──────────────┘    │  provider-*    │     │
+│                                           │                │     │
+│                                           │ gRPC: Describe │     │
 │                                           │ Generate, Scan │     │
 │  ┌──────────────┐                         └────────────────┘     │
 │  │  Workspace   │                                                │
@@ -54,8 +56,9 @@ A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/
 |:---|:---|
 | **OCI Registry** | Remote store for Gemara policies. Supports two OCI manifest layouts: split-layer (distinct media types per artifact) and Gemara bundle format (single artifact media type with annotation-based differentiation). Both formats are auto-detected and resolved transparently. |
 | **Workspace** | Resolved workspace directory containing `.complytime/complytime.yaml` (or legacy `complytime.yaml` at root). Configurable via `--workspace` flag or `COMPLYTIME_WORKSPACE` env var. Defines which registry, policies, and targets to use. Scan output lands in `.complytime/scan/`. |
-| **Cache** | Local OCI Layout stores under `~/.complytime/policies/`. One store per policy ID. `state.json` tracks digests for incremental sync. |
-| **Providers** | Standalone executables in `~/.complytime/providers/` matching the `complyctl-provider-*` naming convention. Communicate via gRPC (`Describe`, `Generate`, `Scan`). Evaluator ID derived from filename. |
+| **Cache** | Local OCI Layout stores under `~/.cache/complytime/policies/`. One store per policy ID. Follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/) (`$XDG_CACHE_HOME`). |
+| **Data** | Persistent data under `~/.local/share/complytime/` (`$XDG_DATA_HOME`). Includes `state.json` (digest tracking for incremental sync) and `providers/` (provider binaries). |
+| **Providers** | Standalone executables in `~/.local/share/complytime/providers/` matching the `complyctl-provider-*` naming convention. Communicate via gRPC (`Describe`, `Generate`, `Scan`). Evaluator ID derived from filename. |
 | **CLI** | Orchestrates the workflow: fetch policies, resolve dependency graphs, dispatch to providers, produce compliance reports. |
 
 ## Documentation

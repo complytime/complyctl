@@ -10,7 +10,7 @@
 //
 // The resulting binary follows the complyctl-provider-* naming convention
 // so the provider discovery system finds it automatically when placed in
-// the providers directory (~/.complytime/providers/ or a test-specific path).
+// the providers directory (~/.local/share/complytime/providers/ or a test-specific path).
 //
 // This binary is NOT referenced by any production code.
 package main

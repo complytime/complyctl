@@ -39,7 +39,7 @@ type ComplypackCache struct {
 }
 
 // NewComplypackCache creates a ComplypackCache rooted at the given base cache
-// directory (e.g., ~/.complytime). The optional state parameter enables
+// directory (e.g., ~/.cache/complytime). The optional state parameter enables
 // state-driven lookup and retention-aware eviction. When state is nil,
 // both features fall back to filesystem-only behavior (D4).
 //
@@ -99,7 +99,7 @@ func (c *ComplypackCache) Store(config complypack.Config, content io.Reader) (st
 	parentDir := filepath.Dir(finalDir)
 
 	// Ensure the parent directory exists for both the temp dir and the final path.
-	if err := os.MkdirAll(parentDir, 0755); err != nil {
+	if err := os.MkdirAll(parentDir, 0700); err != nil {
 		return "", fmt.Errorf("failed to create complypack parent directory %s: %w", parentDir, err)
 	}
 
