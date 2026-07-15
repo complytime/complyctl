@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestCheckLegacyDir_LegacyExistsXDGAbsent_Warns(t *testing.T) {
 	homeDir := t.TempDir()
 
