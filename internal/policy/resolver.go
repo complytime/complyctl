@@ -215,7 +215,8 @@ func (r *Resolver) extractSplitMetadata(
 		// control count may be inaccurate rather than silently
 		// defaulting to zero.
 		log.Warn("catalog layer unavailable, control count will be 0",
-			"policy", policyID, "error", catalogLoadErr)
+			"policy", policyID, "version", version,
+			"error", catalogLoadErr)
 	} else {
 		catalog, catErr := parseControlCatalog(catalogData)
 		if catErr != nil {
