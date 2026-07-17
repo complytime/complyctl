@@ -471,7 +471,7 @@ func installTestPlugin(t *testing.T, homeDir string) {
 	}
 
 	providerDir := filepath.Join(dataDir(homeDir), "providers")
-	require.NoError(t, os.MkdirAll(providerDir, 0755))
+	require.NoError(t, os.MkdirAll(providerDir, 0700))
 
 	dstBinary := filepath.Join(providerDir, "complyctl-provider-test")
 	data, err := os.ReadFile(srcBinary)
