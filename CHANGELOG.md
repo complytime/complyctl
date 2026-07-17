@@ -14,9 +14,9 @@
 
   Workspace-local `.complytime/` (config, scan output, logs) is **unchanged**.
 
-  **Migration**: On first run, complyctl automatically detects the legacy
-  `~/.complytime/` directory and migrates files to the new XDG locations. To
-  migrate manually:
+  **Migration**: If the legacy `~/.complytime/` directory exists, complyctl
+  prints a deprecation warning with migration instructions on first run. To
+  migrate:
   ```bash
   # Copy data files (state, providers)
   mkdir -p ~/.local/share/complytime

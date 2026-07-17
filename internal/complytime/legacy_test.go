@@ -207,7 +207,7 @@ func TestCheckLegacyDir_PublicFunction_NoHomeError(t *testing.T) {
 	assert.Empty(t, buf.String(), "must not print when home dir is unavailable")
 }
 
-func TestCheckLegacyDir_LegacyExistsDataExistsCacheAbsent_NoWarn(t *testing.T) {
+func TestCheckLegacyDir_LegacyExistsDataExistsCacheAbsent_Warns(t *testing.T) {
 	// When data dir exists but cache dir doesn't, the critical state.json
 	// is already in the right place. Cache will be re-created on next
 	// `complyctl get`. However, the warning should still fire because
