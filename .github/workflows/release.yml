@@ -43,6 +43,7 @@ jobs:
               uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
               with:
                   fetch-depth: 0
+                  persist-credentials: false
 
             # Accepts vMAJOR.MINOR.PATCH with optional
             # pre-release suffix (e.g., v1.0.0-beta.0).
@@ -128,6 +129,8 @@ jobs:
                   echo "$COUNT commit(s) since ${LATEST:-initial commit}."
 
             - name: Create and push tag
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   # Skip if tag was already created (e.g.,
                   # re-run after partial failure or manual
@@ -141,7 +144,10 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
                   git tag -a "$RELEASE_TAG" -m "$RELEASE_TAG"
-                  git push origin "$RELEASE_TAG"
+                  # Push via token URL since persist-credentials
+                  # is disabled on checkout.
+                  PUSH_URL="https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+                  git push "${PUSH_URL}" "$RELEASE_TAG"
                   echo "Created and pushed tag: $RELEASE_TAG"
 
     release:
