@@ -62,7 +62,7 @@ jobs:
               run: echo "GOTOOLCHAIN=auto" >> "$GITHUB_ENV"
 
             - name: Install snappy
-              uses: carabiner-dev/actions/install/snappy@94f29392187fe5082d1195a7d4cae3a7ddf09d9c # v1.2.1
+              uses: carabiner-dev/actions/install/snappy@2a4b2cd115ede14629b03ef7e77586d3269d4c72 # v1.2.3
 
             - name: Install ampel
               uses: carabiner-dev/actions/install/ampel@94f29392187fe5082d1195a7d4cae3a7ddf09d9c # v1.2.1
