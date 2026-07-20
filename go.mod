@@ -9,7 +9,7 @@ require (
 	github.com/charmbracelet/log v1.0.0
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/complytime/complypack v0.0.7
-	github.com/defenseunicorns/go-oscal v0.7.0
+	github.com/defenseunicorns/go-oscal v0.7.1
 	github.com/gemaraproj/go-gemara v0.7.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/go-containerregistry v0.21.7
