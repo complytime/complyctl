@@ -4,7 +4,10 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -16,8 +19,35 @@ import (
 	"github.com/complytime/complyctl/internal/registry"
 )
 
+// diagnosticOutput is the top-level JSON structure for --format json.
+type diagnosticOutput struct {
+	Checks          []checkOutput     `json:"checks"`
+	Summary         diagnosticSummary `json:"summary"`
+	BlockingFailure bool              `json:"blocking_failure"`
+}
+
+// checkOutput is one entry in the JSON checks array.
+type checkOutput struct {
+	Name     string             `json:"name"`
+	Label    string             `json:"label,omitempty"`
+	Status   doctor.CheckStatus `json:"status"`
+	Message  string             `json:"message"`
+	Blocking bool               `json:"blocking"`
+	Group    doctor.CheckGroup  `json:"group,omitempty"`
+	Children []checkOutput      `json:"children,omitempty"`
+}
+
+// diagnosticSummary holds the counts for the JSON summary field.
+type diagnosticSummary struct {
+	Total    int `json:"total"`
+	Passed   int `json:"passed"`
+	Failed   int `json:"failed"`
+	Warnings int `json:"warnings"`
+}
+
 func doctorCmd(common *Common) *cobra.Command {
 	var verbose bool
+	var format string
 	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Run pre-flight diagnostics on the workspace",
@@ -34,10 +64,20 @@ and reports missing entries.`,
 			if err != nil {
 				return err
 			}
-			return runDoctor(baseDir, verbose)
+			resolvedFormat, err := resolveFormat(format)
+			if err != nil {
+				return err
+			}
+			return runDoctor(baseDir, verbose, resolvedFormat)
 		},
 	}
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "expand per-provider variable detail")
+	cmd.Flags().StringVarP(&format, "format", "f", "", "output format: text, json")
+	if err := cmd.RegisterFlagCompletionFunc("format", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return []string{complytime.OutputFormatText, complytime.OutputFormatJSON}, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		logger.Error("Failed to register format completion", "error", err)
+	}
 	return cmd
 }
 
@@ -75,7 +115,7 @@ func (r *registryVersionResolver) resolve(registryURL, repository, version strin
 }
 
 // See FR-039, R44, R51, R52, R55: specs/001-gemara-native-workflow/spec.md
-func runDoctor(baseDir string, verbose bool) error {
+func runDoctor(baseDir string, verbose bool, format string) error {
 	providerDir, err := complytime.ResolveProviderDir()
 	if err != nil {
 		return fmt.Errorf("failed to resolve provider directory: %w", err)
@@ -107,12 +147,82 @@ func runDoctor(baseDir string, verbose bool) error {
 	versionResolver := &registryVersionResolver{timeout: 5 * time.Second}
 
 	results := doctor.Run(cfg, configPath, providerDir, cacheDir, dataDir, resolver, versionResolver, verbose, logger)
-	return printDiagnostics(results)
+	return printDiagnostics(results, format)
 }
 
-func printDiagnostics(results []doctor.CheckResult) error {
-	fmt.Println("Running workspace diagnostics...")
-	fmt.Println()
+// statusLabel maps a CheckStatus to a grep-stable bracketed label.
+func statusLabel(s doctor.CheckStatus) string {
+	switch s {
+	case doctor.StatusPass:
+		return "[PASS]"
+	case doctor.StatusFail:
+		return "[FAIL]"
+	case doctor.StatusWarn:
+		return "[WARN]"
+	default:
+		return "[UNKNOWN]"
+	}
+}
+
+// resolveFormat returns the effective output format. An explicit --format flag
+// value takes precedence; when the flag is empty, NO_COLOR triggers text mode.
+// Returns an error for unrecognised flag values.
+func resolveFormat(flagValue string) (string, error) {
+	if flagValue != "" {
+		switch flagValue {
+		case complytime.OutputFormatText, complytime.OutputFormatJSON:
+			return flagValue, nil
+		default:
+			return "", fmt.Errorf("invalid format %q: must be one of %s, %s",
+				flagValue, complytime.OutputFormatText, complytime.OutputFormatJSON)
+		}
+	}
+	if os.Getenv("NO_COLOR") != "" {
+		return complytime.OutputFormatText, nil
+	}
+	return "", nil
+}
+
+// resultLabel returns the display label for a CheckResult. Uses Label
+// when set, falls back to Name when Label is empty. No string parsing
+// of Name occurs — display text is set at the source (D10).
+func resultLabel(r doctor.CheckResult) string {
+	if r.Label != "" {
+		return r.Label
+	}
+	return r.Name
+}
+
+// statusEmoji maps a CheckStatus to its emoji indicator for human output.
+func statusEmoji(s doctor.CheckStatus) string {
+	switch s {
+	case doctor.StatusPass:
+		return complytime.StatusPassed
+	case doctor.StatusFail:
+		return complytime.StatusFailed
+	case doctor.StatusWarn:
+		return complytime.StatusError
+	default:
+		return "?"
+	}
+}
+
+func countStatus(s doctor.CheckStatus, pass, fail, warn *int) {
+	switch s {
+	case doctor.StatusPass:
+		*pass++
+	case doctor.StatusFail:
+		*fail++
+	case doctor.StatusWarn:
+		*warn++
+	}
+}
+
+// printDiagnosticsHuman renders results with emoji status indicators followed
+// by a grep-stable [STATUS] label. This is the default interactive mode.
+func printDiagnosticsHuman(results []doctor.CheckResult, w io.Writer) error {
+	fmt.Fprintln(w, "Running workspace diagnostics...")
+	fmt.Fprintln(w)
 
 	grouped := make(map[doctor.CheckGroup][]doctor.CheckResult)
 	for _, r := range results {
@@ -130,15 +240,15 @@ func printDiagnostics(results []doctor.CheckResult) error {
 		}
 
 		if !firstSection {
-			fmt.Println()
+			fmt.Fprintln(w)
 		}
 		firstSection = false
-		fmt.Println(string(group))
+		fmt.Fprintln(w, string(group))
 
 		for _, r := range checks {
 			emoji := statusEmoji(r.Status)
 			countStatus(r.Status, &passCount, &failCount, &warnCount)
-			fmt.Printf("  %s %s: %s\n", emoji, resultLabel(r), r.Message)
+			fmt.Fprintf(w, "  %s %s %s: %s\n", emoji, statusLabel(r.Status), resultLabel(r), r.Message)
 			if r.Blocking && r.Status == doctor.StatusFail {
 				hasBlockingFailure = true
 			}
@@ -146,7 +256,7 @@ func printDiagnostics(results []doctor.CheckResult) error {
 			for _, child := range r.Children {
 				childEmoji := statusEmoji(child.Status)
 				countStatus(child.Status, &passCount, &failCount, &warnCount)
-				fmt.Printf("      %s %s: %s\n", childEmoji, resultLabel(child), child.Message)
+				fmt.Fprintf(w, "      %s %s %s: %s\n", childEmoji, statusLabel(child.Status), resultLabel(child), child.Message)
 				if child.Blocking && child.Status == doctor.StatusFail {
 					hasBlockingFailure = true
 				}
@@ -156,14 +266,14 @@ func printDiagnostics(results []doctor.CheckResult) error {
 				// of --verbose).
 				for _, gc := range child.Children {
 					gcEmoji := statusEmoji(gc.Status)
-					fmt.Printf("          %s %s\n", gcEmoji, gc.Message)
+					fmt.Fprintf(w, "          %s %s %s\n", gcEmoji, statusLabel(gc.Status), gc.Message)
 				}
 			}
 		}
 	}
 
 	total := passCount + failCount + warnCount
-	fmt.Printf("\n%d checks: %d passed, %d failed, %d warnings\n", total, passCount, failCount, warnCount)
+	fmt.Fprintf(w, "\n%d checks: %d passed, %d failed, %d warnings\n", total, passCount, failCount, warnCount)
 
 	if hasBlockingFailure {
 		return fmt.Errorf("one or more blocking checks failed")
@@ -171,36 +281,139 @@ func printDiagnostics(results []doctor.CheckResult) error {
 	return nil
 }
 
-// resultLabel returns the display label for a CheckResult. Uses Label
-// when set, falls back to Name when Label is empty. No string parsing
-// of Name occurs — display text is set at the source (D10).
-func resultLabel(r doctor.CheckResult) string {
-	if r.Label != "" {
-		return r.Label
+// printDiagnosticsText renders results with bracketed [STATUS] labels and no
+// emoji. Used for --format text and when NO_COLOR is set.
+func printDiagnosticsText(results []doctor.CheckResult, w io.Writer) error {
+	fmt.Fprintln(w, "Running workspace diagnostics...")
+	fmt.Fprintln(w)
+
+	grouped := make(map[doctor.CheckGroup][]doctor.CheckResult)
+	for _, r := range results {
+		grouped[r.Group] = append(grouped[r.Group], r)
 	}
-	return r.Name
+
+	var passCount, failCount, warnCount int
+	hasBlockingFailure := false
+	firstSection := true
+
+	for _, group := range doctor.GroupOrder() {
+		checks, ok := grouped[group]
+		if !ok {
+			continue
+		}
+
+		if !firstSection {
+			fmt.Fprintln(w)
+		}
+		firstSection = false
+		fmt.Fprintln(w, string(group))
+
+		for _, r := range checks {
+			countStatus(r.Status, &passCount, &failCount, &warnCount)
+			fmt.Fprintf(w, "  %s %s: %s\n", statusLabel(r.Status), resultLabel(r), r.Message)
+			if r.Blocking && r.Status == doctor.StatusFail {
+				hasBlockingFailure = true
+			}
+
+			for _, child := range r.Children {
+				countStatus(child.Status, &passCount, &failCount, &warnCount)
+				fmt.Fprintf(w, "      %s %s: %s\n", statusLabel(child.Status), resultLabel(child), child.Message)
+				if child.Blocking && child.Status == doctor.StatusFail {
+					hasBlockingFailure = true
+				}
+
+				for _, gc := range child.Children {
+					fmt.Fprintf(w, "          %s %s\n", statusLabel(gc.Status), gc.Message)
+				}
+			}
+		}
+	}
+
+	total := passCount + failCount + warnCount
+	fmt.Fprintf(w, "\n%d checks: %d passed, %d failed, %d warnings\n", total, passCount, failCount, warnCount)
+
+	if hasBlockingFailure {
+		return fmt.Errorf("one or more blocking checks failed")
+	}
+	return nil
 }
 
-func statusEmoji(s doctor.CheckStatus) string {
-	switch s {
-	case doctor.StatusPass:
-		return complytime.StatusPassed
-	case doctor.StatusFail:
-		return complytime.StatusFailed
-	case doctor.StatusWarn:
-		return complytime.StatusSkipped
+// convertResult converts a doctor.CheckResult to a checkOutput for JSON
+// serialisation, recursively converting children.
+func convertResult(r doctor.CheckResult) checkOutput {
+	var children []checkOutput
+	for _, child := range r.Children {
+		children = append(children, convertResult(child))
+	}
+	return checkOutput{
+		Name:     r.Name,
+		Label:    r.Label,
+		Status:   r.Status,
+		Message:  r.Message,
+		Blocking: r.Blocking,
+		Group:    r.Group,
+		Children: children,
+	}
+}
+
+// printDiagnosticsJSON renders results as a single JSON object. No prose is
+// written. Used for --format json.
+func printDiagnosticsJSON(results []doctor.CheckResult, w io.Writer) error {
+	checks := make([]checkOutput, 0, len(results))
+	var passCount, failCount, warnCount int
+	hasBlockingFailure := false
+
+	for _, r := range results {
+		countStatus(r.Status, &passCount, &failCount, &warnCount)
+		if r.Blocking && r.Status == doctor.StatusFail {
+			hasBlockingFailure = true
+		}
+		for _, child := range r.Children {
+			countStatus(child.Status, &passCount, &failCount, &warnCount)
+			if child.Blocking && child.Status == doctor.StatusFail {
+				hasBlockingFailure = true
+			}
+		}
+		checks = append(checks, convertResult(r))
+	}
+
+	out := diagnosticOutput{
+		Checks: checks,
+		Summary: diagnosticSummary{
+			Total:    passCount + failCount + warnCount,
+			Passed:   passCount,
+			Failed:   failCount,
+			Warnings: warnCount,
+		},
+		BlockingFailure: hasBlockingFailure,
+	}
+
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(out); err != nil {
+		return fmt.Errorf("encoding diagnostic output: %w", err)
+	}
+
+	if hasBlockingFailure {
+		return fmt.Errorf("one or more blocking checks failed")
+	}
+	return nil
+}
+
+// printDiagnosticsTo dispatches to the appropriate renderer based on format,
+// writing output to w. An empty format string selects the human renderer.
+func printDiagnosticsTo(results []doctor.CheckResult, format string, w io.Writer) error {
+	switch format {
+	case complytime.OutputFormatText:
+		return printDiagnosticsText(results, w)
+	case complytime.OutputFormatJSON:
+		return printDiagnosticsJSON(results, w)
 	default:
-		return "?"
+		return printDiagnosticsHuman(results, w)
 	}
 }
 
-func countStatus(s doctor.CheckStatus, pass, fail, warn *int) {
-	switch s {
-	case doctor.StatusPass:
-		*pass++
-	case doctor.StatusFail:
-		*fail++
-	case doctor.StatusWarn:
-		*warn++
-	}
+// printDiagnostics dispatches to the appropriate renderer writing to os.Stdout.
+func printDiagnostics(results []doctor.CheckResult, format string) error {
+	return printDiagnosticsTo(results, format, os.Stdout)
 }

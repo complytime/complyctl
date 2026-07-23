@@ -31,7 +31,11 @@ Generate the autocompletion script for the specified shell.
 Run pre-flight diagnostics on the workspace. Checks provider discovery, policy
 cache integrity, configuration validation, and complypack availability. Also
 reports complypack cache disk usage, orphaned versions (on disk but not tracked
-in state.json), and untracked versions (no state.json exists).
+in state.json), and untracked versions (no state.json exists). Output format is
+controlled by **--format** (default: human-readable with emoji; **text** for
+grep-friendly plain labels; **json** for structured machine output). When the
+**NO_COLOR** environment variable is set, **text** format is selected
+automatically.
 
 **generate**
 Generate policy graph and invoke providers.
@@ -119,6 +123,17 @@ $ complyctl doctor
 # Run pre-flight diagnostics: provider discovery, cache integrity,
 # configuration validation, complypack availability, and cache health
 
+$ complyctl doctor --format text
+# Same diagnostics with grep-friendly plain labels ([PASS]/[FAIL]/[WARN])
+# instead of emoji; useful in CI logs
+
+$ complyctl doctor --format json
+# Structured JSON output: {"checks": [...], "summary": {...}, "blocking_failure": bool}
+# Exits non-zero when a blocking check fails
+
+$ NO_COLOR=1 complyctl doctor
+# Automatically selects text format when NO_COLOR is set
+
 $ COMPLYTIME_CACHE_VERSIONS=3 complyctl get
 # Retain up to 3 complypack versions per evaluator-id
 ```
@@ -155,6 +170,12 @@ resolves configuration and output paths relative to this directory.
 **COMPLYTIME_SHOW_PASSING**
 : When set to **false**, exclude passing controls from the terminal scan
 summary table. Default: **true** (show all controls).
+
+**NO_COLOR**
+: When set (any non-empty value), **complyctl doctor** automatically selects
+**text** format instead of the default human-readable emoji output. Follows
+the NO_COLOR convention at https://no-color.org. Has no effect when
+**--format** is specified explicitly.
 
 # SEE ALSO
 

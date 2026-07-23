@@ -29,6 +29,8 @@ const (
 	OutputFormatOSCAL  = "oscal"
 	OutputFormatPretty = "pretty"
 	OutputFormatSARIF  = "sarif"
+	OutputFormatText   = "text"
+	OutputFormatJSON   = "json"
 )
 
 // ShowPassingEnvVar is the environment variable that controls whether

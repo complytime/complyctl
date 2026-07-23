@@ -63,8 +63,20 @@ whether each provider's prerequisites are met. It also reports
 complypack cache health: total disk usage, orphaned versions
 (on disk but not tracked in state.json), and untracked versions
 (no state.json exists), with a suggestion to run `complyctl get`
-to rebuild state. You can also list discovered providers
-directly:
+to rebuild state.
+
+Use `--format text` for grep-friendly output in CI logs, or
+`--format json` for structured output that scripts can parse:
+
+```bash
+# JSON: {"checks": [...], "summary": {...}, "blocking_failure": bool}
+complyctl doctor --format json
+
+# Plain labels ([PASS]/[FAIL]/[WARN]) — also auto-selected when NO_COLOR is set
+complyctl doctor --format text
+```
+
+You can also list discovered providers directly:
 
 ```bash
 complyctl providers
