@@ -29,7 +29,7 @@ func TestVerifyComplypackArtifactType_AlreadyPopulated(t *testing.T) {
 	store := memory.New()
 
 	// Create a real complypack artifact — Pack sets ArtifactType on the descriptor
-	cfg := complypack.Config{ID: "test-pack", EvaluatorID: "test-eval", Version: "1.0.0"}
+	cfg := complypack.Config{ID: "io.complytime.test-pack", EvaluatorID: "test-eval", Version: "1.0.0"}
 	desc, err := complypack.Pack(ctx, store, cfg, strings.NewReader("content"))
 	require.NoError(t, err)
 	require.Equal(t, complypack.MediaTypeArtifact, desc.ArtifactType)
@@ -45,7 +45,7 @@ func TestVerifyComplypackArtifactType_FallbackToManifestBody(t *testing.T) {
 	store := memory.New()
 
 	// Create a real complypack artifact
-	cfg := complypack.Config{ID: "test-pack", EvaluatorID: "test-eval", Version: "1.0.0"}
+	cfg := complypack.Config{ID: "io.complytime.test-pack", EvaluatorID: "test-eval", Version: "1.0.0"}
 	desc, err := complypack.Pack(ctx, store, cfg, strings.NewReader("content"))
 	require.NoError(t, err)
 

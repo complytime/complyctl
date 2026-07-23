@@ -3,18 +3,24 @@
 package cache_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"oras.land/oras-go/v2"
 	ocistore "oras.land/oras-go/v2/content/oci"
+	"oras.land/oras-go/v2/errdef"
 
 	"github.com/complytime/complyctl/internal/cache"
 	"github.com/complytime/complypack/pkg/complypack"
@@ -579,15 +585,9 @@ func TestComplypackSync_InvalidEvaluatorID(t *testing.T) {
 
 // maliciousEvaluatorMock wraps a mockComplypackSource but overrides the
 // evaluator-id in the packed artifact config to inject a path traversal value.
-// complypack.Pack() validates Config, so we pack with a safe ID and then
-// re-pack with the malicious ID by manipulating the OCI store content.
-// Instead, we use a simpler approach: pack with a safe config, then the
-// Unpack result will have the safe config. We override CopyComplypack to
-// pack an artifact whose config has the malicious evaluator-id.
-//
-// Since complypack.Config.Validate() rejects empty evaluator-ids but does
-// NOT reject path traversal characters (that's complyctl's responsibility),
-// we can pack with "../../evil" directly.
+// complypack v0.0.8 validates Config at Pack() time, so we bypass Pack()
+// entirely and construct the OCI artifact manually to simulate receiving
+// a maliciously crafted artifact from an untrusted registry.
 type maliciousEvaluatorMock struct {
 	base *mockComplypackSource
 }
@@ -596,26 +596,54 @@ func (m *maliciousEvaluatorMock) DefinitionVersion(ctx context.Context, reposito
 	return m.base.DefinitionVersion(ctx, repository)
 }
 
-func (m *maliciousEvaluatorMock) CopyComplypack(ctx context.Context, repository, tag string, dst *ocistore.Store) (ocispec.Descriptor, error) {
-	// Pack with the malicious evaluator-id. complypack.Config.Validate()
-	// checks for empty fields but does not enforce path safety — that's
-	// the consumer's (complyctl's) responsibility.
+func (m *maliciousEvaluatorMock) CopyComplypack(ctx context.Context, _, tag string, dst *ocistore.Store) (ocispec.Descriptor, error) {
+	// Bypass complypack.Pack() validation by constructing the OCI artifact
+	// manually. This simulates a malicious registry serving a complypack
+	// with a path traversal evaluator-id.
 	cfg := complypack.Config{
-		ID:          "evil-pack",
+		ID:          "io.complytime.evil-pack",
 		EvaluatorID: "../../evil",
 		Version:     "1.0.0",
 	}
-
-	desc, err := complypack.Pack(ctx, dst, cfg, strings.NewReader("evil content"))
+	configData, err := json.Marshal(cfg)
 	if err != nil {
+		return ocispec.Descriptor{}, fmt.Errorf("marshaling config: %w", err)
+	}
+	configDesc := ocispec.Descriptor{
+		MediaType: complypack.MediaTypeConfig,
+		Digest:    digest.FromBytes(configData),
+		Size:      int64(len(configData)),
+	}
+	if err := dst.Push(ctx, configDesc, bytes.NewReader(configData)); err != nil && !errors.Is(err, errdef.ErrAlreadyExists) {
+		return ocispec.Descriptor{}, fmt.Errorf("pushing config: %w", err)
+	}
+
+	contentData := []byte("evil content")
+	contentDesc := ocispec.Descriptor{
+		MediaType: complypack.MediaTypeContent,
+		Digest:    digest.FromBytes(contentData),
+		Size:      int64(len(contentData)),
+	}
+	if err := dst.Push(ctx, contentDesc, bytes.NewReader(contentData)); err != nil && !errors.Is(err, errdef.ErrAlreadyExists) {
+		return ocispec.Descriptor{}, fmt.Errorf("pushing content: %w", err)
+	}
+
+	manifestDesc, err := oras.PackManifest(ctx, dst,
+		oras.PackManifestVersion1_1,
+		complypack.MediaTypeArtifact,
+		oras.PackManifestOptions{
+			ConfigDescriptor: &configDesc,
+			Layers:           []ocispec.Descriptor{contentDesc},
+		})
+	if err != nil {
+		return ocispec.Descriptor{}, fmt.Errorf("packing manifest: %w", err)
+	}
+
+	if err := dst.Tag(ctx, manifestDesc, tag); err != nil {
 		return ocispec.Descriptor{}, err
 	}
 
-	if err := dst.Tag(ctx, desc, tag); err != nil {
-		return ocispec.Descriptor{}, err
-	}
-
-	return desc, nil
+	return manifestDesc, nil
 }
 
 // TestComplypackSync_EmptyVersion_ResolvesToRemote verifies that when version

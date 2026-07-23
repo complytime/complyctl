@@ -162,23 +162,33 @@ func (m *MockPolicySource) CopyPolicy(ctx context.Context, policyID, tag string,
 type MockBundlePolicySource struct {
 	mu       sync.RWMutex
 	policies map[string]*mockPolicyData
-	files    map[string][]bundle.File // key: policyID
+	bundles  map[string]*bundle.Bundle // key: policyID
 }
 
 // NewMockBundlePolicySource creates a mock source that pushes bundle artifacts.
 func NewMockBundlePolicySource() *MockBundlePolicySource {
 	return &MockBundlePolicySource{
 		policies: make(map[string]*mockPolicyData),
-		files:    make(map[string][]bundle.File),
+		bundles:  make(map[string]*bundle.Bundle),
 	}
 }
 
 // SeedBundlePolicy registers a bundle-shape policy with the given files.
+// The first file becomes the Source; remaining files become Imports.
 func (m *MockBundlePolicySource) SeedBundlePolicy(policyID, version, digestStr string, files []bundle.File) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.policies[policyID] = &mockPolicyData{digest: digestStr, version: version}
-	m.files[policyID] = files
+	b := &bundle.Bundle{
+		Manifest: bundle.Manifest{BundleVersion: "1", GemaraVersion: "v1.0.0"},
+	}
+	if len(files) > 0 {
+		b.Source = files[0]
+	}
+	if len(files) > 1 {
+		b.Imports = files[1:]
+	}
+	m.bundles[policyID] = b
 }
 
 func (m *MockBundlePolicySource) DefinitionVersion(_ context.Context, lookupRef string) (string, string, error) {
@@ -195,15 +205,10 @@ func (m *MockBundlePolicySource) DefinitionVersion(_ context.Context, lookupRef 
 // destination OCI store, matching the production publish pipeline.
 func (m *MockBundlePolicySource) CopyPolicy(ctx context.Context, policyID, tag string, dst *ocistore.Store) (ocispec.Descriptor, error) {
 	m.mu.RLock()
-	files, ok := m.files[policyID]
+	b, ok := m.bundles[policyID]
 	m.mu.RUnlock()
 	if !ok {
 		return ocispec.Descriptor{}, fmt.Errorf("bundle policy %s not found in mock", policyID)
-	}
-
-	b := &bundle.Bundle{
-		Manifest: bundle.Manifest{BundleVersion: "1", GemaraVersion: "v1.0.0"},
-		Files:    files,
 	}
 
 	desc, err := bundle.Pack(ctx, dst, b)

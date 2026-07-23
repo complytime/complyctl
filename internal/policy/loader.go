@@ -141,11 +141,9 @@ func (l *Loader) LoadBundleFiles(policyID, version string) (map[string][]byte, e
 		return artTypes[f.Name]
 	}
 
-	files := make(map[string][]byte, len(b.Files)+len(b.Imports))
-	for _, f := range b.Files {
-		if t := fileType(f); t != "" {
-			files[t] = f.Data
-		}
+	files := make(map[string][]byte, 1+len(b.Imports))
+	if t := fileType(b.Source); t != "" {
+		files[t] = b.Source.Data
 	}
 	for _, f := range b.Imports {
 		if t := fileType(f); t != "" {
