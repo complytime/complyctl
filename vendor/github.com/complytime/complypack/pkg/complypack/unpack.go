@@ -32,23 +32,8 @@ type ComplyPack struct {
 //	if err != nil { return err }
 //	defer result.Content.Close()  // Required!
 //
-// Options:
-//   - WithVerification(keyPath) enables keyed signature verification
-//   - WithKeylessVerification(cert, issuer, identity) enables OIDC-based verification
-//
 // Returns ComplyPack with config and content reader. Caller must close Content.
-func Unpack(ctx context.Context, store content.ReadOnlyStorage, desc ocispec.Descriptor, opts ...UnpackOption) (*ComplyPack, error) {
-	// Apply options
-	options := &unpackOptions{}
-	for _, opt := range opts {
-		opt(options)
-	}
-
-	// Verify signature if requested
-	if err := verify(ctx, store, desc, options); err != nil {
-		return nil, err
-	}
-
+func Unpack(ctx context.Context, store content.ReadOnlyStorage, desc ocispec.Descriptor) (*ComplyPack, error) {
 	// Fetch manifest
 	manifestData, err := content.FetchAll(ctx, store, desc)
 	if err != nil {

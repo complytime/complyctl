@@ -35,11 +35,11 @@ func (u *URI) Fetch(ctx context.Context, source string) (io.ReadCloser, error) {
 	case strings.HasPrefix(source, "http://"), strings.HasPrefix(source, "https://"):
 		return (&HTTP{Client: u.Client}).Fetch(ctx, source)
 	case strings.HasPrefix(source, "file://"):
-		parsed, err := url.Parse(source)
+		path, err := url.PathUnescape(strings.TrimPrefix(source, "file://"))
 		if err != nil {
 			return nil, fmt.Errorf("invalid file URI %q: %w", source, err)
 		}
-		return (&File{}).Fetch(ctx, parsed.Path)
+		return (&File{}).Fetch(ctx, path)
 	case schemePrefix.MatchString(source):
 		return nil, fmt.Errorf("unsupported URI scheme in %q", source)
 	default:

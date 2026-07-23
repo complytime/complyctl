@@ -71,14 +71,25 @@ type File struct {
 type Bundle struct {
 	// Manifest is the OCI config blob describing the bundle contents.
 	Manifest Manifest
-	// Files are the primary artifact files provided as assembly sources.
-	Files []File
+	// Source is the primary artifact file that anchors this bundle.
+	Source File
 	// Imports are the resolved transitive dependency files.
 	Imports []File
+	// Warnings holds non-fatal issues found during assembly,
+	// such as mapping-reference IDs that don't match any artifact.
+	Warnings []MappingWarning
 	// Etag is the OCI manifest digest used for cache comparison.
 	Etag string
 
 	sizeLimitBytes int64
+}
+
+// MappingWarning describes a mapping-reference whose id does not match
+// any artifact metadata.id in the provided set.
+type MappingWarning struct {
+	File        string
+	ArtifactID  string
+	ReferenceID string
 }
 
 // SizeLimitBytes returns the configured size limit.
@@ -95,16 +106,30 @@ func (b *Bundle) SetSizeLimitBytes(n int64) {
 	b.sizeLimitBytes = n
 }
 
+// Version returns the bundle version from the manifest.
+func (b *Bundle) Version() string {
+	return b.Manifest.BundleVersion
+}
+
 // PackOption configures Pack behaviour.
 type PackOption func(*packOptions)
 
 type packOptions struct {
 	annotations map[string]string
+	version     *string
 }
 
 // WithAnnotations adds custom annotations to the OCI manifest.
 func WithAnnotations(annotations map[string]string) PackOption {
 	return func(o *packOptions) {
 		o.annotations = annotations
+	}
+}
+
+// WithVersion overrides the bundle's Manifest.BundleVersion at pack time.
+// When not set, the version assembled from the main artifact metadata is used.
+func WithVersion(v string) PackOption {
+	return func(o *packOptions) {
+		o.version = &v
 	}
 }

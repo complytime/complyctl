@@ -2,7 +2,11 @@
 
 package complypack
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/complytime/complypack/schemas/jsonschema"
+)
 
 // Config is the ComplyPack OCI artifact configuration.
 // Embedded in the OCI config layer so consumers can identify the pack
@@ -38,17 +42,28 @@ type Provenance struct {
 	PolicyID string `json:"policy-id"`
 }
 
-// Validate checks that required Config fields are present.
+// Validate checks that required Config fields are present and well-formed.
+// Format patterns are derived from the embedded JSON Schema — same source
+// of truth used by the YAML config layer.
 // Returns ErrInvalidConfig if validation fails.
 func (c Config) Validate() error {
 	if c.ID == "" {
 		return fmt.Errorf("%w: id is required", ErrInvalidConfig)
 	}
+	if !jsonschema.IDPattern().MatchString(c.ID) {
+		return fmt.Errorf("%w: id %q must use reverse-domain notation (e.g. io.complytime.my-pack)", ErrInvalidConfig, c.ID)
+	}
 	if c.EvaluatorID == "" {
 		return fmt.Errorf("%w: evaluator-id is required", ErrInvalidConfig)
 	}
+	if !jsonschema.EvaluatorIDPattern().MatchString(c.EvaluatorID) {
+		return fmt.Errorf("%w: evaluator-id %q must be a lowercase identifier (e.g. opa)", ErrInvalidConfig, c.EvaluatorID)
+	}
 	if c.Version == "" {
 		return fmt.Errorf("%w: version is required", ErrInvalidConfig)
+	}
+	if !jsonschema.VersionPattern().MatchString(c.Version) {
+		return fmt.Errorf("%w: version %q must be semver (e.g. 1.0.0)", ErrInvalidConfig, c.Version)
 	}
 	if c.Source != nil {
 		if c.Source.GemaraContent == "" {
