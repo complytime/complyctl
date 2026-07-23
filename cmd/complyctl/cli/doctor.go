@@ -72,9 +72,9 @@ and reports missing entries.`,
 		},
 	}
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "expand per-provider variable detail")
-	cmd.Flags().StringVarP(&format, "format", "f", "", "output format: text, json")
+	cmd.Flags().StringVarP(&format, "format", "f", "", "output format: human, text, json (default human)")
 	if err := cmd.RegisterFlagCompletionFunc("format", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return []string{complytime.OutputFormatText, complytime.OutputFormatJSON}, cobra.ShellCompDirectiveNoFileComp
+		return []string{complytime.OutputFormatHuman, complytime.OutputFormatText, complytime.OutputFormatJSON}, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
 		logger.Error("Failed to register format completion", "error", err)
 	}
@@ -150,6 +150,52 @@ func runDoctor(baseDir string, verbose bool, format string) error {
 	return printDiagnostics(results, format)
 }
 
+// resultSummary holds aggregated counts and blocking state computed from a
+// slice of CheckResults. All three renderers share this to avoid structural
+// divergence in counting and blocking-failure detection.
+type resultSummary struct {
+	passCount       int
+	failCount       int
+	warnCount       int
+	total           int
+	blockingFailure bool
+}
+
+// summarizeResults computes counts and blocking state from results. Counts
+// include top-level checks and their children but not grandchildren
+// (D5 — stable count regardless of --verbose). A blocking failure is
+// detected when a check has both Blocking=true and Status=StatusFail.
+func summarizeResults(results []doctor.CheckResult) resultSummary {
+	var s resultSummary
+	for _, r := range results {
+		countStatusSummary(r.Status, &s)
+		if r.Blocking && r.Status == doctor.StatusFail {
+			s.blockingFailure = true
+		}
+		for _, child := range r.Children {
+			countStatusSummary(child.Status, &s)
+			if child.Blocking && child.Status == doctor.StatusFail {
+				s.blockingFailure = true
+			}
+			// Grandchildren (verbose detail) are not counted (D5).
+		}
+	}
+	s.total = s.passCount + s.failCount + s.warnCount
+	return s
+}
+
+// countStatusSummary increments the appropriate counter in the summary.
+func countStatusSummary(status doctor.CheckStatus, s *resultSummary) {
+	switch status {
+	case doctor.StatusPass:
+		s.passCount++
+	case doctor.StatusFail:
+		s.failCount++
+	case doctor.StatusWarn:
+		s.warnCount++
+	}
+}
+
 // statusLabel maps a CheckStatus to a grep-stable bracketed label.
 func statusLabel(s doctor.CheckStatus) string {
 	switch s {
@@ -172,9 +218,11 @@ func resolveFormat(flagValue string) (string, error) {
 		switch flagValue {
 		case complytime.OutputFormatText, complytime.OutputFormatJSON:
 			return flagValue, nil
+		case complytime.OutputFormatHuman:
+			return "", nil
 		default:
-			return "", fmt.Errorf("invalid format %q: must be one of %s, %s",
-				flagValue, complytime.OutputFormatText, complytime.OutputFormatJSON)
+			return "", fmt.Errorf("invalid format %q: must be one of %s, %s, %s",
+				flagValue, complytime.OutputFormatHuman, complytime.OutputFormatText, complytime.OutputFormatJSON)
 		}
 	}
 	if os.Getenv("NO_COLOR") != "" {
@@ -203,18 +251,7 @@ func statusEmoji(s doctor.CheckStatus) string {
 	case doctor.StatusWarn:
 		return complytime.StatusError
 	default:
-		return "?"
-	}
-}
-
-func countStatus(s doctor.CheckStatus, pass, fail, warn *int) {
-	switch s {
-	case doctor.StatusPass:
-		*pass++
-	case doctor.StatusFail:
-		*fail++
-	case doctor.StatusWarn:
-		*warn++
+		return "❓"
 	}
 }
 
@@ -229,10 +266,7 @@ func printDiagnosticsHuman(results []doctor.CheckResult, w io.Writer) error {
 		grouped[r.Group] = append(grouped[r.Group], r)
 	}
 
-	var passCount, failCount, warnCount int
-	hasBlockingFailure := false
 	firstSection := true
-
 	for _, group := range doctor.GroupOrder() {
 		checks, ok := grouped[group]
 		if !ok {
@@ -246,36 +280,25 @@ func printDiagnosticsHuman(results []doctor.CheckResult, w io.Writer) error {
 		fmt.Fprintln(w, string(group))
 
 		for _, r := range checks {
-			emoji := statusEmoji(r.Status)
-			countStatus(r.Status, &passCount, &failCount, &warnCount)
-			fmt.Fprintf(w, "  %s %s %s: %s\n", emoji, statusLabel(r.Status), resultLabel(r), r.Message)
-			if r.Blocking && r.Status == doctor.StatusFail {
-				hasBlockingFailure = true
-			}
+			fmt.Fprintf(w, "  %s %s %s: %s\n", statusEmoji(r.Status), statusLabel(r.Status), resultLabel(r), r.Message)
 
 			for _, child := range r.Children {
-				childEmoji := statusEmoji(child.Status)
-				countStatus(child.Status, &passCount, &failCount, &warnCount)
-				fmt.Fprintf(w, "      %s %s %s: %s\n", childEmoji, statusLabel(child.Status), resultLabel(child), child.Message)
-				if child.Blocking && child.Status == doctor.StatusFail {
-					hasBlockingFailure = true
-				}
+				fmt.Fprintf(w, "      %s %s %s: %s\n", statusEmoji(child.Status), statusLabel(child.Status), resultLabel(child), child.Message)
 
 				// Grandchildren (verbose detail) are rendered but not
 				// counted in the summary (D5 — stable count regardless
 				// of --verbose).
 				for _, gc := range child.Children {
-					gcEmoji := statusEmoji(gc.Status)
-					fmt.Fprintf(w, "          %s %s %s\n", gcEmoji, statusLabel(gc.Status), gc.Message)
+					fmt.Fprintf(w, "          %s %s %s\n", statusEmoji(gc.Status), statusLabel(gc.Status), gc.Message)
 				}
 			}
 		}
 	}
 
-	total := passCount + failCount + warnCount
-	fmt.Fprintf(w, "\n%d checks: %d passed, %d failed, %d warnings\n", total, passCount, failCount, warnCount)
+	s := summarizeResults(results)
+	fmt.Fprintf(w, "\n%d checks: %d passed, %d failed, %d warnings\n", s.total, s.passCount, s.failCount, s.warnCount)
 
-	if hasBlockingFailure {
+	if s.blockingFailure {
 		return fmt.Errorf("one or more blocking checks failed")
 	}
 	return nil
@@ -292,10 +315,7 @@ func printDiagnosticsText(results []doctor.CheckResult, w io.Writer) error {
 		grouped[r.Group] = append(grouped[r.Group], r)
 	}
 
-	var passCount, failCount, warnCount int
-	hasBlockingFailure := false
 	firstSection := true
-
 	for _, group := range doctor.GroupOrder() {
 		checks, ok := grouped[group]
 		if !ok {
@@ -309,18 +329,10 @@ func printDiagnosticsText(results []doctor.CheckResult, w io.Writer) error {
 		fmt.Fprintln(w, string(group))
 
 		for _, r := range checks {
-			countStatus(r.Status, &passCount, &failCount, &warnCount)
 			fmt.Fprintf(w, "  %s %s: %s\n", statusLabel(r.Status), resultLabel(r), r.Message)
-			if r.Blocking && r.Status == doctor.StatusFail {
-				hasBlockingFailure = true
-			}
 
 			for _, child := range r.Children {
-				countStatus(child.Status, &passCount, &failCount, &warnCount)
 				fmt.Fprintf(w, "      %s %s: %s\n", statusLabel(child.Status), resultLabel(child), child.Message)
-				if child.Blocking && child.Status == doctor.StatusFail {
-					hasBlockingFailure = true
-				}
 
 				for _, gc := range child.Children {
 					fmt.Fprintf(w, "          %s %s\n", statusLabel(gc.Status), gc.Message)
@@ -329,10 +341,10 @@ func printDiagnosticsText(results []doctor.CheckResult, w io.Writer) error {
 		}
 	}
 
-	total := passCount + failCount + warnCount
-	fmt.Fprintf(w, "\n%d checks: %d passed, %d failed, %d warnings\n", total, passCount, failCount, warnCount)
+	s := summarizeResults(results)
+	fmt.Fprintf(w, "\n%d checks: %d passed, %d failed, %d warnings\n", s.total, s.passCount, s.failCount, s.warnCount)
 
-	if hasBlockingFailure {
+	if s.blockingFailure {
 		return fmt.Errorf("one or more blocking checks failed")
 	}
 	return nil
@@ -360,32 +372,20 @@ func convertResult(r doctor.CheckResult) checkOutput {
 // written. Used for --format json.
 func printDiagnosticsJSON(results []doctor.CheckResult, w io.Writer) error {
 	checks := make([]checkOutput, 0, len(results))
-	var passCount, failCount, warnCount int
-	hasBlockingFailure := false
-
 	for _, r := range results {
-		countStatus(r.Status, &passCount, &failCount, &warnCount)
-		if r.Blocking && r.Status == doctor.StatusFail {
-			hasBlockingFailure = true
-		}
-		for _, child := range r.Children {
-			countStatus(child.Status, &passCount, &failCount, &warnCount)
-			if child.Blocking && child.Status == doctor.StatusFail {
-				hasBlockingFailure = true
-			}
-		}
 		checks = append(checks, convertResult(r))
 	}
 
+	s := summarizeResults(results)
 	out := diagnosticOutput{
 		Checks: checks,
 		Summary: diagnosticSummary{
-			Total:    passCount + failCount + warnCount,
-			Passed:   passCount,
-			Failed:   failCount,
-			Warnings: warnCount,
+			Total:    s.total,
+			Passed:   s.passCount,
+			Failed:   s.failCount,
+			Warnings: s.warnCount,
 		},
-		BlockingFailure: hasBlockingFailure,
+		BlockingFailure: s.blockingFailure,
 	}
 
 	enc := json.NewEncoder(w)
@@ -394,7 +394,7 @@ func printDiagnosticsJSON(results []doctor.CheckResult, w io.Writer) error {
 		return fmt.Errorf("encoding diagnostic output: %w", err)
 	}
 
-	if hasBlockingFailure {
+	if s.blockingFailure {
 		return fmt.Errorf("one or more blocking checks failed")
 	}
 	return nil
@@ -402,14 +402,17 @@ func printDiagnosticsJSON(results []doctor.CheckResult, w io.Writer) error {
 
 // printDiagnosticsTo dispatches to the appropriate renderer based on format,
 // writing output to w. An empty format string selects the human renderer.
+// Unrecognised format values return an error.
 func printDiagnosticsTo(results []doctor.CheckResult, format string, w io.Writer) error {
 	switch format {
+	case "":
+		return printDiagnosticsHuman(results, w)
 	case complytime.OutputFormatText:
 		return printDiagnosticsText(results, w)
 	case complytime.OutputFormatJSON:
 		return printDiagnosticsJSON(results, w)
 	default:
-		return printDiagnosticsHuman(results, w)
+		return fmt.Errorf("unsupported output format: %s", format)
 	}
 }
 

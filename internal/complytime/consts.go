@@ -31,6 +31,7 @@ const (
 	OutputFormatSARIF  = "sarif"
 	OutputFormatText   = "text"
 	OutputFormatJSON   = "json"
+	OutputFormatHuman  = "human"
 )
 
 // ShowPassingEnvVar is the environment variable that controls whether

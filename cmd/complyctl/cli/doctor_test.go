@@ -67,6 +67,12 @@ func TestResolveFormat_InvalidFlag(t *testing.T) {
 	assert.Contains(t, err.Error(), "xml")
 }
 
+func TestResolveFormat_HumanFlag(t *testing.T) {
+	got, err := resolveFormat(complytime.OutputFormatHuman)
+	require.NoError(t, err)
+	assert.Equal(t, "", got, "human maps to empty string internally")
+}
+
 func TestResolveFormat_ExplicitFlagOverridesNOCOLOR(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	got, err := resolveFormat(complytime.OutputFormatJSON)
@@ -74,13 +80,32 @@ func TestResolveFormat_ExplicitFlagOverridesNOCOLOR(t *testing.T) {
 	assert.Equal(t, complytime.OutputFormatJSON, got)
 }
 
+func TestResolveFormat_HumanFlagOverridesNOCOLOR(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	got, err := resolveFormat(complytime.OutputFormatHuman)
+	require.NoError(t, err)
+	assert.Equal(t, "", got, "--format human must produce human output even with NO_COLOR")
+}
+
+// --- resultLabel ---
+
+func TestResultLabel_UsesLabelWhenSet(t *testing.T) {
+	r := doctor.CheckResult{Name: "internal-name", Label: "Display Name"}
+	assert.Equal(t, "Display Name", resultLabel(r))
+}
+
+func TestResultLabel_FallsBackToName(t *testing.T) {
+	r := doctor.CheckResult{Name: "fallback-name"}
+	assert.Equal(t, "fallback-name", resultLabel(r))
+}
+
 // --- printDiagnosticsHuman ---
 
 func TestPrintDiagnosticsHuman_ContainsEmojiAndLabel(t *testing.T) {
 	results := []doctor.CheckResult{
-		{Name: "config", Status: doctor.StatusFail, Message: "bad config", Blocking: true},
-		{Name: "providers", Status: doctor.StatusWarn, Message: "no providers", Blocking: false},
-		{Name: "cache", Status: doctor.StatusPass, Message: "cache ok", Blocking: false},
+		{Name: "config", Status: doctor.StatusFail, Message: "bad config", Blocking: true, Group: doctor.GroupWorkspace},
+		{Name: "providers", Status: doctor.StatusWarn, Message: "no providers", Blocking: false, Group: doctor.GroupProviders},
+		{Name: "cache", Status: doctor.StatusPass, Message: "cache ok", Blocking: false, Group: doctor.GroupCache},
 	}
 
 	var buf bytes.Buffer
@@ -99,7 +124,7 @@ func TestPrintDiagnosticsHuman_ContainsEmojiAndLabel(t *testing.T) {
 
 func TestPrintDiagnosticsHuman_NoBlockingFailure_ReturnsNil(t *testing.T) {
 	results := []doctor.CheckResult{
-		{Name: "config", Status: doctor.StatusPass, Message: "ok", Blocking: true},
+		{Name: "config", Status: doctor.StatusPass, Message: "ok", Blocking: true, Group: doctor.GroupWorkspace},
 	}
 	var buf bytes.Buffer
 	err := printDiagnosticsHuman(results, &buf)
@@ -108,18 +133,52 @@ func TestPrintDiagnosticsHuman_NoBlockingFailure_ReturnsNil(t *testing.T) {
 
 func TestPrintDiagnosticsHuman_WarnBlockingDoesNotFail(t *testing.T) {
 	results := []doctor.CheckResult{
-		{Name: "providers", Status: doctor.StatusWarn, Message: "no providers", Blocking: true},
+		{Name: "providers", Status: doctor.StatusWarn, Message: "no providers", Blocking: true, Group: doctor.GroupProviders},
 	}
 	var buf bytes.Buffer
 	err := printDiagnosticsHuman(results, &buf)
 	assert.NoError(t, err, "warn+blocking should not trigger error")
 }
 
+func TestPrintDiagnosticsHuman_GroupedSections(t *testing.T) {
+	results := []doctor.CheckResult{
+		{Name: "prov1", Status: doctor.StatusPass, Message: "ok", Group: doctor.GroupProviders},
+		{Name: "cache1", Status: doctor.StatusPass, Message: "ok", Group: doctor.GroupCache},
+	}
+	var buf bytes.Buffer
+	err := printDiagnosticsHuman(results, &buf)
+	require.NoError(t, err)
+	out := buf.String()
+	assert.Contains(t, out, string(doctor.GroupProviders))
+	assert.Contains(t, out, string(doctor.GroupCache))
+	provIdx := strings.Index(out, string(doctor.GroupProviders))
+	cacheIdx := strings.Index(out, string(doctor.GroupCache))
+	assert.Less(t, provIdx, cacheIdx, "providers section should appear before cache")
+}
+
+func TestPrintDiagnosticsHuman_ChildrenRendered(t *testing.T) {
+	results := []doctor.CheckResult{
+		{
+			Name: "parent", Status: doctor.StatusPass, Message: "ok", Group: doctor.GroupProviders,
+			Children: []doctor.CheckResult{
+				{Name: "child1", Status: doctor.StatusWarn, Message: "child warning"},
+			},
+		},
+	}
+	var buf bytes.Buffer
+	err := printDiagnosticsHuman(results, &buf)
+	require.NoError(t, err)
+	out := buf.String()
+	assert.Contains(t, out, "child1")
+	assert.Contains(t, out, "child warning")
+	assert.Contains(t, out, "2 checks:", "children should be counted")
+}
+
 // --- printDiagnosticsText ---
 
 func TestPrintDiagnosticsText_NoEmoji(t *testing.T) {
 	results := []doctor.CheckResult{
-		{Name: "config", Status: doctor.StatusFail, Message: "bad config", Blocking: true},
+		{Name: "config", Status: doctor.StatusFail, Message: "bad config", Blocking: true, Group: doctor.GroupWorkspace},
 	}
 
 	var buf bytes.Buffer
@@ -134,9 +193,9 @@ func TestPrintDiagnosticsText_NoEmoji(t *testing.T) {
 
 func TestPrintDiagnosticsText_AllStatuses(t *testing.T) {
 	results := []doctor.CheckResult{
-		{Name: "a", Status: doctor.StatusPass, Message: "ok", Blocking: false},
-		{Name: "b", Status: doctor.StatusWarn, Message: "warn", Blocking: false},
-		{Name: "c", Status: doctor.StatusFail, Message: "fail", Blocking: true},
+		{Name: "a", Status: doctor.StatusPass, Message: "ok", Blocking: false, Group: doctor.GroupProviders},
+		{Name: "b", Status: doctor.StatusWarn, Message: "warn", Blocking: false, Group: doctor.GroupProviders},
+		{Name: "c", Status: doctor.StatusFail, Message: "fail", Blocking: true, Group: doctor.GroupProviders},
 	}
 
 	var buf bytes.Buffer
@@ -152,7 +211,7 @@ func TestPrintDiagnosticsText_AllStatuses(t *testing.T) {
 
 func TestPrintDiagnosticsText_NoBlockingFailure_ReturnsNil(t *testing.T) {
 	results := []doctor.CheckResult{
-		{Name: "config", Status: doctor.StatusPass, Message: "ok", Blocking: true},
+		{Name: "config", Status: doctor.StatusPass, Message: "ok", Blocking: true, Group: doctor.GroupWorkspace},
 	}
 	var buf bytes.Buffer
 	err := printDiagnosticsText(results, &buf)
@@ -163,8 +222,8 @@ func TestPrintDiagnosticsText_NoBlockingFailure_ReturnsNil(t *testing.T) {
 
 func TestPrintDiagnosticsJSON_ValidJSON(t *testing.T) {
 	results := []doctor.CheckResult{
-		{Name: "config", Status: doctor.StatusFail, Message: "bad config", Blocking: true},
-		{Name: "providers", Status: doctor.StatusWarn, Message: "no providers", Blocking: false},
+		{Name: "config", Status: doctor.StatusFail, Message: "bad config", Blocking: true, Group: doctor.GroupWorkspace},
+		{Name: "providers", Status: doctor.StatusWarn, Message: "no providers", Blocking: false, Group: doctor.GroupProviders},
 	}
 
 	var buf bytes.Buffer
@@ -190,7 +249,7 @@ func TestPrintDiagnosticsJSON_ValidJSON(t *testing.T) {
 
 func TestPrintDiagnosticsJSON_NoBlockingFailure(t *testing.T) {
 	results := []doctor.CheckResult{
-		{Name: "config", Status: doctor.StatusPass, Message: "ok", Blocking: true},
+		{Name: "config", Status: doctor.StatusPass, Message: "ok", Blocking: true, Group: doctor.GroupWorkspace},
 	}
 	var buf bytes.Buffer
 	err := printDiagnosticsJSON(results, &buf)
@@ -213,27 +272,32 @@ func TestPrintDiagnosticsJSON_EmptyResults(t *testing.T) {
 	assert.Empty(t, out.Checks)
 }
 
-// --- NO_COLOR integration via resolveFormat ---
-
-func TestResolveFormat_NOCOLOREmpty_ReturnsHuman(t *testing.T) {
-	// Ensure NO_COLOR is not set.
-	t.Setenv("NO_COLOR", "")
-	got, err := resolveFormat("")
+func TestPrintDiagnosticsJSON_ChildrenIncluded(t *testing.T) {
+	results := []doctor.CheckResult{
+		{
+			Name: "parent", Status: doctor.StatusPass, Message: "ok",
+			Group: doctor.GroupProviders,
+			Children: []doctor.CheckResult{
+				{Name: "child", Status: doctor.StatusWarn, Message: "child warning"},
+			},
+		},
+	}
+	var buf bytes.Buffer
+	err := printDiagnosticsJSON(results, &buf)
 	require.NoError(t, err)
-	assert.Equal(t, "", got, "empty string signals human mode")
-}
 
-func TestResolveFormat_NOCOLORNonEmpty_ReturnsText(t *testing.T) {
-	t.Setenv("NO_COLOR", "true")
-	got, err := resolveFormat("")
-	require.NoError(t, err)
-	assert.Equal(t, complytime.OutputFormatText, got)
+	var out diagnosticOutput
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &out))
+	require.Len(t, out.Checks, 1)
+	require.Len(t, out.Checks[0].Children, 1)
+	assert.Equal(t, "child", out.Checks[0].Children[0].Name)
+	assert.Equal(t, 2, out.Summary.Total, "children should be counted in summary")
 }
 
 func TestPrintDiagnosticsText_GrepPattern(t *testing.T) {
 	results := []doctor.CheckResult{
-		{Name: "config", Status: doctor.StatusFail, Message: "missing policy", Blocking: true},
-		{Name: "cache", Status: doctor.StatusPass, Message: "ok", Blocking: false},
+		{Name: "config", Status: doctor.StatusFail, Message: "missing policy", Blocking: true, Group: doctor.GroupWorkspace},
+		{Name: "cache", Status: doctor.StatusPass, Message: "ok", Blocking: false, Group: doctor.GroupCache},
 	}
 	var buf bytes.Buffer
 	err := printDiagnosticsText(results, &buf)
@@ -254,10 +318,10 @@ func TestPrintDiagnosticsText_GrepPattern(t *testing.T) {
 
 func TestPrintDiagnosticsTo_DispatchesCorrectly(t *testing.T) {
 	passOnly := []doctor.CheckResult{
-		{Name: "check", Status: doctor.StatusPass, Message: "ok", Blocking: false},
+		{Name: "check", Status: doctor.StatusPass, Message: "ok", Blocking: false, Group: doctor.GroupWorkspace},
 	}
 	failBlocking := []doctor.CheckResult{
-		{Name: "check", Status: doctor.StatusFail, Message: "broken", Blocking: true},
+		{Name: "check", Status: doctor.StatusFail, Message: "broken", Blocking: true, Group: doctor.GroupWorkspace},
 	}
 
 	t.Run("text format: labels present, no emoji", func(t *testing.T) {
@@ -290,4 +354,89 @@ func TestPrintDiagnosticsTo_DispatchesCorrectly(t *testing.T) {
 		err := printDiagnosticsTo(failBlocking, complytime.OutputFormatText, &buf)
 		assert.Error(t, err)
 	})
+
+	t.Run("unrecognised format returns error", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := printDiagnosticsTo(passOnly, "xml", &buf)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported output format")
+	})
+}
+
+// --- summarizeResults ---
+
+func TestSummarizeResults_CountsAndBlocking(t *testing.T) {
+	results := []doctor.CheckResult{
+		{Name: "a", Status: doctor.StatusPass, Message: "ok", Blocking: false},
+		{Name: "b", Status: doctor.StatusFail, Message: "bad", Blocking: true},
+		{Name: "c", Status: doctor.StatusWarn, Message: "warn", Blocking: false},
+		{Name: "d", Status: doctor.StatusFail, Message: "bad2", Blocking: false},
+	}
+	s := summarizeResults(results)
+	assert.Equal(t, 1, s.passCount)
+	assert.Equal(t, 2, s.failCount)
+	assert.Equal(t, 1, s.warnCount)
+	assert.Equal(t, 4, s.total)
+	assert.True(t, s.blockingFailure)
+}
+
+func TestSummarizeResults_NoBlockingFailure(t *testing.T) {
+	results := []doctor.CheckResult{
+		{Name: "a", Status: doctor.StatusPass, Message: "ok", Blocking: true},
+		{Name: "b", Status: doctor.StatusWarn, Message: "warn", Blocking: true},
+	}
+	s := summarizeResults(results)
+	assert.False(t, s.blockingFailure)
+}
+
+func TestSummarizeResults_Empty(t *testing.T) {
+	s := summarizeResults([]doctor.CheckResult{})
+	assert.Equal(t, 0, s.total)
+	assert.False(t, s.blockingFailure)
+}
+
+func TestSummarizeResults_CountsChildren(t *testing.T) {
+	results := []doctor.CheckResult{
+		{
+			Name: "parent", Status: doctor.StatusPass, Message: "ok",
+			Children: []doctor.CheckResult{
+				{Name: "child", Status: doctor.StatusWarn, Message: "warn"},
+			},
+		},
+	}
+	s := summarizeResults(results)
+	assert.Equal(t, 1, s.passCount, "parent counted")
+	assert.Equal(t, 1, s.warnCount, "child counted")
+	assert.Equal(t, 2, s.total)
+}
+
+func TestSummarizeResults_GrandchildrenNotCounted(t *testing.T) {
+	results := []doctor.CheckResult{
+		{
+			Name: "parent", Status: doctor.StatusPass, Message: "ok",
+			Children: []doctor.CheckResult{
+				{
+					Name: "child", Status: doctor.StatusPass, Message: "ok",
+					Children: []doctor.CheckResult{
+						{Name: "grandchild", Status: doctor.StatusFail, Message: "fail"},
+					},
+				},
+			},
+		},
+	}
+	s := summarizeResults(results)
+	assert.Equal(t, 2, s.total, "grandchildren must not be counted (D5)")
+	assert.Equal(t, 0, s.failCount, "grandchild fail must not be counted")
+}
+
+// --- statusEmoji ---
+
+func TestStatusEmoji_KnownStatuses(t *testing.T) {
+	assert.Equal(t, complytime.StatusPassed, statusEmoji(doctor.StatusPass))
+	assert.Equal(t, complytime.StatusFailed, statusEmoji(doctor.StatusFail))
+	assert.Equal(t, complytime.StatusError, statusEmoji(doctor.StatusWarn))
+}
+
+func TestStatusEmoji_UnknownStatus(t *testing.T) {
+	assert.Equal(t, "❓", statusEmoji(doctor.CheckStatus("bogus")))
 }

@@ -66,9 +66,14 @@ complypack cache health: total disk usage, orphaned versions
 to rebuild state.
 
 Use `--format text` for grep-friendly output in CI logs, or
-`--format json` for structured output that scripts can parse:
+`--format json` for structured output that scripts can parse.
+The default format is `human` (emoji + labels); you can request
+it explicitly with `--format human`:
 
 ```bash
+# Human-readable with emoji (default)
+complyctl doctor --format human
+
 # JSON: {"checks": [...], "summary": {...}, "blocking_failure": bool}
 complyctl doctor --format json
 
