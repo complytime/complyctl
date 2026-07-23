@@ -32,8 +32,6 @@ const (
 // Returns ErrContentTooLarge if content exceeds this limit.
 //
 // Options:
-//   - WithSigning(keyPath) enables keyed signing
-//   - WithKeylessSigning(identity, issuer) enables OIDC-based keyless signing
 //   - WithAnnotations(map) adds OCI manifest annotations
 //
 // Returns the OCI manifest descriptor pointing to the packed artifact.
@@ -100,11 +98,6 @@ func Pack(ctx context.Context, store content.Storage, cfg Config, content io.Rea
 		})
 	if err != nil {
 		return ocispec.Descriptor{}, fmt.Errorf("packing manifest: %w", err)
-	}
-
-	// Sign if requested
-	if err := sign(ctx, store, manifestDesc, options); err != nil {
-		return ocispec.Descriptor{}, err
 	}
 
 	return manifestDesc, nil

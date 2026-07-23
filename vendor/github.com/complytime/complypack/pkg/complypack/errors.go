@@ -14,12 +14,6 @@ var (
 	// ErrContentTooLarge is returned when content exceeds maximum size.
 	ErrContentTooLarge = errors.New("complypack: content exceeds maximum size")
 
-	// ErrVerificationFailed is returned when signature verification fails.
-	ErrVerificationFailed = errors.New("complypack: signature verification failed")
-
-	// ErrSigningFailed is returned when signing fails.
-	ErrSigningFailed = errors.New("complypack: signing failed")
-
 	// ErrInvalidMediaType is returned when an OCI layer has an unexpected media type.
 	ErrInvalidMediaType = errors.New("complypack: invalid media type")
 

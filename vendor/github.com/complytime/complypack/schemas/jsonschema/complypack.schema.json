@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://complytime.github.io/complypack/schemas/complypack.schema.json",
+  "title": "ComplyPack Configuration",
+  "description": "Schema for complypack.yaml configuration files.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$",
+      "description": "Globally unique pack identifier using reverse-domain convention (e.g. io.complytime.my-pack)."
+    },
+    "evaluator-id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]([a-z0-9_.-]*[a-z0-9])?$",
+      "description": "Provider plugin identifier (e.g. opa)."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)*)?(\\+[a-zA-Z0-9-]+(\\.[a-zA-Z0-9-]+)*)?$",
+      "description": "Pack version in semver format."
+    },
+    "gemara": {
+      "type": "object",
+      "description": "Gemara catalog source configuration.",
+      "oneOf": [
+        {
+          "properties": {
+            "source": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Legacy single-source URI or path."
+            },
+            "plain-http": {
+              "type": "boolean",
+              "description": "Use plain HTTP for OCI transport."
+            }
+          },
+          "required": ["source"],
+          "not": { "required": ["sources"] }
+        },
+        {
+          "properties": {
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Gemara artifact URI or path."
+                  },
+                  "plain-http": {
+                    "type": "boolean",
+                    "description": "Use plain HTTP for OCI transport."
+                  }
+                },
+                "required": ["source"]
+              }
+            }
+          },
+          "required": ["sources"],
+          "not": { "required": ["source"] }
+        }
+      ]
+    },
+    "schemas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target platform identifier."
+          },
+          "source": {
+            "type": "string",
+            "description": "Explicit schema source URI (overrides index)."
+          },
+          "path": {
+            "type": "string",
+            "description": "Deprecated: use source with file:// scheme."
+          }
+        },
+        "required": ["platform"]
+      }
+    },
+    "policies": { "$ref": "#/$defs/dirConfig" },
+    "tests": { "$ref": "#/$defs/dirConfigSimple" },
+    "fixtures": { "$ref": "#/$defs/dirConfigSimple" },
+    "output": { "$ref": "#/$defs/dirConfigSimple" }
+  },
+  "$defs": {
+    "dirConfig": {
+      "type": "object",
+      "properties": {
+        "dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Directory path."
+        },
+        "helpers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Helper file paths."
+        }
+      },
+      "required": ["dir"]
+    },
+    "dirConfigSimple": {
+      "type": "object",
+      "properties": {
+        "dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Directory path."
+        }
+      },
+      "required": ["dir"]
+    }
+  }
+}

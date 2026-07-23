@@ -46,7 +46,11 @@ func Load[T any](ctx context.Context, f Fetcher, source string) (*T, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid source %q: %w", source, err)
 	}
-	ext := path.Ext(u.Path)
+	p := u.Path
+	if p == "" {
+		p = source
+	}
+	ext := path.Ext(p)
 	switch ext {
 	case ".yaml", ".yml", ".json":
 	default:

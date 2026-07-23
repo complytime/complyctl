@@ -59,6 +59,7 @@ func CatalogToMarkdown(ctx context.Context, catalog gemara.ControlCatalog, cfg C
 	}
 
 	text := collapseExtraNewlines(buf.String())
+	text = strings.ReplaceAll(text, "\r\n", "\n")
 	out := []byte(text)
 	if lineEnding != "\n" {
 		out = []byte(strings.ReplaceAll(string(out), "\n", lineEnding))
