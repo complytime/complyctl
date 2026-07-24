@@ -53,6 +53,14 @@
   `--format human` explicitly selects the default emoji output.
   When `NO_COLOR` is set, text format is selected automatically.
   (#611, #744)
+- Digest format validation at the state ingestion layer.
+  `UpdatePolicyStateWithVerification` and
+  `UpdateComplypackStateWithVerification` now return an error when
+  the digest is non-empty and not a valid OCI content digest
+  (`algorithm:hex` with correct hex length). `LoadState` warns and
+  excludes entries with malformed digests while preserving valid and
+  empty-digest entries. Defense-in-depth per NIST 800-53 SI-10
+  input validation. (#677)
 
 - Cross-repo integration workflow now validates EvaluationLog YAML
   output against the Gemara CUE schema with `cue vet`. Catches
