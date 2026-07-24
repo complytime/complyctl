@@ -379,7 +379,7 @@ func syncSinglePolicy(
 
 	client := registry.NewClient(ref.Registry, credFunc)
 	source := cache.NewRegistrySource(client)
-	sync := cache.NewSync(cacheMgr, state, source, dataDir, syncOpts...)
+	sync := cache.NewSync(cacheMgr, state, source, dataDir, ref.Registry, syncOpts...)
 
 	if version == "" {
 		version = resolveLatestVersion(
@@ -575,7 +575,7 @@ func syncSingleComplypack(
 	source := cache.NewRegistryComplypackSource(client)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 	cpSync := cache.NewComplypackSync(
-		complypackCache, state, source, dataDir, syncOpts...,
+		complypackCache, state, source, dataDir, ref.Registry, syncOpts...,
 	)
 
 	if version == "" {

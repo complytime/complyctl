@@ -13,18 +13,24 @@ import (
 )
 
 // BuildLookupRef constructs an OCI lookup reference from a repository with
-// separate tag and digest fields. When digest is non-empty it uses "@" as
+// separate tag and digest fields. When registryHost is non-empty it is
+// prepended as "registryHost/repository"; when empty the repository is used
+// as-is for backward compatibility. When digest is non-empty it uses "@" as
 // the separator; when tag is non-empty (and not "latest") it uses ":".
 // If both are empty or tag is "latest", the bare repository is returned so
 // oras resolves the default tag.
-func BuildLookupRef(repository, tag, digest string) string {
+func BuildLookupRef(registryHost, repository, tag, digest string) string {
+	ref := repository
+	if registryHost != "" {
+		ref = registryHost + "/" + repository
+	}
 	if digest != "" {
-		return repository + "@" + digest
+		return ref + "@" + digest
 	}
 	if tag == "" || tag == "latest" {
-		return repository
+		return ref
 	}
-	return repository + ":" + tag
+	return ref + ":" + tag
 }
 
 // classifyVersion splits a version string into tag and digest components.
@@ -57,27 +63,32 @@ func WithVerifier(vf VerifyFunc) SyncOption {
 
 // Sync provides incremental sync using oras.Copy() for remote-to-local transfer.
 type Sync struct {
-	cache    *Cache
-	state    *State
-	source   PolicySource
-	verifier VerifyFunc
-	dataDir  string
+	cache        *Cache
+	state        *State
+	source       PolicySource
+	verifier     VerifyFunc
+	registryHost string
+	dataDir      string
 }
 
 // NewSync creates a Sync that orchestrates remote-to-local policy transfer.
+// registryHost is the OCI registry hostname (e.g. "ghcr.io") used to qualify
+// lookup references for signature verification; it may be empty when
+// verification is not configured.
 // dataDir is the XDG data directory where state.json is persisted.
 // SyncOption args configure optional behavior such as signature verification.
-func NewSync(cache *Cache, state *State, source PolicySource, dataDir string, opts ...SyncOption) *Sync {
+func NewSync(cache *Cache, state *State, source PolicySource, dataDir, registryHost string, opts ...SyncOption) *Sync {
 	cfg := &syncConfig{}
 	for _, opt := range opts {
 		opt(cfg)
 	}
 	return &Sync{
-		cache:    cache,
-		state:    state,
-		source:   source,
-		verifier: cfg.verifier,
-		dataDir:  dataDir,
+		cache:        cache,
+		state:        state,
+		source:       source,
+		verifier:     cfg.verifier,
+		registryHost: registryHost,
+		dataDir:      dataDir,
 	}
 }
 
@@ -93,7 +104,9 @@ func (s *Sync) SyncPolicy(ctx context.Context, policyID, version string) (bool, 
 	}
 
 	tag, digest := classifyVersion(version)
-	lookupRef := BuildLookupRef(policyID, tag, digest)
+	// DefinitionVersion resolves its own host internally via buildRef(),
+	// so pass empty registryHost here to avoid double-host references.
+	lookupRef := BuildLookupRef("", policyID, tag, digest)
 
 	remoteDigest, remoteVersion, err := s.source.DefinitionVersion(ctx, lookupRef)
 	if err != nil {
@@ -116,7 +129,12 @@ func (s *Sync) SyncPolicy(ctx context.Context, policyID, version string) (bool, 
 	// content to disk. If verification fails, the local cache is unchanged.
 	var verifyResult *VerificationResult
 	if s.verifier != nil {
-		registryRef := BuildLookupRef(policyID, tag, digest)
+		// Fail-closed: refuse to verify against an unqualified reference that
+		// would silently resolve to Docker Hub instead of the intended registry.
+		if s.registryHost == "" {
+			return false, fmt.Errorf("policy %s: registry host is required for signature verification; include the registry host in the policy URL or use --skip-verify", policyID)
+		}
+		registryRef := BuildLookupRef(s.registryHost, policyID, tag, digest)
 		vr, verifyErr := s.verifier(ctx, registryRef)
 		if verifyErr != nil {
 			return false, fmt.Errorf("policy %s: verification failed: %w", policyID, verifyErr)
