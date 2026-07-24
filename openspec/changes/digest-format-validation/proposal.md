@@ -21,9 +21,33 @@ validated at every handoff point. Tracked in
   gain an `error` return, rejecting malformed digests at the write path.
 - `LoadState` gains post-unmarshal validation that warns and excludes entries
   with malformed digests, preserving backward compatibility with corrupted
-  state files.
-- Test fixtures across `internal/cache/*_test.go` and
-  `cmd/complyctl/cli/cli_test.go` updated to use valid-format digests.
+  state files. Empty digest fields are preserved (not treated as malformed).
+- Test fixtures across `internal/cache/*_test.go`,
+  `cmd/complyctl/cli/cli_test.go`, `internal/doctor/doctor_test.go`,
+  `internal/policy/generation_state_test.go`, and other files updated to
+  use valid-format digests.
+
+## Acceptance Criteria
+
+- FR-001: Given a valid OCI digest (e.g., `sha256:<64 hex chars>`),
+  When `UpdatePolicyStateWithVerification` is called,
+  Then no error is returned and the entry is stored in state.
+- FR-002: Given a malformed digest (wrong hex length, missing colon,
+  unsupported algorithm), When `UpdatePolicyStateWithVerification` is
+  called, Then an error is returned and state is not modified.
+- FR-003: Given a `state.json` with a policy entry whose digest is
+  malformed, When `LoadState` is called, Then the entry is excluded
+  from the returned State and a warning is logged containing the
+  entry key and the validation error.
+- FR-004: Given a `state.json` with entries having valid digests,
+  When `LoadState` is called, Then all valid entries are preserved.
+- FR-005: Given a `state.json` with entries having empty digest fields,
+  When `LoadState` is called, Then those entries are preserved (empty
+  digests are not treated as malformed).
+- FR-006: Given a `state.json` with a mix of valid, malformed, and
+  empty digest entries, When `LoadState` is called, Then valid and
+  empty entries are preserved, malformed entries are excluded with
+  warnings, and `LoadState` returns `(state, nil)`.
 
 ## Capabilities
 
@@ -36,7 +60,7 @@ validated at every handoff point. Tracked in
 - `UpdatePolicyStateWithVerification`: Returns `error` on malformed digest.
 - `UpdateComplypackStateWithVerification`: Returns `error` on malformed digest.
 - `LoadState`: Warns and excludes entries with malformed digests instead of
-  loading them silently.
+  loading them silently. Empty digest fields are preserved.
 
 ### Removed Capabilities
 - None.
@@ -46,41 +70,64 @@ validated at every handoff point. Tracked in
 - `internal/cache/state.go` -- validation function, signature changes,
   post-load validation loop
 - `internal/cache/sync.go` -- handle new error return from
-  `UpdatePolicyStateWithVerification`
+  `UpdatePolicyStateWithVerification` (1 call site, line ~137)
 - `internal/cache/complypack_sync.go` -- handle new error return from
-  `UpdateComplypackStateWithVerification`
-- `internal/cache/*_test.go` -- ~20 test fixtures with short invalid digests
-- `cmd/complyctl/cli/cli_test.go` -- ~20 test fixtures with short invalid
+  `UpdateComplypackStateWithVerification` (2 call sites, lines ~190, ~235)
+- `internal/cache/*_test.go` -- ~30 test fixtures with short invalid digests
+- `cmd/complyctl/cli/cli_test.go` -- ~30 test fixtures with short invalid
   digests
+- `internal/doctor/doctor_test.go` -- 1 fixture calling
+  `UpdatePolicyStateWithVerification` with short digest
+- `internal/policy/generation_state_test.go` -- ~22 fixtures with short
+  invalid digests
 - `internal/cache/cachetest/` -- mock helpers using short digests
 - No new dependencies (uses already-vendored `opencontainers/go-digest`)
 
+### Documentation Impact
+
+- **`CHANGELOG.md`**: Add entry describing digest validation behavior
+  (warn+exclude on load, error on write).
+- **`AGENTS.md`**: Add `digest-format-validation` to Recent Changes.
+- **`README.md`**: No update needed (no CLI interface changes).
+- **Website**: No update needed -- internal hardening, exempt per
+  AGENTS.md website gate.
+
 ## Constitution Alignment
 
-### I. Autonomous Collaboration
+### I. Single Source of Truth (Centralized Constants)
 
 **Assessment**: PASS
 
-Warning messages on malformed digests are self-describing, identifying the
-specific entry and the validation failure.
+`ValidateDigest` centralizes digest format validation in a single function.
+All validation call sites delegate to this function rather than
+implementing inline checks.
 
-### II. Composability First
-
-**Assessment**: PASS
-
-Validation is additive. The `ValidateDigest` function is standalone and
-reusable. No new dependencies introduced.
-
-### III. Observable Quality
+### II. Simplicity & Isolation
 
 **Assessment**: PASS
 
-Malformed digests are now observable via warnings at load time and errors at
-write time, rather than propagating silently.
+`ValidateDigest` follows SRP -- a small, focused function that validates
+one thing. Each validation boundary (write, read) is independently
+testable.
 
-### IV. Testability
+### III. Incremental Improvement
 
 **Assessment**: PASS
 
-`ValidateDigest` is independently testable. Each validation boundary
-(write, read) is testable in isolation.
+Focused on a single concern (digest validation). No unrelated changes
+included. Test fixture updates are mechanical consequences of the
+validation change, not scope creep.
+
+### V. Do Not Reinvent the Wheel
+
+**Assessment**: PASS
+
+Uses `digest.Parse()` from `opencontainers/go-digest`, already vendored
+and imported in `internal/cache/sync.go`. No custom regex.
+
+### VI. Composability (The Unix Philosophy)
+
+**Assessment**: PASS
+
+`ValidateDigest` is a standalone function usable at any boundary.
+No coupling to specific callers.
