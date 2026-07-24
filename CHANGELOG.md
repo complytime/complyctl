@@ -65,6 +65,18 @@
 
 ### Fixed
 
+- **BREAKING**: `complyctl get` signature verification now resolves
+  against the configured OCI registry instead of defaulting to Docker
+  Hub. Previously, bare OCI references (without a registry host) were
+  passed to the sigstore verifier, which resolved them against Docker
+  Hub -- a different registry than where the artifact was actually
+  fetched from. `BuildLookupRef()` now accepts a `registryHost`
+  parameter, and `Sync`/`ComplypackSync` carry the registry host from
+  the parsed policy reference. When a verifier is configured but the
+  registry host is empty, `complyctl get` fails closed with an
+  actionable error instead of silently verifying against the wrong
+  registry. (#767)
+
 - `complyctl get` recorded the OCI tag version (e.g., `v1.0.0`) in
   complypack state instead of the embedded `config.Version` (e.g.,
   `1.0.0`), causing a mismatch between state tracking and the on-disk

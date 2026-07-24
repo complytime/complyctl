@@ -21,14 +21,18 @@ type ComplypackSync struct {
 	state           *State
 	source          ComplypackSource
 	verifier        VerifyFunc
+	registryHost    string
 	dataDir         string
 }
 
 // NewComplypackSync creates a ComplypackSync that orchestrates the
-// fetch-unpack-store pipeline for complypack artifacts. dataDir is the
-// XDG data directory where state.json is persisted. SyncOption args
-// configure optional behavior such as signature verification.
-func NewComplypackSync(complypackCache *ComplypackCache, state *State, source ComplypackSource, dataDir string, opts ...SyncOption) *ComplypackSync {
+// fetch-unpack-store pipeline for complypack artifacts.
+// registryHost is the OCI registry hostname (e.g. "ghcr.io") used to qualify
+// lookup references for signature verification; it may be empty when
+// verification is not configured.
+// dataDir is the XDG data directory where state.json is persisted. SyncOption
+// args configure optional behavior such as signature verification.
+func NewComplypackSync(complypackCache *ComplypackCache, state *State, source ComplypackSource, dataDir, registryHost string, opts ...SyncOption) *ComplypackSync {
 	cfg := &syncConfig{}
 	for _, opt := range opts {
 		opt(cfg)
@@ -38,6 +42,7 @@ func NewComplypackSync(complypackCache *ComplypackCache, state *State, source Co
 		state:           state,
 		source:          source,
 		verifier:        cfg.verifier,
+		registryHost:    registryHost,
 		dataDir:         dataDir,
 	}
 }
@@ -68,8 +73,18 @@ func (s *ComplypackSync) SyncComplypack(ctx context.Context, repository, version
 		return false, fmt.Errorf("complypack repository cannot be empty")
 	}
 
+	// Fail-closed: refuse to verify against an unqualified reference that
+	// would silently resolve to Docker Hub instead of the intended registry.
+	// This check is placed before any VerifyFunc call path (pre-copy and
+	// tryLocalCacheHit re-verification) to protect all verification sites.
+	if s.verifier != nil && s.registryHost == "" {
+		return false, fmt.Errorf("complypack %s: registry host is required for signature verification; include the registry host in the policy URL or use --skip-verify", repository)
+	}
+
 	tag, digest := classifyVersion(version)
-	lookupRef := BuildLookupRef(repository, tag, digest)
+	// DefinitionVersion resolves its own host internally via buildRef(),
+	// so pass empty registryHost here to avoid double-host references.
+	lookupRef := BuildLookupRef("", repository, tag, digest)
 
 	remoteDigest, remoteVersion, err := s.source.DefinitionVersion(ctx, lookupRef)
 	if err != nil {
@@ -139,7 +154,7 @@ func (s *ComplypackSync) SyncComplypack(ctx context.Context, repository, version
 	// content to disk. If verification fails, the local cache is unchanged.
 	var verifyResult *VerificationResult
 	if s.verifier != nil {
-		registryRef := BuildLookupRef(repository, tag, digest)
+		registryRef := BuildLookupRef(s.registryHost, repository, tag, digest)
 		vr, verifyErr := s.verifier(ctx, registryRef)
 		if verifyErr != nil {
 			return false, fmt.Errorf("complypack %s: verification failed: %w", repository, verifyErr)
@@ -218,7 +233,7 @@ func (s *ComplypackSync) tryLocalCacheHit(
 	// proceed to the standard fetch path.
 	var verifyResult *VerificationResult
 	if s.verifier != nil {
-		registryRef := BuildLookupRef(repository, tag, digest)
+		registryRef := BuildLookupRef(s.registryHost, repository, tag, digest)
 		vr, verifyErr := s.verifier(ctx, registryRef)
 		if verifyErr != nil {
 			return false, verifyErr

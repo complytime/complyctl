@@ -33,7 +33,7 @@ func TestSync_CopyOnSuccess(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "")
 
 	fetched, err := sync.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func TestSync_CopyOnSuccess_PinnedVersion(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "")
 
 	fetched, err := sync.SyncPolicy(context.Background(), "test-policy", "v1.0.0")
 	require.NoError(t, err)
@@ -94,7 +94,7 @@ func TestSync_FailureOnMissingPolicy(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "")
 
 	fetched, err := sync.SyncPolicy(context.Background(), "nonexistent-policy", "latest")
 	require.Error(t, err)
@@ -117,7 +117,7 @@ func TestSync_RegistryUnreachableError(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "")
 
 	fetched, err := sync.SyncPolicy(context.Background(), "unreachable-policy", "latest")
 	require.Error(t, err)
@@ -142,7 +142,7 @@ func TestSync_IncrementalSkip(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "")
 
 	// First sync
 	fetched, err := sync.SyncPolicy(context.Background(), "test-policy", "latest")
@@ -156,7 +156,7 @@ func TestSync_IncrementalSkip(t *testing.T) {
 	originalDigest := ps.Digest
 
 	// Second sync with same digest — should be no-op (FR-004)
-	sync2 := cache.NewSync(cacheMgr, state2, mock, cacheDir)
+	sync2 := cache.NewSync(cacheMgr, state2, mock, cacheDir, "")
 	fetched2, err := sync2.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)
 	assert.False(t, fetched2, "incremental skip should not report a fetch")
@@ -176,7 +176,7 @@ func TestSync_EmptyPolicyID(t *testing.T) {
 	cacheMgr := cache.NewCache(cacheDir)
 	state, _ := cache.LoadState(cacheDir)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "")
 	fetched, err := sync.SyncPolicy(context.Background(), "", "latest")
 	require.Error(t, err)
 	assert.False(t, fetched, "empty policy ID should not report a fetch")
@@ -195,7 +195,7 @@ func TestSync_RedownloadAfterDeletion(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "")
 
 	fetched, err := sync.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)
@@ -209,7 +209,7 @@ func TestSync_RedownloadAfterDeletion(t *testing.T) {
 
 	state2, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
-	sync2 := cache.NewSync(cacheMgr, state2, mock, cacheDir)
+	sync2 := cache.NewSync(cacheMgr, state2, mock, cacheDir, "")
 
 	fetched2, err := sync2.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)
@@ -267,7 +267,7 @@ func TestSync_ConcurrentDifferentPolicies(t *testing.T) {
 				return
 			}
 
-			syncMgr := cache.NewSync(r.cacheMgr, state, mock, r.cacheDir)
+			syncMgr := cache.NewSync(r.cacheMgr, state, mock, r.cacheDir, "")
 			policyID := fmt.Sprintf("policy-%d", workerID)
 
 			_, syncErr := syncMgr.SyncPolicy(context.Background(), policyID, "latest")
@@ -341,7 +341,7 @@ func TestSync_ConcurrentMixedFailures(t *testing.T) {
 				return
 			}
 
-			syncMgr := cache.NewSync(cacheMgr, state, mock, workerCacheDir)
+			syncMgr := cache.NewSync(cacheMgr, state, mock, workerCacheDir, "")
 			policyID := fmt.Sprintf("policy-%d", workerID)
 
 			_, syncErr := syncMgr.SyncPolicy(context.Background(), policyID, "latest")
@@ -377,21 +377,28 @@ func TestSync_ConcurrentMixedFailures(t *testing.T) {
 
 func TestBuildLookupRef(t *testing.T) {
 	tests := []struct {
-		name       string
-		repository string
-		tag        string
-		digest     string
-		want       string
+		name         string
+		registryHost string
+		repository   string
+		tag          string
+		digest       string
+		want         string
 	}{
-		{"tag version", "org/policy", "v1.0", "", "org/policy:v1.0"},
-		{"sha256 digest", "org/policy", "", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "org/policy@sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
-		{"sha512 digest", "org/policy", "", "sha512:def456", "org/policy@sha512:def456"},
-		{"empty version", "org/policy", "", "", "org/policy"},
-		{"latest version", "org/policy", "latest", "", "org/policy"},
+		// Backward-compatible cases: empty registryHost preserves existing behavior.
+		{"tag version", "", "org/policy", "v1.0", "", "org/policy:v1.0"},
+		{"sha256 digest", "", "org/policy", "", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "org/policy@sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
+		{"sha512 digest", "", "org/policy", "", "sha512:def456", "org/policy@sha512:def456"},
+		{"empty version", "", "org/policy", "", "", "org/policy"},
+		{"latest version", "", "org/policy", "latest", "", "org/policy"},
+		// New cases: non-empty registryHost prepends host prefix.
+		{"host with tag", "registry.example.com", "policies/verify-keyed", "v1.0.0", "", "registry.example.com/policies/verify-keyed:v1.0.0"},
+		{"host with digest", "registry.example.com", "policies/verify-keyed", "", "sha256:abc123", "registry.example.com/policies/verify-keyed@sha256:abc123"},
+		{"host with empty version", "registry.example.com", "org/policy", "", "", "registry.example.com/org/policy"},
+		{"host with latest", "registry.example.com", "org/policy", "latest", "", "registry.example.com/org/policy"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := cache.BuildLookupRef(tt.repository, tt.tag, tt.digest)
+			got := cache.BuildLookupRef(tt.registryHost, tt.repository, tt.tag, tt.digest)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -400,7 +407,7 @@ func TestBuildLookupRef(t *testing.T) {
 // TestBuildLookupRef_DigestPrecedence verifies that when both tag and
 // digest are provided, digest takes precedence (OCI convention).
 func TestBuildLookupRef_DigestPrecedence(t *testing.T) {
-	got := cache.BuildLookupRef("org/policy", "v1.0", "sha256:abc123")
+	got := cache.BuildLookupRef("", "org/policy", "v1.0", "sha256:abc123")
 	assert.Equal(t, "org/policy@sha256:abc123", got)
 }
 
@@ -408,7 +415,7 @@ func TestBuildLookupRef_DigestPrecedence(t *testing.T) {
 // correctly through the typed fields.
 func TestBuildLookupRef_SHA384Digest(t *testing.T) {
 	sha384Digest := "sha384:" + "a" + strings.Repeat("b", 95)
-	got := cache.BuildLookupRef("org/policy", "", sha384Digest)
+	got := cache.BuildLookupRef("", "org/policy", "", sha384Digest)
 	assert.Equal(t, "org/policy@"+sha384Digest, got)
 }
 
@@ -431,7 +438,7 @@ func TestSync_SHA384Digest(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "")
 
 	// Pass a sha384 digest as the version string. classifyVersion must
 	// detect it as a digest and BuildLookupRef must use "@" separator.
@@ -451,7 +458,7 @@ func TestBuildLookupRef_Regression_NoDoubleTag(t *testing.T) {
 	// When ParsePolicyRef correctly extracts the tag, Repository
 	// will be "complytime/complypack-ampel-bp" and Tag "v0.4.0".
 	// BuildLookupRef should produce a single-tagged reference.
-	lookupRef := cache.BuildLookupRef("complytime/complypack-ampel-bp", "v0.4.0", "")
+	lookupRef := cache.BuildLookupRef("", "complytime/complypack-ampel-bp", "v0.4.0", "")
 	assert.Equal(t, "complytime/complypack-ampel-bp:v0.4.0", lookupRef)
 	assert.NotContains(t, lookupRef, ":v0.4.0:v0.4.0")
 }
@@ -462,6 +469,7 @@ func TestSync_VerificationFailure_AbortsCopy(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	mock := cachetest.NewMockPolicySource()
+	mock.SeedPolicy("registry.example.com/test-policy", "v1.0.0", "sha256:abc123")
 	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
 
 	failVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
@@ -472,7 +480,7 @@ func TestSync_VerificationFailure_AbortsCopy(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, cache.WithVerifier(failVerifier))
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "registry.example.com", cache.WithVerifier(failVerifier))
 
 	_, err = sync.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.Error(t, err)
@@ -493,6 +501,7 @@ func TestSync_VerificationSuccess_RecordsMetadata(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	mock := cachetest.NewMockPolicySource()
+	mock.SeedPolicy("registry.example.com/test-policy", "v1.0.0", "sha256:abc123")
 	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
 
 	successVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
@@ -508,7 +517,7 @@ func TestSync_VerificationSuccess_RecordsMetadata(t *testing.T) {
 	state, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, cache.WithVerifier(successVerifier))
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "registry.example.com", cache.WithVerifier(successVerifier))
 
 	_, err = sync.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)
@@ -535,7 +544,7 @@ func TestSync_NilVerifier_SkipsVerification(t *testing.T) {
 	require.NoError(t, err)
 
 	// No WithVerifier option — verification disabled
-	sync := cache.NewSync(cacheMgr, state, mock, cacheDir)
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "")
 
 	_, err = sync.SyncPolicy(context.Background(), "test-policy", "latest")
 	require.NoError(t, err)
@@ -545,4 +554,69 @@ func TestSync_NilVerifier_SkipsVerification(t *testing.T) {
 	require.True(t, exists)
 	assert.False(t, ps.Verified, "Verified must be false when no verifier is configured")
 	assert.Empty(t, ps.SignerIdentity)
+}
+
+// TestSync_RegistryHost_PassedToVerifier verifies that when a registryHost
+// is configured on the Sync struct, the VerifyFunc receives a reference
+// prefixed with that host — not Docker Hub's index.docker.io (regression
+// test for the registry-host-resolution security defect).
+func TestSync_RegistryHost_PassedToVerifier(t *testing.T) {
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+
+	mock := cachetest.NewMockPolicySource()
+	// Seed with host-qualified ref for DefinitionVersion and bare policyID for CopyPolicy.
+	mock.SeedPolicy("registry.example.com/org/test-policy", "v1.0.0", "sha256:abc123")
+	mock.SeedPolicy("org/test-policy", "v1.0.0", "sha256:abc123")
+
+	var capturedRef string
+	capturingVerifier := func(_ context.Context, registryRef string) (*cache.VerificationResult, error) {
+		capturedRef = registryRef
+		return &cache.VerificationResult{Verified: true}, nil
+	}
+
+	cacheMgr := cache.NewCache(cacheDir)
+	state, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "registry.example.com",
+		cache.WithVerifier(capturingVerifier))
+
+	_, err = sync.SyncPolicy(context.Background(), "org/test-policy", "latest")
+	require.NoError(t, err)
+
+	assert.True(t, strings.HasPrefix(capturedRef, "registry.example.com/"),
+		"verifier ref must have registry host prefix, got: %s", capturedRef)
+	assert.NotContains(t, capturedRef, "index.docker.io",
+		"verifier ref must NOT resolve to Docker Hub")
+}
+
+// TestSync_EmptyRegistryHost_FailClosed verifies that when a verifier is
+// configured but registryHost is empty, SyncPolicy returns a fail-closed
+// error rather than silently resolving against Docker Hub.
+func TestSync_EmptyRegistryHost_FailClosed(t *testing.T) {
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+
+	mock := cachetest.NewMockPolicySource()
+	mock.SeedPolicy("org/test-policy", "v1.0.0", "sha256:abc123")
+
+	neverCalledVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
+		t.Fatal("verifier must not be called when registryHost is empty")
+		return nil, nil
+	}
+
+	cacheMgr := cache.NewCache(cacheDir)
+	state, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "",
+		cache.WithVerifier(neverCalledVerifier))
+
+	_, err = sync.SyncPolicy(context.Background(), "org/test-policy", "latest")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "registry host",
+		"fail-closed error must mention 'registry host'")
 }
