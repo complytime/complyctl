@@ -9,8 +9,8 @@ import (
 )
 
 func TestFormatStepIdentity_WithComplypackRef(t *testing.T) {
-	result := formatStepIdentity("registry.example.com/complypacks/opa@sha256:abc123", "kubernetes.run_as_nonroot")
-	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:abc123#kubernetes.run_as_nonroot", result)
+	result := formatStepIdentity("registry.example.com/complypacks/opa@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", "kubernetes.run_as_nonroot")
+	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2#kubernetes.run_as_nonroot", result)
 }
 
 func TestFormatStepIdentity_WithoutComplypackRef(t *testing.T) {
@@ -19,7 +19,7 @@ func TestFormatStepIdentity_WithoutComplypackRef(t *testing.T) {
 }
 
 func TestFormatStepIdentity_EmptyStepName(t *testing.T) {
-	result := formatStepIdentity("registry.example.com/complypacks/opa@sha256:abc123", "")
+	result := formatStepIdentity("registry.example.com/complypacks/opa@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", "")
 	assert.Equal(t, "", result)
 }
 

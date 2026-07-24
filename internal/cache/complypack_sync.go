@@ -202,7 +202,9 @@ func (s *ComplypackSync) SyncComplypack(ctx context.Context, repository, version
 	// on-disk directories using config.Version (e.g., "1.0.0"), so state
 	// must record the same value to keep state ↔ filesystem consistent.
 	// See: https://github.com/complytime/complyctl/issues/694
-	s.state.UpdateComplypackStateWithVerification(repository, result.Config.Version, remoteDigest, result.Config.EvaluatorID, verifyResult)
+	if err := s.state.UpdateComplypackStateWithVerification(repository, result.Config.Version, remoteDigest, result.Config.EvaluatorID, verifyResult); err != nil {
+		return false, err
+	}
 	if err := SaveState(s.state, s.dataDir); err != nil {
 		return false, fmt.Errorf("failed to save state after complypack sync: %w (complypack blobs are valid)", err)
 	}
@@ -247,10 +249,12 @@ func (s *ComplypackSync) tryLocalCacheHit(
 	// check (localState.Digest == remoteDigest) can skip redundant
 	// fetches on subsequent runs. Using a local content digest would
 	// cause a permanent mismatch and force re-fetches every time.
-	s.state.UpdateComplypackStateWithVerification(
+	if err := s.state.UpdateComplypackStateWithVerification(
 		repository, version, remoteDigest,
 		localState.EvaluatorID, verifyResult,
-	)
+	); err != nil {
+		return false, err
+	}
 	if err := SaveState(s.state, s.dataDir); err != nil {
 		return false, err
 	}

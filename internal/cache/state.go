@@ -9,8 +9,26 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/charmbracelet/log"
+	"github.com/opencontainers/go-digest"
+
 	"github.com/complytime/complyctl/internal/complytime"
 )
+
+// ValidateDigest checks that s is a well-formed OCI content digest
+// (algorithm:hex, supported algorithm, correct hex length). Empty
+// strings are allowed and return nil — they represent entries that
+// have not yet been synced.
+func ValidateDigest(s string) error {
+	if s == "" {
+		return nil
+	}
+	_, err := digest.Parse(s)
+	if err != nil {
+		return fmt.Errorf("invalid digest %q: %w", s, err)
+	}
+	return nil
+}
 
 // State tracks sync metadata for all cached policies and complypacks,
 // persisted as state.json.
@@ -65,8 +83,31 @@ func LoadState(baseDir string) (*State, error) {
 	}
 
 	initStateMaps(&state)
+	excludeMalformedDigests(&state)
 
 	return &state, nil
+}
+
+// excludeMalformedDigests removes entries with non-empty, malformed digest
+// fields from the Policies and Complypacks maps, logging a warning for each.
+// Empty digest fields are preserved for backward compatibility with
+// pre-digest state entries. This provides defense-in-depth against corrupted
+// or hand-edited state files.
+func excludeMalformedDigests(s *State) {
+	for key, ps := range s.Policies {
+		if err := ValidateDigest(ps.Digest); err != nil {
+			log.Warn("excluding policy with malformed digest, run complyctl get to re-fetch",
+				"policy", key, "error", err)
+			delete(s.Policies, key)
+		}
+	}
+	for key, ps := range s.Complypacks {
+		if err := ValidateDigest(ps.Digest); err != nil {
+			log.Warn("excluding complypack with malformed digest, run complyctl get to re-fetch",
+				"repository", key, "error", err)
+			delete(s.Complypacks, key)
+		}
+	}
 }
 
 // initStateMaps ensures Policies and Complypacks maps are non-nil.
@@ -132,14 +173,18 @@ func SaveState(state *State, baseDir string) error {
 
 // UpdatePolicyStateWithVerification records version, digest, verification
 // metadata, and current timestamp for a cached policy. When vr is nil,
-// Verified is set to false (no verification was performed).
-func (s *State) UpdatePolicyStateWithVerification(policyID, version, digest string, vr *VerificationResult) {
+// Verified is set to false (no verification was performed). Returns an
+// error if the digest is non-empty and not a valid OCI content digest.
+func (s *State) UpdatePolicyStateWithVerification(policyID, version, dgst string, vr *VerificationResult) error {
+	if err := ValidateDigest(dgst); err != nil {
+		return fmt.Errorf("policy %s: %w", policyID, err)
+	}
 	if s.Policies == nil {
 		s.Policies = make(map[string]PolicyState)
 	}
 	ps := PolicyState{
 		Version:     version,
-		Digest:      digest,
+		Digest:      dgst,
 		LastUpdated: time.Now(),
 	}
 	if vr != nil {
@@ -150,17 +195,23 @@ func (s *State) UpdatePolicyStateWithVerification(policyID, version, digest stri
 	}
 	s.Policies[policyID] = ps
 	s.LastSync = time.Now()
+	return nil
 }
 
 // UpdateComplypackStateWithVerification records version, digest, evaluator-id,
 // verification metadata, and current timestamp for a cached complypack.
-func (s *State) UpdateComplypackStateWithVerification(repository, version, digest, evaluatorID string, vr *VerificationResult) {
+// Returns an error if the digest is non-empty and not a valid OCI content
+// digest.
+func (s *State) UpdateComplypackStateWithVerification(repository, version, dgst, evaluatorID string, vr *VerificationResult) error {
+	if err := ValidateDigest(dgst); err != nil {
+		return fmt.Errorf("complypack %s: %w", repository, err)
+	}
 	if s.Complypacks == nil {
 		s.Complypacks = make(map[string]PolicyState)
 	}
 	ps := PolicyState{
 		Version:     version,
-		Digest:      digest,
+		Digest:      dgst,
 		EvaluatorID: evaluatorID,
 		LastUpdated: time.Now(),
 	}
@@ -172,6 +223,7 @@ func (s *State) UpdateComplypackStateWithVerification(repository, version, diges
 	}
 	s.Complypacks[repository] = ps
 	s.LastSync = time.Now()
+	return nil
 }
 
 // GetPolicyState returns the cached state for a policy identified by policyID.

@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/complytime/complyctl/internal/cache"
+	"github.com/complytime/complyctl/internal/cache/cachetest"
 	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/internal/policy"
 	"github.com/complytime/complyctl/internal/terminal"
@@ -984,8 +985,8 @@ func TestAbbreviateDigest(t *testing.T) {
 		input  string
 		expect string
 	}{
-		{"full sha256", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b", "sha256:9f86d081884c"},
-		{"exact 12 hex chars", "sha256:9f86d081884c", "sha256:9f86d081884c"},
+		{"full sha256", cachetest.DigestA, "sha256:9f86d081884c"},
+		{"full sha256 alt", cachetest.DigestB, "sha256:3e23e8160039"},
 		{"empty", "", "-"},
 		{"no colon", "invaliddigest", "invaliddigest"},
 		{"sha512 full", "sha512:cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e", "sha512:cf83e1357eef"},
@@ -1433,16 +1434,16 @@ func TestEvaluatorArtifactsExist_PathIsFile(t *testing.T) {
 // --- needsRegeneration tests ---
 
 func TestNeedsRegeneration_NilState(t *testing.T) {
-	assert.True(t, needsRegeneration(".", nil, "sha256:abc", nil, "test-policy"),
+	assert.True(t, needsRegeneration(".", nil, cachetest.DigestA, nil, "test-policy"),
 		"nil generation state should require regeneration")
 }
 
 func TestNeedsRegeneration_StaleDigest(t *testing.T) {
 	state := &policy.GenerationState{
-		PolicyDigest: "sha256:old",
+		PolicyDigest: cachetest.DigestA,
 		EvaluatorIDs: []string{"ampel"},
 	}
-	assert.True(t, needsRegeneration(".", state, "sha256:new", nil, "test-policy"),
+	assert.True(t, needsRegeneration(".", state, cachetest.DigestB, nil, "test-policy"),
 		"mismatched digest should require regeneration")
 }
 
@@ -1453,10 +1454,10 @@ func TestNeedsRegeneration_FreshWithArtifacts(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "policy.rego"), []byte("package test"), 0600))
 
 	state := &policy.GenerationState{
-		PolicyDigest: "sha256:current",
+		PolicyDigest: cachetest.DigestA,
 		EvaluatorIDs: []string{"ampel"},
 	}
-	assert.False(t, needsRegeneration(baseDir, state, "sha256:current", nil, "test-policy"),
+	assert.False(t, needsRegeneration(baseDir, state, cachetest.DigestA, nil, "test-policy"),
 		"fresh digest with existing artifacts should not require regeneration")
 }
 
@@ -1464,10 +1465,10 @@ func TestNeedsRegeneration_FreshButArtifactsMissing(t *testing.T) {
 	baseDir := t.TempDir()
 	// Do not create the evaluator directory — simulates deleted artifacts.
 	state := &policy.GenerationState{
-		PolicyDigest: "sha256:current",
+		PolicyDigest: cachetest.DigestA,
 		EvaluatorIDs: []string{"ampel"},
 	}
-	assert.True(t, needsRegeneration(baseDir, state, "sha256:current", nil, "test-policy"),
+	assert.True(t, needsRegeneration(baseDir, state, cachetest.DigestA, nil, "test-policy"),
 		"fresh digest but missing artifacts should require regeneration")
 }
 
@@ -1478,12 +1479,12 @@ func TestNeedsRegeneration_ComplypackDigestChanged(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "policy.rego"), []byte("package test"), 0600))
 
 	state := &policy.GenerationState{
-		PolicyDigest:      "sha256:current",
-		ComplypackDigests: map[string]string{"opa": "sha256:old-cp"},
+		PolicyDigest:      cachetest.DigestA,
+		ComplypackDigests: map[string]string{"opa": cachetest.DigestB},
 		EvaluatorIDs:      []string{"ampel"},
 	}
-	assert.True(t, needsRegeneration(baseDir, state, "sha256:current",
-		map[string]string{"opa": "sha256:new-cp"}, "test-policy"),
+	assert.True(t, needsRegeneration(baseDir, state, cachetest.DigestA,
+		map[string]string{"opa": cachetest.DigestC}, "test-policy"),
 		"changed complypack digest should require regeneration")
 }
 
@@ -1499,7 +1500,7 @@ func TestComplypackDigestsByEvaluator_SkipsIncomplete(t *testing.T) {
 	state := &cache.State{
 		Complypacks: map[string]cache.PolicyState{
 			"repo/missing-digest":    {EvaluatorID: "opa", Digest: ""},
-			"repo/missing-evaluator": {EvaluatorID: "", Digest: "sha256:abc"},
+			"repo/missing-evaluator": {EvaluatorID: "", Digest: cachetest.DigestA},
 		},
 	}
 	result := complypackDigestsByEvaluator(state)
@@ -1509,14 +1510,14 @@ func TestComplypackDigestsByEvaluator_SkipsIncomplete(t *testing.T) {
 func TestComplypackDigestsByEvaluator_ExtractsDigests(t *testing.T) {
 	state := &cache.State{
 		Complypacks: map[string]cache.PolicyState{
-			"example.com/cp/opa":   {EvaluatorID: "io.complytime.opa", Digest: "sha256:aaa"},
-			"example.com/cp/ampel": {EvaluatorID: "io.complytime.ampel", Digest: "sha256:bbb"},
+			"example.com/cp/opa":   {EvaluatorID: "io.complytime.opa", Digest: cachetest.DigestA},
+			"example.com/cp/ampel": {EvaluatorID: "io.complytime.ampel", Digest: cachetest.DigestB},
 		},
 	}
 	result := complypackDigestsByEvaluator(state)
 	assert.Equal(t, map[string]string{
-		"io.complytime.opa":   "sha256:aaa",
-		"io.complytime.ampel": "sha256:bbb",
+		"io.complytime.opa":   cachetest.DigestA,
+		"io.complytime.ampel": cachetest.DigestB,
 	}, result)
 }
 
@@ -1524,27 +1525,27 @@ func TestComplypackDigestsByEvaluator_ExtractsDigests(t *testing.T) {
 
 func TestFilterComplypackDigests_AllAvailable(t *testing.T) {
 	allDigests := map[string]string{
-		"io.complytime.opa":   "sha256:aaa",
-		"io.complytime.ampel": "sha256:bbb",
+		"io.complytime.opa":   cachetest.DigestA,
+		"io.complytime.ampel": cachetest.DigestB,
 	}
 	available := []string{"io.complytime.opa", "io.complytime.ampel"}
 	result := filterComplypackDigests(allDigests, available)
 	assert.Equal(t, map[string]string{
-		"io.complytime.opa":   "sha256:aaa",
-		"io.complytime.ampel": "sha256:bbb",
+		"io.complytime.opa":   cachetest.DigestA,
+		"io.complytime.ampel": cachetest.DigestB,
 	}, result)
 }
 
 func TestFilterComplypackDigests_Unavailable(t *testing.T) {
 	allDigests := map[string]string{
-		"io.complytime.opa":   "sha256:aaa",
-		"io.complytime.ampel": "sha256:bbb",
+		"io.complytime.opa":   cachetest.DigestA,
+		"io.complytime.ampel": cachetest.DigestB,
 	}
 	// Only opa was available; ampel had no content.
 	available := []string{"io.complytime.opa"}
 	result := filterComplypackDigests(allDigests, available)
 	assert.Equal(t, map[string]string{
-		"io.complytime.opa": "sha256:aaa",
+		"io.complytime.opa": cachetest.DigestA,
 	}, result)
 	assert.NotContains(t, result, "io.complytime.ampel",
 		"unavailable evaluator must not have digest recorded")
@@ -1552,22 +1553,22 @@ func TestFilterComplypackDigests_Unavailable(t *testing.T) {
 
 func TestFilterComplypackDigests_MixedAvailability(t *testing.T) {
 	allDigests := map[string]string{
-		"io.complytime.opa":     "sha256:aaa",
-		"io.complytime.ampel":   "sha256:bbb",
-		"io.complytime.kyverno": "sha256:ccc",
+		"io.complytime.opa":     cachetest.DigestA,
+		"io.complytime.ampel":   cachetest.DigestB,
+		"io.complytime.kyverno": cachetest.DigestC,
 	}
 	available := []string{"io.complytime.opa", "io.complytime.kyverno"}
 	result := filterComplypackDigests(allDigests, available)
 	assert.Equal(t, map[string]string{
-		"io.complytime.opa":     "sha256:aaa",
-		"io.complytime.kyverno": "sha256:ccc",
+		"io.complytime.opa":     cachetest.DigestA,
+		"io.complytime.kyverno": cachetest.DigestC,
 	}, result)
 	assert.NotContains(t, result, "io.complytime.ampel")
 }
 
 func TestFilterComplypackDigests_NoComplypacks(t *testing.T) {
 	allDigests := map[string]string{
-		"io.complytime.opa": "sha256:aaa",
+		"io.complytime.opa": cachetest.DigestA,
 	}
 	// No evaluators had complypack content available.
 	result := filterComplypackDigests(allDigests, nil)
@@ -1586,11 +1587,11 @@ func TestSaveGenerationAndPrint_AllComplypacksAvailable(t *testing.T) {
 	// Set up cache state with two complypack entries.
 	state := &cache.State{
 		Policies: map[string]cache.PolicyState{
-			"test-repo": {Version: "1.0.0", Digest: "sha256:policy-digest"},
+			"test-repo": {Version: "1.0.0", Digest: cachetest.DigestA},
 		},
 		Complypacks: map[string]cache.PolicyState{
-			"example.com/cp/opa":   {EvaluatorID: "io.complytime.opa", Digest: "sha256:opa-digest"},
-			"example.com/cp/ampel": {EvaluatorID: "io.complytime.ampel", Digest: "sha256:ampel-digest"},
+			"example.com/cp/opa":   {EvaluatorID: "io.complytime.opa", Digest: cachetest.DigestB},
+			"example.com/cp/ampel": {EvaluatorID: "io.complytime.ampel", Digest: cachetest.DigestC},
 		},
 	}
 	require.NoError(t, cache.SaveState(state, cacheDir))
@@ -1606,10 +1607,10 @@ func TestSaveGenerationAndPrint_AllComplypacksAvailable(t *testing.T) {
 	genState, err := policy.LoadGenerationState(baseDir, "test-repo")
 	require.NoError(t, err)
 	require.NotNil(t, genState)
-	assert.Equal(t, "sha256:policy-digest", genState.PolicyDigest)
+	assert.Equal(t, cachetest.DigestA, genState.PolicyDigest)
 	assert.Equal(t, map[string]string{
-		"io.complytime.opa":   "sha256:opa-digest",
-		"io.complytime.ampel": "sha256:ampel-digest",
+		"io.complytime.opa":   cachetest.DigestB,
+		"io.complytime.ampel": cachetest.DigestC,
 	}, genState.ComplypackDigests)
 }
 
@@ -1620,10 +1621,10 @@ func TestSaveGenerationAndPrint_ComplypackUnavailable(t *testing.T) {
 	// State has a complypack entry, but content was not available.
 	state := &cache.State{
 		Policies: map[string]cache.PolicyState{
-			"test-repo": {Version: "1.0.0", Digest: "sha256:policy-digest"},
+			"test-repo": {Version: "1.0.0", Digest: cachetest.DigestA},
 		},
 		Complypacks: map[string]cache.PolicyState{
-			"example.com/cp/opa": {EvaluatorID: "io.complytime.opa", Digest: "sha256:opa-digest"},
+			"example.com/cp/opa": {EvaluatorID: "io.complytime.opa", Digest: cachetest.DigestB},
 		},
 	}
 	require.NoError(t, cache.SaveState(state, cacheDir))
@@ -1649,11 +1650,11 @@ func TestSaveGenerationAndPrint_MixedAvailability(t *testing.T) {
 
 	state := &cache.State{
 		Policies: map[string]cache.PolicyState{
-			"test-repo": {Version: "1.0.0", Digest: "sha256:policy-digest"},
+			"test-repo": {Version: "1.0.0", Digest: cachetest.DigestA},
 		},
 		Complypacks: map[string]cache.PolicyState{
-			"example.com/cp/opa":   {EvaluatorID: "io.complytime.opa", Digest: "sha256:opa-digest"},
-			"example.com/cp/ampel": {EvaluatorID: "io.complytime.ampel", Digest: "sha256:ampel-digest"},
+			"example.com/cp/opa":   {EvaluatorID: "io.complytime.opa", Digest: cachetest.DigestB},
+			"example.com/cp/ampel": {EvaluatorID: "io.complytime.ampel", Digest: cachetest.DigestC},
 		},
 	}
 	require.NoError(t, cache.SaveState(state, cacheDir))
@@ -1670,7 +1671,7 @@ func TestSaveGenerationAndPrint_MixedAvailability(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, genState)
 	assert.Equal(t, map[string]string{
-		"io.complytime.opa": "sha256:opa-digest",
+		"io.complytime.opa": cachetest.DigestB,
 	}, genState.ComplypackDigests,
 		"only available evaluator's digest should be recorded")
 }
@@ -1682,7 +1683,7 @@ func TestSaveGenerationAndPrint_NoComplypacks(t *testing.T) {
 	// No complypack entries in state at all.
 	state := &cache.State{
 		Policies: map[string]cache.PolicyState{
-			"test-repo": {Version: "1.0.0", Digest: "sha256:policy-digest"},
+			"test-repo": {Version: "1.0.0", Digest: cachetest.DigestA},
 		},
 		Complypacks: make(map[string]cache.PolicyState),
 	}
@@ -2164,11 +2165,11 @@ func TestBuildReqToComplypackRef_ResolvesRequirements(t *testing.T) {
 	state := &cache.State{
 		Complypacks: map[string]cache.PolicyState{
 			"registry.example.com/complypacks/opa": {
-				Digest:      "sha256:abc123",
+				Digest:      cachetest.DigestA,
 				EvaluatorID: "opa",
 			},
 			"registry.example.com/complypacks/kyverno": {
-				Digest:      "sha256:def456",
+				Digest:      cachetest.DigestB,
 				EvaluatorID: "kyverno",
 			},
 		},
@@ -2191,9 +2192,9 @@ func TestBuildReqToComplypackRef_ResolvesRequirements(t *testing.T) {
 		},
 	}
 	m := buildReqToComplypackRef(cacheDir, groups)
-	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:abc123", m["plan-1"])
-	assert.Equal(t, "registry.example.com/complypacks/opa@sha256:abc123", m["plan-2"])
-	assert.Equal(t, "registry.example.com/complypacks/kyverno@sha256:def456", m["req-3"])
+	assert.Equal(t, "registry.example.com/complypacks/opa@"+cachetest.DigestA, m["plan-1"])
+	assert.Equal(t, "registry.example.com/complypacks/opa@"+cachetest.DigestA, m["plan-2"])
+	assert.Equal(t, "registry.example.com/complypacks/kyverno@"+cachetest.DigestB, m["req-3"])
 }
 
 // --- validateUniqueEvaluatorIDs tests ---
@@ -2201,8 +2202,8 @@ func TestBuildReqToComplypackRef_ResolvesRequirements(t *testing.T) {
 func TestValidateUniqueEvaluatorIDs_NoDuplicates(t *testing.T) {
 	state := &cache.State{
 		Complypacks: map[string]cache.PolicyState{
-			"complypacks/opa":   {EvaluatorID: "opa", Digest: "sha256:aaa"},
-			"complypacks/ampel": {EvaluatorID: "ampel", Digest: "sha256:bbb"},
+			"complypacks/opa":   {EvaluatorID: "opa", Digest: cachetest.DigestA},
+			"complypacks/ampel": {EvaluatorID: "ampel", Digest: cachetest.DigestB},
 		},
 	}
 	complypacks := []complytime.PolicyEntry{
@@ -2216,8 +2217,8 @@ func TestValidateUniqueEvaluatorIDs_NoDuplicates(t *testing.T) {
 func TestValidateUniqueEvaluatorIDs_DuplicateDetected(t *testing.T) {
 	state := &cache.State{
 		Complypacks: map[string]cache.PolicyState{
-			"complypacks/opa-a": {EvaluatorID: "opa", Digest: "sha256:aaa"},
-			"complypacks/opa-b": {EvaluatorID: "opa", Digest: "sha256:bbb"},
+			"complypacks/opa-a": {EvaluatorID: "opa", Digest: cachetest.DigestA},
+			"complypacks/opa-b": {EvaluatorID: "opa", Digest: cachetest.DigestB},
 		},
 	}
 	complypacks := []complytime.PolicyEntry{
@@ -2235,7 +2236,7 @@ func TestValidateUniqueEvaluatorIDs_DuplicateDetected(t *testing.T) {
 func TestValidateUniqueEvaluatorIDs_SingleEntry(t *testing.T) {
 	state := &cache.State{
 		Complypacks: map[string]cache.PolicyState{
-			"complypacks/opa": {EvaluatorID: "opa", Digest: "sha256:aaa"},
+			"complypacks/opa": {EvaluatorID: "opa", Digest: cachetest.DigestA},
 		},
 	}
 	complypacks := []complytime.PolicyEntry{
@@ -2287,7 +2288,7 @@ func TestInvalidateGenerationForComplypack_InvalidatesOnFetch(t *testing.T) {
 	// 1. Seed generation state referencing the "opa" evaluator.
 	genState := &policy.GenerationState{
 		PolicyID:     "test-policy",
-		PolicyDigest: "sha256:abc",
+		PolicyDigest: cachetest.DigestA,
 		EvaluatorIDs: []string{"opa"},
 	}
 	require.NoError(t, policy.SaveGenerationState(baseDir, "test-policy", genState))
@@ -2302,7 +2303,7 @@ func TestInvalidateGenerationForComplypack_InvalidatesOnFetch(t *testing.T) {
 		Complypacks: map[string]cache.PolicyState{
 			"registry.example.com/packs/opa": {
 				Version:     "1.0.0",
-				Digest:      "sha256:cp-digest",
+				Digest:      cachetest.DigestB,
 				EvaluatorID: "opa",
 			},
 		},
@@ -2333,7 +2334,7 @@ func TestInvalidateGenerationForComplypack_NoOpWhenRepositoryUnknown(t *testing.
 	// Seed generation state that should NOT be touched.
 	genState := &policy.GenerationState{
 		PolicyID:     "test-policy",
-		PolicyDigest: "sha256:abc",
+		PolicyDigest: cachetest.DigestA,
 		EvaluatorIDs: []string{"opa"},
 	}
 	require.NoError(t, policy.SaveGenerationState(baseDir, "test-policy", genState))
@@ -2360,7 +2361,7 @@ func TestInvalidateGenerationForComplypack_NestedPolicyID(t *testing.T) {
 
 	genState := &policy.GenerationState{
 		PolicyID:     "policies/nested-policy",
-		PolicyDigest: "sha256:abc",
+		PolicyDigest: cachetest.DigestA,
 		EvaluatorIDs: []string{"opa"},
 	}
 	require.NoError(t, policy.SaveGenerationState(baseDir, "policies/nested-policy", genState))
@@ -2373,7 +2374,7 @@ func TestInvalidateGenerationForComplypack_NestedPolicyID(t *testing.T) {
 		Complypacks: map[string]cache.PolicyState{
 			"registry.example.com/packs/opa": {
 				Version:     "1.0.0",
-				Digest:      "sha256:cp-digest",
+				Digest:      cachetest.DigestB,
 				EvaluatorID: "opa",
 			},
 		},
@@ -2399,7 +2400,7 @@ func TestInvalidateGenerationForComplypack_NoOpWhenEvaluatorIDEmpty(t *testing.T
 	// Seed generation state that should NOT be touched.
 	genState := &policy.GenerationState{
 		PolicyID:     "test-policy",
-		PolicyDigest: "sha256:abc",
+		PolicyDigest: cachetest.DigestA,
 		EvaluatorIDs: []string{"opa"},
 	}
 	require.NoError(t, policy.SaveGenerationState(baseDir, "test-policy", genState))
@@ -2409,7 +2410,7 @@ func TestInvalidateGenerationForComplypack_NoOpWhenEvaluatorIDEmpty(t *testing.T
 		Complypacks: map[string]cache.PolicyState{
 			"registry.example.com/packs/opa": {
 				Version:     "1.0.0",
-				Digest:      "sha256:cp-digest",
+				Digest:      cachetest.DigestB,
 				EvaluatorID: "",
 			},
 		},

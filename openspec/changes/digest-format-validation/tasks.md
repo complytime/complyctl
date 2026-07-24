@@ -76,3 +76,4 @@
 - [ ] 7.1 [P] Update `CHANGELOG.md` with digest validation entry
 - [ ] 7.2 [P] Update `AGENTS.md` Recent Changes with
   digest-format-validation summary
+<!-- spec-review: passed -->

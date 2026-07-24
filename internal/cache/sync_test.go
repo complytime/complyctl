@@ -27,7 +27,7 @@ func TestSync_CopyOnSuccess(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	mock := cachetest.NewMockPolicySource()
-	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
+	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
 
 	cacheMgr := cache.NewCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
@@ -60,7 +60,7 @@ func TestSync_CopyOnSuccess_PinnedVersion(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	mock := cachetest.NewMockPolicySource()
-	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
+	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
 
 	cacheMgr := cache.NewCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
@@ -80,7 +80,7 @@ func TestSync_CopyOnSuccess_PinnedVersion(t *testing.T) {
 	ps, ok := state2.GetPolicyState("test-policy")
 	assert.True(t, ok)
 	assert.Equal(t, "v1.0.0", ps.Version)
-	assert.Equal(t, "sha256:abc123", ps.Digest)
+	assert.Equal(t, "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", ps.Digest)
 }
 
 func TestSync_FailureOnMissingPolicy(t *testing.T) {
@@ -136,7 +136,7 @@ func TestSync_IncrementalSkip(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	mock := cachetest.NewMockPolicySource()
-	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
+	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
 
 	cacheMgr := cache.NewCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
@@ -189,7 +189,7 @@ func TestSync_RedownloadAfterDeletion(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	mock := cachetest.NewMockPolicySource()
-	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
+	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
 
 	cacheMgr := cache.NewCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
@@ -238,7 +238,7 @@ func TestSync_ConcurrentDifferentPolicies(t *testing.T) {
 		mock.SeedPolicy(
 			fmt.Sprintf("policy-%d", i),
 			"v1.0.0",
-			fmt.Sprintf("sha256:digest%d", i),
+			fmt.Sprintf("sha256:%064x", i),
 		)
 	}
 
@@ -316,7 +316,7 @@ func TestSync_ConcurrentMixedFailures(t *testing.T) {
 		mock.SeedPolicy(
 			fmt.Sprintf("policy-%d", i),
 			"v1.0.0",
-			fmt.Sprintf("sha256:digest%d", i),
+			fmt.Sprintf("sha256:%064x", i),
 		)
 	}
 
@@ -387,17 +387,17 @@ func TestBuildLookupRef(t *testing.T) {
 		// Backward-compatible cases: empty registryHost preserves existing behavior.
 		{"tag version", "", "org/policy", "v1.0", "", "org/policy:v1.0"},
 		{"sha256 digest", "", "org/policy", "", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "org/policy@sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
-		{"sha512 digest", "", "org/policy", "", "sha512:def456", "org/policy@sha512:def456"},
+		{"sha512 digest", "", "org/policy", "", "sha512:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d", "org/policy@sha512:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d"},
 		{"empty version", "", "org/policy", "", "", "org/policy"},
 		{"latest version", "", "org/policy", "latest", "", "org/policy"},
 		// New cases: non-empty registryHost prepends host prefix.
 		{"host with tag", "registry.example.com", "policies/verify-keyed", "v1.0.0", "", "registry.example.com/policies/verify-keyed:v1.0.0"},
-		{"host with digest", "registry.example.com", "policies/verify-keyed", "", "sha256:abc123", "registry.example.com/policies/verify-keyed@sha256:abc123"},
+		{"host with digest", "registry.example.com", "policies/verify-keyed", "", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "registry.example.com/policies/verify-keyed@sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
 		{"host with empty version", "registry.example.com", "org/policy", "", "", "registry.example.com/org/policy"},
 		{"host with latest", "registry.example.com", "org/policy", "latest", "", "registry.example.com/org/policy"},
 		// Edge cases: port-based registries and trailing slash normalization.
 		{"host with port and tag", "myregistry.io:5000", "org/policy", "v1.0.0", "", "myregistry.io:5000/org/policy:v1.0.0"},
-		{"host with port and digest", "localhost:5000", "org/policy", "", "sha256:abc123", "localhost:5000/org/policy@sha256:abc123"},
+		{"host with port and digest", "localhost:5000", "org/policy", "", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "localhost:5000/org/policy@sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"},
 		{"host with trailing slash", "registry.example.com/", "org/policy", "v1.0.0", "", "registry.example.com/org/policy:v1.0.0"},
 	}
 	for _, tt := range tests {
@@ -411,8 +411,8 @@ func TestBuildLookupRef(t *testing.T) {
 // TestBuildLookupRef_DigestPrecedence verifies that when both tag and
 // digest are provided, digest takes precedence (OCI convention).
 func TestBuildLookupRef_DigestPrecedence(t *testing.T) {
-	got := cache.BuildLookupRef("", "org/policy", "v1.0", "sha256:abc123")
-	assert.Equal(t, "org/policy@sha256:abc123", got)
+	got := cache.BuildLookupRef("", "org/policy", "v1.0", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
+	assert.Equal(t, "org/policy@sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", got)
 }
 
 // TestBuildLookupRef_SHA384Digest verifies sha384 digests are handled
@@ -435,8 +435,8 @@ func TestSync_SHA384Digest(t *testing.T) {
 	mock := cachetest.NewMockPolicySource()
 	// Seed with the digest-based lookup ref so DefinitionVersion succeeds,
 	// and with the bare policyID so CopyPolicy can find it.
-	mock.SeedPolicy(lookupRef, "v1.0.0", "sha256:abc123")
-	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
+	mock.SeedPolicy(lookupRef, "v1.0.0", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
+	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
 
 	cacheMgr := cache.NewCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)
@@ -473,8 +473,8 @@ func TestSync_VerificationFailure_AbortsCopy(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	mock := cachetest.NewMockPolicySource()
-	mock.SeedPolicy("registry.example.com/test-policy", "v1.0.0", "sha256:abc123")
-	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
+	mock.SeedPolicy("registry.example.com/test-policy", "v1.0.0", cachetest.DigestA)
+	mock.SeedPolicy("test-policy", "v1.0.0", cachetest.DigestA)
 
 	failVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
 		return nil, fmt.Errorf("signature verification failed: identity mismatch")
@@ -505,8 +505,8 @@ func TestSync_VerificationSuccess_RecordsMetadata(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	mock := cachetest.NewMockPolicySource()
-	mock.SeedPolicy("registry.example.com/test-policy", "v1.0.0", "sha256:abc123")
-	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
+	mock.SeedPolicy("registry.example.com/test-policy", "v1.0.0", cachetest.DigestA)
+	mock.SeedPolicy("test-policy", "v1.0.0", cachetest.DigestA)
 
 	successVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
 		return &cache.VerificationResult{
@@ -541,7 +541,7 @@ func TestSync_NilVerifier_SkipsVerification(t *testing.T) {
 	require.NoError(t, os.MkdirAll(cacheDir, 0755))
 
 	mock := cachetest.NewMockPolicySource()
-	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:abc123")
+	mock.SeedPolicy("test-policy", "v1.0.0", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
 
 	cacheMgr := cache.NewCache(cacheDir)
 	state, err := cache.LoadState(cacheDir)

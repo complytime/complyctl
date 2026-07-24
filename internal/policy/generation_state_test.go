@@ -19,8 +19,8 @@ func TestGenerationState_SaveLoadRoundTrip(t *testing.T) {
 	baseDir := t.TempDir()
 	state := &GenerationState{
 		PolicyID:          "nist-800-53-r5",
-		PolicyDigest:      "sha256:abc123",
-		ComplypackDigests: map[string]string{"opa": "sha256:cp1", "ampel": "sha256:cp2"},
+		PolicyDigest:      "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+		ComplypackDigests: map[string]string{"opa": "sha256:1111111111111111111111111111111111111111111111111111111111111111", "ampel": "sha256:2222222222222222222222222222222222222222222222222222222222222222"},
 		GeneratedAt:       time.Now().UTC().Format(time.RFC3339),
 		EvaluatorIDs:      []string{"openscap", "kube-eval"},
 	}
@@ -42,7 +42,7 @@ func TestGenerationState_SaveLoadRoundTrip_NoComplypackDigests(t *testing.T) {
 	baseDir := t.TempDir()
 	state := &GenerationState{
 		PolicyID:     "test-policy",
-		PolicyDigest: "sha256:abc",
+		PolicyDigest: "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 	}
 
 	require.NoError(t, SaveGenerationState(baseDir, "test-policy", state))
@@ -86,18 +86,18 @@ func TestLoadGenerationState_CorruptJSON(t *testing.T) {
 // --- T153: IsFresh tests ---
 
 func TestIsFresh_MatchingDigest(t *testing.T) {
-	s := &GenerationState{PolicyDigest: "sha256:abc123"}
-	assert.True(t, s.IsFresh("sha256:abc123", nil))
+	s := &GenerationState{PolicyDigest: "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"}
+	assert.True(t, s.IsFresh("sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", nil))
 }
 
 func TestIsFresh_MismatchedDigest(t *testing.T) {
-	s := &GenerationState{PolicyDigest: "sha256:abc123"}
-	assert.False(t, s.IsFresh("sha256:def456", nil))
+	s := &GenerationState{PolicyDigest: "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"}
+	assert.False(t, s.IsFresh("sha256:d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5", nil))
 }
 
 func TestIsFresh_EmptyDigest(t *testing.T) {
 	s := &GenerationState{PolicyDigest: ""}
-	assert.False(t, s.IsFresh("sha256:abc123", nil))
+	assert.False(t, s.IsFresh("sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", nil))
 }
 
 func TestIsFresh_BothEmpty(t *testing.T) {
@@ -107,50 +107,50 @@ func TestIsFresh_BothEmpty(t *testing.T) {
 
 func TestIsFresh_ComplypackDigestChanged(t *testing.T) {
 	s := &GenerationState{
-		PolicyDigest:      "sha256:abc123",
-		ComplypackDigests: map[string]string{"opa": "sha256:old"},
+		PolicyDigest:      "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+		ComplypackDigests: map[string]string{"opa": "sha256:4444444444444444444444444444444444444444444444444444444444444444"},
 	}
-	assert.False(t, s.IsFresh("sha256:abc123", map[string]string{"opa": "sha256:new"}))
+	assert.False(t, s.IsFresh("sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", map[string]string{"opa": "sha256:3333333333333333333333333333333333333333333333333333333333333333"}))
 }
 
 func TestIsFresh_ComplypackDigestAdded(t *testing.T) {
-	s := &GenerationState{PolicyDigest: "sha256:abc123"}
-	assert.False(t, s.IsFresh("sha256:abc123", map[string]string{"opa": "sha256:cp1"}))
+	s := &GenerationState{PolicyDigest: "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"}
+	assert.False(t, s.IsFresh("sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", map[string]string{"opa": "sha256:1111111111111111111111111111111111111111111111111111111111111111"}))
 }
 
 func TestIsFresh_NilVsEmptyComplypackDigests(t *testing.T) {
-	s := &GenerationState{PolicyDigest: "sha256:abc123"}
-	assert.True(t, s.IsFresh("sha256:abc123", map[string]string{}),
+	s := &GenerationState{PolicyDigest: "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"}
+	assert.True(t, s.IsFresh("sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", map[string]string{}),
 		"nil and empty map both mean no complypacks")
 }
 
 func TestIsFresh_ComplypackDigestRemoved(t *testing.T) {
 	s := &GenerationState{
-		PolicyDigest:      "sha256:abc123",
-		ComplypackDigests: map[string]string{"opa": "sha256:cp1"},
+		PolicyDigest:      "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+		ComplypackDigests: map[string]string{"opa": "sha256:1111111111111111111111111111111111111111111111111111111111111111"},
 	}
-	assert.False(t, s.IsFresh("sha256:abc123", nil),
+	assert.False(t, s.IsFresh("sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", nil),
 		"removing a complypack should trigger regeneration")
 }
 
 func TestIsFresh_MatchingComplypackDigests(t *testing.T) {
-	cpDigests := map[string]string{"opa": "sha256:cp1", "ampel": "sha256:cp2"}
+	cpDigests := map[string]string{"opa": "sha256:1111111111111111111111111111111111111111111111111111111111111111", "ampel": "sha256:2222222222222222222222222222222222222222222222222222222222222222"}
 	s := &GenerationState{
-		PolicyDigest:      "sha256:abc123",
+		PolicyDigest:      "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
 		ComplypackDigests: cpDigests,
 	}
-	assert.True(t, s.IsFresh("sha256:abc123", map[string]string{"opa": "sha256:cp1", "ampel": "sha256:cp2"}))
+	assert.True(t, s.IsFresh("sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", map[string]string{"opa": "sha256:1111111111111111111111111111111111111111111111111111111111111111", "ampel": "sha256:2222222222222222222222222222222222222222222222222222222222222222"}))
 }
 
 // --- T154: NewGenerationState tests ---
 
 func TestNewGenerationState(t *testing.T) {
 	evalIDs := []string{"openscap", "kube-eval"}
-	cpDigests := map[string]string{"opa": "sha256:cp1"}
-	state := NewGenerationState("test-policy", "sha256:abc", evalIDs, cpDigests)
+	cpDigests := map[string]string{"opa": "sha256:1111111111111111111111111111111111111111111111111111111111111111"}
+	state := NewGenerationState("test-policy", "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", evalIDs, cpDigests)
 
 	assert.Equal(t, "test-policy", state.PolicyID)
-	assert.Equal(t, "sha256:abc", state.PolicyDigest)
+	assert.Equal(t, "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", state.PolicyDigest)
 	assert.Equal(t, cpDigests, state.ComplypackDigests)
 	assert.Equal(t, evalIDs, state.EvaluatorIDs)
 
@@ -159,7 +159,7 @@ func TestNewGenerationState(t *testing.T) {
 }
 
 func TestNewGenerationState_NilEvaluatorIDs(t *testing.T) {
-	state := NewGenerationState("test", "sha256:xyz", nil, nil)
+	state := NewGenerationState("test", "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", nil, nil)
 	assert.Nil(t, state.EvaluatorIDs)
 	assert.Nil(t, state.ComplypackDigests)
 }
@@ -170,7 +170,7 @@ func TestInvalidateForEvaluator_RemovesMatchingState(t *testing.T) {
 	baseDir := t.TempDir()
 	state := &GenerationState{
 		PolicyID:     "test-policy",
-		PolicyDigest: "sha256:abc",
+		PolicyDigest: "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 		EvaluatorIDs: []string{"opa", "ampel"},
 	}
 	require.NoError(t, SaveGenerationState(baseDir, "test-policy", state))
@@ -189,12 +189,12 @@ func TestInvalidateForEvaluator_PreservesUnrelatedState(t *testing.T) {
 
 	opaState := &GenerationState{
 		PolicyID:     "policy-a",
-		PolicyDigest: "sha256:aaa",
+		PolicyDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		EvaluatorIDs: []string{"opa"},
 	}
 	ampelState := &GenerationState{
 		PolicyID:     "policy-b",
-		PolicyDigest: "sha256:bbb",
+		PolicyDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 		EvaluatorIDs: []string{"ampel"},
 	}
 	require.NoError(t, SaveGenerationState(baseDir, "policy-a", opaState))
@@ -256,7 +256,7 @@ func TestInvalidateForEvaluator_NestedPolicyID(t *testing.T) {
 	baseDir := t.TempDir()
 	state := &GenerationState{
 		PolicyID:     "policies/nested-policy",
-		PolicyDigest: "sha256:abc",
+		PolicyDigest: "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 		EvaluatorIDs: []string{"opa"},
 	}
 	require.NoError(t, SaveGenerationState(baseDir, "policies/nested-policy", state))
@@ -280,7 +280,7 @@ func TestInvalidateForEvaluator_NestedNonJSONPreserved(t *testing.T) {
 
 	state := &GenerationState{
 		PolicyID:     "policies/target",
-		PolicyDigest: "sha256:abc",
+		PolicyDigest: "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 		EvaluatorIDs: []string{"opa"},
 	}
 	require.NoError(t, SaveGenerationState(baseDir, "policies/target", state))
@@ -332,7 +332,7 @@ func TestInvalidateForEvaluator_IgnoresNonJSONFiles(t *testing.T) {
 
 	state := &GenerationState{
 		PolicyID:     "policy-x",
-		PolicyDigest: "sha256:xxx",
+		PolicyDigest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 		EvaluatorIDs: []string{"opa"},
 	}
 	require.NoError(t, SaveGenerationState(baseDir, "policy-x", state))

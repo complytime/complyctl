@@ -275,7 +275,7 @@ func TestCheckPolicyVersions_RegistryUnreachable(t *testing.T) {
 	vr := newMockVersionResolver()
 	vr.unreachable["unreachable.io"] = true
 
-	state.UpdatePolicyStateWithVerification("policies/cis", "v2.0.0", "sha256:abc", nil)
+	require.NoError(t, state.UpdatePolicyStateWithVerification("policies/cis", "v2.0.0", "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", nil))
 	require.NoError(t, cache.SaveState(state, tmpDir))
 
 	results := CheckPolicyVersions(cfg, tmpDir, vr)

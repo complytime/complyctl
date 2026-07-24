@@ -156,7 +156,9 @@ func (s *Sync) SyncPolicy(ctx context.Context, policyID, version string) (bool, 
 		return false, fmt.Errorf("policy %s@%s: copy failed: %w", policyID, version, err)
 	}
 
-	s.state.UpdatePolicyStateWithVerification(policyID, version, remoteDigest, verifyResult)
+	if err := s.state.UpdatePolicyStateWithVerification(policyID, version, remoteDigest, verifyResult); err != nil {
+		return false, err
+	}
 	if err := SaveState(s.state, s.dataDir); err != nil {
 		return false, fmt.Errorf("failed to save state after sync: %w (policy blobs are valid)", err)
 	}

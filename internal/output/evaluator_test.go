@@ -26,7 +26,7 @@ func TestNewEvaluator_NilMapsInitialized(t *testing.T) {
 func TestNewEvaluator_NonNilMapsPreserved(t *testing.T) {
 	reqToControl := map[string]string{"req-1": "ctrl-1"}
 	reqToPlan := map[string]string{"req-1": "plan-1"}
-	reqToComplypackRef := map[string]string{"req-1": "registry.example.com/complypacks/opa@sha256:abc"}
+	reqToComplypackRef := map[string]string{"req-1": "registry.example.com/complypacks/opa@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"}
 	eval := output.NewEvaluator("pol", "tgt", reqToControl, reqToPlan, reqToComplypackRef)
 	eval.AddTarget([]provider.AssessmentLog{
 		{
@@ -212,7 +212,7 @@ func TestEvaluator_Write(t *testing.T) {
 func TestEvaluator_Write_StepIdentityWithComplypackRef(t *testing.T) {
 	outDir := t.TempDir()
 	reqToPlan := map[string]string{"req-1": "plan-1"}
-	reqToComplypackRef := map[string]string{"req-1": "registry.example.com/complypacks/opa@sha256:abc123"}
+	reqToComplypackRef := map[string]string{"req-1": "registry.example.com/complypacks/opa@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"}
 	eval := output.NewEvaluator("pol", "tgt", nil, reqToPlan, reqToComplypackRef)
 	eval.AddTarget([]provider.AssessmentLog{
 		{
@@ -229,7 +229,7 @@ func TestEvaluator_Write_StepIdentityWithComplypackRef(t *testing.T) {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	content := string(data)
-	assert.Contains(t, content, "registry.example.com/complypacks/opa@sha256:abc123#kubernetes.run_as_nonroot")
+	assert.Contains(t, content, "registry.example.com/complypacks/opa@sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2#kubernetes.run_as_nonroot")
 	assert.NotContains(t, content, "providerStepToGemara")
 	assert.Contains(t, content, "plan:")
 	assert.Contains(t, content, "entry-id: plan-1")

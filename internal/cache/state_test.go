@@ -113,7 +113,7 @@ func TestPolicyState_BackwardCompatibility_NoVerifiedField(t *testing.T) {
 		"policies": map[string]interface{}{
 			"legacy-policy": map[string]interface{}{
 				"version":      "v1.0.0",
-				"digest":       "sha256:legacy",
+				"digest":       "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 				"last_updated": "2025-01-01T00:00:00Z",
 			},
 		},
@@ -128,13 +128,13 @@ func TestPolicyState_BackwardCompatibility_NoVerifiedField(t *testing.T) {
 	ps, ok := loaded.GetPolicyState("legacy-policy")
 	require.True(t, ok)
 	assert.Equal(t, "v1.0.0", ps.Version)
-	assert.Equal(t, "sha256:legacy", ps.Digest)
+	assert.Equal(t, "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", ps.Digest)
 }
 
 func TestPolicyState_JSONRoundTrip_WithMetadata(t *testing.T) {
 	original := cache.PolicyState{
 		Version:         "v2.0.0",
-		Digest:          "sha256:abc123",
+		Digest:          "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 		EvaluatorID:     "openscap",
 		LastUpdated:     time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
 		Verified:        true,
@@ -161,7 +161,7 @@ func TestPolicyState_JSONBackwardCompatibility(t *testing.T) {
 	// JSON from an older complyctl version that lacks metadata fields.
 	oldJSON := `{
 		"version": "v1.0.0",
-		"digest": "sha256:old",
+		"digest": "sha256:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d",
 		"last_updated": "2025-06-01T00:00:00Z"
 	}`
 
@@ -170,7 +170,7 @@ func TestPolicyState_JSONBackwardCompatibility(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "v1.0.0", ps.Version)
-	assert.Equal(t, "sha256:old", ps.Digest)
+	assert.Equal(t, "sha256:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d", ps.Digest)
 	// Metadata fields default to zero values.
 	assert.Equal(t, "", ps.PolicyTitle)
 	assert.Equal(t, "", ps.PolicyEvaluator)
@@ -185,7 +185,7 @@ func TestPolicyState_JSONRoundTrip_ZeroControlCount(t *testing.T) {
 	// from "metadata never extracted" after deserialization.
 	original := cache.PolicyState{
 		Version:         "v1.0.0",
-		Digest:          "sha256:abc",
+		Digest:          "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
 		PolicyTitle:     "Zero Controls Policy",
 		PolicyEvaluator: "opa",
 		ControlCount:    0,
@@ -215,7 +215,7 @@ func TestState_SetPolicyMetadata_PreservesSyncFields(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"example.com/policies/cis-fedora": {
 				Version:        "v3.1.0",
-				Digest:         "sha256:syncdigest",
+				Digest:         "sha256:82a920ed89b44f30bd4e09e0c18bc4f2ef3d4274f3e6d5f9c68b14b1e3e5dda6",
 				EvaluatorID:    "complypack-eval",
 				LastUpdated:    lastUpdated,
 				Verified:       true,
@@ -241,7 +241,7 @@ func TestState_SetPolicyMetadata_PreservesSyncFields(t *testing.T) {
 
 	// Sync fields MUST be unchanged.
 	assert.Equal(t, "v3.1.0", ps.Version)
-	assert.Equal(t, "sha256:syncdigest", ps.Digest)
+	assert.Equal(t, "sha256:82a920ed89b44f30bd4e09e0c18bc4f2ef3d4274f3e6d5f9c68b14b1e3e5dda6", ps.Digest)
 	assert.Equal(t, "complypack-eval", ps.EvaluatorID)
 	assert.Equal(t, lastUpdated, ps.LastUpdated)
 	assert.True(t, ps.Verified)
@@ -268,7 +268,7 @@ func TestSaveState_StateSeparation(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"example.com/policies/test": {
 				Version: "v1.0.0",
-				Digest:  "sha256:abc123",
+				Digest:  "sha256:a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890",
 			},
 		},
 		Complypacks: make(map[string]cache.PolicyState),
@@ -294,7 +294,7 @@ func TestSaveState_StateSeparation(t *testing.T) {
 	ps, exists := loaded.GetPolicyState("example.com/policies/test")
 	require.True(t, exists)
 	assert.Equal(t, "v1.0.0", ps.Version)
-	assert.Equal(t, "sha256:abc123", ps.Digest)
+	assert.Equal(t, "sha256:a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890", ps.Digest)
 }
 
 // TestSaveState_DirectoryPermissions verifies that SaveState creates the
@@ -330,7 +330,7 @@ func TestState_SetPolicyMetadata_NoOpForMissingKey(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"existing-policy": {
 				Version: "v1.0.0",
-				Digest:  "sha256:exists",
+				Digest:  "sha256:b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4f5a67890",
 			},
 		},
 	}
@@ -353,5 +353,142 @@ func TestState_SetPolicyMetadata_NoOpForMissingKey(t *testing.T) {
 	ps, exists := state.GetPolicyState("existing-policy")
 	require.True(t, exists)
 	assert.Equal(t, "v1.0.0", ps.Version)
-	assert.Equal(t, "sha256:exists", ps.Digest)
+	assert.Equal(t, "sha256:b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4f5a67890", ps.Digest)
+}
+
+// --- ValidateDigest tests (D4) ---
+
+func TestValidateDigest(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{"valid sha256", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", false},
+		{"valid sha384", "sha384:768412320f7b0aa5812fce428dc4706b3cae50e02a64caa16a782249bfe8efc4b7ef1ccb126255d196047dfedf17a0a9", false},
+		{"valid sha512", "sha512:ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff", false},
+		{"empty string is allowed", "", false},
+		{"missing colon", "sha256abc123", true},
+		{"wrong hex length for sha256", "sha256:abc123", true},
+		{"unsupported algorithm", "md5:d41d8cd98f00b204e9800998ecf8427e", true},
+		{"no hex after colon", "sha256:", true},
+		{"bare algorithm name", "sha256", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := cache.ValidateDigest(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// --- UpdatePolicyStateWithVerification rejects malformed digest (D2) ---
+
+func TestUpdatePolicyStateWithVerification_RejectsMalformedDigest(t *testing.T) {
+	state := &cache.State{
+		Policies: make(map[string]cache.PolicyState),
+	}
+
+	err := state.UpdatePolicyStateWithVerification("test-policy", "v1.0", "sha256:bad", nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid digest")
+	assert.Contains(t, err.Error(), "test-policy")
+
+	// State must not be modified.
+	_, exists := state.GetPolicyState("test-policy")
+	assert.False(t, exists, "malformed digest must not be stored")
+}
+
+// --- UpdateComplypackStateWithVerification rejects malformed digest (D2) ---
+
+func TestUpdateComplypackStateWithVerification_RejectsMalformedDigest(t *testing.T) {
+	state := &cache.State{
+		Complypacks: make(map[string]cache.PolicyState),
+	}
+
+	err := state.UpdateComplypackStateWithVerification("repo/pack", "v1.0", "sha256:bad", "opa", nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid digest")
+	assert.Contains(t, err.Error(), "repo/pack")
+
+	// State must not be modified.
+	_, exists := state.GetComplypackState("repo/pack")
+	assert.False(t, exists, "malformed digest must not be stored")
+}
+
+// --- LoadState warns and excludes malformed digests (D1) ---
+
+func TestLoadState_ExcludesMalformedDigests(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Write a state.json with a mix of valid, malformed, and empty digests.
+	stateData := map[string]interface{}{
+		"last_sync": time.Now().Format(time.RFC3339),
+		"policies": map[string]interface{}{
+			"valid-policy": map[string]interface{}{
+				"version":      "v1.0",
+				"digest":       "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+				"last_updated": time.Now().Format(time.RFC3339),
+			},
+			"malformed-policy": map[string]interface{}{
+				"version":      "v2.0",
+				"digest":       "sha256:bad",
+				"last_updated": time.Now().Format(time.RFC3339),
+			},
+			"empty-digest-policy": map[string]interface{}{
+				"version":      "v3.0",
+				"digest":       "",
+				"last_updated": time.Now().Format(time.RFC3339),
+			},
+		},
+		"complypacks": map[string]interface{}{
+			"valid-pack": map[string]interface{}{
+				"version":      "v1.0",
+				"digest":       "sha256:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d",
+				"evaluator_id": "opa",
+				"last_updated": time.Now().Format(time.RFC3339),
+			},
+			"malformed-pack": map[string]interface{}{
+				"version":      "v2.0",
+				"digest":       "sha256:tooshort",
+				"evaluator_id": "ampel",
+				"last_updated": time.Now().Format(time.RFC3339),
+			},
+		},
+	}
+
+	data, err := json.MarshalIndent(stateData, "", "  ")
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "state.json"), data, 0600))
+
+	state, err := cache.LoadState(tmpDir)
+	require.NoError(t, err, "LoadState must return nil error even with malformed entries")
+
+	// Valid policy must be preserved.
+	ps, exists := state.GetPolicyState("valid-policy")
+	require.True(t, exists, "valid-policy must be preserved")
+	assert.Equal(t, "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", ps.Digest)
+
+	// Malformed policy must be excluded.
+	_, exists = state.GetPolicyState("malformed-policy")
+	assert.False(t, exists, "malformed-policy must be excluded")
+
+	// Empty-digest policy must be preserved.
+	ps, exists = state.GetPolicyState("empty-digest-policy")
+	require.True(t, exists, "empty-digest-policy must be preserved")
+	assert.Empty(t, ps.Digest)
+
+	// Valid complypack must be preserved.
+	ps, exists = state.GetComplypackState("valid-pack")
+	require.True(t, exists, "valid-pack must be preserved")
+	assert.Equal(t, "sha256:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d", ps.Digest)
+
+	// Malformed complypack must be excluded.
+	_, exists = state.GetComplypackState("malformed-pack")
+	assert.False(t, exists, "malformed-pack must be excluded")
 }

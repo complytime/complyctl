@@ -134,12 +134,12 @@ func TestVerificationResult_ZeroValue(t *testing.T) {
 
 func TestPolicyState_BackwardCompatibility(t *testing.T) {
 	// Old-format JSON without verification fields must deserialize correctly
-	oldJSON := `{"version":"v1.0","digest":"sha256:abc123","last_updated":"2024-01-01T00:00:00Z"}`
+	oldJSON := `{"version":"v1.0","digest":"sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","last_updated":"2024-01-01T00:00:00Z"}`
 	var ps PolicyState
 	err := json.Unmarshal([]byte(oldJSON), &ps)
 	require.NoError(t, err)
 	assert.Equal(t, "v1.0", ps.Version)
-	assert.Equal(t, "sha256:abc123", ps.Digest)
+	assert.Equal(t, "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", ps.Digest)
 	assert.False(t, ps.Verified)
 	assert.Empty(t, ps.SignerIdentity)
 	assert.Empty(t, ps.Issuer)
@@ -152,7 +152,7 @@ func TestPolicyState_OmitemptyMarshal(t *testing.T) {
 	// emitted since omitempty does not apply to structs in encoding/json.
 	ps := PolicyState{
 		Version:     "v1.0",
-		Digest:      "sha256:abc123",
+		Digest:      "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 		LastUpdated: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
 	data, err := json.Marshal(ps)
@@ -167,7 +167,7 @@ func TestPolicyState_VerifiedMarshal(t *testing.T) {
 	verifiedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	ps := PolicyState{
 		Version:        "v1.0",
-		Digest:         "sha256:abc123",
+		Digest:         "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
 		LastUpdated:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		Verified:       true,
 		SignerIdentity: "workflow@github.com",
@@ -185,11 +185,11 @@ func TestPolicyState_VerifiedMarshal(t *testing.T) {
 
 func TestUpdatePolicyStateWithVerification_NilResult(t *testing.T) {
 	state := &State{Policies: make(map[string]PolicyState)}
-	state.UpdatePolicyStateWithVerification("test-policy", "v1.0", "sha256:abc", nil)
+	require.NoError(t, state.UpdatePolicyStateWithVerification("test-policy", "v1.0", "sha256:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d", nil))
 	ps, ok := state.GetPolicyState("test-policy")
 	require.True(t, ok)
 	assert.Equal(t, "v1.0", ps.Version)
-	assert.Equal(t, "sha256:abc", ps.Digest)
+	assert.Equal(t, "sha256:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d", ps.Digest)
 	assert.False(t, ps.Verified)
 	assert.Empty(t, ps.SignerIdentity)
 }
@@ -202,7 +202,7 @@ func TestUpdatePolicyStateWithVerification_WithResult(t *testing.T) {
 		Issuer:         "https://issuer.example.com",
 		VerifiedAt:     time.Now(),
 	}
-	state.UpdatePolicyStateWithVerification("test-policy", "v1.0", "sha256:abc", vr)
+	require.NoError(t, state.UpdatePolicyStateWithVerification("test-policy", "v1.0", "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", vr))
 	ps, ok := state.GetPolicyState("test-policy")
 	require.True(t, ok)
 	assert.True(t, ps.Verified)
@@ -219,7 +219,7 @@ func TestUpdateComplypackStateWithVerification_WithResult(t *testing.T) {
 		Issuer:         "https://ci.issuer.com",
 		VerifiedAt:     time.Now(),
 	}
-	state.UpdateComplypackStateWithVerification("repo/pack", "v2.0", "sha256:def", "opa", vr)
+	require.NoError(t, state.UpdateComplypackStateWithVerification("repo/pack", "v2.0", "sha256:82a920ed89b44f30bd4e09e0c18bc4f2ef3d4274f3e6d5f9c68b14b1e3e5dda6", "opa", vr))
 	ps, ok := state.GetComplypackState("repo/pack")
 	require.True(t, ok)
 	assert.True(t, ps.Verified)
