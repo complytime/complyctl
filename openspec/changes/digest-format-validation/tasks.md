@@ -68,8 +68,8 @@
 - [x] 6.1 Run `make test-unit` -- all tests pass
 - [x] 6.2 Run `make lint` -- zero lint issues
 - [x] 6.3 Run `make vet` -- passes
-- [ ] 6.4 Run `make sanity` -- vendor + format + vet + git diff check
-- [ ] 6.5 Run `make crapload-check` -- no CRAP regressions
+- [x] 6.4 Run `make sanity` -- vendor + format + vet + git diff check
+- [x] 6.5 Run `make crapload-check` -- no CRAP regressions
 
 ## 7. Documentation
 
