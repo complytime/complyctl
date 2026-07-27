@@ -77,3 +77,4 @@
 - [x] 7.2 [P] Update `AGENTS.md` Recent Changes with
   digest-format-validation summary
 <!-- spec-review: passed -->
+<!-- code-review: passed -->
