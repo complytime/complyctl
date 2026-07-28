@@ -311,6 +311,39 @@ func TestPrintDiagnosticsJSON_ChildrenIncluded(t *testing.T) {
 	assert.Equal(t, 2, out.Summary.Total, "children should be counted in summary")
 }
 
+func TestPrintDiagnosticsJSON_GrandchildrenSerialized(t *testing.T) {
+	results := []doctor.CheckResult{
+		{
+			Name: "parent", Status: doctor.StatusPass, Message: "ok",
+			Group: doctor.GroupProviders,
+			Children: []doctor.CheckResult{
+				{
+					Name: "child", Status: doctor.StatusPass, Message: "ok",
+					Children: []doctor.CheckResult{
+						{Name: "grandchild", Status: doctor.StatusFail, Message: "detail"},
+					},
+				},
+			},
+		},
+	}
+	var buf bytes.Buffer
+	err := printDiagnosticsJSON(results, &buf)
+	require.NoError(t, err)
+
+	var out diagnosticOutput
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &out))
+
+	// Grandchildren must appear in JSON output (full structure serialized)
+	require.Len(t, out.Checks[0].Children, 1)
+	require.Len(t, out.Checks[0].Children[0].Children, 1)
+	assert.Equal(t, "grandchild", out.Checks[0].Children[0].Children[0].Name)
+	assert.Equal(t, doctor.StatusFail, out.Checks[0].Children[0].Children[0].Status)
+
+	// But grandchildren must NOT be counted in summary (D5)
+	assert.Equal(t, 2, out.Summary.Total, "grandchildren must not be counted (D5)")
+	assert.Equal(t, 0, out.Summary.Failed, "grandchild fail must not inflate summary")
+}
+
 func TestPrintDiagnosticsText_GrepPattern(t *testing.T) {
 	results := []doctor.CheckResult{
 		{Name: "config", Status: doctor.StatusFail, Message: "missing policy", Blocking: true, Group: doctor.GroupWorkspace},
