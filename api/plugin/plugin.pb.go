@@ -830,8 +830,14 @@ type DescribeResponse struct {
 	// Required target variable names — doctor validates these
 	// keys exist in relevant config.targets[].variables (R51)
 	RequiredTargetVariables []string `protobuf:"bytes,5,rep,name=required_target_variables,json=requiredTargetVariables,proto3" json:"required_target_variables,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// Optional target variable groups — each entry is a pipe-delimited
+	// group of variable names (e.g. "url|input_path"). Doctor validates
+	// that at least one member of each group is present per target.
+	// Use this for mutually-exclusive variables where exactly one is
+	// needed but the provider accepts either.
+	OptionalTargetVariableGroups []string `protobuf:"bytes,7,rep,name=optional_target_variable_groups,json=optionalTargetVariableGroups,proto3" json:"optional_target_variable_groups,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *DescribeResponse) Reset() {
@@ -899,6 +905,13 @@ func (x *DescribeResponse) GetRequiredTargetVariables() []string {
 	return nil
 }
 
+func (x *DescribeResponse) GetOptionalTargetVariableGroups() []string {
+	if x != nil {
+		return x.OptionalTargetVariableGroups
+	}
+	return nil
+}
+
 var File_plugin_proto protoreflect.FileDescriptor
 
 const file_plugin_proto_rawDesc = "" +
@@ -957,13 +970,14 @@ const file_plugin_proto_rawDesc = "" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x18\n" +
 	"\apayload\x18\x04 \x01(\fR\apayload\x12!\n" +
 	"\fcollected_at\x18\x05 \x01(\tR\vcollectedAt\"\x11\n" +
-	"\x0fDescribeRequest\"\xfa\x01\n" +
+	"\x0fDescribeRequest\"\xc1\x02\n" +
 	"\x10DescribeResponse\x12\x18\n" +
 	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12#\n" +
 	"\rerror_message\x18\x03 \x01(\tR\ferrorMessage\x12:\n" +
 	"\x19required_global_variables\x18\x04 \x03(\tR\x17requiredGlobalVariables\x12:\n" +
-	"\x19required_target_variables\x18\x05 \x03(\tR\x17requiredTargetVariablesJ\x04\b\x06\x10\aR\x0fsupports_export*\xa4\x01\n" +
+	"\x19required_target_variables\x18\x05 \x03(\tR\x17requiredTargetVariables\x12E\n" +
+	"\x1foptional_target_variable_groups\x18\a \x03(\tR\x1coptionalTargetVariableGroupsJ\x04\b\x06\x10\aR\x0fsupports_export*\xa4\x01\n" +
 	"\x0fConfidenceLevel\x12\x1c\n" +
 	"\x18CONFIDENCE_LEVEL_NOT_SET\x10\x00\x12!\n" +
 	"\x1dCONFIDENCE_LEVEL_UNDETERMINED\x10\x01\x12\x18\n" +

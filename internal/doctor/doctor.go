@@ -91,9 +91,10 @@ type CheckResult struct {
 // ProviderHealth holds Describe-declared variable requirements for a
 // single scanning provider, collected during provider discovery (R51).
 type ProviderHealth struct {
-	EvaluatorID             string
-	RequiredGlobalVariables []string
-	RequiredTargetVariables []string
+	EvaluatorID                  string
+	RequiredGlobalVariables      []string
+	RequiredTargetVariables      []string
+	OptionalTargetVariableGroups []string
 }
 
 // PolicyGraphResolver resolves a policy's dependency graph from cached content.
@@ -414,9 +415,10 @@ func CheckProviders(providerDir string, providerLogger hclog.Logger) ([]CheckRes
 			Blocking: true,
 		})
 		healthData = append(healthData, ProviderHealth{
-			EvaluatorID:             lp.Info.EvaluatorID,
-			RequiredGlobalVariables: resp.RequiredGlobalVariables,
-			RequiredTargetVariables: resp.RequiredTargetVariables,
+			EvaluatorID:                  lp.Info.EvaluatorID,
+			RequiredGlobalVariables:      resp.RequiredGlobalVariables,
+			RequiredTargetVariables:      resp.RequiredTargetVariables,
+			OptionalTargetVariableGroups: resp.OptionalTargetVariableGroups,
 		})
 	}
 	return results, healthData
@@ -750,9 +752,10 @@ func CheckVariables(cfg *complytime.WorkspaceConfig, healthData []ProviderHealth
 	for _, ph := range healthData {
 		targets := evaluatorTargets[ph.EvaluatorID]
 
-		// Skip providers with no required variables and no policy mapping —
-		// there is nothing to validate and the result would be pure noise.
-		if len(ph.RequiredGlobalVariables) == 0 && len(ph.RequiredTargetVariables) == 0 && len(targets) == 0 {
+		// Skip providers with no required variables, no optional groups,
+		// and no policy mapping — nothing to validate.
+		hasTargetVarReqs := len(ph.RequiredTargetVariables) > 0 || len(ph.OptionalTargetVariableGroups) > 0
+		if len(ph.RequiredGlobalVariables) == 0 && !hasTargetVarReqs && len(targets) == 0 {
 			continue
 		}
 
@@ -764,7 +767,7 @@ func CheckVariables(cfg *complytime.WorkspaceConfig, healthData []ProviderHealth
 			}
 		}
 
-		unmappedTargetVars := len(ph.RequiredTargetVariables) > 0 && len(targets) == 0
+		unmappedTargetVars := hasTargetVarReqs && len(targets) == 0
 
 		targetTotal := 0
 		targetResolved := 0
@@ -777,6 +780,23 @@ func CheckVariables(cfg *complytime.WorkspaceConfig, healthData []ProviderHealth
 				} else {
 					missingTargetVars = append(missingTargetVars,
 						fmt.Sprintf("%s for target %q", reqVar, target.ID))
+				}
+			}
+			for _, group := range ph.OptionalTargetVariableGroups {
+				members := strings.Split(group, "|")
+				targetTotal++
+				found := false
+				for _, m := range members {
+					if _, ok := target.Variables[m]; ok {
+						found = true
+						break
+					}
+				}
+				if found {
+					targetResolved++
+				} else {
+					missingTargetVars = append(missingTargetVars,
+						fmt.Sprintf("one of (%s) for target %q", group, target.ID))
 				}
 			}
 		}
@@ -848,6 +868,14 @@ func CheckVariables(cfg *complytime.WorkspaceConfig, healthData []ProviderHealth
 						Message: fmt.Sprintf("target: %s (not validated)", reqVar),
 					})
 				}
+				for _, group := range ph.OptionalTargetVariableGroups {
+					details = append(details, CheckResult{
+						Name:    fmt.Sprintf("variables/%s/detail", ph.EvaluatorID),
+						Group:   GroupVariables,
+						Status:  StatusWarn,
+						Message: fmt.Sprintf("target: one of (%s) (not validated)", group),
+					})
+				}
 			} else {
 				for _, target := range targets {
 					for _, reqVar := range ph.RequiredTargetVariables {
@@ -860,6 +888,22 @@ func CheckVariables(cfg *complytime.WorkspaceConfig, healthData []ProviderHealth
 							Group:   GroupVariables,
 							Status:  detailStatus,
 							Message: fmt.Sprintf("target[%s]: %s", target.ID, reqVar),
+						})
+					}
+					for _, group := range ph.OptionalTargetVariableGroups {
+						members := strings.Split(group, "|")
+						detailStatus := StatusFail
+						for _, m := range members {
+							if _, ok := target.Variables[m]; ok {
+								detailStatus = StatusPass
+								break
+							}
+						}
+						details = append(details, CheckResult{
+							Name:    fmt.Sprintf("variables/%s/detail", ph.EvaluatorID),
+							Group:   GroupVariables,
+							Status:  detailStatus,
+							Message: fmt.Sprintf("target[%s]: one of (%s)", target.ID, group),
 						})
 					}
 				}

@@ -847,6 +847,145 @@ func TestCheckVariables_ResolveFailure_GraphNotFound(t *testing.T) {
 	assert.True(t, foundResolveWarn, "expected StatusWarn result for graph resolution failure")
 }
 
+// --- CheckVariables Optional Target Variable Groups Tests ---
+
+func TestCheckVariables_OptionalGroup_OneMemberPresent_Passes(t *testing.T) {
+	cfg := &complytime.WorkspaceConfig{
+		Variables: map[string]string{},
+		Policies:  []complytime.PolicyEntry{{URL: "reg.io/policies/nist:v1.0.0"}},
+		Targets: []complytime.TargetConfig{{
+			ID:        "kubernetes",
+			Policies:  []string{"nist"},
+			Variables: map[string]string{"input_path": "targets/kubernetes/"},
+		}},
+	}
+	health := []ProviderHealth{{
+		EvaluatorID:                  "opa",
+		OptionalTargetVariableGroups: []string{"url|input_path"},
+	}}
+
+	resolver := newMockPolicyGraphResolver()
+	resolver.versions["policies/nist@v1.0.0"] = "v1.0.0"
+	resolver.graphs["policies/nist@v1.0.0"] = &policy.DependencyGraph{
+		PolicyID:    "policies/nist",
+		EvaluatorID: "opa",
+	}
+
+	results := CheckVariables(cfg, health, resolver, false)
+	require.Len(t, results, 1)
+	assert.Equal(t, StatusPass, results[0].Status)
+	assert.Contains(t, results[0].Message, "1/1 target vars")
+}
+
+func TestCheckVariables_OptionalGroup_NoMemberPresent_Fails(t *testing.T) {
+	cfg := &complytime.WorkspaceConfig{
+		Variables: map[string]string{},
+		Policies:  []complytime.PolicyEntry{{URL: "reg.io/policies/nist:v1.0.0"}},
+		Targets: []complytime.TargetConfig{{
+			ID:        "kubernetes",
+			Policies:  []string{"nist"},
+			Variables: map[string]string{},
+		}},
+	}
+	health := []ProviderHealth{{
+		EvaluatorID:                  "opa",
+		OptionalTargetVariableGroups: []string{"url|input_path"},
+	}}
+
+	resolver := newMockPolicyGraphResolver()
+	resolver.versions["policies/nist@v1.0.0"] = "v1.0.0"
+	resolver.graphs["policies/nist@v1.0.0"] = &policy.DependencyGraph{
+		PolicyID:    "policies/nist",
+		EvaluatorID: "opa",
+	}
+
+	results := CheckVariables(cfg, health, resolver, false)
+	require.Len(t, results, 1)
+	assert.Equal(t, StatusFail, results[0].Status)
+	assert.Contains(t, results[0].Message, "one of (url|input_path)")
+}
+
+func TestCheckVariables_OptionalGroup_BothMembersPresent_Passes(t *testing.T) {
+	cfg := &complytime.WorkspaceConfig{
+		Variables: map[string]string{},
+		Policies:  []complytime.PolicyEntry{{URL: "reg.io/policies/nist:v1.0.0"}},
+		Targets: []complytime.TargetConfig{{
+			ID:        "kubernetes",
+			Policies:  []string{"nist"},
+			Variables: map[string]string{"url": "https://example.com", "input_path": "targets/kubernetes/"},
+		}},
+	}
+	health := []ProviderHealth{{
+		EvaluatorID:                  "opa",
+		OptionalTargetVariableGroups: []string{"url|input_path"},
+	}}
+
+	resolver := newMockPolicyGraphResolver()
+	resolver.versions["policies/nist@v1.0.0"] = "v1.0.0"
+	resolver.graphs["policies/nist@v1.0.0"] = &policy.DependencyGraph{
+		PolicyID:    "policies/nist",
+		EvaluatorID: "opa",
+	}
+
+	results := CheckVariables(cfg, health, resolver, false)
+	require.Len(t, results, 1)
+	assert.Equal(t, StatusPass, results[0].Status)
+	assert.Contains(t, results[0].Message, "1/1 target vars")
+}
+
+func TestCheckVariables_OptionalGroup_UnmappedTargetVars_NilResolver(t *testing.T) {
+	cfg := &complytime.WorkspaceConfig{
+		Variables: map[string]string{},
+		Policies:  []complytime.PolicyEntry{{URL: "reg.io/policies/nist:v1.0.0"}},
+		Targets:   []complytime.TargetConfig{{ID: "host1", Policies: []string{"nist"}}},
+	}
+	health := []ProviderHealth{{
+		EvaluatorID:                  "opa",
+		OptionalTargetVariableGroups: []string{"url|input_path"},
+	}}
+
+	results := CheckVariables(cfg, health, nil, false)
+	require.Len(t, results, 1)
+	assert.Equal(t, StatusFail, results[0].Status)
+	assert.Contains(t, results[0].Message, "target vars not validated")
+}
+
+func TestCheckVariables_OptionalGroup_Verbose_ShowsGroupDetail(t *testing.T) {
+	cfg := &complytime.WorkspaceConfig{
+		Variables: map[string]string{},
+		Policies:  []complytime.PolicyEntry{{URL: "reg.io/policies/nist:v1.0.0"}},
+		Targets: []complytime.TargetConfig{{
+			ID:        "kubernetes",
+			Policies:  []string{"nist"},
+			Variables: map[string]string{"input_path": "targets/kubernetes/"},
+		}},
+	}
+	health := []ProviderHealth{{
+		EvaluatorID:                  "opa",
+		OptionalTargetVariableGroups: []string{"url|input_path"},
+	}}
+
+	resolver := newMockPolicyGraphResolver()
+	resolver.versions["policies/nist@v1.0.0"] = "v1.0.0"
+	resolver.graphs["policies/nist@v1.0.0"] = &policy.DependencyGraph{
+		PolicyID:    "policies/nist",
+		EvaluatorID: "opa",
+	}
+
+	results := CheckVariables(cfg, health, resolver, true)
+	require.Len(t, results, 1)
+	assert.Equal(t, StatusPass, results[0].Status)
+
+	foundGroupDetail := false
+	for _, child := range results[0].Children {
+		if strings.Contains(child.Message, "one of (url|input_path)") {
+			foundGroupDetail = true
+			assert.Equal(t, StatusPass, child.Status)
+		}
+	}
+	assert.True(t, foundGroupDetail, "expected verbose detail showing optional group")
+}
+
 // --- CheckPolicyActivePeriod Tests ---
 
 func TestCheckPolicyActivePeriod_NilConfig(t *testing.T) {

@@ -23,11 +23,12 @@ func (s *grpcServer) Describe(ctx context.Context, _ *proto.DescribeRequest) (*p
 		return nil, err
 	}
 	return &proto.DescribeResponse{
-		Healthy:                 resp.Healthy,
-		Version:                 resp.Version,
-		ErrorMessage:            resp.ErrorMessage,
-		RequiredGlobalVariables: resp.RequiredGlobalVariables,
-		RequiredTargetVariables: resp.RequiredTargetVariables,
+		Healthy:                      resp.Healthy,
+		Version:                      resp.Version,
+		ErrorMessage:                 resp.ErrorMessage,
+		RequiredGlobalVariables:      resp.RequiredGlobalVariables,
+		RequiredTargetVariables:      resp.RequiredTargetVariables,
+		OptionalTargetVariableGroups: resp.OptionalTargetVariableGroups,
 	}, nil
 }
 

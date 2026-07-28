@@ -239,4 +239,11 @@ message DescribeResponse {
   // Required target variable names — doctor validates these
   // keys exist in relevant config.targets[].variables (R51)
   repeated string required_target_variables = 5;
+
+  // Optional target variable groups — each entry is a pipe-delimited
+  // group of variable names (e.g. "url|input_path"). Doctor validates
+  // that at least one member of each group is present per target.
+  // Use this for mutually-exclusive variables where exactly one is
+  // needed but the provider accepts either.
+  repeated string optional_target_variable_groups = 7;
 }

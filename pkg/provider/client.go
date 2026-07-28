@@ -152,11 +152,12 @@ type DescribeRequest struct{}
 // DescribeResponse reports provider identity, health, version, and declared
 // variable requirements used by doctor diagnostics (R51).
 type DescribeResponse struct {
-	Healthy                 bool
-	Version                 string
-	ErrorMessage            string
-	RequiredGlobalVariables []string
-	RequiredTargetVariables []string
+	Healthy                      bool
+	Version                      string
+	ErrorMessage                 string
+	RequiredGlobalVariables      []string
+	RequiredTargetVariables      []string
+	OptionalTargetVariableGroups []string
 }
 
 // Client provides gRPC communication with a provider subprocess managed by
@@ -182,11 +183,12 @@ func (c *Client) Describe(ctx context.Context, req *DescribeRequest) (*DescribeR
 	}
 
 	return &DescribeResponse{
-		Healthy:                 protoResp.GetHealthy(),
-		Version:                 protoResp.GetVersion(),
-		ErrorMessage:            protoResp.GetErrorMessage(),
-		RequiredGlobalVariables: protoResp.GetRequiredGlobalVariables(),
-		RequiredTargetVariables: protoResp.GetRequiredTargetVariables(),
+		Healthy:                      protoResp.GetHealthy(),
+		Version:                      protoResp.GetVersion(),
+		ErrorMessage:                 protoResp.GetErrorMessage(),
+		RequiredGlobalVariables:      protoResp.GetRequiredGlobalVariables(),
+		RequiredTargetVariables:      protoResp.GetRequiredTargetVariables(),
+		OptionalTargetVariableGroups: protoResp.GetOptionalTargetVariableGroups(),
 	}, nil
 }
 
