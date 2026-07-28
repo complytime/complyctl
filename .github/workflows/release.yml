@@ -22,6 +22,18 @@ on:
                 description: 'The tag to release (e.g., v1.2.3)'
                 required: true
                 type: string
+            skip_semver_check:
+                description: 'Skip semver ordering verification'
+                type: boolean
+                default: false
+            skip_ci_checks:
+                description: 'Skip CI check verification on HEAD'
+                type: boolean
+                default: false
+            skip_unreleased_check:
+                description: 'Skip unreleased commits verification'
+                type: boolean
+                default: false
 
 permissions:
     contents: none
@@ -30,10 +42,13 @@ permissions:
 jobs:
     preflight:
         name: Preflight
-        uses: complytime/org-infra/.github/workflows/reusable_release_preflight.yml@7e13c504ba68fd7b80634e367a8170fb4041663b # v0.7.0
+        uses: complytime/org-infra/.github/workflows/reusable_release_preflight.yml@0c784711926c9864f027ec565fd7c06a382d80f8 # v0.7.1
         with:
             tag: ${{ inputs.tag }}
             ci_checks: '["unit-test", "e2e-test", "integration-test"]'
+            skip_semver_check: ${{ inputs.skip_semver_check }}
+            skip_ci_checks: ${{ inputs.skip_ci_checks }}
+            skip_unreleased_check: ${{ inputs.skip_unreleased_check }}
         permissions:
             contents: write
             checks: read
@@ -42,7 +57,7 @@ jobs:
         name: Release
         needs: preflight
         if: needs.preflight.outputs.tag != ''
-        uses: complytime/org-infra/.github/workflows/reusable_release_goreleaser.yml@7e13c504ba68fd7b80634e367a8170fb4041663b # v0.7.0
+        uses: complytime/org-infra/.github/workflows/reusable_release_goreleaser.yml@0c784711926c9864f027ec565fd7c06a382d80f8 # v0.7.1
         with:
             tag: ${{ needs.preflight.outputs.tag }}
         permissions:
