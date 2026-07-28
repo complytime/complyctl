@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/complytime/complyctl/internal/cache"
+	"github.com/complytime/complyctl/internal/cache/cachetest"
 )
 
 // --- EvaluatorIDToVersion tests ---
@@ -134,7 +135,7 @@ func TestPolicyState_BackwardCompatibility_NoVerifiedField(t *testing.T) {
 func TestPolicyState_JSONRoundTrip_WithMetadata(t *testing.T) {
 	original := cache.PolicyState{
 		Version:         "v2.0.0",
-		Digest:          "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+		Digest:          cachetest.DigestA,
 		EvaluatorID:     "openscap",
 		LastUpdated:     time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
 		Verified:        true,
@@ -185,7 +186,7 @@ func TestPolicyState_JSONRoundTrip_ZeroControlCount(t *testing.T) {
 	// from "metadata never extracted" after deserialization.
 	original := cache.PolicyState{
 		Version:         "v1.0.0",
-		Digest:          "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+		Digest:          cachetest.DigestC,
 		PolicyTitle:     "Zero Controls Policy",
 		PolicyEvaluator: "opa",
 		ControlCount:    0,
@@ -215,7 +216,7 @@ func TestState_SetPolicyMetadata_PreservesSyncFields(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"example.com/policies/cis-fedora": {
 				Version:        "v3.1.0",
-				Digest:         "sha256:82a920ed89b44f30bd4e09e0c18bc4f2ef3d4274f3e6d5f9c68b14b1e3e5dda6",
+				Digest:         cachetest.DigestD,
 				EvaluatorID:    "complypack-eval",
 				LastUpdated:    lastUpdated,
 				Verified:       true,
@@ -241,7 +242,7 @@ func TestState_SetPolicyMetadata_PreservesSyncFields(t *testing.T) {
 
 	// Sync fields MUST be unchanged.
 	assert.Equal(t, "v3.1.0", ps.Version)
-	assert.Equal(t, "sha256:82a920ed89b44f30bd4e09e0c18bc4f2ef3d4274f3e6d5f9c68b14b1e3e5dda6", ps.Digest)
+	assert.Equal(t, cachetest.DigestD, ps.Digest)
 	assert.Equal(t, "complypack-eval", ps.EvaluatorID)
 	assert.Equal(t, lastUpdated, ps.LastUpdated)
 	assert.True(t, ps.Verified)
@@ -268,7 +269,7 @@ func TestSaveState_StateSeparation(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"example.com/policies/test": {
 				Version: "v1.0.0",
-				Digest:  "sha256:a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890",
+				Digest:  cachetest.DigestE,
 			},
 		},
 		Complypacks: make(map[string]cache.PolicyState),
@@ -294,7 +295,7 @@ func TestSaveState_StateSeparation(t *testing.T) {
 	ps, exists := loaded.GetPolicyState("example.com/policies/test")
 	require.True(t, exists)
 	assert.Equal(t, "v1.0.0", ps.Version)
-	assert.Equal(t, "sha256:a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890", ps.Digest)
+	assert.Equal(t, cachetest.DigestE, ps.Digest)
 }
 
 // TestSaveState_DirectoryPermissions verifies that SaveState creates the
@@ -330,7 +331,7 @@ func TestState_SetPolicyMetadata_NoOpForMissingKey(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"existing-policy": {
 				Version: "v1.0.0",
-				Digest:  "sha256:b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4f5a67890",
+				Digest:  cachetest.DigestF,
 			},
 		},
 	}
@@ -353,7 +354,7 @@ func TestState_SetPolicyMetadata_NoOpForMissingKey(t *testing.T) {
 	ps, exists := state.GetPolicyState("existing-policy")
 	require.True(t, exists)
 	assert.Equal(t, "v1.0.0", ps.Version)
-	assert.Equal(t, "sha256:b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4f5a67890", ps.Digest)
+	assert.Equal(t, cachetest.DigestF, ps.Digest)
 }
 
 // --- ValidateDigest tests (D4) ---

@@ -580,7 +580,7 @@ func TestListOptions_Run_ShowsDigestColumn(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version: "v1.0",
-				Digest:  "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+				Digest:  cachetest.DigestA,
 			},
 		},
 	}
@@ -639,7 +639,7 @@ func TestListOptions_Run_ColumnOrder(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version:         "v1.0",
-				Digest:          "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+				Digest:          cachetest.DigestA,
 				PolicyEvaluator: "openscap",
 				ControlCount:    42,
 			},
@@ -684,7 +684,7 @@ func TestListOptions_Run_ShowsMetadata(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version:         "v1.0",
-				Digest:          "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+				Digest:          cachetest.DigestA,
 				PolicyEvaluator: "openscap",
 				ControlCount:    42,
 			},
@@ -719,7 +719,7 @@ func TestListOptions_Run_NoMetadataShowsDash(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version: "v1.0",
-				Digest:  "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+				Digest:  cachetest.DigestA,
 			},
 		},
 	}
@@ -814,7 +814,7 @@ func TestListOptions_Run_MultiEvaluatorShowsDash(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version:      "v1.0",
-				Digest:       "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+				Digest:       cachetest.DigestA,
 				PolicyTitle:  "Multi-Eval Policy",
 				ControlCount: 25,
 			},
@@ -862,7 +862,7 @@ func TestListOptions_Run_ZeroControlsWithMetadata(t *testing.T) {
 		Policies: map[string]cache.PolicyState{
 			"policies/test-policy": {
 				Version:         "v1.0",
-				Digest:          "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+				Digest:          cachetest.DigestA,
 				PolicyEvaluator: "opa",
 				ControlCount:    0,
 			},

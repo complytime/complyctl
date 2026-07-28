@@ -23,6 +23,7 @@ import (
 	"oras.land/oras-go/v2/errdef"
 
 	"github.com/complytime/complyctl/internal/cache"
+	"github.com/complytime/complyctl/internal/cache/cachetest"
 	"github.com/complytime/complypack/pkg/complypack"
 )
 
@@ -328,7 +329,7 @@ func TestComplypackSync_FetchAndStore(t *testing.T) {
 		"example.com/complypacks/opa-bundle",
 		"io.complytime.opa",
 		"1.0.0",
-		"sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+		cachetest.DigestA,
 		"test policy content for opa",
 	)
 
@@ -347,7 +348,7 @@ func TestComplypackSync_FetchAndStore(t *testing.T) {
 	require.NoError(t, err)
 	ps, ok := state2.GetComplypackState("example.com/complypacks/opa-bundle")
 	assert.True(t, ok, "complypack state should exist after sync")
-	assert.Equal(t, "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", ps.Digest)
+	assert.Equal(t, cachetest.DigestA, ps.Digest)
 	assert.Equal(t, "1.0.0", ps.Version)
 
 	// Verify cache files exist via Lookup.
@@ -379,7 +380,7 @@ func TestComplypackSync_IncrementalSkip(t *testing.T) {
 		"example.com/complypacks/opa-bundle",
 		"io.complytime.opa",
 		"1.0.0",
-		"sha256:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d",
+		cachetest.DigestB,
 		"opa bundle content",
 	)
 
@@ -414,7 +415,7 @@ func TestComplypackSync_IncrementalSkip(t *testing.T) {
 	require.NoError(t, err)
 	ps, ok := state3.GetComplypackState("example.com/complypacks/opa-bundle")
 	require.True(t, ok)
-	assert.Equal(t, "sha256:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d", ps.Digest)
+	assert.Equal(t, cachetest.DigestB, ps.Digest)
 }
 
 // TestComplypackSync_CacheMissing_RefetchesDespiteMatchingDigest verifies that
@@ -431,7 +432,7 @@ func TestComplypackSync_CacheMissing_RefetchesDespiteMatchingDigest(t *testing.T
 		"example.com/complypacks/opa-bundle",
 		"io.complytime.opa",
 		"1.0.0",
-		"sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+		cachetest.DigestC,
 		"opa bundle content for cache-missing test",
 	)
 
@@ -466,7 +467,7 @@ func TestComplypackSync_CacheMissing_RefetchesDespiteMatchingDigest(t *testing.T
 	require.NoError(t, err)
 	ps, ok := state2.GetComplypackState("example.com/complypacks/opa-bundle")
 	require.True(t, ok, "state should still record the complypack")
-	assert.Equal(t, "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", ps.Digest,
+	assert.Equal(t, cachetest.DigestC, ps.Digest,
 		"state should still have the old digest")
 
 	complypackCache2 := cache.NewComplypackCache(cacheDir, state2)
@@ -499,7 +500,7 @@ func TestComplypackSync_DigestChanged(t *testing.T) {
 		"example.com/complypacks/opa-bundle",
 		"io.complytime.opa",
 		"1.0.0",
-		"sha256:82a920ed89b44f30bd4e09e0c18bc4f2ef3d4274f3e6d5f9c68b14b1e3e5dda6",
+		cachetest.DigestD,
 		"opa bundle content v1",
 	)
 
@@ -520,7 +521,7 @@ func TestComplypackSync_DigestChanged(t *testing.T) {
 		"example.com/complypacks/opa-bundle",
 		"io.complytime.opa",
 		"1.0.0",
-		"sha256:a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890",
+		cachetest.DigestE,
 		"opa bundle content v2 — updated",
 	)
 
@@ -543,7 +544,7 @@ func TestComplypackSync_DigestChanged(t *testing.T) {
 	require.NoError(t, err)
 	ps, ok := state3.GetComplypackState("example.com/complypacks/opa-bundle")
 	require.True(t, ok)
-	assert.Equal(t, "sha256:a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890a1b2c3d4e5f67890", ps.Digest, "state should reflect the updated digest")
+	assert.Equal(t, cachetest.DigestE, ps.Digest, "state should reflect the updated digest")
 }
 
 // TestComplypackSync_InvalidEvaluatorID verifies that a complypack with a
@@ -566,7 +567,7 @@ func TestComplypackSync_InvalidEvaluatorID(t *testing.T) {
 		"example.com/complypacks/evil",
 		"io.complytime.opa", // safe ID for Pack() validation
 		"1.0.0",
-		"sha256:b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4f5a67890b1c2d3e4f5a67890",
+		cachetest.DigestF,
 		"evil content",
 	)
 
@@ -914,8 +915,8 @@ func TestComplypackSync_RegistryHost_PassedToVerifier(t *testing.T) {
 
 	// Seed with both host-qualified ref (for DefinitionVersion lookups) and
 	// bare repository (for CopyComplypack lookups).
-	mock.seedComplypack(host+"/"+repository, evalID, "1.0.0", "sha256:host-v1", "v1 content")
-	mock.seedComplypack(repository, evalID, "1.0.0", "sha256:host-v1", "v1 content")
+	mock.seedComplypack(host+"/"+repository, evalID, "1.0.0", cachetest.DigestA, "v1 content")
+	mock.seedComplypack(repository, evalID, "1.0.0", cachetest.DigestA, "v1 content")
 
 	// Track all refs passed to the verifier across call sites.
 	// All SyncComplypack calls below are sequential, so no mutex is needed.
@@ -937,8 +938,8 @@ func TestComplypackSync_RegistryHost_PassedToVerifier(t *testing.T) {
 	assert.True(t, fetched)
 
 	// --- Second sync with different version to set up cache hit path ---
-	mock.seedComplypack(host+"/"+repository, evalID, "2.0.0", "sha256:host-v2", "v2 content")
-	mock.seedComplypack(repository, evalID, "2.0.0", "sha256:host-v2", "v2 content")
+	mock.seedComplypack(host+"/"+repository, evalID, "2.0.0", cachetest.DigestB, "v2 content")
+	mock.seedComplypack(repository, evalID, "2.0.0", cachetest.DigestB, "v2 content")
 
 	state2, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
@@ -951,8 +952,8 @@ func TestComplypackSync_RegistryHost_PassedToVerifier(t *testing.T) {
 	assert.True(t, fetched2)
 
 	// --- Switch back to v1.0.0: exercises the cache re-verification call site ---
-	mock.seedComplypack(host+"/"+repository, evalID, "1.0.0", "sha256:host-v1", "v1 content")
-	mock.seedComplypack(repository, evalID, "1.0.0", "sha256:host-v1", "v1 content")
+	mock.seedComplypack(host+"/"+repository, evalID, "1.0.0", cachetest.DigestA, "v1 content")
+	mock.seedComplypack(repository, evalID, "1.0.0", cachetest.DigestA, "v1 content")
 
 	state3, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
@@ -985,7 +986,7 @@ func TestComplypackSync_EmptyRegistryHost_FailClosed(t *testing.T) {
 
 	mock := newMockComplypackSource()
 	repository := "example.com/complypacks/opa-bundle"
-	mock.seedComplypack(repository, "io.complytime.opa", "1.0.0", "sha256:failclosed", "content")
+	mock.seedComplypack(repository, "io.complytime.opa", "1.0.0", cachetest.DigestA, "content")
 
 	neverCalledVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
 		t.Fatal("verifier must not be called when registryHost is empty")

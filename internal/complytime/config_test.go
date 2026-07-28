@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/complytime/complyctl/internal/cache/cachetest"
 	"github.com/complytime/complyctl/internal/complytime"
 )
 
@@ -70,7 +71,7 @@ func TestParsePolicyRef_BareID(t *testing.T) {
 }
 
 func TestParsePolicyRef_BareIDWithDigest(t *testing.T) {
-	dgst := "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+	dgst := cachetest.DigestA
 	ref, err := complytime.ParsePolicyRef("my-policy@" + dgst)
 	require.NoError(t, err)
 	assert.Empty(t, ref.Registry)
@@ -107,7 +108,7 @@ func TestParsePolicyRef_ColonLatest(t *testing.T) {
 }
 
 func TestParsePolicyRef_Digest(t *testing.T) {
-	dgst := "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+	dgst := cachetest.DigestA
 	ref, err := complytime.ParsePolicyRef("quay.io/complytime/complypack-ampel-bp@" + dgst)
 	require.NoError(t, err)
 	assert.Equal(t, "quay.io", ref.Registry)
@@ -179,7 +180,7 @@ func TestParsePolicyRef_DeprecationWarning_AtVersion(t *testing.T) {
 }
 
 func TestParsePolicyRef_NoDeprecationWarning_Digest(t *testing.T) {
-	dgst := "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+	dgst := cachetest.DigestA
 	origStderr := os.Stderr
 	r, w, err := os.Pipe()
 	require.NoError(t, err)

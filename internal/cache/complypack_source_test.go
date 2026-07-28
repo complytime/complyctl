@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/complytime/complyctl/internal/cache"
+	"github.com/complytime/complyctl/internal/cache/cachetest"
 	"github.com/complytime/complypack/pkg/complypack"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -67,7 +68,7 @@ func TestVerifyComplypackArtifactType_WrongType(t *testing.T) {
 		"schemaVersion": 2,
 		"mediaType":     "application/vnd.oci.image.manifest.v1+json",
 		"artifactType":  "application/vnd.oci.image.config.v1+json",
-		"config":        map[string]interface{}{"mediaType": "application/vnd.oci.empty.v1+json", "digest": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "size": 2},
+		"config":        map[string]interface{}{"mediaType": "application/vnd.oci.empty.v1+json", "digest": cachetest.DigestA, "size": 2},
 		"layers":        []interface{}{},
 	}
 	manifestBytes, err := json.Marshal(manifest)

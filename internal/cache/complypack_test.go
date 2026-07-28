@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/complytime/complyctl/internal/cache"
+	"github.com/complytime/complyctl/internal/cache/cachetest"
 	"github.com/complytime/complypack/pkg/complypack"
 )
 
@@ -562,8 +563,8 @@ func TestState_ComplypackRoundTrip(t *testing.T) {
 	state, err := cache.LoadState(stateDir)
 	require.NoError(t, err)
 
-	require.NoError(t, state.UpdateComplypackStateWithVerification("io.complytime.opa", "1.0.0", "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "opa", nil))
-	require.NoError(t, state.UpdateComplypackStateWithVerification("io.complytime.kyverno", "2.0.0", "sha256:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d", "kyverno", nil))
+	require.NoError(t, state.UpdateComplypackStateWithVerification("io.complytime.opa", "1.0.0", cachetest.DigestA, "opa", nil))
+	require.NoError(t, state.UpdateComplypackStateWithVerification("io.complytime.kyverno", "2.0.0", cachetest.DigestB, "kyverno", nil))
 
 	err = cache.SaveState(state, stateDir)
 	require.NoError(t, err)
@@ -575,13 +576,13 @@ func TestState_ComplypackRoundTrip(t *testing.T) {
 	ps1, ok := loaded.GetComplypackState("io.complytime.opa")
 	require.True(t, ok, "expected io.complytime.opa to be present in loaded state")
 	assert.Equal(t, "1.0.0", ps1.Version)
-	assert.Equal(t, "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", ps1.Digest)
+	assert.Equal(t, cachetest.DigestA, ps1.Digest)
 	assert.WithinDuration(t, time.Now(), ps1.LastUpdated, 5*time.Second)
 
 	ps2, ok := loaded.GetComplypackState("io.complytime.kyverno")
 	require.True(t, ok, "expected io.complytime.kyverno to be present in loaded state")
 	assert.Equal(t, "2.0.0", ps2.Version)
-	assert.Equal(t, "sha256:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d", ps2.Digest)
+	assert.Equal(t, cachetest.DigestB, ps2.Digest)
 	assert.WithinDuration(t, time.Now(), ps2.LastUpdated, 5*time.Second)
 }
 
