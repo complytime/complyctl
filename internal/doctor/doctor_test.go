@@ -976,6 +976,8 @@ func TestCheckVariables_OptionalGroup_Verbose_ShowsGroupDetail(t *testing.T) {
 	require.Len(t, results, 1)
 	assert.Equal(t, StatusPass, results[0].Status)
 
+	require.Len(t, results[0].Children, 1,
+		"expected exactly 1 verbose detail child for the single optional group")
 	foundGroupDetail := false
 	for _, child := range results[0].Children {
 		if strings.Contains(child.Message, "one of (url|input_path)") {
@@ -984,6 +986,64 @@ func TestCheckVariables_OptionalGroup_Verbose_ShowsGroupDetail(t *testing.T) {
 		}
 	}
 	assert.True(t, foundGroupDetail, "expected verbose detail showing optional group")
+}
+
+func TestCheckVariables_OptionalGroup_MixedRequiredAndOptional(t *testing.T) {
+	cfg := &complytime.WorkspaceConfig{
+		Variables: map[string]string{},
+		Policies:  []complytime.PolicyEntry{{URL: "reg.io/policies/nist:v1.0.0"}},
+		Targets: []complytime.TargetConfig{{
+			ID:        "kubernetes",
+			Policies:  []string{"nist"},
+			Variables: map[string]string{"profile": "cis-l1", "input_path": "targets/k8s/"},
+		}},
+	}
+	health := []ProviderHealth{{
+		EvaluatorID:                  "opa",
+		RequiredTargetVariables:      []string{"profile"},
+		OptionalTargetVariableGroups: []string{"url|input_path"},
+	}}
+
+	resolver := newMockPolicyGraphResolver()
+	resolver.versions["policies/nist@v1.0.0"] = "v1.0.0"
+	resolver.graphs["policies/nist@v1.0.0"] = &policy.DependencyGraph{
+		PolicyID:    "policies/nist",
+		EvaluatorID: "opa",
+	}
+
+	results := CheckVariables(cfg, health, resolver, false)
+	require.Len(t, results, 1)
+	assert.Equal(t, StatusPass, results[0].Status)
+	assert.Contains(t, results[0].Message, "2/2 target vars")
+}
+
+func TestCheckVariables_OptionalGroup_MultipleGroups_PartialSatisfied(t *testing.T) {
+	cfg := &complytime.WorkspaceConfig{
+		Variables: map[string]string{},
+		Policies:  []complytime.PolicyEntry{{URL: "reg.io/policies/nist:v1.0.0"}},
+		Targets: []complytime.TargetConfig{{
+			ID:        "kubernetes",
+			Policies:  []string{"nist"},
+			Variables: map[string]string{"input_path": "targets/k8s/"},
+		}},
+	}
+	health := []ProviderHealth{{
+		EvaluatorID:                  "opa",
+		OptionalTargetVariableGroups: []string{"url|input_path", "namespace|cluster_name"},
+	}}
+
+	resolver := newMockPolicyGraphResolver()
+	resolver.versions["policies/nist@v1.0.0"] = "v1.0.0"
+	resolver.graphs["policies/nist@v1.0.0"] = &policy.DependencyGraph{
+		PolicyID:    "policies/nist",
+		EvaluatorID: "opa",
+	}
+
+	results := CheckVariables(cfg, health, resolver, false)
+	require.Len(t, results, 1)
+	assert.Equal(t, StatusFail, results[0].Status)
+	assert.Contains(t, results[0].Message, "1/2 target vars")
+	assert.Contains(t, results[0].Message, "one of (namespace|cluster_name)")
 }
 
 // --- CheckPolicyActivePeriod Tests ---

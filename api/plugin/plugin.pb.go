@@ -833,8 +833,8 @@ type DescribeResponse struct {
 	// Optional target variable groups — each entry is a pipe-delimited
 	// group of variable names (e.g. "url|input_path"). Doctor validates
 	// that at least one member of each group is present per target.
-	// Use this for mutually-exclusive variables where exactly one is
-	// needed but the provider accepts either.
+	// Mutual exclusivity is not enforced by doctor; providers handle
+	// that at scan time if needed.
 	OptionalTargetVariableGroups []string `protobuf:"bytes,7,rep,name=optional_target_variable_groups,json=optionalTargetVariableGroups,proto3" json:"optional_target_variable_groups,omitempty"`
 	unknownFields                protoimpl.UnknownFields
 	sizeCache                    protoimpl.SizeCache

@@ -86,6 +86,15 @@
 
 ### Fixed
 
+- `complyctl doctor` no longer requires all target variables declared
+  by a provider when those variables are mutually exclusive. Providers
+  can now declare one-of variable groups via the
+  `optional_target_variable_groups` field in the Describe protocol.
+  Doctor validates that at least one member of each group is present
+  per target, resolving the contradiction where `doctor` required both
+  `url` and `input_path` while `scan` rejected configs with both set.
+  (#759)
+
 - **BREAKING**: `complyctl get` signature verification now resolves
   against the configured OCI registry instead of defaulting to Docker
   Hub. Previously, bare OCI references (without a registry host) were
