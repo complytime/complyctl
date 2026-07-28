@@ -30,7 +30,7 @@ permissions:
 jobs:
     preflight:
         name: Preflight
-        uses: complytime/org-infra/.github/workflows/reusable_release_preflight.yml@aff4817ed6f0364e7f899bfb63ec6db42e69fde2 # v0.6.0
+        uses: complytime/org-infra/.github/workflows/reusable_release_preflight.yml@7e13c504ba68fd7b80634e367a8170fb4041663b # v0.7.0
         with:
             tag: ${{ inputs.tag }}
             ci_checks: '["unit-test", "e2e-test", "integration-test"]'
@@ -42,7 +42,7 @@ jobs:
         name: Release
         needs: preflight
         if: needs.preflight.outputs.tag != ''
-        uses: complytime/org-infra/.github/workflows/reusable_release_goreleaser.yml@aff4817ed6f0364e7f899bfb63ec6db42e69fde2 # v0.6.0
+        uses: complytime/org-infra/.github/workflows/reusable_release_goreleaser.yml@7e13c504ba68fd7b80634e367a8170fb4041663b # v0.7.0
         with:
             tag: ${{ needs.preflight.outputs.tag }}
         permissions:
