@@ -395,6 +395,10 @@ func TestBuildLookupRef(t *testing.T) {
 		{"host with digest", "registry.example.com", "policies/verify-keyed", "", "sha256:abc123", "registry.example.com/policies/verify-keyed@sha256:abc123"},
 		{"host with empty version", "registry.example.com", "org/policy", "", "", "registry.example.com/org/policy"},
 		{"host with latest", "registry.example.com", "org/policy", "latest", "", "registry.example.com/org/policy"},
+		// Edge cases: port-based registries and trailing slash normalization.
+		{"host with port and tag", "myregistry.io:5000", "org/policy", "v1.0.0", "", "myregistry.io:5000/org/policy:v1.0.0"},
+		{"host with port and digest", "localhost:5000", "org/policy", "", "sha256:abc123", "localhost:5000/org/policy@sha256:abc123"},
+		{"host with trailing slash", "registry.example.com/", "org/policy", "v1.0.0", "", "registry.example.com/org/policy:v1.0.0"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/opencontainers/go-digest"
 
@@ -22,7 +23,7 @@ import (
 func BuildLookupRef(registryHost, repository, tag, digest string) string {
 	ref := repository
 	if registryHost != "" {
-		ref = registryHost + "/" + repository
+		ref = strings.TrimRight(registryHost, "/") + "/" + repository
 	}
 	if digest != "" {
 		return ref + "@" + digest
