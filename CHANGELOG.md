@@ -39,7 +39,20 @@
   aligns with [complypack#127](https://github.com/complytime/complypack/pull/127).
   (#734)
 
+- **BREAKING**: `complyctl doctor` default output now includes
+  `[PASS]`/`[FAIL]`/`[WARN]` labels alongside emoji status indicators.
+  Scripts that parse the previous emoji-only format may need updating.
+  The warning emoji changed from `⏭️` to `⚠️`. (#611, #744)
+
 ### Added
+
+- `complyctl doctor --format text|json` flag for machine-readable
+  output. `--format text` produces grep-stable `[PASS]`/`[FAIL]`/
+  `[WARN]` labels without emoji; `--format json` produces structured
+  JSON with `checks`, `summary`, and `blocking_failure` fields.
+  `--format human` explicitly selects the default emoji output.
+  When `NO_COLOR` is set, text format is selected automatically.
+  (#611, #744)
 
 - Cross-repo integration workflow now validates EvaluationLog YAML
   output against the Gemara CUE schema with `cue vet`. Catches
