@@ -17,20 +17,22 @@ import (
 
 // --- statusLabel ---
 
-func TestStatusLabel_Pass(t *testing.T) {
-	assert.Equal(t, "[PASS]", statusLabel(doctor.StatusPass))
-}
-
-func TestStatusLabel_Fail(t *testing.T) {
-	assert.Equal(t, "[FAIL]", statusLabel(doctor.StatusFail))
-}
-
-func TestStatusLabel_Warn(t *testing.T) {
-	assert.Equal(t, "[WARN]", statusLabel(doctor.StatusWarn))
-}
-
-func TestStatusLabel_Unknown(t *testing.T) {
-	assert.Equal(t, "[UNKNOWN]", statusLabel(doctor.CheckStatus("bogus")))
+func TestStatusLabel(t *testing.T) {
+	tests := []struct {
+		name   string
+		status doctor.CheckStatus
+		want   string
+	}{
+		{"pass", doctor.StatusPass, "[PASS]"},
+		{"fail", doctor.StatusFail, "[FAIL]"},
+		{"warn", doctor.StatusWarn, "[WARN]"},
+		{"unknown", doctor.CheckStatus("bogus"), "[UNKNOWN]"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, statusLabel(tt.status))
+		})
+	}
 }
 
 // --- resolveFormat ---
@@ -85,6 +87,33 @@ func TestResolveFormat_HumanFlagOverridesNOCOLOR(t *testing.T) {
 	got, err := resolveFormat(complytime.OutputFormatHuman)
 	require.NoError(t, err)
 	assert.Equal(t, "", got, "--format human must produce human output even with NO_COLOR")
+}
+
+// --- resultLabel ---
+
+func TestResultLabel_UsesLabelWhenSet(t *testing.T) {
+	r := doctor.CheckResult{Name: "provider/ampel", Label: "ampel"}
+	assert.Equal(t, "ampel", resultLabel(r))
+}
+
+func TestResultLabel_FallsBackToName(t *testing.T) {
+	r := doctor.CheckResult{Name: "cache", Label: ""}
+	assert.Equal(t, "cache", resultLabel(r))
+}
+
+// --- countStatusSummary ---
+
+func TestCountStatusSummary(t *testing.T) {
+	var s resultSummary
+
+	countStatusSummary(doctor.StatusPass, &s)
+	countStatusSummary(doctor.StatusFail, &s)
+	countStatusSummary(doctor.StatusWarn, &s)
+	countStatusSummary(doctor.StatusPass, &s)
+
+	assert.Equal(t, 2, s.passCount)
+	assert.Equal(t, 1, s.failCount)
+	assert.Equal(t, 1, s.warnCount)
 }
 
 // --- printDiagnosticsHuman ---
@@ -419,12 +448,20 @@ func TestSummarizeResults_GrandchildrenNotCounted(t *testing.T) {
 
 // --- statusEmoji ---
 
-func TestStatusEmoji_KnownStatuses(t *testing.T) {
-	assert.Equal(t, complytime.StatusPassed, statusEmoji(doctor.StatusPass))
-	assert.Equal(t, complytime.StatusFailed, statusEmoji(doctor.StatusFail))
-	assert.Equal(t, complytime.StatusError, statusEmoji(doctor.StatusWarn))
-}
-
-func TestStatusEmoji_UnknownStatus(t *testing.T) {
-	assert.Equal(t, complytime.StatusUnknown, statusEmoji(doctor.CheckStatus("bogus")))
+func TestStatusEmoji(t *testing.T) {
+	tests := []struct {
+		name   string
+		status doctor.CheckStatus
+		want   string
+	}{
+		{"pass", doctor.StatusPass, complytime.StatusPassed},
+		{"fail", doctor.StatusFail, complytime.StatusFailed},
+		{"warn", doctor.StatusWarn, complytime.StatusError},
+		{"unknown", doctor.CheckStatus("bogus"), complytime.StatusUnknown},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, statusEmoji(tt.status))
+		})
+	}
 }

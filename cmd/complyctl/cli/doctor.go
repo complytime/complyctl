@@ -412,7 +412,7 @@ func printDiagnosticsTo(results []doctor.CheckResult, format string, w io.Writer
 	case complytime.OutputFormatJSON:
 		return printDiagnosticsJSON(results, w)
 	default:
-		return fmt.Errorf("unsupported output format: %s", format)
+		return fmt.Errorf("unsupported output format: %q", format)
 	}
 }
 

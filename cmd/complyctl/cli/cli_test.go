@@ -20,7 +20,6 @@ import (
 
 	"github.com/complytime/complyctl/internal/cache"
 	"github.com/complytime/complyctl/internal/complytime"
-	"github.com/complytime/complyctl/internal/doctor"
 	"github.com/complytime/complyctl/internal/policy"
 	"github.com/complytime/complyctl/internal/terminal"
 	"github.com/complytime/complyctl/internal/version"
@@ -2695,47 +2694,4 @@ func TestFormatPolicySummary_CountsOnlyNoTitleNoEval(t *testing.T) {
 	result := formatPolicySummary(meta)
 	assert.Contains(t, result, "Controls: 5 | Assessments: 3")
 	assert.NotContains(t, result, "Policy:")
-}
-
-// --- Doctor renderer helper tests ---
-
-func TestResultLabel_UsesLabelWhenSet(t *testing.T) {
-	r := doctor.CheckResult{Name: "provider/ampel", Label: "ampel"}
-	assert.Equal(t, "ampel", resultLabel(r))
-}
-
-func TestResultLabel_FallsBackToName(t *testing.T) {
-	r := doctor.CheckResult{Name: "cache", Label: ""}
-	assert.Equal(t, "cache", resultLabel(r))
-}
-
-func TestStatusEmoji(t *testing.T) {
-	tests := []struct {
-		name     string
-		status   doctor.CheckStatus
-		expected string
-	}{
-		{name: "pass", status: doctor.StatusPass, expected: complytime.StatusPassed},
-		{name: "fail", status: doctor.StatusFail, expected: complytime.StatusFailed},
-		{name: "warn", status: doctor.StatusWarn, expected: complytime.StatusError},
-		{name: "unknown", status: doctor.CheckStatus("other"), expected: complytime.StatusUnknown},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, statusEmoji(tc.status))
-		})
-	}
-}
-
-func TestCountStatusSummary(t *testing.T) {
-	var s resultSummary
-
-	countStatusSummary(doctor.StatusPass, &s)
-	countStatusSummary(doctor.StatusFail, &s)
-	countStatusSummary(doctor.StatusWarn, &s)
-	countStatusSummary(doctor.StatusPass, &s)
-
-	assert.Equal(t, 2, s.passCount)
-	assert.Equal(t, 1, s.failCount)
-	assert.Equal(t, 1, s.warnCount)
 }
