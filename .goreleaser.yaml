@@ -18,7 +18,11 @@ builds:
       env:
           - CGO_ENABLED=0
       goos:
+          - darwin
           - linux
+      goarch:
+          - amd64
+          - arm64
       ldflags:
           - "-X github.com/complytime/complyctl/internal/version.version={{ .Version }}"
           - "-X github.com/complytime/complyctl/internal/version.gitTreeState={{ .GitTreeState }}"
@@ -26,7 +30,7 @@ builds:
           - "-X github.com/complytime/complyctl/internal/version.buildDate={{ .Date }}"
 
 archives:
-    - format: tar.gz
+    - formats: [tar.gz]
       # this name template makes the OS and Arch compatible with the results of `uname`.
       name_template: >-
           {{ .ProjectName }}_

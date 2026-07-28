@@ -58,6 +58,10 @@ make test-schema-validation
 # Acceptance tests (container-based, requires podman-compose or docker compose)
 make test-acceptance
 # → compose up --profile lifecycle (zot + seed + SUT containers)
+
+# Homebrew formula smoke test (requires brew, macOS/Linux)
+make test-homebrew
+# → ./tests/homebrew_test.sh
 ```
 
 ### Lint & Format
@@ -95,7 +99,7 @@ make crapload-check     # check for CRAP regressions against baseline
 | Behavioral | `behavioral_assessment.yml` | Behavioral assessment reports |
 | Scheduled | `ci_scheduled.yml` | Daily OSV-Scanner and Scorecards |
 | Acceptance Test | `acceptance_test.yml` | Container-based acceptance tests with real OCI registry |
-| Release | `release.yml` | Release automation (reusable preflight + GoReleaser from org-infra) |
+| Release | `release.yml` | Release automation (reusable preflight + GoReleaser from org-infra) + Homebrew formula publishing |
 
 ## Project Structure
 
@@ -139,6 +143,7 @@ tests/
 ├── cross-repo/      # cross-repo integration tests (complyctl + ampel + opa providers)
 ├── e2e/             # E2E tests (build-tag gated: -tags=e2e)
 ├── schema-validation/  # CUE schema validation of EvaluationLog output (validate.sh)
+├── homebrew_test.sh     # Homebrew formula smoke test (requires brew)
 └── integration_test.sh  # shell-based integration test
 vendor/              # vendored dependencies
 ```
@@ -311,6 +316,7 @@ packages organized by domain responsibility.
 ## Recent Changes
 - custom-trusted-root: `VerificationConfig` gains `TrustedRoot string` field with `yaml:"trusted_root,omitempty"` tag in `internal/complytime/config.go`; `ValidateVerificationConfig()` enforces mutual exclusivity with `key` (error: "trusted_root cannot be used with key-based verification"), requires `issuer` + `identity` (error: "trusted_root requires issuer and identity for keyless verification"), and validates file existence via `filepath.Clean` + `os.Stat`; `NewKeylessVerifier()` in `internal/cache/verify.go` gains `trustedRootPath string` parameter — when non-empty, calls `root.NewTrustedRootFromPath(trustedRootPath)` instead of TUF fetch, wrapping errors with `"failed to load trusted root from %s: %w"`; `buildVerifierFromConfig()` in `cmd/complyctl/cli/get.go` passes `cfg.TrustedRoot` to `NewKeylessVerifier()`; THR02.MIT05 added to threat model for user-supplied trust anchor without TUF integrity protection; fixes #768
 - multi-target-report-filenames: `BuildReportFilename(prefix, policyID, targetID, ext string) string` in `internal/output/filename.go` centralizes report filename construction for all four formatters (EvaluationLog, OSCAL, SARIF, Markdown); sanitizes via `complytime.FilenameSafe`, timestamps via `time.Now().Format("20060102-150405")`, omits targetID segment when empty; OSCAL/SARIF/Markdown formatters migrated from inline `fmt.Sprintf` to shared helper, adding targetID to filenames; fixes #773 (multi-target scans overwrote report files)
+- homebrew-formula-and-go-install: macOS binary releases (darwin/amd64, darwin/arm64) added to GoReleaser build matrix; source-build Homebrew Formula auto-published to `complytime/homebrew-tap` on release via GitHub App token; `go install` documented in `docs/INSTALLATION.md`; `make test-homebrew` target and `tests/homebrew_test.sh` for formula validation; shell completions (Bash, Zsh, Fish) installed by Formula (#713)
 - fix-doctor-target-variable-oneofs: `DescribeResponse` proto gains `optional_target_variable_groups` field 7 (pipe-delimited one-of groups, e.g. `"url|input_path"`); `ProviderHealth` struct gains `OptionalTargetVariableGroups []string`; `CheckVariables()` validates optional groups as at-least-one-present per target instead of requiring all; resolves contradiction where `doctor` required both `url` and `input_path` while `scan` rejected configs with both set; OPA provider update tracked in complytime-providers#145; fixes #759
 - registry-host-verification-fix: **BREAKING** -- `BuildLookupRef()` gains `registryHost` parameter prepended to OCI references for signature verification; `Sync`/`ComplypackSync` structs gain `registryHost` field populated from `ref.Registry` at construction; `NewSync`/`NewComplypackSync` constructors gain `registryHost string` parameter; all `VerifyFunc` invocations now receive host-qualified `registryRef` resolving against the configured registry instead of Docker Hub; fail-closed when `registryHost` is empty with verifier configured (returns error containing "registry host"); defense-in-depth with `ValidateOCIRef` config-time check; THR02 mitigations updated (MIT02 refined, MIT04 added for fail-closed); fixes #767
 - digest-format-validation: `ValidateDigest()` in `internal/cache/state.go` validates OCI digest format (`algorithm:hex`) using `opencontainers/go-digest`; `UpdatePolicyStateWithVerification` and `UpdateComplypackStateWithVerification` now return `error`, rejecting malformed digests at write time; `LoadState` warns and excludes entries with malformed digests while preserving valid and empty-digest entries; `internal/cache/cachetest/digests.go` provides canonical test digest constants; defense-in-depth per NIST 800-53 SI-10 (#677)

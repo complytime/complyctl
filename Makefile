@@ -78,6 +78,13 @@ test-devcontainer: ## verify devcontainer Containerfile builds
 	@echo "Containerfile builds successfully."
 .PHONY: test-devcontainer
 
+TIMEOUT := $(shell command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null || echo "")
+
+test-homebrew: ## verify Homebrew formula builds and installs from HEAD (requires brew, macOS/Linux)
+	@command -v brew >/dev/null 2>&1 || { echo "ERROR: brew not found. Install Homebrew first."; exit 1; }
+	$(if $(TIMEOUT),$(TIMEOUT) 300) ./tests/homebrew_test.sh
+.PHONY: test-homebrew
+
 ACCEPTANCE_COMPOSE = $(COMPOSE) -f tests/acceptance/compose.yaml --profile lifecycle
 
 test-acceptance: build build-test-provider build-acceptance-test ## run container-based acceptance tests (requires podman-compose or docker compose)

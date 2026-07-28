@@ -72,6 +72,16 @@
   empty-digest entries. Defense-in-depth per NIST 800-53 SI-10
   input validation. (#677)
 
+- macOS binary releases: darwin/amd64 and darwin/arm64 archives now
+  included in GoReleaser release matrix. (#713)
+
+- Homebrew formula: `brew install complytime/tap/complyctl` installs
+  complyctl via source build from the `complytime/homebrew-tap`
+  repository. Formula is auto-published by the release workflow. (#713)
+
+- `go install` documented as an installation method in
+  `docs/INSTALLATION.md`. (#713)
+
 - Cross-repo integration workflow now validates EvaluationLog YAML
   output against the Gemara CUE schema with `cue vet`. Catches
   schema conformance regressions (e.g. empty `steps` arrays, missing

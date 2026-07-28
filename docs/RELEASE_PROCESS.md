@@ -11,6 +11,30 @@ complyctl uses the org-wide release infrastructure from [org-infra](https://gith
 
 GoReleaser is configured in [.goreleaser.yaml](https://github.com/complytime/complyctl/blob/main/.goreleaser.yaml).
 
+3. **Homebrew Formula Publishing** -- after the release job completes, a third job downloads the source tarball for the tag, computes its SHA256, templates a source-build Homebrew Formula, and pushes it to `complytime/homebrew-tap`.
+
+### Homebrew Formula Publishing
+
+The `homebrew` job in the release workflow automatically publishes or updates `Formula/complyctl.rb` in the [homebrew-tap](https://github.com/complytime/homebrew-tap) repository.
+
+**Prerequisites:**
+- The GitHub App (secrets: `APP_ID`, `PRIVATE_KEY`) must have `Contents:write` permission on `complytime/homebrew-tap`
+- If the App installation is scoped to specific repos, `homebrew-tap` must be included
+
+**Failure modes:**
+- Tarball download failure (HTTP != 200) -- the step exits with an error
+- SHA256 length mismatch -- the step exits with an error
+- GitHub App token generation failure -- the step fails visibly
+- No changes to commit (re-run of the same version) -- exits 0 silently, which is safe
+
+**Re-runs:** Safe. If the Formula is already up-to-date, `git commit` exits with "No changes to commit" and the job succeeds without pushing.
+
+**Manual recovery:** If the automation fails, manually create and push the Formula:
+1. Download the source tarball: `curl -sL -o source.tar.gz https://github.com/complytime/complyctl/archive/refs/tags/vX.Y.Z.tar.gz`
+2. Compute SHA256: `sha256sum source.tar.gz`
+3. Update `Formula/complyctl.rb` in the `homebrew-tap` repo with the new `url` and `sha256`
+4. Commit and push
+
 ### Creating a Release
 
 To create a release, a project maintainer triggers the workflow manually:

@@ -9,6 +9,9 @@
 # re-run resilience), semver ordering, CI check status,
 # and unreleased commits before creating an annotated tag.
 #
+# After release, publishes a source-build Homebrew Formula
+# to complytime/homebrew-tap for macOS/Linux installation.
+#
 # See: https://github.com/complytime/complyctl/issues/699
 # Fixes: https://github.com/complytime/complyctl/issues/654
 # Fixes: https://github.com/complytime/complyctl/issues/655
@@ -63,3 +66,100 @@ jobs:
         permissions:
             contents: write
             id-token: write
+
+    homebrew:
+        name: Publish Homebrew Formula
+        needs: [preflight, release]
+        if: needs.preflight.outputs.tag != ''
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - name: Generate Homebrew tap token
+              id: homebrew-token
+              uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+              with:
+                  app-id: ${{ secrets.APP_ID }}
+                  private-key: ${{ secrets.PRIVATE_KEY }}
+                  repositories: homebrew-tap
+                  owner: complytime # zizmor: ignore[github-app] — scoped by repositories: homebrew-tap above
+                  permission-contents: write
+
+            - name: Publish Homebrew formula
+              env:
+                  TAP_TOKEN: ${{ steps.homebrew-token.outputs.token }}
+                  TAG: ${{ needs.preflight.outputs.tag }}
+              run: |
+                  set -euo pipefail
+
+                  # Defense-in-depth: validate tag format locally even though
+                  # preflight already validates upstream.
+                  if ! [[ "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+                      echo "::error::TAG does not match expected semver format: ${TAG}"
+                      exit 1
+                  fi
+
+                  VERSION="${TAG#v}"
+
+                  TARBALL_URL="https://github.com/complytime/complyctl/archive/refs/tags/${TAG}.tar.gz"
+                  HTTP_CODE=$(curl -sL -o /tmp/source.tar.gz -w "%{http_code}" --fail --retry 3 "${TARBALL_URL}")
+                  if [ "${HTTP_CODE}" != "200" ]; then
+                      echo "::error::Failed to download source tarball (HTTP ${HTTP_CODE})"
+                      exit 1
+                  fi
+                  SHA256=$(sha256sum /tmp/source.tar.gz | awk '{print $1}')
+                  if [ ${#SHA256} -ne 64 ]; then
+                      echo "::error::SHA256 checksum has unexpected length: ${SHA256}"
+                      exit 1
+                  fi
+
+                  cat > complyctl.rb <<'FORMULA'
+                  class Complyctl < Formula
+                    desc "CLI for streamlining end-to-end compliance workflows"
+                    homepage "https://github.com/complytime/complyctl"
+                    url "TARBALL_URL_PLACEHOLDER"
+                    sha256 "SHA256_PLACEHOLDER"
+                    license "Apache-2.0"
+                    head "https://github.com/complytime/complyctl.git", branch: "main"
+
+                    depends_on "go" => :build
+
+                    def install
+                      ldflags = %W[
+                        -X github.com/complytime/complyctl/internal/version.version=#{version}
+                        -X github.com/complytime/complyctl/internal/version.buildDate=#{time.iso8601}
+                        -X github.com/complytime/complyctl/internal/version.gitTreeState=clean
+                      ]
+                      system "go", "build", *std_go_args(ldflags:), "./cmd/complyctl"
+                      generate_completions_from_executable(bin/"complyctl", "completion")
+                    end
+
+                    test do
+                      assert_match version.to_s, shell_output("#{bin}/complyctl version")
+                    end
+                  end
+                  FORMULA
+
+                  # These substitutions are safe because TAG is validated
+                  # by the semver regex above (defense-in-depth) and SHA256
+                  # is computed locally from sha256sum output. If the TAG
+                  # validation is removed, TARBALL_URL becomes an injection
+                  # vector via sed replacement.
+                  sed -i "s|TARBALL_URL_PLACEHOLDER|${TARBALL_URL}|" complyctl.rb
+                  sed -i "s|SHA256_PLACEHOLDER|${SHA256}|" complyctl.rb
+
+                  # Use gh CLI for clone and push to avoid embedding
+                  # the token in git config or process arguments.
+                  GH_TOKEN="${TAP_TOKEN}" gh repo clone complytime/homebrew-tap tap-repo -- --depth 1
+                  cd tap-repo
+                  mkdir -p Formula
+                  cp ../complyctl.rb Formula/complyctl.rb
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add Formula/complyctl.rb
+                  git commit -m "complyctl ${VERSION}" || { echo "No changes to commit"; exit 0; }
+                  # gh configures a credential helper that supplies the
+                  # token via GH_TOKEN without persisting it in git config.
+                  GH_TOKEN="${TAP_TOKEN}" gh auth setup-git
+                  git push origin main
+                  echo "::notice::Published Formula for complyctl ${VERSION} to homebrew-tap"
