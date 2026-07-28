@@ -918,12 +918,10 @@ func TestComplypackSync_RegistryHost_PassedToVerifier(t *testing.T) {
 	mock.seedComplypack(repository, evalID, "1.0.0", "sha256:host-v1", "v1 content")
 
 	// Track all refs passed to the verifier across call sites.
-	var mu sync.Mutex
+	// All SyncComplypack calls below are sequential, so no mutex is needed.
 	var capturedRefs []string
 	capturingVerifier := func(_ context.Context, registryRef string) (*cache.VerificationResult, error) {
-		mu.Lock()
 		capturedRefs = append(capturedRefs, registryRef)
-		mu.Unlock()
 		return &cache.VerificationResult{Verified: true}, nil
 	}
 
@@ -967,14 +965,9 @@ func TestComplypackSync_RegistryHost_PassedToVerifier(t *testing.T) {
 	assert.True(t, fetched3, "local cache hit should return true")
 
 	// All captured refs must have the registry host prefix.
-	mu.Lock()
-	refs := make([]string, len(capturedRefs))
-	copy(refs, capturedRefs)
-	mu.Unlock()
-
-	require.GreaterOrEqual(t, len(refs), 3,
-		"verifier should be called at least 3 times (pre-copy x2 + cache re-verify x1)")
-	for i, ref := range refs {
+	require.Equal(t, 3, len(capturedRefs),
+		"verifier should be called exactly 3 times (pre-copy x2 + cache re-verify x1)")
+	for i, ref := range capturedRefs {
 		assert.True(t, strings.HasPrefix(ref, host+"/"),
 			"verifier ref [%d] must have registry host prefix, got: %s", i, ref)
 		assert.NotContains(t, ref, "index.docker.io",
