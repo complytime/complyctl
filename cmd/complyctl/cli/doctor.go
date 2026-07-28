@@ -255,9 +255,25 @@ func statusEmoji(s doctor.CheckStatus) string {
 	}
 }
 
-// printDiagnosticsHuman renders results with emoji status indicators followed
-// by a grep-stable [STATUS] label. This is the default interactive mode.
-func printDiagnosticsHuman(results []doctor.CheckResult, w io.Writer) error {
+// statusFormatter returns the status prefix for a check result line.
+// Human format uses emoji + label; text format uses label only.
+type statusFormatter func(doctor.CheckStatus) string
+
+// humanStatusPrefix returns emoji followed by a bracketed label
+// (e.g., "✅ [PASS]").
+func humanStatusPrefix(s doctor.CheckStatus) string {
+	return statusEmoji(s) + " " + statusLabel(s)
+}
+
+// textStatusPrefix returns a bracketed label only (e.g., "[PASS]").
+func textStatusPrefix(s doctor.CheckStatus) string {
+	return statusLabel(s)
+}
+
+// renderDiagnostics walks the grouped result tree and writes each check
+// using the provided status formatter. Shared by human and text renderers
+// to avoid duplicating the tree-walk structure.
+func renderDiagnostics(results []doctor.CheckResult, w io.Writer, fmtStatus statusFormatter) error {
 	fmt.Fprintln(w, "Running workspace diagnostics...")
 	fmt.Fprintln(w)
 
@@ -280,16 +296,16 @@ func printDiagnosticsHuman(results []doctor.CheckResult, w io.Writer) error {
 		fmt.Fprintln(w, string(group))
 
 		for _, r := range checks {
-			fmt.Fprintf(w, "  %s %s %s: %s\n", statusEmoji(r.Status), statusLabel(r.Status), resultLabel(r), r.Message)
+			fmt.Fprintf(w, "  %s %s: %s\n", fmtStatus(r.Status), resultLabel(r), r.Message)
 
 			for _, child := range r.Children {
-				fmt.Fprintf(w, "      %s %s %s: %s\n", statusEmoji(child.Status), statusLabel(child.Status), resultLabel(child), child.Message)
+				fmt.Fprintf(w, "      %s %s: %s\n", fmtStatus(child.Status), resultLabel(child), child.Message)
 
 				// Grandchildren (verbose detail) are rendered but not
 				// counted in the summary (D5 — stable count regardless
 				// of --verbose).
 				for _, gc := range child.Children {
-					fmt.Fprintf(w, "          %s %s %s\n", statusEmoji(gc.Status), statusLabel(gc.Status), gc.Message)
+					fmt.Fprintf(w, "          %s %s\n", fmtStatus(gc.Status), gc.Message)
 				}
 			}
 		}
@@ -304,50 +320,16 @@ func printDiagnosticsHuman(results []doctor.CheckResult, w io.Writer) error {
 	return nil
 }
 
+// printDiagnosticsHuman renders results with emoji status indicators followed
+// by a grep-stable [STATUS] label. This is the default interactive mode.
+func printDiagnosticsHuman(results []doctor.CheckResult, w io.Writer) error {
+	return renderDiagnostics(results, w, humanStatusPrefix)
+}
+
 // printDiagnosticsText renders results with bracketed [STATUS] labels and no
 // emoji. Used for --format text and when NO_COLOR is set.
 func printDiagnosticsText(results []doctor.CheckResult, w io.Writer) error {
-	fmt.Fprintln(w, "Running workspace diagnostics...")
-	fmt.Fprintln(w)
-
-	grouped := make(map[doctor.CheckGroup][]doctor.CheckResult)
-	for _, r := range results {
-		grouped[r.Group] = append(grouped[r.Group], r)
-	}
-
-	firstSection := true
-	for _, group := range doctor.GroupOrder() {
-		checks, ok := grouped[group]
-		if !ok {
-			continue
-		}
-
-		if !firstSection {
-			fmt.Fprintln(w)
-		}
-		firstSection = false
-		fmt.Fprintln(w, string(group))
-
-		for _, r := range checks {
-			fmt.Fprintf(w, "  %s %s: %s\n", statusLabel(r.Status), resultLabel(r), r.Message)
-
-			for _, child := range r.Children {
-				fmt.Fprintf(w, "      %s %s: %s\n", statusLabel(child.Status), resultLabel(child), child.Message)
-
-				for _, gc := range child.Children {
-					fmt.Fprintf(w, "          %s %s\n", statusLabel(gc.Status), gc.Message)
-				}
-			}
-		}
-	}
-
-	s := summarizeResults(results)
-	fmt.Fprintf(w, "\n%d checks: %d passed, %d failed, %d warnings\n", s.total, s.passCount, s.failCount, s.warnCount)
-
-	if s.blockingFailure {
-		return fmt.Errorf("one or more blocking checks failed")
-	}
-	return nil
+	return renderDiagnostics(results, w, textStatusPrefix)
 }
 
 // convertResult converts a doctor.CheckResult to a checkOutput for JSON
