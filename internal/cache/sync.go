@@ -103,6 +103,14 @@ func (s *Sync) SyncPolicy(ctx context.Context, policyID, version string) (bool, 
 		return false, fmt.Errorf("policy ID cannot be empty")
 	}
 
+	// Fail-closed: refuse to verify against an unqualified reference that
+	// would silently resolve to Docker Hub instead of the intended registry.
+	// This check is placed before any network call to avoid wasted round-trips
+	// on misconfigured setups, matching the ComplypackSync pattern.
+	if s.verifier != nil && s.registryHost == "" {
+		return false, fmt.Errorf("policy %s: registry host is required for signature verification; include the registry host in the policy URL or use --skip-verify", policyID)
+	}
+
 	tag, digest := classifyVersion(version)
 	// DefinitionVersion resolves its own host internally via buildRef(),
 	// so pass empty registryHost here to avoid double-host references.
@@ -129,11 +137,6 @@ func (s *Sync) SyncPolicy(ctx context.Context, policyID, version string) (bool, 
 	// content to disk. If verification fails, the local cache is unchanged.
 	var verifyResult *VerificationResult
 	if s.verifier != nil {
-		// Fail-closed: refuse to verify against an unqualified reference that
-		// would silently resolve to Docker Hub instead of the intended registry.
-		if s.registryHost == "" {
-			return false, fmt.Errorf("policy %s: registry host is required for signature verification; include the registry host in the policy URL or use --skip-verify", policyID)
-		}
 		registryRef := BuildLookupRef(s.registryHost, policyID, tag, digest)
 		vr, verifyErr := s.verifier(ctx, registryRef)
 		if verifyErr != nil {
