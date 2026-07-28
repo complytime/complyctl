@@ -251,7 +251,7 @@ func statusEmoji(s doctor.CheckStatus) string {
 	case doctor.StatusWarn:
 		return complytime.StatusError
 	default:
-		return "❓"
+		return complytime.StatusUnknown
 	}
 }
 

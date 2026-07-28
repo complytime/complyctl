@@ -97,6 +97,7 @@ const (
 	StatusFailed  = "❌"
 	StatusSkipped = "⏭️"
 	StatusError   = "⚠️"
+	StatusUnknown = "❓"
 )
 
 // FilenameSafe replaces characters unsafe for filenames (e.g., path separators)

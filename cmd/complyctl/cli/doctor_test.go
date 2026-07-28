@@ -87,18 +87,6 @@ func TestResolveFormat_HumanFlagOverridesNOCOLOR(t *testing.T) {
 	assert.Equal(t, "", got, "--format human must produce human output even with NO_COLOR")
 }
 
-// --- resultLabel ---
-
-func TestResultLabel_UsesLabelWhenSet(t *testing.T) {
-	r := doctor.CheckResult{Name: "internal-name", Label: "Display Name"}
-	assert.Equal(t, "Display Name", resultLabel(r))
-}
-
-func TestResultLabel_FallsBackToName(t *testing.T) {
-	r := doctor.CheckResult{Name: "fallback-name"}
-	assert.Equal(t, "fallback-name", resultLabel(r))
-}
-
 // --- printDiagnosticsHuman ---
 
 func TestPrintDiagnosticsHuman_ContainsEmojiAndLabel(t *testing.T) {
@@ -438,5 +426,5 @@ func TestStatusEmoji_KnownStatuses(t *testing.T) {
 }
 
 func TestStatusEmoji_UnknownStatus(t *testing.T) {
-	assert.Equal(t, "❓", statusEmoji(doctor.CheckStatus("bogus")))
+	assert.Equal(t, complytime.StatusUnknown, statusEmoji(doctor.CheckStatus("bogus")))
 }

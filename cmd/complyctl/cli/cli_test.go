@@ -2717,8 +2717,8 @@ func TestStatusEmoji(t *testing.T) {
 	}{
 		{name: "pass", status: doctor.StatusPass, expected: complytime.StatusPassed},
 		{name: "fail", status: doctor.StatusFail, expected: complytime.StatusFailed},
-		{name: "warn", status: doctor.StatusWarn, expected: complytime.StatusSkipped},
-		{name: "unknown", status: doctor.CheckStatus("other"), expected: "?"},
+		{name: "warn", status: doctor.StatusWarn, expected: complytime.StatusError},
+		{name: "unknown", status: doctor.CheckStatus("other"), expected: complytime.StatusUnknown},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -2727,15 +2727,15 @@ func TestStatusEmoji(t *testing.T) {
 	}
 }
 
-func TestCountStatus(t *testing.T) {
-	var pass, fail, warn int
+func TestCountStatusSummary(t *testing.T) {
+	var s resultSummary
 
-	countStatus(doctor.StatusPass, &pass, &fail, &warn)
-	countStatus(doctor.StatusFail, &pass, &fail, &warn)
-	countStatus(doctor.StatusWarn, &pass, &fail, &warn)
-	countStatus(doctor.StatusPass, &pass, &fail, &warn)
+	countStatusSummary(doctor.StatusPass, &s)
+	countStatusSummary(doctor.StatusFail, &s)
+	countStatusSummary(doctor.StatusWarn, &s)
+	countStatusSummary(doctor.StatusPass, &s)
 
-	assert.Equal(t, 2, pass)
-	assert.Equal(t, 1, fail)
-	assert.Equal(t, 1, warn)
+	assert.Equal(t, 2, s.passCount)
+	assert.Equal(t, 1, s.failCount)
+	assert.Equal(t, 1, s.warnCount)
 }
