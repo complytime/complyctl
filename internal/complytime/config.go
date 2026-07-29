@@ -5,6 +5,7 @@ package complytime
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -84,6 +85,10 @@ type VerificationConfig struct {
 	Identity string `yaml:"identity,omitempty"`
 	// Key is the path to a PEM-encoded public key for keyed verification.
 	Key string `yaml:"key,omitempty"`
+	// TrustedRoot is the path to a trusted_root.json file for keyless
+	// verification against private Sigstore instances. Mutually exclusive
+	// with Key; requires Issuer and Identity.
+	TrustedRoot string `yaml:"trusted_root,omitempty"`
 }
 
 // ValidateVerificationConfig checks that the verification configuration is
@@ -96,6 +101,12 @@ func ValidateVerificationConfig(v *VerificationConfig) error {
 	hasKeyless := v.Issuer != "" || v.Identity != ""
 	hasKeyed := v.Key != ""
 
+	// Check trusted_root + key mutual exclusivity first so the more
+	// specific error surfaces before the generic keyed/keyless check.
+	if v.TrustedRoot != "" && hasKeyed {
+		return fmt.Errorf("verification: trusted_root cannot be used with key-based verification")
+	}
+
 	if hasKeyed && hasKeyless {
 		return fmt.Errorf("verification: key and issuer/identity are mutually exclusive")
 	}
@@ -105,6 +116,21 @@ func ValidateVerificationConfig(v *VerificationConfig) error {
 	if v.Identity != "" && v.Issuer == "" {
 		return fmt.Errorf("verification: identity requires issuer")
 	}
+
+	// trusted_root requires issuer + identity for keyless verification.
+	if v.TrustedRoot != "" && (v.Issuer == "" || v.Identity == "") {
+		return fmt.Errorf("verification: trusted_root requires issuer and identity for keyless verification")
+	}
+
+	// Sanitize and validate trusted_root path so the same cleaned value
+	// is consumed downstream (eliminates validated-vs-consumed divergence).
+	if v.TrustedRoot != "" {
+		v.TrustedRoot = filepath.Clean(v.TrustedRoot)
+		if _, err := os.Stat(v.TrustedRoot); err != nil {
+			return fmt.Errorf("verification: trusted_root file %q not found: %w", v.TrustedRoot, err)
+		}
+	}
+
 	return nil
 }
 

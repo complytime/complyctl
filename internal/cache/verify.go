@@ -74,15 +74,28 @@ const tufFetchTimeout = 30 * time.Second
 // NewKeylessVerifier creates a VerifyFunc that verifies cosign signatures using
 // Sigstore keyless verification (Fulcio + Rekor). The issuer and identity
 // parameters match the OIDC issuer and SAN identity in the signing certificate.
-func NewKeylessVerifier(issuer, identity string) (VerifyFunc, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), tufFetchTimeout)
-	defer cancel()
+// When trustedRootPath is non-empty, the trusted root is loaded from the
+// specified file instead of fetching it via TUF from the public Sigstore
+// infrastructure. This supports private Sigstore deployments.
+func NewKeylessVerifier(issuer, identity, trustedRootPath string) (VerifyFunc, error) {
+	var trustedRoot *root.TrustedRoot
+	var err error
 
-	fmt.Fprintln(os.Stderr, "Fetching Sigstore trusted root...")
-	opts := tuf.DefaultOptions().WithContext(ctx)
-	trustedRoot, err := root.FetchTrustedRootWithOptions(opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch Sigstore trusted root: %w", err)
+	if trustedRootPath != "" {
+		trustedRoot, err = root.NewTrustedRootFromPath(trustedRootPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load trusted root from %s: %w", trustedRootPath, err)
+		}
+	} else {
+		ctx, cancel := context.WithTimeout(context.Background(), tufFetchTimeout)
+		defer cancel()
+
+		fmt.Fprintln(os.Stderr, "Fetching Sigstore trusted root...")
+		opts := tuf.DefaultOptions().WithContext(ctx)
+		trustedRoot, err = root.FetchTrustedRootWithOptions(opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch Sigstore trusted root: %w", err)
+		}
 	}
 
 	certID, err := verify.NewShortCertificateIdentity(issuer, "", identity, "")

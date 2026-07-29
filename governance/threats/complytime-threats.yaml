@@ -94,6 +94,21 @@ threats:
                 "registry host" instead of silently verifying against Docker
                 Hub. This prevents signature verification from resolving
                 against the wrong registry.
+          - id: CT.COMPLYCTL.THR02.MIT05
+            status: implemented
+            description: >
+                When trusted_root is configured in complytime.yaml,
+                NewKeylessVerifier loads the trust anchor from a
+                user-supplied file via root.NewTrustedRootFromPath instead
+                of fetching the public Sigstore TUF root. The user-supplied
+                file has no TUF integrity protection — file permissions and
+                access control are the operator's responsibility. A TOCTOU
+                gap exists between config-time os.Stat validation and
+                verifier-construction-time file read; this is accepted as
+                the standard filesystem trust model. Mutual exclusivity
+                with key-based verification is enforced at config validation
+                time. trusted_root without issuer and identity is rejected
+                to prevent silent verification bypass.
       capabilities:
           - reference-id: CCC
             entries:

@@ -224,7 +224,7 @@ func buildVerifierFromConfig(
 	if cfg.Key != "" {
 		return cache.NewKeyedVerifier(cfg.Key)
 	}
-	return cache.NewKeylessVerifier(cfg.Issuer, cfg.Identity)
+	return cache.NewKeylessVerifier(cfg.Issuer, cfg.Identity, cfg.TrustedRoot)
 }
 
 func (o *getOptions) syncPolicies(

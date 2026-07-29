@@ -53,6 +53,16 @@
   `--format human` explicitly selects the default emoji output.
   When `NO_COLOR` is set, text format is selected automatically.
   (#611, #744)
+- Custom trusted root support for private Sigstore instances.
+  `VerificationConfig` gains a `trusted_root` field specifying a
+  filesystem path to a `trusted_root.json` file for keyless
+  verification against non-public Sigstore deployments.
+  `NewKeylessVerifier` loads the custom trusted root via
+  `root.NewTrustedRootFromPath` instead of fetching the public TUF
+  root. Mutually exclusive with `key`; requires `issuer` and
+  `identity`. File existence validated at config time with
+  `filepath.Clean` path sanitization. (#768)
+
 - Digest format validation at the state ingestion layer.
   `UpdatePolicyStateWithVerification` and
   `UpdateComplypackStateWithVerification` now return an error when

@@ -3,6 +3,7 @@
 package complytime_test
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -1172,6 +1173,18 @@ func TestValidate_PerEntryVerificationConfig(t *testing.T) {
 			},
 			wantErr: "identity requires issuer",
 		},
+		{
+			name: "trusted_root with key mutual exclusivity",
+			entry: complytime.PolicyEntry{
+				URL: "registry.com/policies/hipaa:v1.0",
+				ID:  "hipaa",
+				Verification: &complytime.VerificationConfig{
+					TrustedRoot: "/path/to/trusted_root.json",
+					Key:         "/path/to/cosign.pub",
+				},
+			},
+			wantErr: "trusted_root cannot be used with key-based verification",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1215,7 +1228,11 @@ func TestValidate_PerEntryVerificationBackwardCompat(t *testing.T) {
 
 func TestValidate_ValidMixedVerificationConfigs(t *testing.T) {
 	// FR-004 scenario: policies from multiple publishers with
-	// different verification configs all pass validation.
+	// different verification configs all pass validation, including
+	// an entry with a custom trusted root for a private Sigstore instance.
+	rootFile := filepath.Join(t.TempDir(), "trusted_root.json")
+	require.NoError(t, os.WriteFile(rootFile, []byte(`{}`), 0600))
+
 	cfg := &complytime.WorkspaceConfig{
 		Policies: []complytime.PolicyEntry{
 			{
@@ -1244,6 +1261,16 @@ func TestValidate_ValidMixedVerificationConfigs(t *testing.T) {
 				ID:         "soc2",
 				SkipVerify: true,
 			},
+			{
+				// Per-entry trusted root for private Sigstore deployment
+				URL: "registry.internal/policies/hipaa:v1.0",
+				ID:  "hipaa",
+				Verification: &complytime.VerificationConfig{
+					Issuer:      "https://fulcio.internal",
+					Identity:    "builder@internal.example.com",
+					TrustedRoot: rootFile,
+				},
+			},
 		},
 		Targets: []complytime.TargetConfig{{
 			ID:       "local",
@@ -1255,6 +1282,147 @@ func TestValidate_ValidMixedVerificationConfigs(t *testing.T) {
 		},
 	}
 	assert.NoError(t, complytime.Validate(cfg))
+}
+
+// --- Custom trusted root config validation tests ---
+
+func TestValidateVerificationConfig_TrustedRootKeyless(t *testing.T) {
+	dir := t.TempDir()
+	rootPath := filepath.Join(dir, "trusted_root.json")
+	require.NoError(t, os.WriteFile(rootPath, []byte(`{}`), 0600))
+
+	v := &complytime.VerificationConfig{
+		Issuer:      "https://token.actions.githubusercontent.com",
+		Identity:    "https://github.com/org/.github/workflows/release.yml@refs/tags/*",
+		TrustedRoot: rootPath,
+	}
+	err := complytime.ValidateVerificationConfig(v)
+	assert.NoError(t, err)
+}
+
+func TestValidateVerificationConfig_TrustedRootWithKey(t *testing.T) {
+	v := &complytime.VerificationConfig{
+		TrustedRoot: "/path/to/trusted_root.json",
+		Key:         "/path/to/cosign.pub",
+	}
+	err := complytime.ValidateVerificationConfig(v)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(),
+		"trusted_root cannot be used with key-based verification")
+}
+
+func TestValidateVerificationConfig_TrustedRootWithoutKeyless(t *testing.T) {
+	v := &complytime.VerificationConfig{
+		TrustedRoot: "/path/to/trusted_root.json",
+	}
+	err := complytime.ValidateVerificationConfig(v)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(),
+		"trusted_root requires issuer and identity for keyless verification")
+}
+
+func TestValidateVerificationConfig_TrustedRootFileNotFound(t *testing.T) {
+	v := &complytime.VerificationConfig{
+		Issuer:      "https://issuer.example.com",
+		Identity:    "user@example.com",
+		TrustedRoot: "/nonexistent/path/trusted_root.json",
+	}
+	err := complytime.ValidateVerificationConfig(v)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "trusted_root file")
+}
+
+func TestValidateVerificationConfig_TrustedRootFileExists(t *testing.T) {
+	dir := t.TempDir()
+	rootPath := filepath.Join(dir, "trusted_root.json")
+	require.NoError(t, os.WriteFile(rootPath, []byte(`{}`), 0600))
+
+	v := &complytime.VerificationConfig{
+		Issuer:      "https://issuer.example.com",
+		Identity:    "user@example.com",
+		TrustedRoot: rootPath,
+	}
+	err := complytime.ValidateVerificationConfig(v)
+	assert.NoError(t, err)
+}
+
+func TestValidateVerificationConfig_TrustedRootPathCleaned(t *testing.T) {
+	dir := t.TempDir()
+	rootPath := filepath.Join(dir, "trusted_root.json")
+	require.NoError(t, os.WriteFile(rootPath, []byte(`{}`), 0600))
+
+	// Path with non-canonical elements that filepath.Clean resolves
+	dirtyPath := filepath.Join(dir, "..", filepath.Base(dir), "trusted_root.json")
+
+	v := &complytime.VerificationConfig{
+		Issuer:      "https://issuer.example.com",
+		Identity:    "user@example.com",
+		TrustedRoot: dirtyPath,
+	}
+	err := complytime.ValidateVerificationConfig(v)
+	assert.NoError(t, err)
+	// Validation stores the cleaned path so downstream consumers
+	// use the same value that was validated.
+	assert.Equal(t, rootPath, v.TrustedRoot,
+		"TrustedRoot should be cleaned in-place after validation")
+}
+
+func TestLoadFrom_WithTrustedRoot(t *testing.T) {
+	dir := t.TempDir()
+	rootPath := filepath.Join(dir, "trusted_root.json")
+	require.NoError(t, os.WriteFile(rootPath, []byte(`{}`), 0600))
+	configPath := filepath.Join(dir, "complytime.yml")
+
+	yamlContent := fmt.Sprintf(`policies:
+  - url: registry.com/policies/nist:v1.0
+    id: nist
+targets:
+  - id: local
+    policies:
+      - nist
+verification:
+  issuer: "https://token.actions.githubusercontent.com"
+  identity: "https://github.com/org/.github/workflows/release.yml@refs/tags/*"
+  trusted_root: %q
+`, rootPath)
+	require.NoError(t, os.WriteFile(configPath, []byte(yamlContent), 0600))
+
+	cfg, err := complytime.LoadFrom(configPath)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	require.NotNil(t, cfg.Verification)
+	assert.Equal(t, rootPath, cfg.Verification.TrustedRoot)
+	assert.Equal(t, "https://token.actions.githubusercontent.com", cfg.Verification.Issuer)
+	assert.Equal(t, "https://github.com/org/.github/workflows/release.yml@refs/tags/*", cfg.Verification.Identity)
+}
+
+// TestLoadFrom_PerEntryTrustedRoot verifies YAML round-trip for per-entry
+// trusted_root. The path is intentionally nonexistent because LoadFrom only
+// deserializes YAML; file existence is validated later by Validate().
+func TestLoadFrom_PerEntryTrustedRoot(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "complytime.yml")
+
+	yamlContent := `policies:
+  - url: registry.com/policies/nist:v1.0
+    id: nist
+    verification:
+      issuer: "https://issuer.example.com"
+      identity: "user@example.com"
+      trusted_root: "/path/to/entry_root.json"
+targets:
+  - id: local
+    policies:
+      - nist
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(yamlContent), 0600))
+
+	cfg, err := complytime.LoadFrom(configPath)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	require.Len(t, cfg.Policies, 1)
+	require.NotNil(t, cfg.Policies[0].Verification)
+	assert.Equal(t, "/path/to/entry_root.json", cfg.Policies[0].Verification.TrustedRoot)
 }
 
 func TestFilenameSafe(t *testing.T) {

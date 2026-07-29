@@ -16,7 +16,7 @@ import (
 	"github.com/complytime/complyctl/internal/complytime"
 )
 
-// --- resolveVerifier tests (Task 2.4) ---
+// --- resolveVerifier tests ---
 
 // mockVerifyFunc returns a no-op VerifyFunc for testing. Each call
 // returns a distinct func value so callers can compare identity.
@@ -329,7 +329,7 @@ func TestResolveVerifier_NilCache(t *testing.T) {
 	assert.Equal(t, 0, *calls)
 }
 
-// --- Error collection tests (Task 3.3) ---
+// --- Error collection tests ---
 
 // stubCredFunc is a no-op credential function for testing.
 func stubCredFunc(_ context.Context, _ string) (
@@ -638,7 +638,7 @@ func installSelectiveBuilder(
 // different verification configs (keyed, keyless entry-level,
 // workspace-inherited) all resolve correctly with the expected
 // number of constructor calls and cache entries within a single
-// invocation (FR-001, FR-005, Task 4.1).
+// invocation.
 func TestResolveVerifier_MixedConfigs(t *testing.T) {
 	calls := installMockBuilder(t)
 
@@ -710,7 +710,7 @@ func TestResolveVerifier_MixedConfigs(t *testing.T) {
 // TestResolveVerifier_SkipVerifyWithVerifiedEntries verifies that
 // a skip_verify entry returns nil opts while other entries in the
 // same invocation get their verifiers resolved. The constructor
-// is called only for the non-skipped entries (FR-002, Task 4.2).
+// is called only for the non-skipped entries.
 func TestResolveVerifier_SkipVerifyWithVerifiedEntries(
 	t *testing.T,
 ) {
@@ -777,7 +777,7 @@ func TestResolveVerifier_SkipVerifyWithVerifiedEntries(
 // when one entry's verifier resolution fails (e.g., invalid key
 // path), other entries still proceed to sync. All errors from
 // both verification failures and sync failures are collected
-// together (FR-006, Task 4.3).
+// together.
 func TestSyncAllPolicies_SelectiveVerificationError(
 	t *testing.T,
 ) {
@@ -858,8 +858,7 @@ func TestSyncAllPolicies_SelectiveVerificationError(
 // TestResolveVerifier_BackwardCompat_WithWorkspace verifies that
 // entries without per-entry fields (no Verification, no
 // SkipVerify) all receive the workspace-level verifier via a
-// single constructor call — matching pre-feature behavior
-// (Task 4.4).
+// single constructor call — matching pre-feature behavior.
 func TestResolveVerifier_BackwardCompat_WithWorkspace(
 	t *testing.T,
 ) {
@@ -908,8 +907,7 @@ func TestResolveVerifier_BackwardCompat_WithWorkspace(
 // TestResolveVerifier_BackwardCompat_NoWorkspace verifies that
 // entries without per-entry fields and no workspace-level
 // verification produce nil opts for all entries — matching
-// pre-feature behavior when no verification was configured
-// (Task 4.4).
+// pre-feature behavior when no verification was configured.
 func TestResolveVerifier_BackwardCompat_NoWorkspace(
 	t *testing.T,
 ) {
@@ -948,10 +946,95 @@ func TestResolveVerifier_BackwardCompat_NoWorkspace(
 		"cache should remain empty")
 }
 
+// --- Builder Passthrough Tests ---
+
+// TestBuildVerifierFromConfig_PassesTrustedRoot verifies that
+// buildVerifierFromConfig passes cfg.TrustedRoot to
+// NewKeylessVerifier when keyless verification is configured.
+func TestResolveVerifier_PassesTrustedRootToBuilder(
+	t *testing.T,
+) {
+	// Capture the config received by the builder to verify
+	// TrustedRoot is passed through.
+	orig := defaultVerifierBuilder
+	t.Cleanup(func() { defaultVerifierBuilder = orig })
+
+	var receivedCfg complytime.VerificationConfig
+	defaultVerifierBuilder = func(
+		cfg complytime.VerificationConfig,
+	) (cache.VerifyFunc, error) {
+		receivedCfg = cfg
+		return mockVerifyFunc(), nil
+	}
+
+	entry := complytime.PolicyEntry{
+		URL: "registry.example.com/policies/test:v1",
+		Verification: &complytime.VerificationConfig{
+			Issuer:      "https://issuer.example.com",
+			Identity:    "user@example.com",
+			TrustedRoot: "/path/to/trusted_root.json",
+		},
+	}
+	vfCache := make(
+		map[complytime.VerificationConfig]cache.VerifyFunc,
+	)
+
+	opts, err := resolveVerifier(entry, nil, vfCache)
+	require.NoError(t, err)
+	require.NotNil(t, opts)
+
+	// Verify the builder received the TrustedRoot field.
+	assert.Equal(t, "/path/to/trusted_root.json",
+		receivedCfg.TrustedRoot,
+		"TrustedRoot should be passed through to builder")
+	assert.Equal(t, "https://issuer.example.com",
+		receivedCfg.Issuer)
+	assert.Equal(t, "user@example.com",
+		receivedCfg.Identity)
+	assert.Empty(t, receivedCfg.Key,
+		"Key should be empty for keyless config")
+}
+
+// TestBuildVerifierFromConfig_EmptyTrustedRoot verifies that
+// buildVerifierFromConfig passes empty TrustedRoot to
+// NewKeylessVerifier when only issuer + identity are set.
+func TestResolveVerifier_EmptyTrustedRootPassedToBuilder(
+	t *testing.T,
+) {
+	orig := defaultVerifierBuilder
+	t.Cleanup(func() { defaultVerifierBuilder = orig })
+
+	var receivedCfg complytime.VerificationConfig
+	defaultVerifierBuilder = func(
+		cfg complytime.VerificationConfig,
+	) (cache.VerifyFunc, error) {
+		receivedCfg = cfg
+		return mockVerifyFunc(), nil
+	}
+
+	entry := complytime.PolicyEntry{
+		URL: "registry.example.com/policies/test:v1",
+		Verification: &complytime.VerificationConfig{
+			Issuer:   "https://issuer.example.com",
+			Identity: "user@example.com",
+			// No TrustedRoot — empty string.
+		},
+	}
+	vfCache := make(
+		map[complytime.VerificationConfig]cache.VerifyFunc,
+	)
+
+	opts, err := resolveVerifier(entry, nil, vfCache)
+	require.NoError(t, err)
+	require.NotNil(t, opts)
+
+	assert.Empty(t, receivedCfg.TrustedRoot,
+		"TrustedRoot should be empty when not configured")
+}
+
 // TestSyncAllComplypacks_SelectiveVerificationError verifies
 // error collection through the complypack sync layer when one
-// entry's verifier resolution fails selectively (FR-006,
-// Task 4.3).
+// entry's verifier resolution fails selectively.
 func TestSyncAllComplypacks_SelectiveVerificationError(
 	t *testing.T,
 ) {

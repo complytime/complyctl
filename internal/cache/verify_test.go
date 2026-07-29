@@ -14,6 +14,8 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -435,6 +437,74 @@ func TestExtractVerificationResult_Empty(t *testing.T) {
 	assert.True(t, vr.Verified)
 	assert.Empty(t, vr.SignerIdentity)
 	assert.Empty(t, vr.Issuer)
+}
+
+// --- Group 4: Verifier Construction Tests (custom trusted root) ---
+
+func TestNewKeylessVerifier_WithTrustedRootFixture(t *testing.T) {
+	// Verifies that a valid (but intentionally minimal) trusted_root.json
+	// fixture loads via the custom-root branch without error. The fixture
+	// has empty trust material arrays — this confirms file parsing, not
+	// verification capability. Branch discrimination is tested separately
+	// by TestNewKeylessVerifier_EmptyTrustedRootPathTakesTUFBranch.
+	fixturePath := filepath.Join("testdata", "trusted_root.json")
+	vf, err := NewKeylessVerifier("https://issuer.example.com", "user@example.com", fixturePath)
+	require.NoError(t, err, "valid trusted_root.json fixture should create verifier")
+	require.NotNil(t, vf, "returned VerifyFunc should not be nil")
+}
+
+func TestNewKeylessVerifier_NonexistentTrustedRootPath(t *testing.T) {
+	// Nonexistent trustedRootPath returns error containing
+	// "failed to load trusted root from".
+	vf, err := NewKeylessVerifier(
+		"https://issuer.example.com", "user@example.com",
+		"/nonexistent/path/trusted_root.json",
+	)
+	require.Error(t, err)
+	assert.Nil(t, vf)
+	assert.Contains(t, err.Error(), "failed to load trusted root from")
+}
+
+func TestNewKeylessVerifier_InvalidJSONTrustedRoot(t *testing.T) {
+	// Invalid JSON at trustedRootPath returns error containing
+	// "failed to load trusted root from".
+	tmpDir := t.TempDir()
+	invalidPath := filepath.Join(tmpDir, "invalid_root.json")
+	require.NoError(t, os.WriteFile(invalidPath, []byte("not valid json"), 0600))
+
+	vf, err := NewKeylessVerifier(
+		"https://issuer.example.com", "user@example.com",
+		invalidPath,
+	)
+	require.Error(t, err)
+	assert.Nil(t, vf)
+	assert.Contains(t, err.Error(), "failed to load trusted root from")
+}
+
+func TestNewKeylessVerifier_EmptyTrustedRootPathTakesTUFBranch(t *testing.T) {
+	// Empty trustedRootPath does not call root.NewTrustedRootFromPath.
+	// Verify by confirming that a nonexistent path that would fail if the
+	// custom-root branch were taken does NOT produce a file-read error.
+	// With empty trustedRootPath, the code takes the TUF fetch branch instead.
+	// The TUF fetch will fail (no network in unit test), but the error should
+	// NOT contain "failed to load trusted root from" — it should contain
+	// "failed to fetch Sigstore trusted root" (the TUF branch error).
+	vf, err := NewKeylessVerifier(
+		"https://issuer.example.com", "user@example.com",
+		"",
+	)
+	// TUF fetch will fail in a unit test environment (no network).
+	// That's expected — we just verify it took the TUF branch, not the file branch.
+	if err != nil {
+		assert.NotContains(t, err.Error(), "failed to load trusted root from",
+			"empty trustedRootPath should not attempt file load")
+		assert.Contains(t, err.Error(), "Sigstore trusted root",
+			"empty trustedRootPath should take TUF fetch branch")
+	}
+	// If it somehow succeeds (e.g., TUF cache available), that's also fine.
+	if err == nil {
+		assert.NotNil(t, vf)
+	}
 }
 
 // fakeImage implements v1.Image minimally for findSigningLayer tests.
