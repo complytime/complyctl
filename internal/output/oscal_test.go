@@ -29,6 +29,7 @@ func mockGemaraEvalLog() *gemara.EvaluationLog {
 				Type: gemara.Software,
 			},
 		},
+		Target: gemara.Resource{Id: "web-server", Name: "web-server", Type: gemara.Software},
 		Evaluations: []*gemara.ControlEvaluation{
 			{
 				Name:    "ctrl-1",
@@ -207,5 +208,46 @@ func TestToOSCAL_OutputFileNaming(t *testing.T) {
 
 	filename := filepath.Base(path)
 	assert.Contains(t, filename, "assessment-results-test-policy-")
+	assert.Contains(t, filename, "web-server")
 	assert.Contains(t, filename, ".json")
+}
+
+func TestMultiTargetDistinctFilenames(t *testing.T) {
+	outDir := t.TempDir()
+
+	makeLog := func(targetID, targetName string) *gemara.EvaluationLog {
+		return &gemara.EvaluationLog{
+			Metadata: gemara.Metadata{
+				Id:            "test-policy",
+				GemaraVersion: gemara.SchemaVersion,
+				Author:        gemara.Actor{Id: "test", Name: "test", Type: gemara.Software},
+			},
+			Target: gemara.Resource{Id: targetID, Name: targetName, Type: gemara.Software},
+			Evaluations: []*gemara.ControlEvaluation{{
+				Name:    "ctrl-1",
+				Result:  gemara.Passed,
+				Message: "ok",
+				Control: gemara.EntryMapping{ReferenceId: "test-policy", EntryId: "ctrl-1"},
+				AssessmentLogs: []*gemara.AssessmentLog{{
+					Requirement: gemara.EntryMapping{ReferenceId: "test-policy", EntryId: "req-1"},
+					Result:      gemara.Passed,
+					Message:     "passed",
+				}},
+			}},
+		}
+	}
+
+	path1, err := output.ToOSCAL(makeLog("web-server", "web-server"), outDir)
+	require.NoError(t, err)
+
+	path2, err := output.ToOSCAL(makeLog("db-server", "db-server"), outDir)
+	require.NoError(t, err)
+
+	require.NotEqual(t, path1, path2, "multi-target scans must produce distinct file paths")
+
+	assert.FileExists(t, path1)
+	assert.FileExists(t, path2)
+
+	assert.Contains(t, filepath.Base(path1), "web-server")
+	assert.Contains(t, filepath.Base(path2), "db-server")
 }

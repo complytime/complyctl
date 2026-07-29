@@ -13,7 +13,6 @@ import (
 	"github.com/gemaraproj/go-gemara"
 	"github.com/goccy/go-yaml"
 
-	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/pkg/provider"
 )
 
@@ -152,8 +151,7 @@ func (e *Evaluator) Write(outDir string) (string, error) {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	filename := fmt.Sprintf("evaluation-log-%s-%s-%s.yaml",
-		complytime.FilenameSafe(e.policyID), complytime.FilenameSafe(e.targetID), time.Now().Format("20060102-150405"))
+	filename := BuildReportFilename("evaluation-log", e.policyID, e.targetID, "yaml")
 	path := filepath.Join(outDir, filename)
 	if err := os.WriteFile(path, data, 0600); err != nil {
 		return "", fmt.Errorf("failed to write evaluation log: %w", err)

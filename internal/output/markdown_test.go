@@ -110,7 +110,7 @@ func TestMarkdown_Write(t *testing.T) {
 
 	assert.Contains(t, content, "# Compliance Scan Report: test-policy")
 	assert.Contains(t, content, "| Policy | test-policy |")
-	assert.Contains(t, content, "| Target | - |")
+	assert.Contains(t, content, "| Target | web-server |")
 	assert.Contains(t, content, "| Tool |")
 	assert.Contains(t, content, "| Result |")
 	assert.Contains(t, content, "| Date |")
@@ -185,6 +185,7 @@ func TestMarkdown_OutputFileNaming(t *testing.T) {
 
 	filename := filepath.Base(path)
 	assert.Contains(t, filename, "report-test-policy-")
+	assert.Contains(t, filename, "web-server")
 	assert.Contains(t, filename, ".md")
 }
 

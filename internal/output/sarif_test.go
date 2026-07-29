@@ -45,5 +45,6 @@ func TestToSARIF_OutputFileNaming(t *testing.T) {
 
 	filename := filepath.Base(path)
 	assert.Contains(t, filename, "scan-test-policy-")
+	assert.Contains(t, filename, "web-server")
 	assert.Contains(t, filename, ".sarif.json")
 }

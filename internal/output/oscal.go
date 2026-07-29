@@ -13,8 +13,6 @@ import (
 
 	oscalUUID "github.com/defenseunicorns/go-oscal/src/pkg/uuid"
 	oscalTypes "github.com/defenseunicorns/go-oscal/src/types/oscal-1-1-3"
-
-	"github.com/complytime/complyctl/internal/complytime"
 )
 
 // FIXME(jpower432): This would probably make more sense in go-gemara/gemaraconv
@@ -92,8 +90,7 @@ func ToOSCAL(log *gemara.EvaluationLog, outDir string) (string, error) {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	filename := fmt.Sprintf("assessment-results-%s-%s.json",
-		complytime.FilenameSafe(policyID), time.Now().Format("20060102-150405"))
+	filename := BuildReportFilename("assessment-results", policyID, log.Target.Id, "json")
 	path := filepath.Join(outDir, filename)
 	if err := os.WriteFile(path, data, 0600); err != nil {
 		return "", fmt.Errorf("failed to write OSCAL file: %w", err)

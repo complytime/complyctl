@@ -96,6 +96,13 @@
 
 ### Fixed
 
+- `complyctl scan` no longer overwrites report files when scanning
+  multiple targets under the same policy. OSCAL, SARIF, and Markdown
+  formatters now include the target ID in output filenames, matching
+  the pattern already used by the EvaluationLog formatter. A new
+  `BuildReportFilename` helper in `internal/output/` centralizes
+  filename construction for all four formatters. (#773)
+
 - `complyctl doctor` no longer requires all target variables declared
   by a provider when those variables are mutually exclusive. Providers
   can now declare one-of variable groups via the

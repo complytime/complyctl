@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/gemaraproj/go-gemara"
 	"github.com/gemaraproj/go-gemara/gemaraconv"
 
-	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/pkg/provider"
 )
 
@@ -30,8 +28,7 @@ func ToSARIF(log *gemara.EvaluationLog, artifactURI, outDir string) (string, err
 	}
 
 	policyID := log.Metadata.Id
-	filename := fmt.Sprintf("scan-%s-%s.sarif.json",
-		complytime.FilenameSafe(policyID), time.Now().Format("20060102-150405"))
+	filename := BuildReportFilename("scan", policyID, log.Target.Id, "sarif.json")
 	path := filepath.Join(outDir, filename)
 	if err := os.WriteFile(path, sarifBytes, 0600); err != nil {
 		return "", fmt.Errorf("failed to write SARIF file: %w", err)

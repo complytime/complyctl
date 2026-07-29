@@ -143,8 +143,7 @@ func (m *Markdown) Write(outDir string) (string, error) {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	filename := fmt.Sprintf("report-%s-%s.md",
-		complytime.FilenameSafe(m.policyID), now.Format("20060102-150405"))
+	filename := BuildReportFilename("report", m.policyID, m.evalLog.Target.Id, "md")
 	path := filepath.Join(outDir, filename)
 	if err := os.WriteFile(path, []byte(sb.String()), 0600); err != nil {
 		return "", fmt.Errorf("failed to write markdown report: %w", err)
