@@ -72,7 +72,7 @@ jobs:
                   install-dir: /home/runner/.carabiner
 
             - name: Install ampel
-              uses: carabiner-dev/actions/install/ampel@2a4b2cd115ede14629b03ef7e77586d3269d4c72 # v1.2.3
+              uses: carabiner-dev/actions/install/ampel@36a39ef667efe7112df8b1a534a4e37f35fad6fd # v1.2.6
               with:
                   install-dir: /home/runner/.carabiner
 
