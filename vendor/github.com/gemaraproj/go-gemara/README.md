@@ -198,6 +198,14 @@ func main() {
 }
 ```
 
+### Fetching Remote Artifacts
+
+The `fetcher.HTTP` and `fetcher.URI` types follow any URL without filtering,
+including private network addresses. Applications that process untrusted
+URLs should supply an `http.Client` with a safe dialer — see
+[`ExampleURI_ssrfSafe`](fetcher/example_test.go) for a complete example
+that blocks private, loopback, and link-local addresses at connect time.
+
 ## Development
 
 ### Building

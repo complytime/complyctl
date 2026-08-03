@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/gemaraproj/go-gemara"
-	"github.com/gemaraproj/go-gemara/fetcher"
 	"github.com/gemaraproj/go-gemara/internal/codec"
 )
 
@@ -39,8 +38,8 @@ func resolveLexiconURL(meta gemara.Metadata) (string, error) {
 
 // loadLexiconFromURI fetches a Lexicon from an http(s):// URL, a file:// URI,
 // or a local file path, and returns normalized entries.
-func loadLexiconFromURI(ctx context.Context, uri string) ([]lexiconEntry, error) {
-	doc, err := gemara.Load[gemara.Lexicon](ctx, &fetcher.URI{}, uri)
+func loadLexiconFromURI(ctx context.Context, f gemara.Fetcher, uri string) ([]lexiconEntry, error) {
+	doc, err := gemara.Load[gemara.Lexicon](ctx, f, uri)
 	if err != nil {
 		return nil, fmt.Errorf("load lexicon: %w", err)
 	}
