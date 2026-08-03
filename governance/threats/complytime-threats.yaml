@@ -65,50 +65,6 @@ threats:
           signature validation. When the verification: configuration is present in
           complytime.yaml, sigstore-go pre-copy verification mitigates this threat
           by verifying cosign signatures before oras.Copy() (see CTRL01).
-      mitigations:
-          - id: CT.COMPLYCTL.THR02.MIT01
-            status: implemented
-            description: >
-                complyctl get emits a NOTE to stderr when a freshly fetched policy
-                or complypack was fetched without signature verification, directing
-                users to configure verification: in complytime.yaml.
-          - id: CT.COMPLYCTL.THR02.MIT02
-            status: implemented
-            description: >
-                complyctl get verifies cosign signatures via sigstore-go before
-                oras.Copy() when verification: is configured in complytime.yaml,
-                resolving signature references against the configured registry
-                host (not Docker Hub), preventing untrusted content from
-                reaching the local cache (CTRL01).
-          - id: CT.COMPLYCTL.THR02.MIT03
-            status: implemented
-            description: >
-                complyctl list surfaces DIGEST and VERIFIED columns from cache
-                state, giving operators CLI-level visibility into the OCI manifest
-                digest and signature verification status of each cached policy.
-          - id: CT.COMPLYCTL.THR02.MIT04
-            status: implemented
-            description: >
-                complyctl get fails closed when a verifier is configured but
-                the registry host is empty, returning an error containing
-                "registry host" instead of silently verifying against Docker
-                Hub. This prevents signature verification from resolving
-                against the wrong registry.
-          - id: CT.COMPLYCTL.THR02.MIT05
-            status: implemented
-            description: >
-                When trusted_root is configured in complytime.yaml,
-                NewKeylessVerifier loads the trust anchor from a
-                user-supplied file via root.NewTrustedRootFromPath instead
-                of fetching the public Sigstore TUF root. The user-supplied
-                file has no TUF integrity protection — file permissions and
-                access control are the operator's responsibility. A TOCTOU
-                gap exists between config-time os.Stat validation and
-                verifier-construction-time file read; this is accepted as
-                the standard filesystem trust model. Mutual exclusivity
-                with key-based verification is enforced at config validation
-                time. trusted_root without issuer and identity is rejected
-                to prevent silent verification bypass.
       capabilities:
           - reference-id: CCC
             entries:
