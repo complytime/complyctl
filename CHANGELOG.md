@@ -178,6 +178,15 @@
   Previously, a deleted cache directory caused the sync to be permanently
   skipped until the user manually cleared state (#649).
 
+- Devcontainer `post-create.sh` now automatically restarts the mock OCI 
+  registry when new bundles are detected in `/bundles/`, ensuring bundles
+  are re-seeded without requiring manual `pkill` commands. The restart 
+  only occurs when new bundles are found during `post-create.sh` execution,
+  maintaining fast re-execution when no changes are present. Additionally,
+  `complytime.yaml` is now preserved across runs instead of being overwritten
+  from the testdata template, preventing false detection of new bundles.
+  Fixes #762 (Part 2: Registry re-seed).
+
 ### Changed
 
 - `complyctl doctor` output redesigned with grouped sections, nested

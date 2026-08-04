@@ -323,6 +323,40 @@ policy entries to `.complytime/complytime.yaml` pointing at the mock
 registry (`http://localhost:8765/policies/{name}`), so `complyctl
 get` populates the cache through normal code paths.
 
+### Adding bundles to a running devcontainer
+
+If you want to add new policy bundles after the devcontainer is already
+running, you can add them to the `/bundles/` directory and re-run the
+`post-create.sh` script to register them.
+
+**Steps:**
+
+1. **Create bundle directory:**
+```bash
+mkdir -p /bundles/my-new-policy
+```
+2. **Add required Gemara Files:**
+```bash
+# Create /bundles/my-new-policy/catalog.yaml
+# Create /bundles/my-new-policy/policy.yaml
+```
+
+3. **Re-run the post-create script:**
+```bash
+bash .devcontainer/scripts/post-create.sh
+```
+
+#### What happens automatically:
+
+After execution of the `post-create.sh` the script detects new bundles in `/bundles/`,
+adds them to `~/test-workspace/.complytime/complytime.yaml`, restarts the mock OCI 
+registry to re-seed (no manual `pkill` is needed) and then makes them available via
+`complyctl get`.
+
+**Note:** On subsequent runs without new bundles, the registry remains running and
+existing registrations are preserved. The script only restarts the registry when
+it detects new bundles.
+
 ## Troubleshooting
 
 ### Mock registry not running

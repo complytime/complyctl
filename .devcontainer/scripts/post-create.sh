@@ -106,8 +106,11 @@ done
 echo ">>> Setting up test workspace..."
 mkdir -p "${HOME}/test-workspace/.complytime/ampel/granular-policies"
 
-cp tests/cross-repo/testdata/complytime.yaml \
-    "${HOME}/test-workspace/.complytime/"
+# Only copy if complytime.yaml doesn't exist yet.
+if [[ ! -f "${HOME}/test-workspace/.complytime/complytime.yaml" ]]; then
+    cp tests/cross-repo/testdata/complytime.yaml \
+        "${HOME}/test-workspace/.complytime/"
+fi
 
 cp tests/cross-repo/testdata/granular-policies/block-force-push.json \
     "${HOME}/test-workspace/.complytime/ampel/granular-policies/"
@@ -164,6 +167,7 @@ if [[ -d "${BUNDLES_DIR}" ]]; then
     CONFIG_FILE="${HOME}/test-workspace/.complytime/complytime.yaml"
 
     BUNDLE_COUNT=0
+    NEW_BUNDLES_ADDED=false
     for bundle_dir in "${BUNDLES_DIR}"/*/; do
         # Guard against glob matching nothing
         [[ -d "${bundle_dir}" ]] || continue
@@ -205,6 +209,7 @@ if [[ -d "${BUNDLES_DIR}" ]]; then
                     "${bundle_name}" "${bundle_name}" >> "${CONFIG_FILE}"
             fi
             echo "    Added ${bundle_name} to complytime.yaml"
+            NEW_BUNDLES_ADDED=true
         else
             echo "    ${bundle_name} already in complytime.yaml, skipping."
         fi
@@ -227,9 +232,21 @@ fi
 # ---------------------------------------------------------------------------
 # Step 5: Start mock OCI registry
 # ---------------------------------------------------------------------------
+SKIP_REGISTRY_START=false
 if curl -sf http://localhost:8765/v2/ > /dev/null 2>&1; then
-    echo ">>> Mock OCI registry already running on port 8765."
-else
+    # Registry is running - check if we need to restart because new bundles have been added
+    if [[ "${NEW_BUNDLES_ADDED:-false}" == "true" ]]; then
+        echo ">>> New bundles detected. Restarting mock OCI registry to re-seed..."
+        pkill -f mock-oci-registry || true
+        sleep 1
+        # Fall through to start registry with new bundles
+    else
+        echo ">>> Mock OCI registry already running on port 8765 (no new bundles)."
+        SKIP_REGISTRY_START=true
+    fi
+fi
+
+if [[ "${SKIP_REGISTRY_START}" != "true" ]]; then
     echo ">>> Starting mock OCI registry..."
     MOCK_REGISTRY_CONTENT_DIR="${COMPLYCTL_BUNDLES_DIR:-/bundles}" \
         nohup ./bin/mock-oci-registry > /tmp/mock-oci-registry.log 2>&1 &
