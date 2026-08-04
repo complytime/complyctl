@@ -7,7 +7,7 @@
 
 ## 2. Release Workflow — Homebrew Publishing
 
-- [x] 2.1 Add "Generate Homebrew tap token" step using `actions/create-github-app-token` with `APP_ID`/`PRIVATE_KEY` secrets, scoped to `homebrew-tap`
+- [x] 2.1 Add "Generate Homebrew tap token" step using `actions/create-github-app-token` with `APP_ID_HOMEBREW_FORMULA_PUBLISHER`/`PRIVATE_KEY_APP_HOMEBREW_FORMULA_PUBLISHER` secrets, scoped to `homebrew-tap`
 - [x] 2.2 Add "Publish Homebrew formula" step that computes source tarball SHA256, templates the Formula, and pushes to `complytime/homebrew-tap` repo
 - [x] 2.3 Verify Formula Ruby uses `std_go_args(ldflags:)` with version, buildDate, and gitTreeState=clean (no commit)
 - [x] 2.4 Verify Formula includes `generate_completions_from_executable(bin/"complyctl", "completion")`

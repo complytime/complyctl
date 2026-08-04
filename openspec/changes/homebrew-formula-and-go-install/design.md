@@ -13,7 +13,8 @@ Homebrew Casks (pre-built binary distribution) were ruled out because:
 - The deprecated GoReleaser `brews` section (which generated "hackyish"
   formulas installing pre-built binaries) is fully deprecated in v2.16.
 
-Cross-repo authentication uses a GitHub App (secrets: `APP_ID`, `PRIVATE_KEY`)
+Cross-repo authentication uses a GitHub App (secrets:
+`APP_ID_HOMEBREW_FORMULA_PUBLISHER`, `PRIVATE_KEY_APP_HOMEBREW_FORMULA_PUBLISHER`)
 with `actions/create-github-app-token` to mint short-lived installation tokens.
 
 ## Goals / Non-Goals
@@ -66,7 +67,7 @@ deprecation.
 ### 3. GitHub App token (not PAT, not GITHUB_TOKEN)
 
 **Choice**: Use `actions/create-github-app-token` with the org's existing
-`APP_ID`/`PRIVATE_KEY` secrets to push to `homebrew-tap`.
+`APP_ID_HOMEBREW_FORMULA_PUBLISHER`/`PRIVATE_KEY_APP_HOMEBREW_FORMULA_PUBLISHER` secrets to push to `homebrew-tap`.
 
 **Rationale**: Short-lived tokens with minimal scope. No long-lived PATs to
 rotate. Consistent with existing cross-repo patterns in the org.

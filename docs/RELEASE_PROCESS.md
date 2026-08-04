@@ -18,7 +18,7 @@ GoReleaser is configured in [.goreleaser.yaml](https://github.com/complytime/com
 The `homebrew` job in the release workflow automatically publishes or updates `Formula/complyctl.rb` in the [homebrew-tap](https://github.com/complytime/homebrew-tap) repository.
 
 **Prerequisites:**
-- The GitHub App (secrets: `APP_ID`, `PRIVATE_KEY`) must have `Contents:write` permission on `complytime/homebrew-tap`
+- The GitHub App (secrets: `APP_ID_HOMEBREW_FORMULA_PUBLISHER`, `PRIVATE_KEY_APP_HOMEBREW_FORMULA_PUBLISHER`) must have `Contents:write` permission on `complytime/homebrew-tap`
 - If the App installation is scoped to specific repos, `homebrew-tap` must be included
 
 **Failure modes:**

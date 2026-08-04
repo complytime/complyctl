@@ -41,7 +41,7 @@ GoReleaser completes successfully.
 
 ### Requirement: Formula authentication uses GitHub App
 The workflow SHALL mint a short-lived token via `actions/create-github-app-token`
-using org secrets `APP_ID` and `PRIVATE_KEY` to push to the tap repository.
+using org secrets `APP_ID_HOMEBREW_FORMULA_PUBLISHER` and `PRIVATE_KEY_APP_HOMEBREW_FORMULA_PUBLISHER` to push to the tap repository.
 The token MUST be scoped to the `homebrew-tap` repository only.
 
 #### Scenario: Token generation
