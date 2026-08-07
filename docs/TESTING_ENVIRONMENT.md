@@ -348,10 +348,13 @@ bash .devcontainer/scripts/post-create.sh
 
 #### What happens automatically:
 
-After execution of the `post-create.sh` the script detects new bundles in `/bundles/`,
-adds them to `~/test-workspace/.complytime/complytime.yaml`, restarts the mock OCI 
-registry to re-seed (no manual `pkill` is needed) and then makes them available via
-`complyctl get`.
+The `post-create.sh` script detects new bundles in `/bundles/` and automatically:
+
+- Adds them to `~/test-workspace/.complytime/complytime.yaml`
+- Restarts the mock OCI registry to re-seed
+- Makes them available via `complyctl get`
+
+No manual `pkill` command is needed
 
 **Note:** On subsequent runs without new bundles, the registry remains running and
 existing registrations are preserved. The script only restarts the registry when
