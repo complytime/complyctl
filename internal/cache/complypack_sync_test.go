@@ -296,7 +296,7 @@ func TestComplypackSync_LocalCacheHit_WithVerifier(t *testing.T) {
 	cpCache3 := cache.NewComplypackCache(cacheDir, state3)
 
 	verifyCalled := false
-	mockVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
+	mockVerifier := func(_ context.Context, _ string, _ bool) (*cache.VerificationResult, error) {
 		verifyCalled = true
 		return &cache.VerificationResult{Verified: true}, nil
 	}
@@ -921,7 +921,7 @@ func TestComplypackSync_RegistryHost_PassedToVerifier(t *testing.T) {
 	// Track all refs passed to the verifier across call sites.
 	// All SyncComplypack calls below are sequential, so no mutex is needed.
 	var capturedRefs []string
-	capturingVerifier := func(_ context.Context, registryRef string) (*cache.VerificationResult, error) {
+	capturingVerifier := func(_ context.Context, registryRef string, _ bool) (*cache.VerificationResult, error) {
 		capturedRefs = append(capturedRefs, registryRef)
 		return &cache.VerificationResult{Verified: true}, nil
 	}
@@ -988,7 +988,7 @@ func TestComplypackSync_EmptyRegistryHost_FailClosed(t *testing.T) {
 	repository := "example.com/complypacks/opa-bundle"
 	mock.seedComplypack(repository, "io.complytime.opa", "1.0.0", cachetest.DigestA, "content")
 
-	neverCalledVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
+	neverCalledVerifier := func(_ context.Context, _ string, _ bool) (*cache.VerificationResult, error) {
 		t.Fatal("verifier must not be called when registryHost is empty")
 		return nil, nil
 	}

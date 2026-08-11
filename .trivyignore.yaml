@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Trivy misconfig suppressions for K8s Deployment test fixtures.
-# These files are intentionally non-compliant or minimally compliant
-# to validate OPA provider policy evaluation. They are not deployed
-# infrastructure.
+# Trivy misconfig suppressions for intentionally non-compliant files.
+# Covers:
+#   - K8s Deployment test fixtures (OPA provider validation — not deployed infrastructure)
+#   - Acceptance test Dockerfiles (ephemeral test-only containers — not production images)
+#   - Vendored Dockerfiles (referenced for tooling, never built in production)
 
 misconfigurations:
   - id: KSV-0118
@@ -83,11 +84,24 @@ misconfigurations:
       - "tests/cross-repo/testdata/test-deployment-bad.yaml"
       - "tests/cross-repo/testdata/test-deployment-good.yaml"
     statement: Intentional test fixture for OPA provider validation
+  - id: DS-0001
+    paths:
+      - "tests/acceptance/Dockerfile.generate-pki"
+      - "tests/acceptance/Dockerfile.sign-seed"
+      - "tests/acceptance/Dockerfile.verify-sut"
+    statement: UBI base images intentionally float on :latest for automatic errata coverage; pinning by digest is deferred per AGENTS.md project convention
   - id: DS-0002
     paths:
+      - "tests/acceptance/Dockerfile.createtree"
+      - "tests/acceptance/Dockerfile.generate-pki"
+      - "tests/acceptance/Dockerfile.sign-seed"
       - "vendor/go.opentelemetry.io/otel/dependencies.Dockerfile"
-    statement: Vendored OTel file used only as renovate-friendly image reference, not a production Dockerfile
+    statement: Ephemeral test-only init containers require root for privileged volume writes and PKI generation; not production infrastructure
   - id: DS-0026
     paths:
+      - "tests/acceptance/Dockerfile.createtree"
+      - "tests/acceptance/Dockerfile.generate-pki"
+      - "tests/acceptance/Dockerfile.sign-seed"
+      - "tests/acceptance/Dockerfile.verify-sut"
       - "vendor/go.opentelemetry.io/otel/dependencies.Dockerfile"
-    statement: Vendored OTel file used only as renovate-friendly image reference, not a production Dockerfile
+    statement: Ephemeral acceptance test containers; Compose service_completed_successfully and depends_on provide lifecycle management; no HEALTHCHECK needed

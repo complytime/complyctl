@@ -171,16 +171,16 @@ export GITHUB_TOKEN=<your-token>
 
 ### Binaries
 
-| Binary | Location |
-| -------- | ---------- |
-| `complyctl` | `./bin/` |
-| `mock-oci-registry` | `./bin/` |
-| `snappy` | `$GOPATH/bin` |
-| `ampel` | `$GOPATH/bin` |
-| `conftest` | `$GOPATH/bin` |
-| `complyctl-provider-ampel` | `~/.local/share/complytime/providers/` |
+| Binary                        | Location                               |
+|-------------------------------|----------------------------------------|
+| `complyctl`                   | `./bin/`                               |
+| `mock-oci-registry`           | `./bin/`                               |
+| `snappy`                      | `$GOPATH/bin`                          |
+| `ampel`                       | `$GOPATH/bin`                          |
+| `conftest`                    | `$GOPATH/bin`                          |
+| `complyctl-provider-ampel`    | `~/.local/share/complytime/providers/` |
 | `complyctl-provider-openscap` | `~/.local/share/complytime/providers/` |
-| `complyctl-provider-opa` | `~/.local/share/complytime/providers/` |
+| `complyctl-provider-opa`      | `~/.local/share/complytime/providers/` |
 
 ### Test Content
 
@@ -457,10 +457,71 @@ services under the `lifecycle` profile:
   (`go test -tags=acceptance ./tests/acceptance/...`) against the
   live registry. The compose stack exits with the SUT's exit code.
 
+### Verification Profile
+
+The verification profile extends the shared zot registry with
+Sigstore infrastructure for testing artifact signature verification.
+The compose stack (`tests/acceptance/compose.yaml`, `--profile
+verification`) runs these additional services:
+
+- **dex-idp** -- OIDC identity provider for keyless signing
+- **fulcio** -- certificate authority that issues signing
+  certificates from OIDC tokens (runs `--ca=fileca` against the
+  runtime-generated test PKI (pki-material volume))
+- **ctfe** -- RFC6962 Certificate Transparency log so keyless
+  signatures carry a real SCT the verifier requires; reuses the
+  mysql+trillian backend and shares Fulcio's committed root
+- **createtree-init** -- one-shot init that provisions the
+  Trillian tree and renders the CTFE config before `ctfe` starts
+- **rekor-server** -- transparency log recording signing events
+- **mysql** / **trillian-log-server** / **trillian-log-signer**
+  -- storage backend Rekor and the CT log require (neither has
+  an in-memory storage path)
+- **sign-seed** -- init container that pushes and signs OCI
+  artifacts in zot using cosign (keyed and keyless), generates
+  `trusted_root.json` at runtime, then exits
+- **verify-sut** -- test binary exercising the verification
+  scenarios (keyed happy path, wrong key, keyless happy path,
+  keyless wrong identity, configuration behavior) against the
+  signed artifacts
+
+Test PKI is generated at runtime by the `generate-pki` service
+into the `pki-material` Docker volume;
+`sign-seed` builds the `trusted_root.json` trust anchor at runtime
+from the generated keys plus the live Rekor key. This PKI is
+test-only with zero security value.
+
+```bash
+# Run verification acceptance tests
+make test-acceptance-verify
+
+# Specify a different compose command
+make test-acceptance-verify COMPOSE="docker compose"
+
+# Run all acceptance tests (lifecycle first, then verification)
+make test-acceptance-all
+
+# Tear down verification containers and volumes
+make test-acceptance-verify-clean
+```
+
+Prerequisites are the same as the lifecycle profile: `podman-compose`
+or `docker compose` (v2) and a container runtime.
+
 ### CI
 
 The `acceptance_test.yml` workflow runs `make test-acceptance` on
 every push and PR using `docker compose`.
+
+The `acceptance_verify_test.yml` workflow runs
+`make test-acceptance-verify` on every push and PR using
+`docker compose` with a 20-minute timeout to accommodate the
+Sigstore provisioning critical path (MySQL health check,
+Trillian/CTFE tree creation, Fulcio/Rekor readiness, artifact
+signing, and the 3-minute verification test). The job typically
+completes in well under this budget; the margin absorbs cold
+runners with no build-layer cache. Superseded runs on the same
+ref are cancelled automatically.
 
 ## See Also
 

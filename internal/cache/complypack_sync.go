@@ -11,6 +11,8 @@ import (
 	ocistore "oras.land/oras-go/v2/content/oci"
 
 	"github.com/complytime/complypack/pkg/complypack"
+
+	"github.com/complytime/complyctl/internal/registry"
 )
 
 // ComplypackSync provides incremental sync for complypack artifacts.
@@ -22,6 +24,7 @@ type ComplypackSync struct {
 	source          ComplypackSource
 	verifier        VerifyFunc
 	registryHost    string
+	insecure        bool
 	dataDir         string
 }
 
@@ -37,12 +40,17 @@ func NewComplypackSync(complypackCache *ComplypackCache, state *State, source Co
 	for _, opt := range opts {
 		opt(cfg)
 	}
+	// Detect plain-HTTP registries from the raw scheme while normalizing the
+	// host, so signature verification (go-containerregistry) can be told to
+	// speak HTTP instead of defaulting to HTTPS, mirroring the oras-go pull path.
+	host, insecure := registry.SplitHostScheme(registryHost)
 	return &ComplypackSync{
 		complypackCache: complypackCache,
 		state:           state,
 		source:          source,
 		verifier:        cfg.verifier,
-		registryHost:    registryHost,
+		registryHost:    host,
+		insecure:        insecure,
 		dataDir:         dataDir,
 	}
 }
@@ -155,7 +163,7 @@ func (s *ComplypackSync) SyncComplypack(ctx context.Context, repository, version
 	var verifyResult *VerificationResult
 	if s.verifier != nil {
 		registryRef := BuildLookupRef(s.registryHost, repository, tag, digest)
-		vr, verifyErr := s.verifier(ctx, registryRef)
+		vr, verifyErr := s.verifier(ctx, registryRef, s.insecure)
 		if verifyErr != nil {
 			return false, fmt.Errorf("complypack %s: verification failed: %w", repository, verifyErr)
 		}
@@ -236,7 +244,7 @@ func (s *ComplypackSync) tryLocalCacheHit(
 	var verifyResult *VerificationResult
 	if s.verifier != nil {
 		registryRef := BuildLookupRef(s.registryHost, repository, tag, digest)
-		vr, verifyErr := s.verifier(ctx, registryRef)
+		vr, verifyErr := s.verifier(ctx, registryRef, s.insecure)
 		if verifyErr != nil {
 			return false, verifyErr
 		}

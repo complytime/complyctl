@@ -1,0 +1,13 @@
+# Fulcio OIDC issuer configuration for the acceptance verification stack.
+#
+# Maps the private Dex issuer (dex-idp service) to a Fulcio client so keyless
+# signing tokens minted by Dex are accepted. Schema mirrors the upstream
+# reference at https://github.com/sigstore/fulcio/blob/main/config/identity/config.yaml
+# (email issuer type: SAN is the token email claim).
+oidc-issuers:
+  http://dex-idp:5556/dex:
+    issuer-url: http://dex-idp:5556/dex
+    client-id: complyctl-test
+    type: email
+    contact: complyctl-acceptance@invalid
+    description: "Private Dex issuer for complyctl keyless acceptance tests"

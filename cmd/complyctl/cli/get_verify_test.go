@@ -21,7 +21,7 @@ import (
 // mockVerifyFunc returns a no-op VerifyFunc for testing. Each call
 // returns a distinct func value so callers can compare identity.
 func mockVerifyFunc() cache.VerifyFunc {
-	return func(_ context.Context, _ string) (
+	return func(_ context.Context, _ string, _ bool) (
 		*cache.VerificationResult, error,
 	) {
 		return &cache.VerificationResult{Verified: true}, nil

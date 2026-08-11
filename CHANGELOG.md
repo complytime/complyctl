@@ -65,7 +65,19 @@
   go-gemara schema. The `COMPLYTIME_LOG_FORMAT` environment
   variable provides an alternative to the flag; the flag takes
   precedence when both are set. (#795)
-
+- Container-based acceptance test stack for live keyless signature
+  verification. A private Sigstore deployment (Dex OIDC, Fulcio with a
+  committed `--ca=fileca` root, Rekor backed by MySQL + Trillian, and a
+  Trillian CTFE RFC6962 CT log) signs OCI policy artifacts keyless and
+  keyed, so the acceptance tests exercise the production sigstore-go
+  verifier end to end (SCT + transparency-log inclusion). Test PKI is
+  committed under `tests/acceptance/testdata/sigstore/` and
+  `trusted_root.json` is assembled at runtime. Policies are signed by
+  their resolved manifest digest (not by tag) so the signature tag
+  matches the digest the verifier resolves regardless of the
+  non-deterministic `org.opencontainers.image.created` annotation
+  `oras push` stamps on each push. Run with
+  `make test-acceptance-verify`. (#678)
 - `complyctl doctor --format text|json` flag for machine-readable
   output. `--format text` produces grep-stable `[PASS]`/`[FAIL]`/
   `[WARN]` labels without emoji; `--format json` produces structured
@@ -125,6 +137,16 @@
   tags. (#506)
 
 ### Fixed
+
+- `complyctl get` signature verification now works against plain-HTTP
+  (`http://`) registries, verifies keyed cosign signatures signed with
+  `--tlog-upload=false`, and correctly matches Rekor transparency-log
+  entries. Previously, verification defaulted to HTTPS (failing on
+  plain-HTTP registries), rejected keyed signatures with a "missing
+  verification material" error, and failed to match Rekor entries
+  because the transparency-log ID was not hex-decoded. Verification now
+  uses the signature-layer (simple-signing) digest as the artifact
+  digest, matching what cosign records in the transparency log. (#678)
 
 - `complyctl scan` no longer overwrites report files when scanning
   multiple targets under the same policy. OSCAL, SARIF, and Markdown

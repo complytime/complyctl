@@ -34,12 +34,15 @@ import (
 // TestMain runs a preflight check to verify the registry is reachable and
 // seeded before executing any tests. This gives a clear error message when
 // the seed container failed silently.
+//
+// The preflight seed check only runs when TEST_POLICY_ID is set (lifecycle
+// profile). Verification tests use their own env vars (COSIGN_KEY_PATH,
+// VERIFY_*_POLICY_ID) and skip via skipIfNoVerificationEnv when the
+// verification profile is not active.
 func TestMain(m *testing.M) {
 	registryURL := os.Getenv("REGISTRY_URL")
-	policyID := os.Getenv("TEST_POLICY_ID")
-	targetID := os.Getenv("TEST_TARGET_ID")
-	if registryURL == "" || policyID == "" || targetID == "" {
-		fmt.Fprintln(os.Stderr, "FATAL: REGISTRY_URL, TEST_POLICY_ID, and TEST_TARGET_ID must be set")
+	if registryURL == "" {
+		fmt.Fprintln(os.Stderr, "FATAL: REGISTRY_URL must be set")
 		os.Exit(1)
 	}
 
@@ -52,16 +55,21 @@ func TestMain(m *testing.M) {
 	}
 	resp.Body.Close()
 
-	// Verify policy was seeded (check tags endpoint)
-	resp, err = client.Get(registryURL + "/v2/policies/" + policyID + "/tags/list")
-	if err != nil || resp.StatusCode != http.StatusOK {
-		fmt.Fprintf(os.Stderr, "FATAL: policy policies/%s not found in registry — seed container likely failed\n", policyID)
-		if err == nil {
-			resp.Body.Close()
+	// Lifecycle profile preflight: verify the seeded policy exists.
+	// Skip this check in the verification profile where TEST_POLICY_ID
+	// is not set — verification tests have their own assertions.
+	policyID := os.Getenv("TEST_POLICY_ID")
+	if policyID != "" {
+		resp, err = client.Get(registryURL + "/v2/policies/" + policyID + "/tags/list")
+		if err != nil || resp.StatusCode != http.StatusOK {
+			fmt.Fprintf(os.Stderr, "FATAL: policy policies/%s not found in registry — seed container likely failed\n", policyID)
+			if err == nil {
+				resp.Body.Close()
+			}
+			os.Exit(1)
 		}
-		os.Exit(1)
+		resp.Body.Close()
 	}
-	resp.Body.Close()
 
 	os.Exit(m.Run())
 }

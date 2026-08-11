@@ -35,6 +35,9 @@ complyctl.log
 .complytime/**
 !.complytime/complytime.yaml
 
+# Test output
+.test-output/
+
 # Outputs
 assessment-plan.json
 assessment-results.*

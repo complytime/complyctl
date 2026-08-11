@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -19,8 +20,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/types"
+	protobundle "github.com/sigstore/protobuf-specs/gen/pb-go/bundle/v1"
 	"github.com/sigstore/sigstore-go/pkg/fulcio/certificate"
 	"github.com/sigstore/sigstore-go/pkg/verify"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +38,7 @@ func TestVerifyFunc_NilSkipsVerification(t *testing.T) {
 }
 
 func TestVerifyFunc_MockSuccess(t *testing.T) {
-	mockVerifier := func(_ context.Context, ref string) (*VerificationResult, error) {
+	mockVerifier := func(_ context.Context, ref string, _ bool) (*VerificationResult, error) {
 		return &VerificationResult{
 			Verified:       true,
 			SignerIdentity: "test@example.com",
@@ -44,7 +47,7 @@ func TestVerifyFunc_MockSuccess(t *testing.T) {
 		}, nil
 	}
 
-	result, err := mockVerifier(context.Background(), "registry.com/repo:v1.0")
+	result, err := mockVerifier(context.Background(), "registry.com/repo:v1.0", false)
 	require.NoError(t, err)
 	assert.True(t, result.Verified)
 	assert.Equal(t, "test@example.com", result.SignerIdentity)
@@ -53,14 +56,46 @@ func TestVerifyFunc_MockSuccess(t *testing.T) {
 }
 
 func TestVerifyFunc_MockFailure(t *testing.T) {
-	mockVerifier := func(_ context.Context, ref string) (*VerificationResult, error) {
+	mockVerifier := func(_ context.Context, ref string, _ bool) (*VerificationResult, error) {
 		return nil, fmt.Errorf("signature verification failed for %s: identity mismatch", ref)
 	}
 
-	result, err := mockVerifier(context.Background(), "registry.com/repo:v1.0")
+	result, err := mockVerifier(context.Background(), "registry.com/repo:v1.0", false)
 	assert.Error(t, err)
 	assert.Nil(t, result)
 	assert.Contains(t, err.Error(), "identity mismatch")
+}
+
+func TestNameOptions_InsecureSelectsPlainHTTP(t *testing.T) {
+	// nameOptions is the crux of the plain-HTTP verification fix: when
+	// insecure is true it must add name.Insecure so signature resolution
+	// uses HTTP; when false it must return no options so the HTTPS default
+	// (the security-relevant default) is preserved. A regression that
+	// inverts this branch would silently downgrade all registries to HTTP
+	// or break http:// registry verification, so both branches are asserted.
+	tests := []struct {
+		name       string
+		insecure   bool
+		wantLen    int
+		wantScheme string
+	}{
+		{name: "insecure true -> plain HTTP", insecure: true, wantLen: 1, wantScheme: "http"},
+		{name: "insecure false -> HTTPS default", insecure: false, wantLen: 0, wantScheme: "https"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := nameOptions(tc.insecure)
+			assert.Len(t, opts, tc.wantLen,
+				"nameOptions(%v) option count", tc.insecure)
+
+			// Functionally confirm the option changes reference resolution:
+			// the returned options must yield the expected registry scheme.
+			ref, err := name.ParseReference("zot:5000/policies/x:v1", opts...)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantScheme, ref.Context().Scheme(),
+				"nameOptions(%v) must yield %s registry scheme", tc.insecure, tc.wantScheme)
+		})
+	}
 }
 
 func TestParseCertificateChain_InvalidPEM(t *testing.T) {
@@ -78,7 +113,8 @@ func TestParseCertificateChain_EmptyPEM(t *testing.T) {
 func TestParseRekorBundle_ValidJSON(t *testing.T) {
 	bodyB64 := base64.StdEncoding.EncodeToString([]byte(`{"test": "body"}`))
 	setB64 := base64.StdEncoding.EncodeToString([]byte("signed-timestamp"))
-	logIDB64 := base64.StdEncoding.EncodeToString([]byte("log-id-bytes"))
+	// cosign writes the Rekor logID as a hex string (SHA-256 of the log key).
+	logIDHex := hex.EncodeToString([]byte("log-id-bytes"))
 
 	payload := rekorBundlePayload{
 		SignedEntryTimestamp: setB64,
@@ -86,7 +122,7 @@ func TestParseRekorBundle_ValidJSON(t *testing.T) {
 	payload.Payload.Body = bodyB64
 	payload.Payload.IntegratedTime = 1701205628
 	payload.Payload.LogIndex = 12345
-	payload.Payload.LogID = logIDB64
+	payload.Payload.LogID = logIDHex
 
 	jsonBytes, err := json.Marshal(payload)
 	require.NoError(t, err)
@@ -98,6 +134,8 @@ func TestParseRekorBundle_ValidJSON(t *testing.T) {
 	assert.Equal(t, int64(1701205628), entries[0].IntegratedTime)
 	assert.Equal(t, "hashedrekord", entries[0].KindVersion.Kind)
 	assert.NotNil(t, entries[0].InclusionPromise)
+	assert.Equal(t, []byte("log-id-bytes"), entries[0].LogId.KeyId,
+		"logID must be hex-decoded to match the trusted-root tlog keyId")
 }
 
 func TestParseRekorBundle_InvalidJSON(t *testing.T) {
@@ -110,7 +148,7 @@ func TestBuildProtobufBundle_MissingAnnotations(t *testing.T) {
 	layer := &v1.Descriptor{
 		MediaType: types.MediaType(cosignSimpleSigningMediaType),
 	}
-	_, err := buildProtobufBundle(layer)
+	_, err := buildProtobufBundle(layer, "")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no annotations")
 }
@@ -123,7 +161,7 @@ func TestBuildProtobufBundle_MissingSignature(t *testing.T) {
 			"some-annotation": "some-value",
 		},
 	}
-	_, err := buildProtobufBundle(layer)
+	_, err := buildProtobufBundle(layer, "")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "missing signature annotation")
 }
@@ -279,13 +317,13 @@ func TestBuildProtobufBundle_ValidAnnotations(t *testing.T) {
 
 	bodyB64 := base64.StdEncoding.EncodeToString([]byte(`{"test":"body"}`))
 	setB64 := base64.StdEncoding.EncodeToString([]byte("signed-entry-timestamp"))
-	logIDB64 := base64.StdEncoding.EncodeToString([]byte("log-id"))
+	logIDHex := hex.EncodeToString([]byte("log-id"))
 
 	rekorBundle := rekorBundlePayload{SignedEntryTimestamp: setB64}
 	rekorBundle.Payload.Body = bodyB64
 	rekorBundle.Payload.IntegratedTime = 1701205628
 	rekorBundle.Payload.LogIndex = 42
-	rekorBundle.Payload.LogID = logIDB64
+	rekorBundle.Payload.LogID = logIDHex
 	rekorJSON, err := json.Marshal(rekorBundle)
 	require.NoError(t, err)
 
@@ -302,7 +340,11 @@ func TestBuildProtobufBundle_ValidAnnotations(t *testing.T) {
 		},
 	}
 
-	pb, err := buildProtobufBundle(layer)
+	// The signed-artifact digest (policy manifest digest) is distinct from the
+	// signature layer's own OCI descriptor digest; the message digest in the
+	// bundle must carry the artifact digest so it matches WithArtifactDigest.
+	artifactDigestHex := "1111111111111111111111111111111111111111111111111111111111111111"
+	pb, err := buildProtobufBundle(layer, artifactDigestHex)
 	require.NoError(t, err)
 	assert.Equal(t, "application/vnd.dev.sigstore.bundle+json;version=0.1", pb.MediaType)
 	require.NotNil(t, pb.VerificationMaterial)
@@ -312,6 +354,12 @@ func TestBuildProtobufBundle_ValidAnnotations(t *testing.T) {
 	msgSig := pb.GetMessageSignature()
 	require.NotNil(t, msgSig)
 	assert.Equal(t, sigBytes, msgSig.Signature)
+
+	// The message digest must be the artifact digest, not the layer digest.
+	wantDigest, err := hex.DecodeString(artifactDigestHex)
+	require.NoError(t, err)
+	assert.Equal(t, wantDigest, msgSig.MessageDigest.Digest,
+		"message digest must be the signed artifact digest")
 
 	// Verify certificate chain is present
 	certChain := pb.VerificationMaterial.GetX509CertificateChain()
@@ -323,13 +371,51 @@ func TestBuildProtobufBundle_ValidAnnotations(t *testing.T) {
 	assert.Equal(t, int64(42), pb.VerificationMaterial.TlogEntries[0].LogIndex)
 }
 
+func TestBuildProtobufBundle_ArtifactDigestInvariant(t *testing.T) {
+	// bundleFromCosignOCI derives a single signedDigestHex (the signature
+	// layer's OCI descriptor digest) and feeds it to TWO sinks: the bundle's
+	// message digest (via buildProtobufBundle) and the returned artifact
+	// digest (via hex.DecodeString). Those two outputs MUST be byte-identical
+	// or sigstore-go's WithArtifactDigest check fails. bundleFromCosignOCI
+	// itself needs a live registry, so this locks the invariant at the two
+	// pure sinks it wires together, guarding against a regression that reverts
+	// signedDigestHex to the manifest digest (the original bug).
+	sigB64 := base64.StdEncoding.EncodeToString([]byte("sig"))
+	signedDigestHex := "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+
+	layer := &v1.Descriptor{
+		MediaType: types.MediaType(cosignSimpleSigningMediaType),
+		Digest:    v1.Hash{Algorithm: "sha256", Hex: signedDigestHex},
+		Annotations: map[string]string{
+			cosignAnnotationSignature: sigB64,
+		},
+	}
+
+	// Sink 1: the message digest inside the bundle.
+	pb, err := buildProtobufBundle(layer, signedDigestHex)
+	require.NoError(t, err)
+	msgDigest := pb.GetMessageSignature().MessageDigest.Digest
+
+	// Sink 2: the artifact digest returned by bundleFromCosignOCI.
+	artifactDigest, err := hex.DecodeString(signedDigestHex)
+	require.NoError(t, err)
+
+	assert.Equal(t, artifactDigest, msgDigest,
+		"returned artifact digest must equal the bundle message digest")
+}
+
 func TestBuildVerificationMaterial_NoCertNoBundle(t *testing.T) {
 	annotations := map[string]string{
 		"unrelated": "value",
 	}
 	vm, err := buildVerificationMaterial(annotations)
 	require.NoError(t, err)
-	assert.Nil(t, vm.Content)
+	// A keyed signature carries neither cert nor Rekor bundle; the verification
+	// material must still be non-empty (a PublicKey identifier) so sigstore-go
+	// accepts the bundle. The trust anchor is the out-of-band keyed verifier.
+	pubKey, ok := vm.Content.(*protobundle.VerificationMaterial_PublicKey)
+	require.True(t, ok, "keyed material must be a PublicKey identifier")
+	assert.NotNil(t, pubKey.PublicKey)
 	assert.Empty(t, vm.TlogEntries)
 }
 

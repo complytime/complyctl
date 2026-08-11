@@ -1,0 +1,6 @@
+# Verify-SUT container only needs pre-built binaries from bin/.
+# Exclude everything else.
+*
+!bin/acceptance.test
+!bin/complyctl
+!tests/acceptance/verify-sut-entrypoint.sh

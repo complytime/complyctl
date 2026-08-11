@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# trivy:ignore:DS001 -- test container, intentionally floats on latest UBI
+# trivy:ignore:DS026 -- ephemeral init container, exits after generating PKI material
+# scorecard:pinned-dependencies -- intentionally unpinned; UBI images track latest for errata coverage
+FROM registry.access.redhat.com/ubi10/ubi-minimal:latest
+
+RUN microdnf install -y openssl && microdnf clean all
+
+COPY generate-pki.sh /generate-pki.sh
+RUN chmod +x /generate-pki.sh
+
+ENTRYPOINT ["/generate-pki.sh"]

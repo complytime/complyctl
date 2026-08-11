@@ -108,6 +108,65 @@ test-acceptance-clean: ## tear down acceptance test containers and volumes
 	$(ACCEPTANCE_COMPOSE) down -v --remove-orphans
 .PHONY: test-acceptance-clean
 
+VERIFICATION_COMPOSE = $(COMPOSE) -f tests/acceptance/compose.yaml --profile verification
+
+# Compose derives volume names as <project>_<volume>. The project name
+# defaults to the compose file's directory basename (acceptance) but can be
+# overridden via COMPOSE_PROJECT_NAME; honor that so the stale-volume cleanup
+# below matches the actual volumes regardless of project name.
+COMPOSE_PROJECT ?= $(if $(COMPOSE_PROJECT_NAME),$(COMPOSE_PROJECT_NAME),acceptance)
+
+test-acceptance-verify: build build-test-provider build-acceptance-test ## run verification acceptance tests (keyed cosign signing)
+	@$(VERIFICATION_COMPOSE) down -v --remove-orphans 2>/dev/null || true ; \
+	$(CONTAINER_ENGINE) volume rm -f $(COMPOSE_PROJECT)_verification-shared $(COMPOSE_PROJECT)_ctfe-config $(COMPOSE_PROJECT)_pki-material 2>/dev/null || true ; \
+	$(CONTAINER_ENGINE) volume create $(COMPOSE_PROJECT)_pki-material ; \
+	$(CONTAINER_ENGINE) build -q -f tests/acceptance/Dockerfile.generate-pki \
+		-t localhost/acceptance-pki-gen:latest tests/acceptance/ ; \
+	$(CONTAINER_ENGINE) run --rm -v $(COMPOSE_PROJECT)_pki-material:/pki \
+		localhost/acceptance-pki-gen:latest ; \
+	$(VERIFICATION_COMPOSE) up --build -d || { \
+		echo "=== container status (up failed) ===" ; \
+		$(CONTAINER_ENGINE) ps -a 2>&1 || true ; \
+		echo "=== all verification service logs ===" ; \
+		$(VERIFICATION_COMPOSE) logs 2>&1 || true ; \
+		$(VERIFICATION_COMPOSE) down -v ; \
+		exit 1 ; \
+	} ; \
+	sut=$$($(CONTAINER_ENGINE) ps -aq --filter name=verify-sut | head -1) ; \
+	if [ -z "$$sut" ]; then \
+		echo "ERROR: verify-sut container not found" ; \
+		echo "=== container status ===" ; \
+		$(CONTAINER_ENGINE) ps -a 2>&1 || true ; \
+		echo "=== all verification service logs ===" ; \
+		$(VERIFICATION_COMPOSE) logs 2>&1 || true ; \
+		$(VERIFICATION_COMPOSE) down -v ; \
+		exit 1 ; \
+	fi ; \
+	rc=$$($(CONTAINER_ENGINE) wait $$sut) ; \
+	echo "=== container status ===" ; \
+	$(CONTAINER_ENGINE) ps -a 2>&1 || true ; \
+	echo "=== all verification service logs ===" ; \
+	$(VERIFICATION_COMPOSE) logs 2>&1 || true ; \
+	echo "=== verify-sut logs ===" ; \
+	$(CONTAINER_ENGINE) logs $$sut ; \
+	$(VERIFICATION_COMPOSE) down -v ; \
+	exit $$rc
+.PHONY: test-acceptance-verify
+
+test-acceptance-verify-clean: ## tear down verification test containers and volumes
+	$(VERIFICATION_COMPOSE) down -v --remove-orphans
+.PHONY: test-acceptance-verify-clean
+
+test-acceptance-all: ## run all acceptance tests (lifecycle + verification) with guaranteed teardown of both profiles
+	@rc=0 ; \
+	$(MAKE) test-acceptance || rc=$$? ; \
+	$(MAKE) test-acceptance-verify || rc=$$? ; \
+	echo "=== ensuring both acceptance profiles are torn down ===" ; \
+	$(MAKE) test-acceptance-clean 2>/dev/null || true ; \
+	$(MAKE) test-acceptance-verify-clean 2>/dev/null || true ; \
+	exit $$rc
+.PHONY: test-acceptance-all
+
 ##@ Compilation
 
 all: clean vendor test-unit build ## compile from scratch
@@ -174,7 +233,7 @@ format:
 .PHONY: format
 
 vet:
-	go vet ./...
+	go vet -mod=vendor ./...
 .PHONY: vet
 
 lint: ## run linters (golangci-lint + goimports check)

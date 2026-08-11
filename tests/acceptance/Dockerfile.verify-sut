@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+
+# Runtime-only container for verification acceptance tests.
+# All binaries are built locally and injected from bin/.
+# trivy:ignore:DS001 -- test container, intentionally floats on latest UBI
+# trivy:ignore:DS026 -- ephemeral test container, compose healthcheck covers readiness
+# scorecard:pinned-dependencies -- intentionally unpinned; UBI images track latest for errata coverage
+FROM registry.access.redhat.com/ubi10/ubi-minimal:latest
+
+RUN microdnf install -y shadow-utils && microdnf clean all && \
+    useradd -m testuser
+
+COPY bin/acceptance.test /usr/local/bin/acceptance.test
+COPY bin/complyctl /usr/local/bin/complyctl
+COPY tests/acceptance/verify-sut-entrypoint.sh /usr/local/bin/verify-sut-entrypoint.sh
+
+USER testuser
+WORKDIR /home/testuser
+
+# The entrypoint wrapper waits for sign-seed artifacts (/shared/cosign.pub
+# etc.) before exec-ing the test binary.  docker compose enforces
+# depends_on service_completed_successfully but podman-compose does not,
+# so this provides defence-in-depth for local runs.
+ENTRYPOINT ["/usr/local/bin/verify-sut-entrypoint.sh"]
+CMD ["-test.v", "-test.timeout=3m", "-test.run=TestVerification"]

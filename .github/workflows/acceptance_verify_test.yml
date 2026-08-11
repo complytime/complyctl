@@ -1,0 +1,50 @@
+name: acceptance-verify-test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref: these heavyweight container
+# jobs are expensive and only the latest push matters.
+concurrency:
+  group: acceptance-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance-verify-test:
+    runs-on: ubuntu-latest
+    # 20 minutes gives margin over the provisioning critical path
+    # (mysql start_period 90s + Trillian/CTFE tree creation + Fulcio/Rekor
+    # readiness + sign-seed + the 3-minute verify-sut test timeout), which
+    # can approach 15 minutes on a cold runner with no build-layer cache.
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: "./go.mod"
+
+      - name: Run verification acceptance tests
+        run: make test-acceptance-verify COMPOSE="docker compose"
+
+      # Workflow-level safety net: if the job is killed by timeout-minutes
+      # before the Makefile target's inline log dump runs, capture the
+      # compose service logs so failures are diagnosable.
+      - name: Dump verification stack logs on failure
+        if: ${{ failure() }}
+        run: >
+          docker compose -f tests/acceptance/compose.yaml
+          --profile verification logs --no-color

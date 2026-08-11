@@ -69,6 +69,7 @@ type Sync struct {
 	source       PolicySource
 	verifier     VerifyFunc
 	registryHost string
+	insecure     bool
 	dataDir      string
 }
 
@@ -83,12 +84,17 @@ func NewSync(cache *Cache, state *State, source PolicySource, dataDir, registryH
 	for _, opt := range opts {
 		opt(cfg)
 	}
+	// Detect plain-HTTP registries from the raw scheme while normalizing the
+	// host, so signature verification (go-containerregistry) can be told to
+	// speak HTTP instead of defaulting to HTTPS, mirroring the oras-go pull path.
+	host, insecure := registry.SplitHostScheme(registryHost)
 	return &Sync{
 		cache:        cache,
 		state:        state,
 		source:       source,
 		verifier:     cfg.verifier,
-		registryHost: registryHost,
+		registryHost: host,
+		insecure:     insecure,
 		dataDir:      dataDir,
 	}
 }
@@ -139,7 +145,7 @@ func (s *Sync) SyncPolicy(ctx context.Context, policyID, version string) (bool, 
 	var verifyResult *VerificationResult
 	if s.verifier != nil {
 		registryRef := BuildLookupRef(s.registryHost, policyID, tag, digest)
-		vr, verifyErr := s.verifier(ctx, registryRef)
+		vr, verifyErr := s.verifier(ctx, registryRef, s.insecure)
 		if verifyErr != nil {
 			return false, fmt.Errorf("policy %s: verification failed: %w", policyID, verifyErr)
 		}

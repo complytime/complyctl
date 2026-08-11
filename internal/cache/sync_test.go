@@ -476,7 +476,7 @@ func TestSync_VerificationFailure_AbortsCopy(t *testing.T) {
 	mock.SeedPolicy("registry.example.com/test-policy", "v1.0.0", cachetest.DigestA)
 	mock.SeedPolicy("test-policy", "v1.0.0", cachetest.DigestA)
 
-	failVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
+	failVerifier := func(_ context.Context, _ string, _ bool) (*cache.VerificationResult, error) {
 		return nil, fmt.Errorf("signature verification failed: identity mismatch")
 	}
 
@@ -508,7 +508,7 @@ func TestSync_VerificationSuccess_RecordsMetadata(t *testing.T) {
 	mock.SeedPolicy("registry.example.com/test-policy", "v1.0.0", cachetest.DigestA)
 	mock.SeedPolicy("test-policy", "v1.0.0", cachetest.DigestA)
 
-	successVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
+	successVerifier := func(_ context.Context, _ string, _ bool) (*cache.VerificationResult, error) {
 		return &cache.VerificationResult{
 			Verified:       true,
 			SignerIdentity: "workflow@github.com",
@@ -575,7 +575,7 @@ func TestSync_RegistryHost_PassedToVerifier(t *testing.T) {
 	mock.SeedPolicy("org/test-policy", "v1.0.0", cachetest.DigestA)
 
 	var capturedRef string
-	capturingVerifier := func(_ context.Context, registryRef string) (*cache.VerificationResult, error) {
+	capturingVerifier := func(_ context.Context, registryRef string, _ bool) (*cache.VerificationResult, error) {
 		capturedRef = registryRef
 		return &cache.VerificationResult{Verified: true}, nil
 	}
@@ -596,6 +596,49 @@ func TestSync_RegistryHost_PassedToVerifier(t *testing.T) {
 		"verifier ref must NOT resolve to Docker Hub")
 }
 
+// TestSync_RegistryHost_SchemeStripped verifies that an http:// (or https://)
+// scheme on the registry host is stripped before the verifier ref is built.
+// Policy URLs carry a scheme so the registry client can detect plain-HTTP
+// registries, but go-containerregistry's reference parser rejects a scheme
+// prefix, so the cosign lookup ref must be scheme-less. Regression test for
+// the "invalid OCI reference \"http://.../...\"" verification failure.
+func TestSync_RegistryHost_SchemeStripped(t *testing.T) {
+	tmpDir := t.TempDir()
+	cacheDir := filepath.Join(tmpDir, "cache")
+	require.NoError(t, os.MkdirAll(cacheDir, 0755))
+
+	mock := cachetest.NewMockPolicySource()
+	mock.SeedPolicy("zot:5000/org/test-policy", "v1.0.0", cachetest.DigestA)
+	mock.SeedPolicy("org/test-policy", "v1.0.0", cachetest.DigestA)
+
+	var capturedRef string
+	var capturedInsecure bool
+	capturingVerifier := func(_ context.Context, registryRef string, insecure bool) (*cache.VerificationResult, error) {
+		capturedRef = registryRef
+		capturedInsecure = insecure
+		return &cache.VerificationResult{Verified: true}, nil
+	}
+
+	cacheMgr := cache.NewCache(cacheDir)
+	state, err := cache.LoadState(cacheDir)
+	require.NoError(t, err)
+
+	sync := cache.NewSync(cacheMgr, state, mock, cacheDir, "http://zot:5000/",
+		cache.WithVerifier(capturingVerifier))
+
+	_, err = sync.SyncPolicy(context.Background(), "org/test-policy", "latest")
+	require.NoError(t, err)
+
+	assert.NotContains(t, capturedRef, "http://",
+		"verifier ref must not carry an http:// scheme, got: %s", capturedRef)
+	assert.NotContains(t, capturedRef, "https://",
+		"verifier ref must not carry an https:// scheme, got: %s", capturedRef)
+	assert.Equal(t, "zot:5000/org/test-policy", capturedRef,
+		"verifier ref must be a bare host-qualified reference")
+	assert.True(t, capturedInsecure,
+		"verifier must receive insecure=true for an http:// registry host")
+}
+
 // TestSync_EmptyRegistryHost_FailClosed verifies that when a verifier is
 // configured but registryHost is empty, SyncPolicy returns a fail-closed
 // error rather than silently resolving against Docker Hub.
@@ -607,7 +650,7 @@ func TestSync_EmptyRegistryHost_FailClosed(t *testing.T) {
 	mock := cachetest.NewMockPolicySource()
 	mock.SeedPolicy("org/test-policy", "v1.0.0", cachetest.DigestA)
 
-	neverCalledVerifier := func(_ context.Context, _ string) (*cache.VerificationResult, error) {
+	neverCalledVerifier := func(_ context.Context, _ string, _ bool) (*cache.VerificationResult, error) {
 		t.Fatal("verifier must not be called when registryHost is empty")
 		return nil, nil
 	}

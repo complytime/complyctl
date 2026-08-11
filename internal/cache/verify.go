@@ -32,8 +32,22 @@ import (
 
 // VerifyFunc verifies an OCI artifact identified by a registry reference.
 // Returns a VerificationResult on success or an error on failure.
-// A nil VerifyFunc means verification is disabled.
-type VerifyFunc func(ctx context.Context, registryRef string) (*VerificationResult, error)
+// A nil VerifyFunc means verification is disabled. The insecure flag selects
+// plain-HTTP registry access (mirroring the pull path) so signature resolution
+// works against http:// registries; go-containerregistry defaults to HTTPS
+// otherwise.
+type VerifyFunc func(ctx context.Context, registryRef string, insecure bool) (*VerificationResult, error)
+
+// nameOptions returns the go-containerregistry name options for reference
+// parsing. When insecure is true it adds name.Insecure so remote access uses
+// plain HTTP instead of the HTTPS default, matching the oras-go pull path for
+// http:// registries.
+func nameOptions(insecure bool) []name.Option {
+	if insecure {
+		return []name.Option{name.Insecure}
+	}
+	return nil
+}
 
 // VerificationResult captures sigstore-go verification output.
 type VerificationResult struct {
@@ -112,8 +126,8 @@ func NewKeylessVerifier(issuer, identity, trustedRootPath string) (VerifyFunc, e
 		return nil, fmt.Errorf("failed to create sigstore verifier: %w", err)
 	}
 
-	return func(ctx context.Context, registryRef string) (*VerificationResult, error) {
-		bun, artifactDigest, err := bundleFromCosignOCI(ctx, registryRef)
+	return func(ctx context.Context, registryRef string, insecure bool) (*VerificationResult, error) {
+		bun, artifactDigest, err := bundleFromCosignOCI(ctx, registryRef, insecure)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve cosign signature for %s: %w", registryRef, err)
 		}
@@ -168,8 +182,8 @@ func NewKeyedVerifier(keyPath string) (VerifyFunc, error) {
 		return nil, fmt.Errorf("failed to create keyed verifier: %w", err)
 	}
 
-	return func(ctx context.Context, registryRef string) (*VerificationResult, error) {
-		bun, artifactDigest, err := bundleFromCosignOCI(ctx, registryRef)
+	return func(ctx context.Context, registryRef string, insecure bool) (*VerificationResult, error) {
+		bun, artifactDigest, err := bundleFromCosignOCI(ctx, registryRef, insecure)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve cosign signature for %s: %w", registryRef, err)
 		}
@@ -194,18 +208,26 @@ func NewKeyedVerifier(keyPath string) (VerifyFunc, error) {
 // bundleFromCosignOCI resolves a cosign signature from the OCI registry for the
 // given image reference, constructs a sigstore-go bundle, and returns it along
 // with the artifact digest bytes.
-func bundleFromCosignOCI(ctx context.Context, registryRef string) (*bundle.Bundle, []byte, error) {
-	ref, digestHex, err := resolveArtifactDigest(ctx, registryRef)
+func bundleFromCosignOCI(ctx context.Context, registryRef string, insecure bool) (*bundle.Bundle, []byte, error) {
+	ref, digestHex, err := resolveArtifactDigest(ctx, registryRef, insecure)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sigLayer, err := fetchCosignSignature(ctx, ref, digestHex, registryRef)
+	sigLayer, err := fetchCosignSignature(ctx, ref, digestHex, registryRef, insecure)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pb, err := buildProtobufBundle(sigLayer)
+	// cosign signs the simple signing payload, not the policy manifest. The
+	// signature layer's own OCI descriptor digest is the SHA-256 of that
+	// payload and is exactly the value recorded in the Rekor hashedrekord
+	// entry, so it is what both the message-signature bundle and the verifier
+	// policy must reference. The manifest digest (digestHex) is used only to
+	// locate the signature via the sha256-<hex>.sig tag convention.
+	signedDigestHex := sigLayer.Digest.Hex
+
+	pb, err := buildProtobufBundle(sigLayer, signedDigestHex)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to build sigstore bundle from cosign annotations: %w", err)
 	}
@@ -215,7 +237,7 @@ func bundleFromCosignOCI(ctx context.Context, registryRef string) (*bundle.Bundl
 		return nil, nil, fmt.Errorf("failed to create sigstore bundle: %w", err)
 	}
 
-	artifactDigest, err := hex.DecodeString(digestHex)
+	artifactDigest, err := hex.DecodeString(signedDigestHex)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to decode artifact digest: %w", err)
 	}
@@ -225,8 +247,8 @@ func bundleFromCosignOCI(ctx context.Context, registryRef string) (*bundle.Bundl
 
 // resolveArtifactDigest parses the OCI reference and resolves the image
 // manifest digest from the registry.
-func resolveArtifactDigest(ctx context.Context, registryRef string) (name.Reference, string, error) {
-	ref, err := name.ParseReference(registryRef)
+func resolveArtifactDigest(ctx context.Context, registryRef string, insecure bool) (name.Reference, string, error) {
+	ref, err := name.ParseReference(registryRef, nameOptions(insecure)...)
 	if err != nil {
 		return nil, "", fmt.Errorf("invalid OCI reference %q: %w", registryRef, err)
 	}
@@ -245,9 +267,9 @@ func resolveArtifactDigest(ctx context.Context, registryRef string) (name.Refere
 // fetchCosignSignature resolves the cosign signature manifest from the
 // registry using the tag convention (sha256-<hex>.sig) and returns the
 // simple signing layer descriptor containing verification annotations.
-func fetchCosignSignature(ctx context.Context, ref name.Reference, digestHex, registryRef string) (*v1.Descriptor, error) {
+func fetchCosignSignature(ctx context.Context, ref name.Reference, digestHex, registryRef string, insecure bool) (*v1.Descriptor, error) {
 	sigTagStr := fmt.Sprintf("%s:sha256-%s.sig", ref.Context().Name(), digestHex)
-	sigTag, err := name.NewTag(sigTagStr)
+	sigTag, err := name.NewTag(sigTagStr, nameOptions(insecure)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct cosign signature tag: %w", err)
 	}
@@ -286,8 +308,12 @@ func findSigningLayer(sigImage v1.Image) (*v1.Descriptor, error) {
 }
 
 // buildProtobufBundle constructs a sigstore protobuf bundle from cosign
-// layer descriptor annotations.
-func buildProtobufBundle(layer *v1.Descriptor) (*protobundle.Bundle, error) {
+// layer descriptor annotations. artifactDigestHex is the hex-encoded digest of
+// the signed payload (the cosign simple signing blob, i.e. the signature
+// layer's own OCI descriptor digest). It is the value cosign signed and
+// recorded in Rekor, and it must match the digest the verifier is given via
+// WithArtifactDigest.
+func buildProtobufBundle(layer *v1.Descriptor, artifactDigestHex string) (*protobundle.Bundle, error) {
 	annotations := layer.Annotations
 	if annotations == nil {
 		return nil, fmt.Errorf("cosign layer has no annotations")
@@ -314,9 +340,9 @@ func buildProtobufBundle(layer *v1.Descriptor) (*protobundle.Bundle, error) {
 		return nil, fmt.Errorf("failed to decode cosign signature: %w", err)
 	}
 
-	digestBytes, err := hex.DecodeString(layer.Digest.Hex)
+	digestBytes, err := hex.DecodeString(artifactDigestHex)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode layer digest: %w", err)
+		return nil, fmt.Errorf("failed to decode artifact digest: %w", err)
 	}
 
 	pb.Content = &protobundle.Bundle_MessageSignature{
@@ -357,6 +383,18 @@ func buildVerificationMaterial(annotations map[string]string) (*protobundle.Veri
 			return nil, fmt.Errorf("failed to parse cosign Rekor bundle: %w", err)
 		}
 		vm.TlogEntries = entries
+	}
+
+	// A keyed cosign signature (cosign sign --key --tlog-upload=false) carries
+	// neither a certificate nor a Rekor bundle annotation. sigstore-go rejects a
+	// bundle with empty VerificationMaterial ("missing verification material"),
+	// so emit a PublicKey identifier: the trust anchor is the out-of-band public
+	// key supplied to NewKeyedVerifier, and the trusted key material's lookup
+	// ignores the hint and returns the single configured key.
+	if !hasCert {
+		vm.Content = &protobundle.VerificationMaterial_PublicKey{
+			PublicKey: &protocommon.PublicKeyIdentifier{},
+		}
 	}
 
 	return vm, nil
@@ -402,7 +440,12 @@ func parseRekorBundle(bundleJSON string) ([]*protorekor.TransparencyLogEntry, er
 		return nil, fmt.Errorf("failed to decode SignedEntryTimestamp: %w", err)
 	}
 
-	logIDBytes, err := base64.StdEncoding.DecodeString(payload.Payload.LogID)
+	// cosign writes the Rekor bundle logID as a hex string (the SHA-256 of the
+	// log's DER public key), not base64. The trusted root stores the same value
+	// as tlog logId.keyId; decoding it as base64 yields the wrong bytes, so the
+	// entry's LogId.KeyId never matches a trusted tlog and sigstore-go drops it
+	// ("not enough verified log entries"). Hex-decode to match.
+	logIDBytes, err := hex.DecodeString(payload.Payload.LogID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode logID: %w", err)
 	}

@@ -1,0 +1,31 @@
+# Dex OIDC configuration for keyless-signing acceptance tests.
+# Issuer must match the URL clients reach Dex at (compose service DNS).
+issuer: http://dex-idp:5556/dex
+
+storage:
+  type: memory
+
+web:
+  http: 0.0.0.0:5556
+
+# Static OIDC client used by sign-seed to obtain an id_token.
+staticClients:
+  - id: complyctl-test
+    secret: test-secret
+    name: complyctl test client
+    # Redirect URIs are unused for the password grant but Dex requires the field.
+    redirectURIs:
+      - http://localhost/callback
+
+# Enable the resource-owner password grant so sign-seed can fetch a token
+# non-interactively via curl.
+oauth2:
+  passwordConnector: local
+
+enablePasswordDB: true
+staticPasswords:
+  # Password is "password"; hash is bcrypt of that literal.
+  - email: admin@example.com
+    hash: "$2a$10$QiWH8f8Ty152VnCcmYp0aucPu2UUfMt6C4AxZS7ZE1YLpNOZ5ymNq"
+    username: admin
+    userID: "08a8684b-db88-4b73-90a9-3cd1661f5466"

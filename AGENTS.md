@@ -62,6 +62,13 @@ make test-acceptance
 # Homebrew formula smoke test (requires brew, macOS/Linux)
 make test-homebrew
 # → ./tests/homebrew_test.sh
+
+# Verification acceptance tests (requires Sigstore infrastructure)
+make test-acceptance-verify
+# → compose up --profile verification (zot + Sigstore + sign-seed + verify-sut)
+
+# All acceptance tests (lifecycle + verification, sequential)
+make test-acceptance-all
 ```
 
 ### Lint & Format
@@ -84,22 +91,23 @@ make crapload-check     # check for CRAP regressions against baseline
 
 ### CI Workflow Structure
 
-| Workflow | File | Purpose |
-| ---------- | ------ | --------- |
-| CI | `ci_checks.yml` | Standardized CI via org-infra reusable workflow |
-| Unit Test | `unit_test.yml` | Unit tests + buf lint |
-| E2E Test | `e2e_test.yml` | End-to-end tests with mock registry |
-| Integration Test | `integration_test.yml` | Shell-based integration tests |
-| Cross-Repo Integration | `ci_cross_repo_integration.yml` | Cross-repo integration tests with complytime-providers + EvaluationLog schema validation |
-| CRAP Load | `ci_crapload.yml` | CRAP analysis on PRs (reusable from org-infra) |
-| Security | `ci_security.yml` | Security scanning |
-| Compliance | `ci_compliance.yml` | Compliance checks |
-| Dependencies | `ci_dependencies.yml` | Dependency management |
-| SonarCloud | `ci_sonarcloud.yml` | Code quality analysis |
-| Behavioral | `behavioral_assessment.yml` | Behavioral assessment reports |
-| Scheduled | `ci_scheduled.yml` | Daily OSV-Scanner and Scorecards |
-| Acceptance Test | `acceptance_test.yml` | Container-based acceptance tests with real OCI registry |
-| Release | `release.yml` | Release automation (reusable preflight + GoReleaser from org-infra) + Homebrew formula publishing |
+| Workflow               | File                            | Purpose                                                                                           |
+| ----------             | ------                          | ---------                                                                                         |
+| CI                     | `ci_checks.yml`                 | Standardized CI via org-infra reusable workflow                                                   |
+| Unit Test              | `unit_test.yml`                 | Unit tests + buf lint                                                                             |
+| E2E Test               | `e2e_test.yml`                  | End-to-end tests with mock registry                                                               |
+| Integration Test       | `integration_test.yml`          | Shell-based integration tests                                                                     |
+| Cross-Repo Integration | `ci_cross_repo_integration.yml` | Cross-repo integration tests with complytime-providers + EvaluationLog schema validation          |
+| CRAP Load              | `ci_crapload.yml`               | CRAP analysis on PRs (reusable from org-infra)                                                    |
+| Security               | `ci_security.yml`               | Security scanning                                                                                 |
+| Compliance             | `ci_compliance.yml`             | Compliance checks                                                                                 |
+| Dependencies           | `ci_dependencies.yml`           | Dependency management                                                                             |
+| SonarCloud             | `ci_sonarcloud.yml`             | Code quality analysis                                                                             |
+| Behavioral             | `behavioral_assessment.yml`     | Behavioral assessment reports                                                                     |
+| Scheduled              | `ci_scheduled.yml`              | Daily OSV-Scanner and Scorecards                                                                  |
+| Acceptance Test        | `acceptance_test.yml`           | Container-based acceptance tests with real OCI registry                                           |
+| Acceptance Verify Test | `acceptance_verify_test.yml`    | Container-based verification acceptance tests with Sigstore infrastructure                        |
+| Release                | `release.yml`                   | Release automation (reusable preflight + GoReleaser from org-infra) + Homebrew formula publishing |
 
 ## Project Structure
 
@@ -139,6 +147,8 @@ scripts/             # maintenance scripts (SPDX checks, workflow setup)
 specs/               # Speckit strategic specifications (NNN-*/  format)
 tests/
 ├── acceptance/      # Container-based acceptance tests (compose + zot)
+│   └── testdata/
+│       └── sigstore/    # PKI README (keys generated at runtime into pki-material volume)
 ├── behavioral/      # behavioral test scenarios
 ├── cross-repo/      # cross-repo integration tests (complyctl + ampel + opa providers)
 ├── e2e/             # E2E tests (build-tag gated: -tags=e2e)
@@ -315,6 +325,7 @@ packages organized by domain responsibility.
 
 ## Recent Changes
 - json-evallog: `complyctl scan --log-format yaml|json` flag and `COMPLYTIME_LOG_FORMAT` env var select EvaluationLog serialization format; `EvalLogFormatEnvVar` constant in `internal/complytime/consts.go`; shadow structs in `internal/output/evaluator.go` gain `json:` tags (kebab-case matching go-gemara); `Write(outDir, logFormat string)` branches on format using `json.MarshalIndent` for JSON path; `scanOptions.logFormat` field, flag registration with shell completion, env var override (flag precedence), and `validateLogFormat()` in `cmd/complyctl/cli/scan.go`; YAML remains default (#795)
+- ctfe-keyless-verify: The verification acceptance stack now provisions a real RFC6962 CT log so keyless signatures carry a genuine SCT that the production sigstore-go verifier (requires >=1 SCT + >=1 transparency-log entry) accepts. Fulcio switched from `--ca=ephemeralca` to `--ca=fileca` with PKI keys generated at runtime by the `generate-pki` service into the `pki-material` volume (superseding the earlier ephemeral-CA/committed-PKI designs). New `ctfe` service (`gcr.io/trillian-opensource-ci/ctfe`, reuses the existing mysql+trillian backend) plus a `createtree-init` service (built from `Dockerfile.createtree`, `createtree@v1.6.1`) that provisions the Trillian tree and renders `ct_server.cfg`; `sign-seed.sh` sets `SIGSTORE_CT_LOG_PUBLIC_KEY_FILE` for cosign SCT self-verify and builds `trusted_root.json` from the runtime-generated CA+CTFE keys plus the runtime Rekor key. `internal/cache/verify.go` fixed to honor the `http://` plain-HTTP registry scheme, emit PublicKey verification material for keyed bundles, hex-decode the Rekor bundle logID, and use the signature-layer (simplesigning payload) digest as the message-signature/artifact digest; `make test-acceptance-verify` dumps all verification-profile service logs on failure (#678)
 - custom-trusted-root: `VerificationConfig` gains `TrustedRoot string` field with `yaml:"trusted_root,omitempty"` tag in `internal/complytime/config.go`; `ValidateVerificationConfig()` enforces mutual exclusivity with `key` (error: "trusted_root cannot be used with key-based verification"), requires `issuer` + `identity` (error: "trusted_root requires issuer and identity for keyless verification"), and validates file existence via `filepath.Clean` + `os.Stat`; `NewKeylessVerifier()` in `internal/cache/verify.go` gains `trustedRootPath string` parameter — when non-empty, calls `root.NewTrustedRootFromPath(trustedRootPath)` instead of TUF fetch, wrapping errors with `"failed to load trusted root from %s: %w"`; `buildVerifierFromConfig()` in `cmd/complyctl/cli/get.go` passes `cfg.TrustedRoot` to `NewKeylessVerifier()`; THR02.MIT05 added to threat model for user-supplied trust anchor without TUF integrity protection; fixes #768
 - multi-target-report-filenames: `BuildReportFilename(prefix, policyID, targetID, ext string) string` in `internal/output/filename.go` centralizes report filename construction for all four formatters (EvaluationLog, OSCAL, SARIF, Markdown); sanitizes via `complytime.FilenameSafe`, timestamps via `time.Now().Format("20060102-150405")`, omits targetID segment when empty; OSCAL/SARIF/Markdown formatters migrated from inline `fmt.Sprintf` to shared helper, adding targetID to filenames; fixes #773 (multi-target scans overwrote report files)
 - homebrew-formula-and-go-install: macOS binary releases (darwin/amd64, darwin/arm64) added to GoReleaser build matrix; source-build Homebrew Formula auto-published to `complytime/homebrew-tap` on release via GitHub App token; `go install` documented in `docs/INSTALLATION.md`; `make test-homebrew` target and `tests/homebrew_test.sh` for formula validation; shell completions (Bash, Zsh, Fish) installed by Formula (#713)
@@ -326,6 +337,7 @@ packages organized by domain responsibility.
 - doctor-grouped-output: `complyctl doctor` output redesigned with grouped sections and nested sub-results; `CheckResult` gains `Children []CheckResult` field, `Label string` field, and `CheckGroup` type with `GroupOrder()` function for section ordering; `Run()` assembles result tree via `attachByEvaluatorID()` and `attachByPolicyID()` helpers; `CheckPolicyVersions` emits per-policy `policy/<eid>` warnings for unreachable registries instead of `registry/<reg>` with silent skip; `CheckComplypacks` lists each complypack individually by evaluator-id; `printDiagnostics` in `cmd/complyctl/cli/doctor.go` rewritten as nested tree walk with summary counts at depth 0–1 (excludes verbose detail grandchildren); string-parsing helpers (`partitionVariables`, `buildChildMap`, `filterParents`, `extractEvaluatorID`) removed (#692)
 - doctor-machine-readable-output: `complyctl doctor` gains `--format text|json` flag; `resolveFormat()` auto-selects `text` when `NO_COLOR` is set; three renderers: `printDiagnosticsHuman` (emoji), `printDiagnosticsText` (plain label), `printDiagnosticsJSON` (structured JSON with `checks`, `summary`, `blocking_failure`); `statusLabel()` maps `CheckStatus` to grep-stable `[PASS]`/`[FAIL]`/`[WARN]`; `OutputFormatText`/`OutputFormatJSON` constants in `internal/complytime/consts.go` (#611)
 - doctor-human-format-refactor: `complyctl doctor --format` gains explicit `human` option (three-value set: `human|text|json`); `OutputFormatHuman` constant in `internal/complytime/consts.go`; `summarizeResults()` extracts shared counting logic across renderers into `resultSummary` struct; `statusEmoji()` centralises emoji mapping; `printDiagnosticsTo()` rejects unrecognised format values instead of falling back to human; flag help text and shell completion updated (#744)
+- acceptance-verify-tests: Container-based verification acceptance test stack (`tests/acceptance/` verification profile, `make test-acceptance-verify`, `acceptance_verify_test.yml`); private Sigstore infrastructure (dex-idp, fulcio with runtime-generated `--ca=fileca` keys, rekor-server backed by mysql + trillian-log-server + trillian-log-signer, plus a Trillian CTFE CT log — see the ctfe-keyless-verify entry above) + sign-seed compose service that signs OCI artifacts (keyed and keyless) and generates `trusted_root.json` at runtime; test scenarios cover keyed verification (happy path, wrong key), keyless verification (happy path, wrong identity), and configuration behavior; keyless verification is active (not skip-gated) via the runtime-generated trust root; `test-acceptance-verify-clean` teardown target; `test-acceptance-all` runs lifecycle + verification sequentially; test PKI is generated at runtime by the `generate-pki` Compose service into the `pki-material` volume, trusted_root.json assembled at runtime (#678)
 - ci-step-summary-report: Emoji status indicators added to `--format pretty` markdown report; `resultEmoji()` helper maps `gemara.Result` to `complytime.Status*` constants; `writeControlsTable()` prefixes Result column with emoji for control and requirement rows; `writeSummary()` prefixes counts table headers with emoji; `writeFindings()` prefixes group headers with emoji; report now directly usable as GitHub Actions Step Summary via `cat report-*.md >> $GITHUB_STEP_SUMMARY` (#697)
 - complypack-cache-versioning: `COMPLYTIME_CACHE_VERSIONS` env var configures retention count (default 1) for complypack cache versions per evaluator-id; `NewComplypackCache()` gains `*State` parameter for state-driven lookup and timestamp-based eviction ordering; `evictOldVersions()` becomes retention-count-aware (orphaned dirs first, then oldest by `LastUpdated`); `LookupByEvaluatorID()` resolves from state.json with directory-scan fallback; `SyncComplypack()` checks local cache before remote fetch with re-verification when verifier is configured, returns `(true, nil)` for cache hits to trigger generation invalidation; `EvaluatorIDToVersion()` reverse lookup on `*State`; `CacheRetentionCount()` in `internal/cache/retention.go`; `CheckComplypacks()` extended with `walkCacheSize()` and `findOrphanedVersions()` for cache health reporting; `complyctl doctor` reports cache size and orphaned/untracked versions (#676)
 - bundle-metadata-cli: `complyctl list` gains EVALUATOR and CONTROLS columns sourced from `PolicyState` metadata in `state.json`; `complyctl get` prints post-sync summary to stderr after fresh fetch showing policy title, evaluator, control count, and assessment count; `PolicyState` gains `PolicyTitle`/`PolicyEvaluator`/`ControlCount`/`AssessmentCount` fields populated at sync time via `SetPolicyMetadata()`; `policy.Resolver.ExtractPolicyMetadata()` extracts display metadata without building full `DependencyGraph`; `policyLayerResult.Title` added to `parsePolicyLayer()` output; upgrade backfill for pre-existing caches without metadata; `formatPolicySummary()` helper for testable stderr output (#506)

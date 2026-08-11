@@ -1,17 +1,20 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Container-based acceptance tests for complyctl.
-# Usage: make test-acceptance
+# Usage: make test-acceptance          (lifecycle profile)
+#        make test-acceptance-verify   (verification profile)
 #
 # Architecture:
-#   zot   — real OCI registry (CNCF zot-minimal)
-#   seed  — init container that pushes Gemara testdata into zot via oras CLI
-#   sut   — compiled Go test binary exercising complyctl against zot
+#   zot       — real OCI registry (CNCF zot-minimal), shared across profiles
+#   seed      — init container that pushes Gemara testdata into zot via oras CLI
+#   sut       — compiled Go test binary exercising complyctl against zot
+#   sign-seed — init container that pushes and cosign-signs artifacts (verification)
+#   verify-sut — test binary exercising verification against signed artifacts
 
 services:
   zot:
     image: ghcr.io/project-zot/zot-minimal-linux-amd64:v2.1.18@sha256:f1ffb7a5bbddc0feea83646e29c587ecf39b3193733b447749d4c9ead111a395
-    profiles: [lifecycle]
+    profiles: [lifecycle, verification]
     volumes:
       - ./zot-config.json:/etc/zot/config.json:ro
     command: ["serve", "/etc/zot/config.json"]
@@ -41,3 +44,253 @@ services:
       REGISTRY_URL: "http://zot:5000"
       TEST_POLICY_ID: "acceptance-test"
       TEST_TARGET_ID: "acceptance-target"
+
+  sign-seed:
+    build:
+      context: .
+      dockerfile: Dockerfile.sign-seed
+    profiles: [verification]
+    # fulcio and rekor-server have no compose healthcheck (distroless, no curl),
+    # so gate on service_started; sign-seed.sh wait_http polls dex/fulcio/rekor
+    # readiness (with its own curl) before signing.
+    depends_on:
+      zot:
+        condition: service_started
+      dex-idp:
+        condition: service_healthy
+      fulcio:
+        condition: service_started
+      rekor-server:
+        condition: service_started
+    volumes:
+      - ./testdata:/testdata:ro
+      - verification-shared:/shared
+      - pki-material:/pki:ro
+    environment:
+      REGISTRY_URL: "zot:5000"
+
+  verify-sut:
+    build:
+      context: ../../
+      dockerfile: tests/acceptance/Dockerfile.verify-sut
+    profiles: [verification]
+    depends_on:
+      sign-seed:
+        condition: service_completed_successfully
+    volumes:
+      - verification-shared:/shared:ro
+    environment:
+      REGISTRY_URL: "http://zot:5000"
+      COSIGN_KEY_PATH: "/shared/cosign.pub"
+      COSIGN_WRONG_KEY_PATH: "/shared/wrong.pub"
+      VERIFY_KEYED_POLICY_ID: "verify-keyed"
+      VERIFY_UNSIGNED_POLICY_ID: "verify-unsigned"
+      TEST_TARGET_ID: "verify-target"
+      VERIFY_KEYLESS_POLICY_ID: verify-keyless
+      TRUSTED_ROOT_PATH: /shared/trusted_root.json
+      OIDC_ISSUER: http://dex-idp:5556/dex
+      OIDC_IDENTITY: admin@example.com
+    entrypoint: ["/usr/local/bin/verify-sut-entrypoint.sh"]
+    command: ["-test.v", "-test.timeout=3m", "-test.run=TestVerification"]
+
+  # --- Private Sigstore stack (verification profile only) ---------------------
+  # Keyless signing/verification requires a full private Sigstore: an OIDC
+  # issuer (Dex), a certificate authority (Fulcio), a Certificate Transparency
+  # log (CTFE) so issued certs carry an SCT, and a transparency log (Rekor).
+  # CTFE and Rekor both use a Trillian backend + MySQL. There is no in-memory
+  # Rekor storage path, and Fulcio must share its root with CTFE, so the root
+  # is generated at runtime (pki-material volume) rather than committed.
+  #
+  # Service topology, command flags, healthchecks, and startup ordering follow
+  # Sigstore's reference compose (which BUILDS Trillian+Rekor from source; we
+  # substitute published, digest-pinned images):
+  #   https://github.com/sigstore/rekor/blob/main/docker-compose.yml
+  # Image sources: gcr.io/projectsigstore/*, gcr.io/trillian-opensource-ci/*,
+  # ghcr.io/dexidp/dex. To bump versions, resolve a new tag from those
+  # registries and re-pin the digest. The `latest`-tagged Trillian images are
+  # digest-pinned and therefore immutable despite the floating tag.
+  dex-idp:
+    image: ghcr.io/dexidp/dex:v2.44.0@sha256:5d0656fce7d453c0e3b2706abf40c0d0ce5b371fb0b73b3cf714d05f35fa5f86
+    profiles: [verification]
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    volumes:
+      - ./dex-config.yaml:/etc/dex/config.yaml:ro
+    healthcheck:
+      test:
+        ["CMD", "wget", "-q", "-O", "-", "http://localhost:5556/dex/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 10s
+
+  fulcio:
+    image: gcr.io/projectsigstore/fulcio:v1.6.6@sha256:d543032eb2d905acffae26e2cb9c9961abc962510cef23af6f133d2c5118d4b5
+    profiles: [verification]
+    # File-based CA: a generated root (pki-material volume) is shared with the
+    # CT log (ctfe) so issued certs verify against it, and
+    # --ct-log-url points Fulcio at ctfe so every leaf embeds a Signed
+    # Certificate Timestamp. sigstore-go verification requires >=1 SCT, so an
+    # SCT-less ephemeral CA would fail the keyless path.
+    command:
+      - "serve"
+      - "--port=5555"
+      - "--ca=fileca"
+      - "--fileca-cert=/pki/root.pem"
+      - "--fileca-key=/pki/root.key"
+      - "--fileca-key-passwd=fulcio"
+      - "--ct-log-url=http://ctfe:6962/testlog"
+      - "--config-path=/etc/fulcio-config/config.yaml"
+    volumes:
+      - pki-material:/pki:ro
+      - ./fulcio-config.yaml:/etc/fulcio-config/config.yaml:ro
+    # No healthcheck: the fulcio image is distroless and ships no curl/wget, so
+    # any HTTP probe here can never run. sign-seed.sh waits on Fulcio via its own
+    # curl (it runs in a UBI image that has curl) before signing.
+    depends_on:
+      dex-idp:
+        condition: service_healthy
+      ctfe:
+        condition: service_started
+
+  mysql:
+    image: gcr.io/trillian-opensource-ci/db_server:v1.4.0@sha256:0794abd3bdf44a567f5d6ef18a0b76802f388611b63aae33eaf28c3b0c5964d8
+    profiles: [verification]
+    environment:
+      MYSQL_ROOT_PASSWORD: zaphod
+      MYSQL_DATABASE: test
+      MYSQL_USER: test
+      MYSQL_PASSWORD: zaphod
+    healthcheck:
+      # Credentials are hardcoded (matching the environment block above) rather
+      # than referencing $MYSQL_USER/$MYSQL_ROOT_PASSWORD: podman-compose runs
+      # the healthcheck as a direct argv exec (no shell), so $$-escaped vars are
+      # not expanded and would authenticate as the literal user "$MYSQL_USER".
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "-h",
+          "127.0.0.1",
+          "--user=test",
+          "--password=zaphod",
+          "-s",
+          "ping",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 90s
+
+  trillian-log-server:
+    image: gcr.io/trillian-opensource-ci/log_server:latest@sha256:b39e1c19162c43473985fbc0ee4ec1edc1db2f3699a2c2afeabcc49a64423d82
+    profiles: [verification]
+    command:
+      - "--quota_system=noop"
+      - "--storage_system=mysql"
+      - "--mysql_uri=test:zaphod@tcp(mysql:3306)/test?parseTime=true&interpolateParams=true"
+      - "--rpc_endpoint=0.0.0.0:8090"
+      - "--http_endpoint=0.0.0.0:8091"
+      - "--alsologtostderr"
+    # No healthcheck: the trillian log_server image is distroless (no curl/wget),
+    # so an HTTP probe cannot run. Dependents wait via app-level readiness
+    # (createtree-init nc-waits :8090; sign-seed waits on downstream services).
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  trillian-log-signer:
+    image: gcr.io/trillian-opensource-ci/log_signer:latest@sha256:e76b1643e5a5cb6a28977ddadac6a2caecde94b9ee2f1416ac28803e2aa6afb8
+    profiles: [verification]
+    command:
+      - "--quota_system=noop"
+      - "--storage_system=mysql"
+      - "--mysql_uri=test:zaphod@tcp(mysql:3306)/test?parseTime=true&interpolateParams=true"
+      - "--rpc_endpoint=0.0.0.0:8090"
+      - "--http_endpoint=0.0.0.0:8091"
+      - "--force_master"
+      - "--alsologtostderr"
+    # No healthcheck: distroless log_signer image ships no curl/wget.
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # Provisions the CT log: builds createtree (no published image exists), loads
+  # the CTFE issuance-chain schema into MySQL, creates a Trillian tree, and
+  # renders ct_server.cfg (with the runtime-generated CTFE public key) into the
+  # shared ctfe-config volume. Runs once and exits 0.
+  createtree-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.createtree
+    profiles: [verification]
+    depends_on:
+      mysql:
+        condition: service_healthy
+      trillian-log-server:
+        condition: service_started
+    volumes:
+      - ./ct_server.cfg.template:/input/ct_server.cfg.template:ro
+      - ./ctfe-schema.sql:/input/ctfe-schema.sql:ro
+      # pki-material is mounted at /pki (not /input) so that Docker can
+      # create the file bind-mount points above inside /input. Docker does
+      # not allow file bind-mounts inside a read-only volume mount at the
+      # same path; createtree-init.sh reads PKI files from PKI_DIR (/pki).
+      - pki-material:/pki:ro
+      - ctfe-config:/ctfe-config
+    environment:
+      PKI_DIR: /pki
+
+  # Certificate Transparency Front End (classic Trillian-backed). Serves the CT
+  # log at /testlog that Fulcio writes to, embedding an SCT in each cert. Reads
+  # the tree id + keys rendered by createtree-init from the shared volume.
+  ctfe:
+    image: gcr.io/trillian-opensource-ci/ctfe:latest@sha256:162fdf473f9bd777866b9314ab4a6eea1e83c35f29a04ef6310c56e604b0be0b
+    profiles: [verification]
+    command:
+      - "--log_rpc_server=trillian-log-server:8090"
+      - "--log_config=/ctfe-config/ct_server.cfg"
+      - "--http_endpoint=0.0.0.0:6962"
+      - "--alsologtostderr"
+    volumes:
+      - ctfe-config:/ctfe-config:ro
+    # No healthcheck: the ctfe image is distroless (no curl/wget). Ordering is
+    # enforced by createtree-init (which renders the config this reads) and by
+    # sign-seed.sh, which does not sign until Fulcio -> ctfe is reachable.
+    depends_on:
+      trillian-log-server:
+        condition: service_started
+      createtree-init:
+        condition: service_completed_successfully
+
+  rekor-server:
+    image: gcr.io/projectsigstore/rekor-server:v1.4.2@sha256:a8052cbed56cdfc6e134c5d405bce83458005cf9f8a9f627bc50b183785f1cbd
+    profiles: [verification]
+    # The image ENTRYPOINT is already "rekor-server"; the command must start
+    # with the "serve" subcommand (not repeat the binary name).
+    command:
+      - "serve"
+      - "--trillian_log_server.address=trillian-log-server"
+      - "--trillian_log_server.port=8090"
+      - "--rekor_server.address=0.0.0.0"
+      - "--rekor_server.signer=memory"
+      # Attestation (DSSE) storage is intentionally disabled: the keyless verify
+      # path only needs Rekor tlog inclusion for the signature, and the
+      # distroless image has no /var/run/attestations dir (rekor panics if
+      # --enable_attestation_storage points at a missing bucket path).
+      - "--search_index.storage_provider=mysql"
+      - "--search_index.mysql.dsn=test:zaphod@tcp(mysql:3306)/test?parseTime=true&interpolateParams=true"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      trillian-log-server:
+        condition: service_started
+    ports:
+      - "3000:3000"
+      - "2112:2112"
+    # No healthcheck: the rekor-server image is distroless (no curl/wget).
+    # sign-seed.sh waits on Rekor via its own curl before signing.
+
+volumes:
+  verification-shared:
+  ctfe-config:
+  pki-material:

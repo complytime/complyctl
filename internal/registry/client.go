@@ -83,10 +83,26 @@ func (c *Client) NewRemoteRepository(ctx context.Context, policyID string) (*rem
 }
 
 func (c *Client) registryHost() string {
-	host := c.registryURL
+	return NormalizeHost(c.registryURL)
+}
+
+// NormalizeHost strips an optional http:// or https:// scheme and any trailing
+// slash from a registry host, yielding a bare host suitable for OCI reference
+// construction. Policy URLs may carry a scheme so callers can detect plain-HTTP
+// registries, but go-containerregistry's reference parser (used by signature
+// verification) rejects a scheme prefix, so the bare host is stored.
+func NormalizeHost(host string) string {
 	host = strings.TrimPrefix(host, "http://")
 	host = strings.TrimPrefix(host, "https://")
 	return strings.TrimSuffix(host, "/")
+}
+
+// SplitHostScheme normalizes a registry host and reports whether it used a
+// plain-HTTP scheme. insecure is true only when the raw host carried an
+// explicit "http://" prefix, so HTTPS remains the secure default and plain-HTTP
+// is opt-in per configured URL.
+func SplitHostScheme(host string) (normalized string, insecure bool) {
+	return NormalizeHost(host), strings.HasPrefix(host, "http://")
 }
 
 // buildRef constructs a fully qualified OCI reference from a registry host and

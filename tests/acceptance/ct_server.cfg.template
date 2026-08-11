@@ -1,0 +1,37 @@
+# CTFE (ct_server) configuration template for the acceptance verification stack.
+#
+# Proto-text form of configpb.LogConfig (single log). @TREE_ID@ is replaced at
+# runtime by createtree-init with the numeric Trillian tree id it provisions.
+#
+# The private key references the runtime-generated (pki-material volume) CTFE PEM key via keyspb.PEMKeyFile.
+# The key is legacy-PEM-encrypted (Proc-Type/DEK-Info, AES-256-CBC) with the
+# passphrase "ctfe": the ctfe image ships an older Trillian whose pemfile loader
+# rejects an empty password, so an unencrypted key fails with "empty password
+# for file". CTFE derives its public key from this private key, so no public_key
+# field is set here: a proto-text bytes field
+# cannot carry the raw DER of an EC key without tripping the parser's UTF-8
+# check. The derived key is the same EC key represented by
+# /pki/ctfe.pub (both come from privkey.pem), which is fed to
+# `cosign trusted-root create --ctfe-key` so SCTs still verify. public_key is
+# only required for mirror logs or a frozen STH, neither of which applies here
+# (see ctfe/config.go ValidateLogConfig).
+#
+# roots_pem_file points at the shared Fulcio fileca root so CTFE accepts the
+# certificates Fulcio issues. Issuance-chain ExtraData is stored in MySQL
+# (CTFE backend) rather than Trillian GRPC.
+config {
+  log_id: @TREE_ID@
+  prefix: "testlog"
+  roots_pem_file: "/ctfe-config/root.pem"
+  private_key: {
+    [type.googleapis.com/keyspb.PEMKeyFile] {
+      path: "/ctfe-config/privkey.pem"
+      password: "ctfe"
+    }
+  }
+  ext_key_usages: "CodeSigning"
+  max_merge_delay_sec: 86400
+  expected_merge_delay_sec: 120
+  ctfe_storage_connection_string: "mysql://test:zaphod@tcp(mysql:3306)/test"
+  extra_data_issuance_chain_storage_backend: ISSUANCE_CHAIN_STORAGE_BACKEND_CTFE
+}
