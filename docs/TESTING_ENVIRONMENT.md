@@ -335,7 +335,7 @@ running, you can add them to the `/bundles/` directory and re-run the
 ```bash
 mkdir -p /bundles/my-new-policy
 ```
-2. **Add required Gemara Files:**
+2. **Add required Gemara files:**
 ```bash
 # Create /bundles/my-new-policy/catalog.yaml
 # Create /bundles/my-new-policy/policy.yaml
@@ -346,7 +346,7 @@ mkdir -p /bundles/my-new-policy
 bash .devcontainer/scripts/post-create.sh
 ```
 
-#### What happens automatically:
+#### What happens automatically
 
 The `post-create.sh` script detects new bundles in `/bundles/` and automatically:
 
@@ -354,7 +354,7 @@ The `post-create.sh` script detects new bundles in `/bundles/` and automatically
 - Restarts the mock OCI registry to re-seed
 - Makes them available via `complyctl get`
 
-No manual `pkill` command is needed
+No manual `pkill` command is needed.
 
 **Note:** On subsequent runs without new bundles, the registry remains running and
 existing registrations are preserved. The script only restarts the registry when

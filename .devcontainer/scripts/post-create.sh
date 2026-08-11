@@ -237,8 +237,11 @@ if curl -sf http://localhost:8765/v2/ > /dev/null 2>&1; then
     # Registry is running - check if we need to restart because new bundles have been added
     if [[ "${NEW_BUNDLES_ADDED:-false}" == "true" ]]; then
         echo ">>> New bundles detected. Restarting mock OCI registry to re-seed..."
-        pkill -f mock-oci-registry || true
-        sleep 1
+        pkill mock-oci-registry || true
+        for i in {1..10}; do
+            curl -sf http://localhost:8765/v2/ > /dev/null 2>&1 || break
+            sleep 0.5
+        done
         # Fall through to start registry with new bundles
     else
         echo ">>> Mock OCI registry already running on port 8765 (no new bundles)."
