@@ -27,11 +27,14 @@ func CatalogToMarkdown(ctx context.Context, catalog gemara.ControlCatalog, cfg C
 	var lexEntries []lexiconEntry
 	switch {
 	case cfg.LexiconAutolink && catalog.Metadata.Lexicon != nil:
+		if cfg.Fetcher == nil {
+			return nil, fmt.Errorf("lexicon autolink requires a non-nil Fetcher")
+		}
 		lexiconURI, err := resolveLexiconURL(catalog.Metadata)
 		if err != nil {
 			return nil, fmt.Errorf("lexicon: resolve URL: %w", err)
 		}
-		loaded, err := loadLexiconFromURI(ctx, lexiconURI)
+		loaded, err := loadLexiconFromURI(ctx, cfg.Fetcher, lexiconURI)
 		if err != nil {
 			return nil, fmt.Errorf("lexicon: %w", err)
 		}

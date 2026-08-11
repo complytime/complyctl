@@ -19,6 +19,11 @@ var (
 	unknownAssessmentStep = func(interface{}) (Result, string, ConfidenceLevel) {
 		return Unknown, "", Undetermined
 	}
+	// notApplicableAssessmentStep models a scope guard: a step that determines the
+	// requirement does not apply to the target at all.
+	notApplicableAssessmentStep = func(interface{}) (Result, string, ConfidenceLevel) {
+		return NotApplicable, "out of scope for this target", High
+	}
 )
 
 func failingAssessmentPtr() *AssessmentLog {
@@ -89,6 +94,27 @@ func unknownAssessment() AssessmentLog {
 		Steps: []AssessmentStep{
 			passingAssessmentStep,
 			unknownAssessmentStep,
+			passingAssessmentStep,
+		},
+		Applicability: testingApplicability,
+	}
+}
+
+func notApplicableAssessmentPtr() *AssessmentLog {
+	a := notApplicableAssessment()
+	return &a
+}
+
+// notApplicableAssessment leads with a scope guard, so the trailing passing step
+// must never execute.
+func notApplicableAssessment() AssessmentLog {
+	return AssessmentLog{
+		Requirement: EntryMapping{
+			EntryId: "notApplicableAssessment()",
+		},
+		Description: "not applicable assessment",
+		Steps: []AssessmentStep{
+			notApplicableAssessmentStep,
 			passingAssessmentStep,
 		},
 		Applicability: testingApplicability,

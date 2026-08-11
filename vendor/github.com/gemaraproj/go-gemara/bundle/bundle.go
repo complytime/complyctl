@@ -111,6 +111,22 @@ func (b *Bundle) Version() string {
 	return b.Manifest.BundleVersion
 }
 
+// AssembleOption configures Assemble behaviour.
+type AssembleOption func(*assembleOptions)
+
+type assembleOptions struct {
+	continueOnError bool
+}
+
+// WithContinueOnError makes Assemble populate Bundle.Warnings instead of
+// returning an error when mapping-reference IDs don't match any artifact
+// metadata.id in the assembled set.
+func WithContinueOnError() AssembleOption {
+	return func(o *assembleOptions) {
+		o.continueOnError = true
+	}
+}
+
 // PackOption configures Pack behaviour.
 type PackOption func(*packOptions)
 

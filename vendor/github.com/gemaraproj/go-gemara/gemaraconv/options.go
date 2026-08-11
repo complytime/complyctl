@@ -72,8 +72,8 @@ type markdownOpts struct {
 	lineEnding          string
 	metadata            bool
 	applicabilityMatrix bool
-	lexiconAutolink     bool
 	inlineLexicon       []InlineLexiconTerm
+	fetcher             gemara.Fetcher
 }
 
 func defaultMarkdownOpts() markdownOpts {
@@ -122,12 +122,20 @@ func WithApplicabilityMatrix(enabled bool) MarkdownOption {
 	}
 }
 
-// WithLexiconAutolink enables loading metadata.lexicon from mapping-references (or remarks URL),
-// strict Gemara Lexicon YAML, term autolinking in prose, and a trailing glossary (default false).
-// When enabled and metadata.lexicon is set, this takes precedence over WithInlineLexicon.
-func WithLexiconAutolink(enabled bool) MarkdownOption {
+// WithLexiconAutolink enables loading the lexicon referenced in metadata.lexicon
+// (via mapping-references or remarks URL), term autolinking in prose, and a
+// trailing glossary. The provided [gemara.Fetcher] is used to load the lexicon
+// document. When enabled and metadata.lexicon is set, this takes precedence
+// over [WithInlineLexicon].
+//
+// See [fetcher.ExampleURI_ssrfSafe] for an example that blocks requests to
+// private network addresses.
+func WithLexiconAutolink(f gemara.Fetcher) MarkdownOption {
+	if f == nil {
+		panic("WithLexiconAutolink requires a non-nil Fetcher")
+	}
 	return func(o *markdownOpts) {
-		o.lexiconAutolink = enabled
+		o.fetcher = f
 	}
 }
 

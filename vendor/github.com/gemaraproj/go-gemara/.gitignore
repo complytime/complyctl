@@ -36,3 +36,9 @@ go.work.sum
 artifacts/
 # Local schema copy
 schema.cue
+
+# ignore local git worktrees
+.worktrees/
+
+# do not commit AI assistant artifacts
+.claude

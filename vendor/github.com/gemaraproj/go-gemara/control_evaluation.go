@@ -12,9 +12,16 @@ func (c *ControlEvaluation) AddAssessment(requirementId string, description stri
 }
 
 // Evaluate runs each step in each assessment, updating the relevant fields on the control evaluation.
-// It will halt if a step returns a failed result. The targetData is the data that the assessment will be run against.
-// The userApplicability is a slice of strings that determine when the assessment is applicable. The changesAllowed
-// determines whether the assessment is allowed to execute its changes.
+// Every applicable assessment (sub-requirement) is evaluated independently; a failing sub-requirement
+// must not suppress evaluation of its siblings. The control's aggregate result is accumulated via
+// UpdateAggregateResult, so an earlier Failed still wins the rollup without skipping later assessments.
+// Message retains the first assessment message that establishes the aggregate result's current severity;
+// tied results do not replace it. Each assessment's own result and message remain in AssessmentLogs so
+// consumers can report every condition rather than relying only on the control-level summary.
+// Consequently, a later sibling's steps may produce side effects after an earlier assessment fails;
+// each assessment retains its own step-level fail-fast behavior.
+// The targetData is the data that the assessment will be run against. The userApplicability is a slice
+// of strings that determine when the assessment is applicable.
 func (c *ControlEvaluation) Evaluate(targetData interface{}, userApplicability []string) {
 	if len(c.AssessmentLogs) == 0 {
 		c.Result = NeedsReview
@@ -32,11 +39,11 @@ func (c *ControlEvaluation) Evaluate(targetData interface{}, userApplicability [
 		}
 		if applicable {
 			result := assessment.Run(targetData)
-			c.Result = UpdateAggregateResult(c.Result, result)
-			c.Message = assessment.Message
-			if c.Result == Failed {
-				break
+			aggregateResult := UpdateAggregateResult(c.Result, result)
+			if aggregateResult != c.Result {
+				c.Message = assessment.Message
 			}
+			c.Result = aggregateResult
 		}
 	}
 }

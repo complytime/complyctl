@@ -1011,9 +1011,16 @@ func UpdateAggregateResult(previous Result, new Result) Result {
 	}
 
 	if previous == NeedsReview || new == NeedsReview {
-		// NeedsReview should not be overwritten by Passed
-		// NeedsReview should overwrite Passed
+		// NeedsReview should not be overwritten by Passed or NotApplicable
+		// NeedsReview should overwrite Passed and NotApplicable
 		return NeedsReview
 	}
-	return Passed
+
+	if previous == Passed || new == Passed {
+		// Passed should not be overwritten by NotApplicable
+		// Passed should overwrite NotApplicable
+		return Passed
+	}
+
+	return NotApplicable
 }

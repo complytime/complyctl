@@ -21,8 +21,9 @@ func CatalogToMarkdown(ctx context.Context, catalog gemara.ControlCatalog, opts 
 		LineEnding:          o.lineEnding,
 		Metadata:            o.metadata,
 		ApplicabilityMatrix: o.applicabilityMatrix,
-		LexiconAutolink:     o.lexiconAutolink,
+		LexiconAutolink:     o.fetcher != nil,
 		InlineLexicon:       o.inlineLexicon,
+		Fetcher:             o.fetcher,
 	}
 	return markdown.CatalogToMarkdown(ctx, catalog, cfg)
 }

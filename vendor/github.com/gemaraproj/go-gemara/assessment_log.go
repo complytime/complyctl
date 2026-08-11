@@ -135,7 +135,9 @@ func (a *AssessmentLog) runStep(targetData interface{}, step AssessmentStep) Res
 	return result
 }
 
-// Run will execute all steps, halting if any step does not return Passed.
+// Run executes the steps in order, halting early on the first step that returns
+// Failed or NotApplicable. Every other result aggregates into a.Result via
+// UpdateAggregateResult and execution continues.
 func (a *AssessmentLog) Run(targetData interface{}) Result {
 	a.Result = NotRun
 
@@ -146,12 +148,28 @@ func (a *AssessmentLog) Run(targetData interface{}) Result {
 		a.ConfidenceLevel = Undetermined
 		return a.Result
 	}
+
+	// Stamp the end time on every path that ran at least one step, including the
+	// early returns below.
+	defer func() {
+		a.End = Datetime(time.Now().Format(time.RFC3339))
+	}()
+
 	for _, step := range a.Steps {
-		if a.runStep(targetData, step) == Failed {
-			return Failed
+		switch a.runStep(targetData, step) {
+		case Failed:
+			// runStep has already aggregated Failed into a.Result, and nothing
+			// outranks it.
+			return a.Result
+		case NotApplicable:
+			// Do not continue if a step determines that the assessment is not applicable
+			// UpdateAggregateResult treats NotApplicable as the
+			// weakest non-NotRun value, so any prior result would absorb it. Correct for rollup for control
+			// evaluation, but in a step-level scope guard it must win unconditionally.
+			a.Result = NotApplicable
+			return a.Result
 		}
 	}
-	a.End = Datetime(time.Now().Format(time.RFC3339))
 	return a.Result
 }
 
