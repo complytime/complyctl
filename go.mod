@@ -8,7 +8,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/log v1.0.0
 	github.com/charmbracelet/x/term v0.2.2
-	github.com/complytime/complypack v0.0.8
+	github.com/complytime/complypack v0.0.9
 	github.com/defenseunicorns/go-oscal v0.7.1
 	github.com/gemaraproj/go-gemara v0.9.1
 	github.com/goccy/go-yaml v1.19.2
