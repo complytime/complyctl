@@ -3,7 +3,9 @@
 package output_test
 
 import (
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gemaraproj/go-gemara"
@@ -219,7 +221,7 @@ func TestEvaluator_Write(t *testing.T) {
 		{RequirementID: "R1", Steps: []provider.Step{{Result: provider.ResultPassed, Message: "ok"}}},
 	})
 
-	path, err := eval.Write(outDir)
+	path, err := eval.Write(outDir, "yaml")
 	require.NoError(t, err)
 	assert.FileExists(t, path)
 	assert.Contains(t, path, "evaluation-log-test-policy-target-1-")
@@ -251,7 +253,7 @@ func TestEvaluator_Write_StepIdentityWithComplypackRef(t *testing.T) {
 		},
 	})
 
-	path, err := eval.Write(outDir)
+	path, err := eval.Write(outDir, "yaml")
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(path)
@@ -275,7 +277,7 @@ func TestEvaluator_Write_StepIdentityWithoutComplypack(t *testing.T) {
 		},
 	})
 
-	path, err := eval.Write(outDir)
+	path, err := eval.Write(outDir, "yaml")
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(path)
@@ -350,7 +352,7 @@ func TestEvaluator_Write_EvidenceSerialized(t *testing.T) {
 		},
 	})
 
-	path, err := eval.Write(outDir)
+	path, err := eval.Write(outDir, "yaml")
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(path)
@@ -400,7 +402,7 @@ func TestEvaluator_Write_StepIdentityEmptyName(t *testing.T) {
 		},
 	})
 
-	path, err := eval.Write(outDir)
+	path, err := eval.Write(outDir, "yaml")
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(path)
@@ -409,4 +411,100 @@ func TestEvaluator_Write_StepIdentityEmptyName(t *testing.T) {
 	assert.NotContains(t, content, "providerStepToGemara")
 	assert.Contains(t, content, "steps:\n    - \"\"",
 		"empty step name should produce an empty-string step identity")
+}
+
+func TestEvaluator_Write_JSON(t *testing.T) {
+	outDir := t.TempDir()
+	eval := output.NewEvaluator("test-policy", "target-1", nil, nil, nil)
+	eval.AddTarget([]provider.AssessmentLog{
+		{RequirementID: "R1", Steps: []provider.Step{{Result: provider.ResultPassed, Message: "ok"}}},
+	})
+
+	path, err := eval.Write(outDir, "json")
+	require.NoError(t, err)
+	assert.FileExists(t, path)
+	assert.True(t, strings.HasSuffix(path, ".json"), "file should have .json extension")
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	// Verify the output is valid JSON.
+	assert.True(t, json.Valid(data), "output should be valid JSON")
+
+	// Verify structural content by unmarshalling with value assertions.
+	var parsed map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &parsed))
+	assert.Contains(t, parsed, "metadata")
+	assert.Contains(t, parsed, "result")
+	assert.Contains(t, parsed, "evaluations")
+	assert.Contains(t, parsed, "target")
+
+	// Verify specific values round-trip correctly.
+	assert.Equal(t, "Passed", parsed["result"])
+	metadata, ok := parsed["metadata"].(map[string]interface{})
+	require.True(t, ok, "metadata should be a map")
+	assert.Equal(t, "EvaluationLog", metadata["type"])
+	assert.Equal(t, "test-policy", metadata["id"])
+	evaluations, ok := parsed["evaluations"].([]interface{})
+	require.True(t, ok, "evaluations should be an array")
+	assert.NotEmpty(t, evaluations)
+}
+
+func TestEvaluator_Write_JSON_FieldNames(t *testing.T) {
+	outDir := t.TempDir()
+	reqToPlan := map[string]string{"req-1": "plan-1"}
+	eval := output.NewEvaluator("pol", "tgt", nil, reqToPlan, nil)
+	eval.AddTarget([]provider.AssessmentLog{
+		{
+			RequirementID: "req-1",
+			Steps:         []provider.Step{{Name: "check", Result: provider.ResultFailed, Message: "bad"}},
+			Evidence: []provider.Evidence{
+				{ID: "ev-1", Type: "config-file", Description: "snippet", Payload: []byte("data")},
+			},
+			Recommendation: "Fix it",
+		},
+	})
+
+	path, err := eval.Write(outDir, "json")
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+
+	// Verify kebab-case field names from shadow structs.
+	assert.Contains(t, content, `"assessment-logs"`)
+	assert.Contains(t, content, `"steps-executed"`)
+
+	// Verify embedded gemara types use their own kebab-case tags.
+	assert.Contains(t, content, `"gemara-version"`)
+	assert.Contains(t, content, `"reference-id"`)
+	assert.Contains(t, content, `"entry-id"`)
+
+	// Verify no camelCase or PascalCase field names leak through.
+	assert.NotContains(t, content, `"AssessmentLogs"`)
+	assert.NotContains(t, content, `"assessmentLogs"`)
+	assert.NotContains(t, content, `"StepsExecuted"`)
+	assert.NotContains(t, content, `"GemaraVersion"`)
+}
+
+func TestEvaluator_Write_YAML_Default(t *testing.T) {
+	outDir := t.TempDir()
+	eval := output.NewEvaluator("test-policy", "target-1", nil, nil, nil)
+	eval.AddTarget([]provider.AssessmentLog{
+		{RequirementID: "R1", Steps: []provider.Step{{Result: provider.ResultPassed, Message: "ok"}}},
+	})
+
+	path, err := eval.Write(outDir, "yaml")
+	require.NoError(t, err)
+	assert.True(t, strings.HasSuffix(path, ".yaml"), "file should have .yaml extension")
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+
+	// YAML output should contain YAML-style fields, not JSON braces.
+	assert.Contains(t, content, "result: Passed")
+	assert.Contains(t, content, "type: EvaluationLog")
+	assert.NotContains(t, content, `"result":`, "YAML output should not contain JSON-style fields")
 }

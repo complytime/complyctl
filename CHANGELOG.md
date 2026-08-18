@@ -58,6 +58,14 @@
 
 ### Added
 
+- `complyctl scan --log-format yaml|json` flag to select the
+  EvaluationLog serialization format. Default remains `yaml`.
+  `--log-format json` produces a JSON file with 2-space indented
+  output using kebab-case field names matching the upstream
+  go-gemara schema. The `COMPLYTIME_LOG_FORMAT` environment
+  variable provides an alternative to the flag; the flag takes
+  precedence when both are set. (#795)
+
 - `complyctl doctor --format text|json` flag for machine-readable
   output. `--format text` produces grep-stable `[PASS]`/`[FAIL]`/
   `[WARN]` labels without emoji; `--format json` produces structured

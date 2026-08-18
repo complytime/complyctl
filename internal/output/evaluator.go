@@ -4,6 +4,7 @@ package output
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/gemaraproj/go-gemara"
 	"github.com/goccy/go-yaml"
 
+	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/pkg/provider"
 )
 
@@ -135,14 +137,26 @@ func (e *Evaluator) GemaraLog() *gemara.EvaluationLog {
 	}
 }
 
-// Write serializes the evaluation log as YAML to outDir and returns the path.
-// It uses a shadow struct to replace gemara.AssessmentStep function closures
-// with human-readable step identity strings.
-func (e *Evaluator) Write(outDir string) (string, error) {
+// Write serializes the evaluation log to outDir and returns the path.
+// The logFormat parameter selects the serialization format: "json" produces
+// JSON with 2-space indentation; any other value (including "yaml") produces
+// YAML. It uses a shadow struct to replace gemara.AssessmentStep function
+// closures with human-readable step identity strings.
+func (e *Evaluator) Write(outDir, logFormat string) (string, error) {
 	evalLog := e.GemaraLog()
 	serializable := e.toSerializable(evalLog)
 
-	data, err := yaml.Marshal(serializable)
+	var data []byte
+	var ext string
+	var err error
+
+	if logFormat == complytime.EvalLogFormatJSON {
+		ext = complytime.EvalLogFormatJSON
+		data, err = json.MarshalIndent(serializable, "", "  ")
+	} else {
+		ext = complytime.EvalLogFormatYAML
+		data, err = yaml.Marshal(serializable)
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal evaluation log: %w", err)
 	}
@@ -151,7 +165,7 @@ func (e *Evaluator) Write(outDir string) (string, error) {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	filename := BuildReportFilename("evaluation-log", e.policyID, e.targetID, "yaml")
+	filename := BuildReportFilename("evaluation-log", e.policyID, e.targetID, ext)
 	path := filepath.Join(outDir, filename)
 	if err := os.WriteFile(path, data, 0600); err != nil {
 		return "", fmt.Errorf("failed to write evaluation log: %w", err)
@@ -287,34 +301,34 @@ func payloadToString(b []byte) string {
 // (function type) with Steps []string (identity strings) for YAML serialization.
 
 type serializableEvaluationLog struct {
-	Metadata    gemara.Metadata                  `yaml:"metadata"`
-	Result      gemara.Result                    `yaml:"result"`
-	Evaluations []*serializableControlEvaluation `yaml:"evaluations"`
-	Target      gemara.Resource                  `yaml:"target"`
+	Metadata    gemara.Metadata                  `json:"metadata" yaml:"metadata"`
+	Result      gemara.Result                    `json:"result" yaml:"result"`
+	Evaluations []*serializableControlEvaluation `json:"evaluations" yaml:"evaluations"`
+	Target      gemara.Resource                  `json:"target" yaml:"target"`
 }
 
 type serializableControlEvaluation struct {
-	Name           string                       `yaml:"name"`
-	Result         gemara.Result                `yaml:"result"`
-	Message        string                       `yaml:"message"`
-	Control        gemara.EntryMapping          `yaml:"control"`
-	AssessmentLogs []*serializableAssessmentLog `yaml:"assessment-logs"`
+	Name           string                       `json:"name" yaml:"name"`
+	Result         gemara.Result                `json:"result" yaml:"result"`
+	Message        string                       `json:"message" yaml:"message"`
+	Control        gemara.EntryMapping          `json:"control" yaml:"control"`
+	AssessmentLogs []*serializableAssessmentLog `json:"assessment-logs" yaml:"assessment-logs"`
 }
 
 type serializableAssessmentLog struct {
-	Requirement     gemara.EntryMapping    `yaml:"requirement"`
-	Plan            *gemara.EntryMapping   `yaml:"plan,omitempty"`
-	Description     string                 `yaml:"description"`
-	Result          gemara.Result          `yaml:"result"`
-	Message         string                 `yaml:"message"`
-	Applicability   []string               `yaml:"applicability"`
-	Steps           []string               `yaml:"steps"`
-	StepsExecuted   int64                  `yaml:"steps-executed,omitempty"`
-	Start           gemara.Datetime        `yaml:"start"`
-	End             gemara.Datetime        `yaml:"end,omitempty"`
-	Recommendation  string                 `yaml:"recommendation,omitempty"`
-	ConfidenceLevel gemara.ConfidenceLevel `yaml:"confidence-level,omitempty"`
-	Evidence        []gemara.Evidence      `yaml:"evidence,omitempty"`
+	Requirement     gemara.EntryMapping    `json:"requirement" yaml:"requirement"`
+	Plan            *gemara.EntryMapping   `json:"plan,omitempty" yaml:"plan,omitempty"`
+	Description     string                 `json:"description" yaml:"description"`
+	Result          gemara.Result          `json:"result" yaml:"result"`
+	Message         string                 `json:"message" yaml:"message"`
+	Applicability   []string               `json:"applicability" yaml:"applicability"`
+	Steps           []string               `json:"steps" yaml:"steps"`
+	StepsExecuted   int64                  `json:"steps-executed,omitempty" yaml:"steps-executed,omitempty"`
+	Start           gemara.Datetime        `json:"start" yaml:"start"`
+	End             gemara.Datetime        `json:"end,omitempty" yaml:"end,omitempty"`
+	Recommendation  string                 `json:"recommendation,omitempty" yaml:"recommendation,omitempty"`
+	ConfidenceLevel gemara.ConfidenceLevel `json:"confidence-level,omitempty" yaml:"confidence-level,omitempty"`
+	Evidence        []gemara.Evidence      `json:"evidence,omitempty" yaml:"evidence,omitempty"`
 }
 
 // formatStepIdentity produces a step identity string. When complypackRef is

@@ -40,6 +40,20 @@ const (
 // provided on the command line.
 const ShowPassingEnvVar = "COMPLYTIME_SHOW_PASSING"
 
+// EvalLogFormatEnvVar is the environment variable that selects the
+// EvaluationLog serialization format ("yaml" or "json"). When set, it
+// overrides the default ("yaml") unless --log-format is explicitly
+// provided on the command line.
+const EvalLogFormatEnvVar = "COMPLYTIME_LOG_FORMAT"
+
+// EvalLogFormat constants define the valid serialization formats for
+// EvaluationLog output. These are distinct from OutputFormat* constants
+// which control secondary report formats (OSCAL, SARIF, Markdown).
+const (
+	EvalLogFormatYAML = "yaml"
+	EvalLogFormatJSON = "json"
+)
+
 const ScanOutputDir = "scan"
 
 // LogFileName is the log file name written to {WorkspaceDir}/{LogFileName}.

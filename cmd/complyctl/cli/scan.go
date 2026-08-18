@@ -28,6 +28,7 @@ type scanOptions struct {
 	target      string
 	policyID    string
 	format      string
+	logFormat   string
 	timeout     time.Duration
 	cacheDir    string
 	dataDir     string
@@ -103,6 +104,10 @@ EXIT CODES:
 					o.showPassing = parsed
 				}
 			}
+			o.logFormat = resolveLogFormat(o.logFormat, cmd.Flags().Changed("log-format"))
+			if err := validateLogFormat(o.logFormat); err != nil {
+				return err
+			}
 			return o.run(cmd.Context())
 		},
 	}
@@ -111,6 +116,14 @@ EXIT CODES:
 	cmd.Flags().DurationVarP(&o.timeout, "timeout", "t", complytime.DefaultCommandTimeout, "Maximum time for the scan operation (e.g. 5m, 10m, 1h)")
 	cmd.Flags().BoolVar(&o.showPassing, "show-passing", true,
 		fmt.Sprintf("Include passing controls in scan summary table (env: %s)", complytime.ShowPassingEnvVar))
+	cmd.Flags().StringVar(&o.logFormat, "log-format", complytime.EvalLogFormatYAML,
+		fmt.Sprintf("EvaluationLog serialization format: %s, %s (env: %s)",
+			complytime.EvalLogFormatYAML, complytime.EvalLogFormatJSON, complytime.EvalLogFormatEnvVar))
+	if err := cmd.RegisterFlagCompletionFunc("log-format", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return []string{complytime.EvalLogFormatYAML, complytime.EvalLogFormatJSON}, cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		logger.Error("Failed to register log-format completion", "error", err)
+	}
 	if err := cmd.RegisterFlagCompletionFunc("format", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 		return []string{complytime.OutputFormatOSCAL, complytime.OutputFormatPretty, complytime.OutputFormatSARIF}, cobra.ShellCompDirectiveNoFileComp
 	}); err != nil {
@@ -144,6 +157,31 @@ func completeTargetIDs(_ *cobra.Command, args []string, _ string) ([]string, cob
 		ids = append(ids, t.ID)
 	}
 	return ids, cobra.ShellCompDirectiveNoFileComp
+}
+
+// resolveLogFormat returns the effective log format value by applying env var
+// override logic. When flagChanged is false and COMPLYTIME_LOG_FORMAT is set
+// to a non-empty value, the env var value overrides flagValue.
+func resolveLogFormat(flagValue string, flagChanged bool) string {
+	logFormat := flagValue
+	if !flagChanged {
+		if envVal := os.Getenv(complytime.EvalLogFormatEnvVar); envVal != "" {
+			logFormat = envVal
+		}
+	}
+	return logFormat
+}
+
+// validateLogFormat returns an error when logFormat is not a recognized value.
+// Valid values are "yaml" and "json" (case-sensitive).
+func validateLogFormat(logFormat string) error {
+	switch logFormat {
+	case complytime.EvalLogFormatYAML, complytime.EvalLogFormatJSON:
+		return nil
+	default:
+		return fmt.Errorf("invalid log format %q: must be one of %s, %s",
+			logFormat, complytime.EvalLogFormatYAML, complytime.EvalLogFormatJSON)
+	}
 }
 
 func (o *scanOptions) validate() error {
@@ -315,7 +353,7 @@ func (o *scanOptions) scanPolicy(ctx context.Context, cfg *complytime.WorkspaceC
 	fmt.Println(output.FormatPreScanSummary(len(assessmentConfigs), evaluatorIDs, targetIDs))
 
 	reqToComplypackRef := buildReqToComplypackRef(o.dataDir, groups)
-	return runScanAndReport(ctx, o.format, mgr, groups, reqToComplypackRef, policyTargets, ref.Repository, eid, graph, targetIDs, baseDir, o.showPassing)
+	return runScanAndReport(ctx, o.format, o.logFormat, mgr, groups, reqToComplypackRef, policyTargets, ref.Repository, eid, graph, targetIDs, baseDir, o.showPassing)
 }
 
 func resolveVersionAndGraph(cacheDir string, ref complytime.PolicyRef) (string, *policy.DependencyGraph, error) {
@@ -382,7 +420,7 @@ func ensureGenerated(ctx context.Context, cacheDir, dataDir, baseDir string, mgr
 // runScanAndReport executes the scan across all targets and processes the
 // combined output (reports + error checking). It delegates post-scan handling
 // to processScanOutput.
-func runScanAndReport(ctx context.Context, format string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, reqToComplypackRef map[string]string, policyTargets []complytime.TargetConfig, repository, eid string, graph *policy.DependencyGraph, targetIDs []string, baseDir string, showPassing bool) error {
+func runScanAndReport(ctx context.Context, format, logFormat string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, reqToComplypackRef map[string]string, policyTargets []complytime.TargetConfig, repository, eid string, graph *policy.DependencyGraph, targetIDs []string, baseDir string, showPassing bool) error {
 	planToReq := extractPlanToReqMap(graph)
 	mappings := resolvedMappings{
 		reqToControl:       extractReqToControlMap(graph),
@@ -396,21 +434,21 @@ func runScanAndReport(ctx context.Context, format string, mgr *provider.Manager,
 	}
 
 	resolveAssessmentIDs(scanOut.assessments, planToReq)
-	return processScanOutput(format, scanOut, repository, &mappings, policyTargets, eid, targetIDs, baseDir, showPassing)
+	return processScanOutput(format, logFormat, scanOut, repository, &mappings, policyTargets, eid, targetIDs, baseDir, showPassing)
 }
 
 // processScanOutput handles post-scan output: prints operational warnings to
 // stderr, writes evaluation reports, and returns an error when operational
 // failures are present (triggering non-zero exit). Reports are always written
 // before the error return so partial results remain available.
-func processScanOutput(format string, scanOut *scanOutput, repository string, mappings *resolvedMappings, policyTargets []complytime.TargetConfig, eid string, targetIDs []string, baseDir string, showPassing bool) error {
+func processScanOutput(format, logFormat string, scanOut *scanOutput, repository string, mappings *resolvedMappings, policyTargets []complytime.TargetConfig, eid string, targetIDs []string, baseDir string, showPassing bool) error {
 	reportOperationalWarnings(scanOut.errors)
 
 	evaluators := buildEvaluators(repository, mappings, policyTargets, scanOut.assessments, scanOut.assessmentTargets)
 
 	outDir := filepath.Join(baseDir, complytime.WorkspaceDir, complytime.ScanOutputDir)
 	for _, eval := range evaluators {
-		if err := writeScanReports(format, eval, outDir, repository); err != nil {
+		if err := writeScanReports(format, logFormat, eval, outDir, repository); err != nil {
 			return err
 		}
 	}
@@ -674,8 +712,8 @@ func scanSingleTarget(ctx context.Context, mgr *provider.Manager, groups map[str
 	return results, operationalErrors, nil
 }
 
-func writeScanReports(format string, eval *output.Evaluator, outDir, repository string) error {
-	logPath, err := eval.Write(outDir)
+func writeScanReports(format, logFormat string, eval *output.Evaluator, outDir, repository string) error {
+	logPath, err := eval.Write(outDir, logFormat)
 	if err != nil {
 		return fmt.Errorf("failed to write evaluation log: %w", err)
 	}

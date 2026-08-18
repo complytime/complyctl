@@ -110,6 +110,55 @@ func TestScanOptions_Validate_ValidFormats(t *testing.T) {
 	}
 }
 
+func TestValidateLogFormat_ValidValues(t *testing.T) {
+	for _, f := range []string{"yaml", "json"} {
+		assert.NoError(t, validateLogFormat(f), "log format %q should be valid", f)
+	}
+}
+
+func TestValidateLogFormat_InvalidValues(t *testing.T) {
+	for _, f := range []string{"xml", "YAML", "JSON", "csv", ""} {
+		err := validateLogFormat(f)
+		require.Error(t, err, "log format %q should be invalid", f)
+		assert.Contains(t, err.Error(), "invalid log format")
+	}
+}
+
+func TestValidateLogFormat_UsesConstants(t *testing.T) {
+	// Verify the function accepts the named constants.
+	assert.NoError(t, validateLogFormat(complytime.EvalLogFormatYAML))
+	assert.NoError(t, validateLogFormat(complytime.EvalLogFormatJSON))
+}
+
+func TestResolveLogFormat_EnvVarApplied(t *testing.T) {
+	t.Setenv(complytime.EvalLogFormatEnvVar, "json")
+	got := resolveLogFormat("yaml", false)
+	assert.Equal(t, "json", got, "env var should override default when flag is not set")
+	assert.NoError(t, validateLogFormat(got))
+}
+
+func TestResolveLogFormat_FlagPrecedence(t *testing.T) {
+	t.Setenv(complytime.EvalLogFormatEnvVar, "json")
+	got := resolveLogFormat("yaml", true)
+	assert.Equal(t, "yaml", got, "flag value should take precedence over env var")
+	assert.NoError(t, validateLogFormat(got))
+}
+
+func TestResolveLogFormat_InvalidEnvVar(t *testing.T) {
+	t.Setenv(complytime.EvalLogFormatEnvVar, "xml")
+	got := resolveLogFormat("yaml", false)
+	assert.Equal(t, "xml", got, "invalid env var value should pass through for validation")
+	err := validateLogFormat(got)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid log format")
+}
+
+func TestResolveLogFormat_EmptyEnvVar(t *testing.T) {
+	t.Setenv(complytime.EvalLogFormatEnvVar, "")
+	got := resolveLogFormat("yaml", false)
+	assert.Equal(t, "yaml", got, "empty env var should leave default intact")
+}
+
 // --- target resolution tests ---
 
 // multiPolicyConfig has a target referencing two policies for disambiguation tests.
@@ -1177,7 +1226,7 @@ func TestProcessScanOutput_NoErrors_ReturnsNil(t *testing.T) {
 		reqToControl: map[string]string{"req-1": "ctrl-1"},
 	}
 
-	err = processScanOutput("", scanOut, "test-repo", mappings, policyTargets, "test-policy", []string{"target-1"}, tmpDir, true)
+	err = processScanOutput("", "yaml", scanOut, "test-repo", mappings, policyTargets, "test-policy", []string{"target-1"}, tmpDir, true)
 	assert.NoError(t, err)
 }
 
@@ -1208,7 +1257,7 @@ func TestProcessScanOutput_WithErrors_ReturnsError(t *testing.T) {
 		reqToControl: map[string]string{"req-1": "ctrl-1"},
 	}
 
-	err = processScanOutput("", scanOut, "test-repo", mappings, policyTargets, "test-policy", []string{"target-1"}, tmpDir, true)
+	err = processScanOutput("", "yaml", scanOut, "test-repo", mappings, policyTargets, "test-policy", []string{"target-1"}, tmpDir, true)
 	w.Close()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "1 operational error")
