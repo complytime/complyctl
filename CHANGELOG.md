@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Fixed
+
+- Scans where all controls are not-applicable now report
+  `NotApplicable` aggregate result instead of `Passed`. This
+  corrects a semantic error in upstream `go-gemara` result
+  aggregation fixed in v0.9.0. (#813)
+
+### Security
+
+- Transitive `oras-go` bump via `go-gemara` v0.9.1 addresses
+  CVE-2026-50163. (#813)
+
 ### Changed
 
 - **BREAKING**: User-scoped paths now follow the

@@ -74,6 +74,19 @@ func TestGemaraLog_AggregatesResult(t *testing.T) {
 			steps:    nil,
 			expected: gemara.NotRun,
 		},
+		{
+			name:     "all skipped yields NotApplicable",
+			steps:    []provider.Step{{Result: provider.ResultSkipped, Message: "n/a"}},
+			expected: gemara.NotApplicable,
+		},
+		{
+			name: "mixed passed and skipped yields Passed",
+			steps: []provider.Step{
+				{Result: provider.ResultPassed, Message: "ok"},
+				{Result: provider.ResultSkipped, Message: "n/a"},
+			},
+			expected: gemara.Passed,
+		},
 	}
 
 	for _, tt := range tests {
@@ -84,6 +97,21 @@ func TestGemaraLog_AggregatesResult(t *testing.T) {
 			})
 			assert.Equal(t, tt.expected, eval.GemaraLog().Result)
 		})
+	}
+}
+
+func TestGemaraLog_AllSkippedControlsYieldNotApplicable(t *testing.T) {
+	eval := output.NewEvaluator("pol", "tgt", nil, nil, nil)
+	eval.AddTarget([]provider.AssessmentLog{
+		{RequirementID: "R1", Steps: []provider.Step{{Result: provider.ResultSkipped, Message: "n/a"}}},
+		{RequirementID: "R2", Steps: []provider.Step{{Result: provider.ResultSkipped, Message: "n/a"}}},
+	})
+	log := eval.GemaraLog()
+	assert.Equal(t, gemara.NotApplicable, log.Result,
+		"overall result should be NotApplicable when all controls are skipped")
+	for _, ce := range log.Evaluations {
+		assert.Equal(t, gemara.NotApplicable, ce.Result,
+			"each control evaluation should be NotApplicable")
 	}
 }
 

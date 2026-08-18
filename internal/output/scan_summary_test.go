@@ -297,9 +297,9 @@ func TestFormatScanSummary_ShowPassingFalse(t *testing.T) {
 }
 
 func TestFormatScanSummary_SortOrder(t *testing.T) {
-	// ResultSkipped maps to gemara.NotApplicable, which aggregates to
-	// gemara.Passed via gemara.UpdateAggregateResult. An empty Steps
-	// slice produces gemara.NotRun (the skip/not-run branch).
+	// ResultSkipped maps to gemara.NotApplicable. When combined with
+	// other NotApplicable results, UpdateAggregateResult preserves
+	// NotApplicable. An empty Steps slice produces gemara.NotRun.
 	// ResultError maps to gemara.Unknown.
 	assessments := []provider.AssessmentLog{
 		{
