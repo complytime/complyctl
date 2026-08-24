@@ -103,7 +103,8 @@ type Contact struct {
 
 // MappingReference represents a reference to an external document with full metadata.
 type MappingReference struct {
-	// id allows this entry to be referenced by other elements
+	// id identifies this mapping reference within the artifact and, when url
+	// is absent, the referenced artifact's metadata.id.
 	Id string `json:"id" yaml:"id"`
 
 	// title describes the purpose of this mapping reference at a glance
@@ -115,7 +116,7 @@ type MappingReference struct {
 	// description is prose regarding the artifact's purpose or content
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 
-	// url is the path where the artifact may be retrieved; preferrably responds with Gemara-compatible YAML/JSON
+	// url is the path where the artifact may be retrieved; preferably responds with Gemara-compatible YAML/JSON
 	Url string `json:"url,omitempty" yaml:"url,omitempty"`
 }
 
@@ -441,68 +442,9 @@ type ControlEvaluation struct {
 
 	// Enforce that control reference and the assessments' references match
 	// This formulation uses the control's reference if the assessment doesn't include a reference
+	//
+	// Require start timestamp on assessments that actually executed
 	AssessmentLogs []*AssessmentLog `json:"assessment-logs" yaml:"assessment-logs"`
-}
-
-// AssessmentLog contains the results of executing a single assessment procedure for a control requirement.
-type AssessmentLog struct {
-	// Requirement should map to the assessment requirement for this assessment.
-	Requirement EntryMapping `json:"requirement" yaml:"requirement"`
-
-	// Plan maps to the policy assessment plan being executed.
-	Plan *EntryMapping `json:"plan,omitempty" yaml:"plan,omitempty"`
-
-	// Description provides a summary of the assessment procedure.
-	Description string `json:"description" yaml:"description"`
-
-	// Result is the overall outcome of the assessment procedure, matching the result of the last step that was run.
-	Result Result `json:"result" yaml:"result"`
-
-	// Message provides additional context about the assessment result.
-	Message string `json:"message" yaml:"message"`
-
-	// Applicability is elevated from the Layer 2 Assessment Requirement to aid in execution and reporting.
-	Applicability []string `json:"applicability" yaml:"applicability"`
-
-	// Steps are sequential actions taken as part of the assessment, which may halt the assessment if a failure occurs.
-	Steps []AssessmentStep `json:"steps" yaml:"steps"`
-
-	// Steps-executed is the number of steps that were executed as part of the assessment.
-	StepsExecuted int64 `json:"steps-executed,omitempty" yaml:"steps-executed,omitempty"`
-
-	// Start is the timestamp when the assessment began.
-	Start Datetime `json:"start" yaml:"start"`
-
-	// End is the timestamp when the assessment concluded.
-	End Datetime `json:"end,omitempty" yaml:"end,omitempty"`
-
-	// Recommendation provides guidance on how to address a failed assessment.
-	Recommendation string `json:"recommendation,omitempty" yaml:"recommendation,omitempty"`
-
-	// ConfidenceLevel indicates the evaluator's confidence level in this specific assessment result.
-	ConfidenceLevel ConfidenceLevel `json:"confidence-level,omitempty" yaml:"confidence-level,omitempty"`
-
-	// Evidence records the raw data cited to support this assessment's opinion.
-	Evidence []Evidence `json:"evidence,omitempty" yaml:"evidence,omitempty"`
-}
-
-// Evidence records what was cited to support an opinion for a specific activity:
-// raw data for the evaluation layer, evaluation and enforcement artifacts for the audit layer.
-type Evidence struct {
-	// id uniquely identifies this evidence
-	Id string `json:"id" yaml:"id"`
-
-	// type categorizes the kind of evidence
-	Type EvidenceType `json:"type" yaml:"type"`
-
-	// collected-at is the timestamp when the evidence was gathered
-	CollectedAt Datetime `json:"collected-at" yaml:"collected-at"`
-
-	// payload is the raw evidence data collected
-	Payload any `json:"payload,omitempty" yaml:"payload,omitempty"`
-
-	// description explains what this evidence represents
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 }
 
 // GuidanceCatalog represents a concerted documentation effort to help bring about an optimal future without foreknowledge of the implementation details
@@ -694,6 +636,29 @@ type TypedMapping struct {
 	ReferenceId string `json:"reference-id" yaml:"reference-id"`
 
 	// remarks is prose regarding the mapped artifact or the mapping relationship
+	Remarks string `json:"remarks,omitempty" yaml:"remarks,omitempty"`
+}
+
+// EvidenceMapping identifies the source from which evidence was collected.
+// reference-id names the MappingReference; coordinate or entry-id gives
+// specificity within it; digest pins the observed content at collection time.
+type EvidenceMapping struct {
+	// reference-id ties this evidence to a mapping-reference in the artifact's metadata
+	ReferenceId string `json:"reference-id" yaml:"reference-id"`
+
+	// coordinate is the precise location within the stream identified by reference-id
+	// (e.g. an API path, file path, or JSON path expression).
+	// Do not set if entry-id is set.
+	Coordinate string `json:"coordinate,omitempty" yaml:"coordinate,omitempty"`
+
+	// entry-id identifies a specific entry within a referenced Gemara artifact.
+	// Do not set if coordinate is set.
+	EntryId string `json:"entry-id,omitempty" yaml:"entry-id,omitempty"`
+
+	// digest is a cryptographic hash of the observed content at collection time; format: algorithm:encoded (e.g. sha256:abc123...)
+	Digest string `json:"digest,omitempty" yaml:"digest,omitempty"`
+
+	// remarks is prose regarding this evidence reference
 	Remarks string `json:"remarks,omitempty" yaml:"remarks,omitempty"`
 }
 
@@ -975,6 +940,29 @@ type AuditResult struct {
 	Recommendations []Recommendation `json:"recommendations,omitempty" yaml:"recommendations,omitempty"`
 }
 
+// Evidence records what was cited to support an opinion for a specific activity:
+// raw data for the evaluation layer, evaluation and enforcement artifacts for the audit layer.
+// At least one of payload or source MUST be present; an entry with neither is semantically incomplete.
+type Evidence struct {
+	// id uniquely identifies this evidence
+	Id string `json:"id" yaml:"id"`
+
+	// type categorizes the kind of evidence
+	Type EvidenceType `json:"type" yaml:"type"`
+
+	// collected-at is the timestamp when the evidence was gathered
+	CollectedAt Datetime `json:"collected-at" yaml:"collected-at"`
+
+	// payload is the raw evidence data collected inline
+	Payload any `json:"payload,omitempty" yaml:"payload,omitempty"`
+
+	// source identifies the artifact or system from which this evidence was collected
+	Source EvidenceMapping `json:"source,omitempty" yaml:"source,omitempty"`
+
+	// description explains what this evidence represents
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+}
+
 // Recommendation provides a corrective action for an audit result
 type Recommendation struct {
 	// id uniquely identifies this recommendation
@@ -1141,6 +1129,49 @@ type Vector struct {
 
 	// applicability specifies the contexts in which this vector can manifest
 	Applicability []string `json:"applicability,omitempty" yaml:"applicability,omitempty"`
+}
+
+// AssessmentLog contains the results of executing a single assessment procedure for a control requirement.
+type AssessmentLog struct {
+	// Requirement should map to the assessment requirement for this assessment.
+	Requirement EntryMapping `json:"requirement" yaml:"requirement"`
+
+	// Plan maps to the policy assessment plan being executed.
+	Plan *EntryMapping `json:"plan,omitempty" yaml:"plan,omitempty"`
+
+	// Description provides a summary of the assessment procedure.
+	Description string `json:"description" yaml:"description"`
+
+	// Result is the overall outcome of the assessment procedure, matching the result of the last step that was run.
+	Result Result `json:"result" yaml:"result"`
+
+	// Message provides additional context about the assessment result.
+	Message string `json:"message" yaml:"message"`
+
+	// Applicability is elevated from the Layer 2 Assessment Requirement to aid in execution and reporting.
+	Applicability []string `json:"applicability" yaml:"applicability"`
+
+	// Steps are sequential actions taken as part of the assessment, which may halt the assessment if a failure occurs.
+	Steps []AssessmentStep `json:"steps" yaml:"steps"`
+
+	// Steps-executed is the number of steps that were executed as part of the assessment.
+	StepsExecuted int64 `json:"steps-executed,omitempty" yaml:"steps-executed,omitempty"`
+
+	// Start is the timestamp when the assessment began.
+	// Assessments that never executed have no start time to record.
+	Start Datetime `json:"start,omitempty" yaml:"start,omitempty"`
+
+	// End is the timestamp when the assessment concluded.
+	End Datetime `json:"end,omitempty" yaml:"end,omitempty"`
+
+	// Recommendation provides guidance on how to address a failed assessment.
+	Recommendation string `json:"recommendation,omitempty" yaml:"recommendation,omitempty"`
+
+	// ConfidenceLevel indicates the evaluator's confidence level in this specific assessment result.
+	ConfidenceLevel ConfidenceLevel `json:"confidence-level,omitempty" yaml:"confidence-level,omitempty"`
+
+	// Evidence records the raw data cited to support this assessment's opinion.
+	Evidence []Evidence `json:"evidence,omitempty" yaml:"evidence,omitempty"`
 }
 
 // MappingTarget identifies a target entry with optional per-target metadata
