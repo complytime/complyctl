@@ -67,7 +67,7 @@ jobs:
             # when using the default install-dir. Use an absolute path
             # until upstream fix lands (carabiner-dev/actions).
             - name: Install snappy
-              uses: carabiner-dev/actions/install/snappy@36a39ef667efe7112df8b1a534a4e37f35fad6fd # v1.2.6
+              uses: carabiner-dev/actions/install/snappy@32587e82f960d49b36101e8c45d1956e511965d3 # v1.2.9
               with:
                   install-dir: /home/runner/.carabiner
 
