@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Changed
+
+- RPM spec modernized for Fedora Go packaging guidelines: switch to
+  `%gobuild` macro for debuginfo generation, adopt `go-vendor-tools`
+  for vendored license verification, use `%gocheck2` for unit tests,
+  `%autorelease` for release numbering. Generalized Fedora 43 Go
+  version compatibility sed. (#rpm-spec-modernization)
+- Packit config updated with `post-modifications` action for vendor
+  archive generation, `srpm_build_deps` for Copr builds, and
+  `go-vendor-tools.toml` sync to dist-git. CentOS Stream targets
+  temporarily removed (go-vendor-tools unavailable).
+
 ### Fixed
 
 - Scans where all controls are not-applicable now report
