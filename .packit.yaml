@@ -5,9 +5,21 @@ downstream_package_name: complyctl
 
 specfile_path: complyctl.spec
 
+srpm_build_deps:
+    - go-vendor-tools
+    - golang
+    - askalono-cli
+
+create_sync_note: false
+
 files_to_sync:
     - complyctl.spec
     - .packit.yaml
+    - go-vendor-tools.toml
+
+actions:
+    post-modifications:
+        - bash -c "set -xeuo pipefail; export GOTOOLCHAIN=local; if [ -n \"${PACKIT_DOWNSTREAM_REPO:-}\" ]; then cd \"$PACKIT_DOWNSTREAM_REPO\"; fi; go_vendor_archive create --config go-vendor-tools.toml complyctl.spec; go_vendor_license --config go-vendor-tools.toml --path complyctl.spec report --verify-spec --autofill=auto"
 
 jobs:
     - job: copr_build
@@ -16,21 +28,23 @@ jobs:
           - fedora-rawhide-x86_64
           - fedora-44-x86_64
           - fedora-43-x86_64
-          - centos-stream-9-x86_64
-          - centos-stream-10-x86_64
+          # CentOS Stream targets removed: go-vendor-tools is not
+          # available in CentOS Stream repos. Restore when the
+          # tooling becomes available on those platforms.
 
-# Running tests using testing farm https://packit.dev/docs/configuration/upstream/tests
+    # Running tests using testing farm https://packit.dev/docs/configuration/upstream/tests
     - job: tests
       trigger: pull_request
       targets:
           - fedora-rawhide-x86_64
           - fedora-44-x86_64
           - fedora-43-x86_64
-          - centos-stream-9-x86_64
-          - centos-stream-10-x86_64
+          # CentOS Stream targets removed: go-vendor-tools is not
+          # available in CentOS Stream repos. Restore when the
+          # tooling becomes available on those platforms.
 
-# https://packit.dev/docs/fedora-releases-guide
-# Propose Downstream PRs once a Upstream release is out
+    # https://packit.dev/docs/fedora-releases-guide
+    # Propose Downstream PRs once a Upstream release is out
     - job: propose_downstream
       trigger: release
       dist_git_branches:
@@ -38,7 +52,7 @@ jobs:
           - f44
           - f43
 
-# Automatically submit builds to Koji after PR is merged into dist-git
+    # Automatically submit builds to Koji after PR is merged into dist-git
     - job: koji_build
       trigger: commit
       dist_git_branches:
@@ -46,7 +60,7 @@ jobs:
           - f44
           - f43
 
-# Trigger Bodhi update for released Fedora versions
+    # Trigger Bodhi update for released Fedora versions
     - job: bodhi_update
       trigger: commit
       dist_git_branches:
