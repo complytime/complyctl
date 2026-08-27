@@ -783,16 +783,8 @@ func CheckVariables(cfg *complytime.WorkspaceConfig, healthData []ProviderHealth
 				}
 			}
 			for _, group := range ph.OptionalTargetVariableGroups {
-				members := strings.Split(group, "|")
 				targetTotal++
-				found := false
-				for _, m := range members {
-					if _, ok := target.Variables[m]; ok {
-						found = true
-						break
-					}
-				}
-				if found {
+				if groupSatisfied(group, target.Variables) {
 					targetResolved++
 				} else {
 					missingTargetVars = append(missingTargetVars,
@@ -891,13 +883,9 @@ func CheckVariables(cfg *complytime.WorkspaceConfig, healthData []ProviderHealth
 						})
 					}
 					for _, group := range ph.OptionalTargetVariableGroups {
-						members := strings.Split(group, "|")
 						detailStatus := StatusFail
-						for _, m := range members {
-							if _, ok := target.Variables[m]; ok {
-								detailStatus = StatusPass
-								break
-							}
+						if groupSatisfied(group, target.Variables) {
+							detailStatus = StatusPass
 						}
 						details = append(details, CheckResult{
 							Name:    fmt.Sprintf("variables/%s/detail", ph.EvaluatorID),
@@ -1053,6 +1041,15 @@ func countResolved(required []string, vars map[string]string) (resolved, total i
 		}
 	}
 	return resolved, total
+}
+
+func groupSatisfied(group string, vars map[string]string) bool {
+	for _, member := range strings.Split(group, "|") {
+		if _, ok := vars[member]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func unmappedReason(resolver PolicyGraphResolver, resolveFailures int) string {
