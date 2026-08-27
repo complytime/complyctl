@@ -54,8 +54,11 @@ func (w *lazyLogWriter) Write(p []byte) (int, error) {
 			baseDir = "."
 		}
 		logDir := filepath.Join(baseDir, complytime.WorkspaceDir)
-		if err := os.MkdirAll(logDir, 0700); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to create log directory: %v\n", err)
+		// Only write logs when the workspace directory already exists.
+		// Do not create it as a side effect of logging — creating
+		// ~/.complytime when workspace is $HOME would trigger a false
+		// legacy-directory deprecation warning from CheckLegacyDir().
+		if _, err := os.Stat(logDir); err != nil {
 			return
 		}
 		logPath := filepath.Join(logDir, complytime.LogFileName)

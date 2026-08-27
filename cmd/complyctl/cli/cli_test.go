@@ -1756,6 +1756,9 @@ func TestSaveGenerationAndPrint_NoComplypacks(t *testing.T) {
 
 func TestLazyLogWriter_Write_CreatesLogFile(t *testing.T) {
 	baseDir := t.TempDir()
+	// Pre-create the workspace directory to simulate an initialized workspace.
+	require.NoError(t, os.MkdirAll(filepath.Join(baseDir, complytime.WorkspaceDir), 0700))
+
 	w := &lazyLogWriter{}
 	w.SetWorkspace(baseDir)
 
@@ -1774,6 +1777,9 @@ func TestLazyLogWriter_Write_CreatesLogFile(t *testing.T) {
 
 func TestLazyLogWriter_Write_DefaultBaseDir(t *testing.T) {
 	chdirTemp(t)
+	// Pre-create the workspace directory to simulate an initialized workspace.
+	require.NoError(t, os.MkdirAll(complytime.WorkspaceDir, 0700))
+
 	w := &lazyLogWriter{}
 	// No SetWorkspace call — should default to "."
 
@@ -1797,6 +1803,9 @@ func TestLazyLogWriter_Close_NilFile(t *testing.T) {
 
 func TestLazyLogWriter_Write_MultipleWrites(t *testing.T) {
 	baseDir := t.TempDir()
+	// Pre-create the workspace directory to simulate an initialized workspace.
+	require.NoError(t, os.MkdirAll(filepath.Join(baseDir, complytime.WorkspaceDir), 0700))
+
 	w := &lazyLogWriter{}
 	w.SetWorkspace(baseDir)
 
@@ -1811,6 +1820,26 @@ func TestLazyLogWriter_Write_MultipleWrites(t *testing.T) {
 	content, err := os.ReadFile(logPath)
 	require.NoError(t, err)
 	assert.Equal(t, "first\nsecond\n", string(content))
+}
+
+func TestLazyLogWriter_Write_SkipsWhenDirNotExists(t *testing.T) {
+	baseDir := t.TempDir()
+	// Do NOT pre-create the workspace directory.
+	// The writer must not create it as a side effect.
+	w := &lazyLogWriter{}
+	w.SetWorkspace(baseDir)
+
+	n, err := w.Write([]byte("should be discarded\n"))
+
+	require.NoError(t, err)
+	assert.Equal(t, 20, n)
+
+	wsDir := filepath.Join(baseDir, complytime.WorkspaceDir)
+	_, statErr := os.Stat(wsDir)
+	assert.True(t, os.IsNotExist(statErr),
+		"workspace directory must not be created as a side effect of logging")
+
+	require.NoError(t, w.Close())
 }
 
 // --- New() tests ---
@@ -2599,19 +2628,16 @@ func TestDebugFlagDescription(t *testing.T) {
 	assert.Equal(t, "output debug logs to stderr and log file", f.Usage)
 }
 
-// TestEnableDebug_UnwritableLogDir verifies that when the log directory cannot
-// be created, debug output still appears on stderr and a warning about the log
-// directory failure is present.
-func TestEnableDebug_UnwritableLogDir(t *testing.T) {
+// TestEnableDebug_NonexistentLogDir verifies that when the workspace directory
+// does not exist, debug output still appears on stderr and the writer silently
+// skips log file creation without creating directories as a side effect.
+func TestEnableDebug_NonexistentLogDir(t *testing.T) {
 	saveLogger(t)
 
-	// Create a read-only directory so MkdirAll fails inside lazyLogWriter.
-	readOnlyDir := t.TempDir()
-	require.NoError(t, os.Chmod(readOnlyDir, 0o500))
-	t.Cleanup(func() { _ = os.Chmod(readOnlyDir, 0o700) })
-
+	// Use a path where the workspace directory does not exist.
+	baseDir := t.TempDir()
 	testLw := &lazyLogWriter{}
-	testLw.SetWorkspace(filepath.Join(readOnlyDir, "nested"))
+	testLw.SetWorkspace(filepath.Join(baseDir, "nonexistent"))
 	lw = testLw
 
 	// Capture stderr via pipe.
@@ -2623,7 +2649,7 @@ func TestEnableDebug_UnwritableLogDir(t *testing.T) {
 
 	opts := &Common{Debug: true}
 	enableDebug(opts, testLw, w)
-	logger.Debug("debug despite unwritable dir")
+	logger.Debug("debug despite missing dir")
 
 	// Trigger the lazyLogWriter to attempt file creation.
 	_, _ = testLw.Write([]byte("trigger\n"))
@@ -2637,10 +2663,13 @@ func TestEnableDebug_UnwritableLogDir(t *testing.T) {
 	// Debug output should still appear on stderr even though the log file
 	// could not be created.
 	assert.Contains(t, output, "DEBUG")
-	assert.Contains(t, output, "debug despite unwritable dir")
+	assert.Contains(t, output, "debug despite missing dir")
 
-	// The lazyLogWriter should have emitted a warning about the failure.
-	assert.Contains(t, output, "Warning:")
+	// No directory should have been created as a side effect.
+	wsDir := filepath.Join(baseDir, "nonexistent", complytime.WorkspaceDir)
+	_, statErr := os.Stat(wsDir)
+	assert.True(t, os.IsNotExist(statErr),
+		"workspace directory must not be created as a side effect")
 }
 
 // TestEnableDebug_NoColor verifies that with NO_COLOR=1, enableDebug does not
