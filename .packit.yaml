@@ -26,6 +26,7 @@ jobs:
       trigger: pull_request
       targets:
           - fedora-rawhide-x86_64
+          - fedora-45-x86_64
           - fedora-44-x86_64
           - fedora-43-x86_64
           # CentOS Stream targets removed: go-vendor-tools is not
@@ -37,6 +38,7 @@ jobs:
       trigger: pull_request
       targets:
           - fedora-rawhide-x86_64
+          - fedora-45-x86_64
           - fedora-44-x86_64
           - fedora-43-x86_64
           # CentOS Stream targets removed: go-vendor-tools is not
@@ -49,6 +51,7 @@ jobs:
       trigger: release
       dist_git_branches:
           - rawhide
+          - f45
           - f44
           - f43
 
@@ -57,6 +60,7 @@ jobs:
       trigger: commit
       dist_git_branches:
           - rawhide
+          - f45
           - f44
           - f43
 
@@ -64,5 +68,6 @@ jobs:
     - job: bodhi_update
       trigger: commit
       dist_git_branches:
+          - f45
           - f44
           - f43
