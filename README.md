@@ -4,7 +4,9 @@
 [![GoDoc](https://img.shields.io/static/v1?label=godoc&message=reference&color=blue)](https://pkg.go.dev/github.com/complytime/complyctl)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/complytime/complyctl/badge)](https://scorecard.dev/viewer/?uri=github.com/complytime/complyctl)
 
-A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/) policies from an OCI registry and executes scans via providers.
+A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/) policies from an OCI registry and executes scans via providers, producing compliance reports in multiple formats (EvaluationLog, OSCAL, SARIF, Markdown).
+
+Providers are standalone executables that integrate complyctl with policy engines such as OpenSCAP, Ampel, and OPA. They are distributed separately (e.g., via the [complytime-providers](https://github.com/complytime/complytime-providers) package) and discovered automatically by naming convention (`complyctl-provider-*`). Run `complyctl providers` to list discovered providers on your system.
 
 ## Architecture
 
@@ -74,7 +76,7 @@ A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/
 | Command | Description |
 | :--- | :--- |
 | `init` | Create a workspace configuration file |
-| `get` | Fetch new/modified policies from OCI registry and update cache |
+| `get` | Fetch policies and complypacks from OCI registries |
 | `list` | List cached Gemara policies |
 | `generate` | Generate policy graph and invoke providers |
 | `scan` | Scan targets and produce compliance reports |
@@ -83,7 +85,7 @@ A lightweight compliance runtime that pulls [Gemara](https://gemara.openssf.org/
 | `version` | Print version |
 
 Global flags:
-- `--debug` / `-d` — output debug logs
+- `--debug` / `-d` — output debug logs to stderr and log file
 - `--workspace` / `-w` — workspace directory (project root containing `.complytime/`, defaults to current directory)
 
 ### Run Commands from Any Directory
@@ -130,9 +132,15 @@ Creates a workspace configuration file (`.complytime/complytime.yaml`). Errors i
 
 ```bash
 complyctl get
+complyctl get --skip-verify
 ```
 
 Performs incremental sync from the OCI registry defined in `complytime.yaml`. Only downloads new or modified content. Uses Docker credential helpers for authentication — if `docker login` works, `complyctl get` works.
+
+| Flag | Short | Description |
+| :--- | :--- | :--- |
+| `--timeout` | `-t` | Maximum time for the get operation (default: 5m) |
+| `--skip-verify` | | Skip signature verification for fetched artifacts |
 
 ### `list`
 
@@ -151,9 +159,10 @@ complyctl list --policy-id nist-800-53-r5
 complyctl generate --policy-id nist-800-53-r5
 ```
 
-| Flag          | Short | Description                       |
-|---------------|-------|-----------------------------------|
-| `--policy-id` | `-p`  | Policy ID to generate (required)  |
+| Flag | Short | Description |
+| :--- | :--- | :--- |
+| `--policy-id` | `-p` | Policy ID to generate (required) |
+| `--timeout` | `-t` | Maximum time for the generate operation (default: 5m) |
 
 Resolves the policy dependency graph from cache, extracts assessment configurations, applies parameter overrides from `complytime.yaml`, and dispatches to the matching provider via Generate RPC.
 
@@ -179,7 +188,10 @@ complyctl scan --policy-id nist-800-53-r5 --format sarif
 | :--- | :--- | :--- |
 | `[target]` | | Optional target ID to scope the scan (from `complytime.yaml`) |
 | `--policy-id` | `-p` | Policy ID to scan (required when no target is given, or target has multiple policies) |
-| `--format` | `-f` | Output format: `oscal`, `pretty`, `sarif` |
+| `--format` | `-f` | Additional output format: `oscal`, `pretty` (Markdown), `sarif` |
+| `--timeout` | `-t` | Maximum time for the scan operation (default: 5m) |
+| `--show-passing` | | Include passing controls in summary table (default: true) |
+| `--log-format` | | EvaluationLog format: `yaml`, `json` (default: yaml) |
 
 When a target is specified and references exactly one policy, `--policy-id` is inferred.
 At least one of `[target]` or `--policy-id` is required.
@@ -202,9 +214,18 @@ requirements assessed) do.
 ```bash
 complyctl doctor
 complyctl doctor --verbose
+complyctl doctor --format text
+complyctl doctor --format json
 ```
 
-Validates workspace configuration, provider health, cache integrity, and provider variable requirements. Use `--verbose` for per-provider variable detail.
+Validates workspace configuration, provider health, cache integrity, complypack availability, and cache health. Use `--verbose` for per-provider variable detail.
+
+| Flag | Short | Description |
+| :--- | :--- | :--- |
+| `--verbose` | | Expand per-provider variable detail |
+| `--format` | `-f` | Output format: `human` (emoji, default), `text` (plain labels), `json` (structured) |
+
+When `NO_COLOR` is set, `text` format is selected automatically.
 
 ### `providers`
 
@@ -213,6 +234,16 @@ complyctl providers
 ```
 
 Lists discovered scanning providers with their evaluator ID, path, health status, and version.
+
+## Environment Variables
+
+| Variable | Description |
+| :--- | :--- |
+| `COMPLYTIME_WORKSPACE` | Override workspace directory (`--workspace` takes precedence) |
+| `COMPLYTIME_SHOW_PASSING` | Set to `false` to exclude passing controls from scan summary (default: `true`) |
+| `COMPLYTIME_LOG_FORMAT` | EvaluationLog format: `yaml` or `json` (default: `yaml`) |
+| `COMPLYTIME_CACHE_VERSIONS` | Complypack versions to retain per evaluator-id (default: `1`) |
+| `NO_COLOR` | Disables emoji output in `complyctl doctor` (selects `text` format) |
 
 ## Workspace Configuration
 
