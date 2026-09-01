@@ -38,16 +38,6 @@ Providers are distributed separately via the complytime-providers package.
 %setup -q -T -D -a1 %{forgesetupargs}
 %autopatch -p1
 
-# Fedora 43 ships Go 1.25 but go.mod may require Go 1.26+ due to
-# transitive dependency requirements. Lower the directive to the
-# system Go major.minor so rpmbuild succeeds with GOTOOLCHAIN=local.
-# Fedora 43 EOL: 2026-12-09 — remove this block after EOL.
-# Reference: https://packages.fedoraproject.org/pkgs/golang/golang/
-%if 0%{?fedora} == 43
-sed -i 's/^go [0-9].*/go 1.25/' go.mod
-sed -i '/^## explicit; go /s/go [0-9]\..*/go 1.25/' vendor/modules.txt
-%endif
-
 %generate_buildrequires
 %go_vendor_license_buildrequires -c %{S:2}
 
