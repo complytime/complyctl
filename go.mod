@@ -12,7 +12,7 @@ require (
 	github.com/defenseunicorns/go-oscal v0.7.1
 	github.com/gemaraproj/go-gemara v0.9.2
 	github.com/goccy/go-yaml v1.19.2
-	github.com/google/go-containerregistry v0.22.0
+	github.com/google/go-containerregistry v0.22.1
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.8.0
 	github.com/mattn/go-isatty v0.0.24
