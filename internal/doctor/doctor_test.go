@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -100,6 +101,39 @@ func (m *mockPolicyGraphResolver) ResolvePolicyGraph(policyID, version string) (
 		return g, nil
 	}
 	return nil, fmt.Errorf("graph not found: %s", key)
+}
+
+// --- CheckProviders Tests ---
+
+func TestCheckProviders_NonExistentUserDir(t *testing.T) {
+	// Simulates RPM-only install where the user XDG provider directory
+	// does not exist. The discovery layer should tolerate the missing
+	// user directory and fall through to the system directory scan.
+	// On dev machines where /usr/libexec/complytime/providers also
+	// does not exist, the result should be a non-blocking WARN
+	// (not the previous blocking FAIL with "directory not found").
+	nonExistent := filepath.Join(t.TempDir(), "does-not-exist")
+	results, healthData := CheckProviders(nonExistent, hclog.NewNullLogger())
+
+	require.Len(t, results, 1)
+	assert.Equal(t, StatusWarn, results[0].Status)
+	assert.False(t, results[0].Blocking)
+	assert.Contains(t, results[0].Message, "no providers found")
+	assert.Contains(t, results[0].Message, complytime.SystemProviderDir)
+	assert.Nil(t, healthData)
+}
+
+func TestCheckProviders_EmptyUserDir(t *testing.T) {
+	// User directory exists but is empty. Same outcome: no providers
+	// discovered from either directory on a dev machine.
+	emptyDir := t.TempDir()
+	results, healthData := CheckProviders(emptyDir, hclog.NewNullLogger())
+
+	require.Len(t, results, 1)
+	assert.Equal(t, StatusWarn, results[0].Status)
+	assert.False(t, results[0].Blocking)
+	assert.Contains(t, results[0].Message, "no providers found")
+	assert.Nil(t, healthData)
 }
 
 // --- CheckPolicyVersions Tests ---

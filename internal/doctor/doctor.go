@@ -333,17 +333,10 @@ func CheckConfig(configPath string) CheckResult {
 // CheckProviders discovers providers and runs Describe on each.
 // Returns both diagnostic results and Describe data for variable validation (R51).
 // providerLogger is passed to the provider Manager for go-plugin client logging.
+// Discovery scans both the user directory (providerDir) and the system-wide
+// directory (complytime.SystemProviderDir) so RPM-installed providers are found
+// even when the user directory does not exist.
 func CheckProviders(providerDir string, providerLogger hclog.Logger) ([]CheckResult, []ProviderHealth) {
-	if _, err := os.Stat(providerDir); os.IsNotExist(err) {
-		return []CheckResult{{
-			Name:     "providers",
-			Group:    GroupProviders,
-			Status:   StatusFail,
-			Message:  fmt.Sprintf("provider directory %s not found", providerDir),
-			Blocking: true,
-		}}, nil
-	}
-
 	mgr, err := provider.NewManager(providerDir, providerLogger)
 	if err != nil {
 		return []CheckResult{{
@@ -369,10 +362,13 @@ func CheckProviders(providerDir string, providerLogger hclog.Logger) ([]CheckRes
 	providers := mgr.ListProviders()
 	if len(providers) == 0 {
 		return []CheckResult{{
-			Name:     "providers",
-			Group:    GroupProviders,
-			Status:   StatusWarn,
-			Message:  fmt.Sprintf("no providers found in %s", providerDir),
+			Name:   "providers",
+			Group:  GroupProviders,
+			Status: StatusWarn,
+			Message: fmt.Sprintf(
+				"no providers found in %s or %s",
+				providerDir, complytime.SystemProviderDir,
+			),
 			Blocking: false,
 		}}, nil
 	}
