@@ -93,31 +93,41 @@ Create `complytime.yaml` in your working directory. This is the runtime configur
 
 ```yaml
 policies:
-  - url: <oci-reference>
-    id: <short-alias>
-complypacks:  # optional — provider-specific content bundles
-  - url: <oci-reference>
-    id: <short-alias>
+  # OCI reference to a Gemara policy bundle (required, at least one)
+  - url: ghcr.io/myorg/policies/nist-800-53-r5:v1.0.0
+    # Short alias used by targets to reference this policy.
+    # Optional — if omitted, derived from the last URL path segment
+    # (e.g., "nist-800-53-r5" from the URL above).
+    id: nist
 
-variables:
-  key: value
+complypacks:  # optional — provider-specific content bundles
+  # OCI reference to a complypack artifact. Matched to a provider
+  # by its evaluator-id. Run `complyctl providers` to see evaluator
+  # IDs and which providers have complypacks.
+  - url: ghcr.io/myorg/complypacks/ampel-bp:v1.0.0
+    id: ampel-bp-pack
+
+variables:  # optional — workspace-scoped constants
+  output_dir: /tmp/scan-results
 
 targets:
-  - id: <target-id>
+  - id: my-repo              # unique scan target identifier
     policies:
-      - <policy-id>
-    variables:
-      key: value
+      - nist                  # references the effective ID from policies above
+    variables:                # provider-specific key-value pairs
+      url: https://github.com/myorg/myrepo
+      access_token: ${GITHUB_TOKEN}   # ${VAR} expanded from environment
 ```
 
 | Section | Purpose |
-| --------- | --------- |
-| `policies` | OCI references to Gemara policy bundles. `id` is a short alias used by targets and for provider routing. |
-| `complypacks` | Optional OCI references to provider-specific content bundles (policies, data files, scripts). Fetched alongside policies during `complyctl get`. |
-| `variables` | Workspace-scoped constants passed to all providers (e.g., custom policy directories). |
-| `targets` | Systems to evaluate. Each target selects one or more policies and provides provider-specific variables. |
+| ------------- | --------- |
+| `policies` | OCI references to Gemara policy bundles. `id` is a short alias used by targets and for provider routing. If omitted, derived from the last path segment of the URL. |
+| `complypacks` | Optional OCI references to provider-specific content bundles (Rego policies, XCCDF profiles, mapping files). Fetched alongside policies during `complyctl get`. Each complypack is matched to a provider by its evaluator-id. |
+| `variables` | Workspace-scoped constants passed to all providers (e.g., custom policy directories). Not expanded for `${VAR}` — see note below. |
+| `targets` | Systems to evaluate. Each target selects one or more policies by effective ID and provides provider-specific variables. |
+| `verification` | Optional OCI signature verification. Supports keyless (Sigstore OIDC) and keyed (cosign public key) modes. See [Verification](#verification) below. |
 
-**Variable expansion**: Only `targets[].variables` supports `${VAR}` environment variable substitution. Use this for secrets and per-target credentials. Top-level `variables` are workspace constants passed to providers as-is — `${...}` references there are **not** expanded.
+**Variable expansion**: Only `targets[].variables` supports `${VAR}` environment variable substitution. Use this for secrets and per-target credentials (e.g., `${GITHUB_TOKEN}`). If a referenced variable is not set in the environment, complyctl reports a configuration error. Top-level `variables` are workspace constants passed to providers as-is — `${...}` references there are **not** expanded.
 
 ### Example: ampel branch protection
 
@@ -125,6 +135,9 @@ targets:
 policies:
   - url: quay.io/complytime/policies-ampel-branch-protection:latest
     id: ampel-bp
+complypacks:
+  - url: ghcr.io/complytime/complypacks/ampel-bp:v1.0.0
+    id: ampel-bp-pack
 
 targets:
   - id: my-repo
@@ -134,8 +147,6 @@ targets:
       url: https://github.com/myorg/myrepo
       specs: builtin:github/branch-rules.yaml
 ```
-
-See the [ampel provider configuration](https://github.com/complytime/complytime-providers/blob/main/cmd/ampel-provider/docs/configuration.md) for all target variables.
 
 ### Example: CIS Fedora L1 (OpenSCAP)
 
@@ -152,6 +163,67 @@ targets:
       profile: xccdf_org.ssgproject.content_profile_cis_workstation_l1
 ```
 
+### Discovering target variables
+
+Target variables are provider-specific — each provider defines which
+variables it requires. To see the required and optional variables for
+your configured targets, run:
+
+```bash
+complyctl doctor --verbose
+```
+
+Some providers define one-of variable groups (e.g., `url|input_path`)
+where at least one variable in the group must be provided. `doctor`
+reports these groups and flags missing variables.
+
+For provider-specific variable reference, see:
+- [ampel provider configuration](https://github.com/complytime/complytime-providers/blob/main/cmd/ampel-provider/docs/configuration.md) — `url`, `specs`, `access_token`
+- [opa provider](https://github.com/complytime/complytime-providers/tree/main/cmd/opa-provider) — `input_path`
+- [openscap provider](https://github.com/complytime/complytime-providers/tree/main/cmd/openscap-provider) — `profile`
+
+### Verification
+
+When OCI artifacts are signed, complyctl can verify signatures during
+`complyctl get`. Add a `verification` block to `complytime.yaml` with
+one of two mutually exclusive modes.
+
+**Keyless verification** (Sigstore OIDC, e.g., GitHub Actions):
+
+```yaml
+verification:
+  issuer: https://token.actions.githubusercontent.com
+  identity: https://github.com/complytime/complyctl/.github/workflows/release.yml@refs/tags/*
+```
+
+**Keyed verification** (cosign public key):
+
+```yaml
+verification:
+  key: /path/to/cosign.pub
+```
+
+For private Sigstore instances, add `trusted_root` pointing to a
+`trusted_root.json` file (requires `issuer` and `identity`; mutually
+exclusive with `key`).
+
+**Per-entry overrides**: individual policies or complypacks can override
+the workspace-level verification or opt out entirely:
+
+```yaml
+policies:
+  - url: ghcr.io/myorg/policies/internal-policy:v1.0
+    verification:
+      key: /path/to/internal.pub
+  - url: ghcr.io/thirdparty/policy:v2.0
+    skip_verify: true
+```
+
+Use `--skip-verify` with `complyctl get` to bypass all verification
+for a single invocation without changing the config file.
+
+### Interactive setup
+
 Or use interactive setup:
 
 ```bash
@@ -161,6 +233,9 @@ complyctl init
 `init` prompts for policy URLs, IDs, and targets when no `complytime.yaml` exists.
 
 Available policy bundles are listed in the [complytime-policies usage guide](https://github.com/complytime/complytime-policies/blob/main/docs/usage.md).
+
+For the full configuration schema reference, see `man complyctl`
+(CONFIGURATION section).
 
 ## Step 4: Fetch policies and complypacks
 

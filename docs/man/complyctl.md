@@ -1,6 +1,6 @@
 % COMPLYCTL(1) Complyctl Manual
 % Marcus Burghardt <maburgha@redhat.com>
-% August 2026
+% September 2026
 
 # NAME
 
@@ -202,6 +202,180 @@ These options apply to all commands.
 Run **complyctl [command] --help** for more information about a
 specific command.
 
+# CONFIGURATION
+
+Complyctl reads its workspace configuration from
+**.complytime/complytime.yaml** in the current (or **--workspace**)
+directory. Create the file with **complyctl init** or write it
+manually.
+
+## policies
+
+OCI references to Gemara policy bundles. At least one is required.
+
+```
+policies:
+  - url: ghcr.io/myorg/policies/nist-800-53-r5:v1.0.0
+    id: nist          # optional; derived from URL path if omitted
+  - url: ghcr.io/myorg/policies/cis-benchmark:latest
+```
+
+**url** (required)
+: Full OCI reference including registry, repository, and optional
+  **:tag** or **@sha256:digest** (e.g.,
+  **registry.example.com/policies/my-policy:v1.0**).
+
+**id** (optional)
+: Short alias used by **targets[].policies** to reference this entry.
+  If omitted, the last path segment of the URL is used (e.g.,
+  **ghcr.io/org/policies/nist-r5:v1.0** derives **nist-r5**).
+
+**verification** (optional)
+: Per-entry verification override. Same fields as the workspace-level
+  **verification** block (see below). Overrides the workspace-level
+  config for this entry.
+
+**skip_verify** (optional)
+: Set to **true** to skip verification for this entry even when
+  workspace-level verification is configured. Mutually exclusive with
+  per-entry **verification**.
+
+## complypacks
+
+OCI references to provider-specific content bundles (Rego policies,
+XCCDF profiles, mapping files). Fetched alongside policies during
+**complyctl get**. Each complypack is matched to a provider by its
+evaluator-id.
+
+```
+complypacks:
+  - url: ghcr.io/myorg/complypacks/ampel-bp:v1.0.0
+    id: ampel-bp-pack
+```
+
+Fields are the same as **policies** (url, id, verification,
+skip_verify). Run **complyctl providers** to see which providers have
+complypacks and their evaluator IDs.
+
+## targets
+
+Systems to evaluate. Each target selects one or more policies by their
+effective ID and provides provider-specific variables.
+
+```
+targets:
+  - id: my-repo
+    policies:
+      - nist
+    variables:
+      url: https://github.com/myorg/myrepo
+      access_token: ${GITHUB_TOKEN}
+```
+
+**id** (required)
+: Scan target identifier. Must be unique across all targets.
+
+**policies** (required)
+: List of effective policy IDs to evaluate against this target.
+  Each must match a **policies[].id** or the auto-derived ID from
+  **policies[].url**.
+
+**variables** (optional)
+: Provider-specific key-value pairs passed to the provider during
+  scan. Supports **${VAR}** environment variable substitution.
+  Unset variables cause a configuration error.
+
+Run **complyctl doctor --verbose** to see the required and optional
+variables for each target, including one-of groups where at least one
+variable in the group must be provided (e.g., **url** or
+**input_path**).
+
+## variables
+
+Workspace-scoped constants passed to all providers. Unlike target
+variables, workspace variables do **not** support **${VAR}**
+substitution — they are passed as-is. Place
+environment-dependent values in **targets[].variables** instead.
+
+```
+variables:
+  output_dir: /tmp/scan-results
+```
+
+## verification
+
+OCI artifact signature verification. Two mutually exclusive modes are
+supported: keyless (Sigstore OIDC) and keyed (cosign key-pair).
+When omitted, verification is skipped.
+
+Keyless verification (GitHub Actions example):
+
+```
+verification:
+  issuer: https://token.actions.githubusercontent.com
+  identity: https://github.com/myorg/myrepo/.github/workflows/release.yml@refs/tags/*
+```
+
+Keyed verification (public key):
+
+```
+verification:
+  key: /path/to/cosign.pub
+```
+
+**issuer** (keyless)
+: OIDC token issuer URL (e.g.,
+  **https://token.actions.githubusercontent.com**). Requires
+  **identity**.
+
+**identity** (keyless)
+: Expected SAN identity in the signing certificate. Supports glob
+  patterns (e.g., **\*@refs/tags/\***).
+
+**key** (keyed)
+: Path to a PEM-encoded public key. Mutually exclusive with
+  **issuer**/**identity**.
+
+**trusted_root** (keyless, optional)
+: Path to a **trusted_root.json** file for keyless verification
+  against private Sigstore instances. Mutually exclusive with
+  **key**; requires **issuer** and **identity**.
+
+Per-entry verification can be set on individual **policies[]** or
+**complypacks[]** entries, overriding the workspace-level config:
+
+```
+policies:
+  - url: ghcr.io/myorg/policies/internal-policy:v1.0
+    verification:
+      key: /path/to/internal.pub
+  - url: ghcr.io/thirdparty/policy:v2.0
+    skip_verify: true
+```
+
+## Complete example
+
+```
+policies:
+  - url: quay.io/complytime/policies-ampel-branch-protection:latest
+    id: ampel-bp
+complypacks:
+  - url: ghcr.io/myorg/complypacks/ampel-bp:v1.0.0
+    id: ampel-bp-pack
+variables:
+  output_dir: /tmp/results
+verification:
+  issuer: https://token.actions.githubusercontent.com
+  identity: https://github.com/complytime/complyctl/.github/workflows/release.yml@refs/tags/*
+targets:
+  - id: my-repo
+    policies:
+      - ampel-bp
+    variables:
+      url: https://github.com/myorg/myrepo
+      access_token: ${GITHUB_TOKEN}
+```
+
 # ENVIRONMENT
 
 **COMPLYTIME_WORKSPACE**
@@ -267,7 +441,8 @@ directory).
 : System-installed provider executables.
 
 **.complytime/complytime.yaml**
-: Workspace configuration file (policies, targets, variables).
+: Workspace configuration file. See the **CONFIGURATION** section for
+  the full schema reference.
 
 **.complytime/scan/**
 : Scan output reports (EvaluationLog, OSCAL, SARIF, Markdown).
