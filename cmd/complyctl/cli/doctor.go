@@ -146,7 +146,17 @@ func runDoctor(baseDir string, verbose bool, format string) error {
 
 	versionResolver := &registryVersionResolver{timeout: 5 * time.Second}
 
-	results := doctor.Run(cfg, configPath, providerDir, cacheDir, dataDir, resolver, versionResolver, verbose, logger)
+	results := doctor.Run(doctor.RunOptions{
+		Config:          cfg,
+		ConfigPath:      configPath,
+		ProviderDir:     providerDir,
+		CacheDir:        cacheDir,
+		DataDir:         dataDir,
+		Resolver:        resolver,
+		VersionResolver: versionResolver,
+		Verbose:         verbose,
+		ProviderLogger:  logger,
+	})
 	return printDiagnostics(results, format)
 }
 
