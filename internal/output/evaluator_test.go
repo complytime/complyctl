@@ -300,6 +300,13 @@ func TestGemaraLog_EvidencePopulated(t *testing.T) {
 					Description: "TLS config snippet",
 					Payload:     []byte(`{"tls": "1.0"}`),
 					CollectedAt: "2026-06-23T14:00:00Z",
+					Source: &provider.EvidenceSource{
+						ReferenceID: "policy-ref",
+						Coordinate:  "/etc/tls.conf",
+						EntryID:     "entry-42",
+						Digest:      "sha256:abc123def456",
+						Remarks:     "collected from prod",
+					},
 				},
 			},
 			Recommendation: "Upgrade to TLS 1.2",
@@ -317,6 +324,43 @@ func TestGemaraLog_EvidencePopulated(t *testing.T) {
 	assert.Equal(t, `{"tls": "1.0"}`, al.Evidence[0].Payload)
 	assert.Equal(t, gemara.Datetime("2026-06-23T14:00:00Z"), al.Evidence[0].CollectedAt)
 	assert.Equal(t, "Upgrade to TLS 1.2", al.Recommendation)
+
+	// Verify source mapping from provider.EvidenceSource to gemara.EvidenceMapping.
+	assert.Equal(t, "policy-ref", al.Evidence[0].Source.ReferenceId)
+	assert.Equal(t, "/etc/tls.conf", al.Evidence[0].Source.Coordinate)
+	assert.Equal(t, "entry-42", al.Evidence[0].Source.EntryId)
+	assert.Equal(t, "sha256:abc123def456", al.Evidence[0].Source.Digest)
+	assert.Equal(t, "collected from prod", al.Evidence[0].Source.Remarks)
+}
+
+func TestGemaraLog_EvidenceSourceNilPreservesZeroValue(t *testing.T) {
+	eval := output.NewEvaluator("pol", "tgt", nil, nil, nil)
+	eval.AddTarget([]provider.AssessmentLog{
+		{
+			RequirementID: "req-1",
+			Steps:         []provider.Step{{Result: provider.ResultFailed, Message: "bad"}},
+			Evidence: []provider.Evidence{
+				{
+					ID:          "ev-no-source",
+					Type:        "log-entry",
+					Description: "log without source",
+					Payload:     []byte("data"),
+					CollectedAt: "2026-06-23T14:00:00Z",
+					// Source is nil — no provenance info.
+				},
+			},
+		},
+	})
+
+	log := eval.GemaraLog()
+	require.Len(t, log.Evaluations, 1)
+	require.Len(t, log.Evaluations[0].AssessmentLogs, 1)
+	al := log.Evaluations[0].AssessmentLogs[0]
+	require.Len(t, al.Evidence, 1)
+	assert.Equal(t, "ev-no-source", al.Evidence[0].Id)
+	// When Source is nil, the gemara EvidenceMapping should be zero-value.
+	assert.Equal(t, gemara.EvidenceMapping{}, al.Evidence[0].Source,
+		"nil Source should produce zero-value gemara.EvidenceMapping")
 }
 
 func TestGemaraLog_EvidenceEmptyWhenNotProvided(t *testing.T) {
@@ -333,6 +377,78 @@ func TestGemaraLog_EvidenceEmptyWhenNotProvided(t *testing.T) {
 }
 
 func TestEvaluator_Write_EvidenceSerialized(t *testing.T) {
+	t.Run("with source", func(t *testing.T) {
+		outDir := t.TempDir()
+		eval := output.NewEvaluator("pol", "tgt", nil, nil, nil)
+		eval.AddTarget([]provider.AssessmentLog{
+			{
+				RequirementID: "req-1",
+				Steps:         []provider.Step{{Result: provider.ResultFailed, Message: "bad"}},
+				Evidence: []provider.Evidence{
+					{
+						ID:          "ev-1",
+						Type:        "config-file",
+						Description: "TLS config",
+						Payload:     []byte("sample"),
+						CollectedAt: "2026-06-23T14:00:00Z",
+						Source: &provider.EvidenceSource{
+							ReferenceID: "policy-ref",
+							Coordinate:  "/etc/tls.conf",
+						},
+					},
+				},
+				Recommendation: "Fix TLS",
+			},
+		})
+
+		path, err := eval.Write(outDir, "yaml")
+		require.NoError(t, err)
+
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		content := string(data)
+		assert.Contains(t, content, "evidence:")
+		assert.Contains(t, content, "id: ev-1")
+		assert.Contains(t, content, "type: config-file")
+		assert.Contains(t, content, "description: TLS config")
+		assert.Contains(t, content, "recommendation: Fix TLS")
+		assert.Contains(t, content, "source:")
+		assert.Contains(t, content, "reference-id: policy-ref")
+		assert.Contains(t, content, "coordinate: /etc/tls.conf")
+	})
+
+	t.Run("without source omits source key in YAML", func(t *testing.T) {
+		outDir := t.TempDir()
+		eval := output.NewEvaluator("pol", "tgt", nil, nil, nil)
+		eval.AddTarget([]provider.AssessmentLog{
+			{
+				RequirementID: "req-1",
+				Steps:         []provider.Step{{Result: provider.ResultFailed, Message: "bad"}},
+				Evidence: []provider.Evidence{
+					{
+						ID:          "ev-no-src",
+						Type:        "log-entry",
+						Description: "plain log",
+						Payload:     []byte("data"),
+						CollectedAt: "2026-06-23T14:00:00Z",
+					},
+				},
+			},
+		})
+
+		path, err := eval.Write(outDir, "yaml")
+		require.NoError(t, err)
+
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		content := string(data)
+		assert.Contains(t, content, "id: ev-no-src")
+		assert.NotContains(t, content, "source:",
+			"YAML should omit source when EvidenceSource is nil")
+	})
+}
+
+func TestEvaluator_Write_JSON_EvidenceSource(t *testing.T) {
 	outDir := t.TempDir()
 	eval := output.NewEvaluator("pol", "tgt", nil, nil, nil)
 	eval.AddTarget([]provider.AssessmentLog{
@@ -341,28 +457,36 @@ func TestEvaluator_Write_EvidenceSerialized(t *testing.T) {
 			Steps:         []provider.Step{{Result: provider.ResultFailed, Message: "bad"}},
 			Evidence: []provider.Evidence{
 				{
-					ID:          "ev-1",
+					ID:          "ev-json",
 					Type:        "config-file",
 					Description: "TLS config",
 					Payload:     []byte("sample"),
 					CollectedAt: "2026-06-23T14:00:00Z",
+					Source: &provider.EvidenceSource{
+						ReferenceID: "policy-ref",
+						Coordinate:  "/etc/tls.conf",
+					},
 				},
 			},
-			Recommendation: "Fix TLS",
 		},
 	})
 
-	path, err := eval.Write(outDir, "yaml")
+	path, err := eval.Write(outDir, "json")
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	content := string(data)
-	assert.Contains(t, content, "evidence:")
-	assert.Contains(t, content, "id: ev-1")
-	assert.Contains(t, content, "type: config-file")
-	assert.Contains(t, content, "description: TLS config")
-	assert.Contains(t, content, "recommendation: Fix TLS")
+
+	// Verify JSON is valid.
+	assert.True(t, json.Valid(data), "output should be valid JSON")
+
+	// Verify kebab-case field names from go-gemara JSON tags.
+	assert.Contains(t, content, `"reference-id"`,
+		"JSON should use kebab-case reference-id from go-gemara tags")
+	assert.Contains(t, content, `"policy-ref"`)
+	assert.Contains(t, content, `"coordinate"`)
+	assert.Contains(t, content, `"/etc/tls.conf"`)
 }
 
 func TestGemaraLog_EvidenceBinaryPayloadBase64(t *testing.T) {

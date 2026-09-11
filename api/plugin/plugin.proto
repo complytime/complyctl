@@ -142,9 +142,33 @@ message Step {
   string message = 3;
 }
 
+// EvidenceMapping identifies the artifact or system from which
+// evidence was collected. Mirrors go-gemara EvidenceMapping.
+message EvidenceMapping {
+  // Ties this evidence to a mapping-reference in the artifact's metadata
+  string reference_id = 1;
+
+  // Precise location within the referenced artifact (e.g. file path,
+  // API path, JSON path). Upstream Gemara schema documents this as
+  // mutually exclusive with entry_id; complyctl passes through without
+  // enforcing exclusivity.
+  string coordinate = 2;
+
+  // Specific entry within a referenced Gemara artifact.
+  // Upstream Gemara schema documents this as mutually exclusive with
+  // coordinate; complyctl passes through without enforcing exclusivity.
+  string entry_id = 3;
+
+  // Cryptographic hash of observed content; format: algorithm:hex
+  // (e.g. sha256:abc123...)
+  string digest = 4;
+
+  // Prose regarding this evidence reference
+  string remarks = 5;
+}
+
 // Evidence records a piece of data collected during assessment.
-// Mirrors go-gemara Evidence with minimal fields; extensible for
-// ADR 0023 EvidenceMapping origin fields in a future revision.
+// Mirrors go-gemara Evidence; see Gemara #Evidence schema.
 message Evidence {
   // Unique identifier for this evidence entry
   string id = 1;
@@ -160,6 +184,9 @@ message Evidence {
 
   // Timestamp when the evidence was gathered (RFC 3339)
   string collected_at = 5;
+
+  // Identifies the artifact or system from which this evidence was collected
+  EvidenceMapping source = 6;
 }
 
 // ConfidenceLevel indicates the evaluator's confidence in an assessment result.

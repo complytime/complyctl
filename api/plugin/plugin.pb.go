@@ -693,9 +693,97 @@ func (x *Step) GetMessage() string {
 	return ""
 }
 
+// EvidenceMapping identifies the artifact or system from which
+// evidence was collected. Mirrors go-gemara EvidenceMapping.
+type EvidenceMapping struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ties this evidence to a mapping-reference in the artifact's metadata
+	ReferenceId string `protobuf:"bytes,1,opt,name=reference_id,json=referenceId,proto3" json:"reference_id,omitempty"`
+	// Precise location within the referenced artifact (e.g. file path,
+	// API path, JSON path). Upstream Gemara schema documents this as
+	// mutually exclusive with entry_id; complyctl passes through without
+	// enforcing exclusivity.
+	Coordinate string `protobuf:"bytes,2,opt,name=coordinate,proto3" json:"coordinate,omitempty"`
+	// Specific entry within a referenced Gemara artifact.
+	// Upstream Gemara schema documents this as mutually exclusive with
+	// coordinate; complyctl passes through without enforcing exclusivity.
+	EntryId string `protobuf:"bytes,3,opt,name=entry_id,json=entryId,proto3" json:"entry_id,omitempty"`
+	// Cryptographic hash of observed content; format: algorithm:hex
+	// (e.g. sha256:abc123...)
+	Digest string `protobuf:"bytes,4,opt,name=digest,proto3" json:"digest,omitempty"`
+	// Prose regarding this evidence reference
+	Remarks       string `protobuf:"bytes,5,opt,name=remarks,proto3" json:"remarks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EvidenceMapping) Reset() {
+	*x = EvidenceMapping{}
+	mi := &file_plugin_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvidenceMapping) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvidenceMapping) ProtoMessage() {}
+
+func (x *EvidenceMapping) ProtoReflect() protoreflect.Message {
+	mi := &file_plugin_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvidenceMapping.ProtoReflect.Descriptor instead.
+func (*EvidenceMapping) Descriptor() ([]byte, []int) {
+	return file_plugin_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *EvidenceMapping) GetReferenceId() string {
+	if x != nil {
+		return x.ReferenceId
+	}
+	return ""
+}
+
+func (x *EvidenceMapping) GetCoordinate() string {
+	if x != nil {
+		return x.Coordinate
+	}
+	return ""
+}
+
+func (x *EvidenceMapping) GetEntryId() string {
+	if x != nil {
+		return x.EntryId
+	}
+	return ""
+}
+
+func (x *EvidenceMapping) GetDigest() string {
+	if x != nil {
+		return x.Digest
+	}
+	return ""
+}
+
+func (x *EvidenceMapping) GetRemarks() string {
+	if x != nil {
+		return x.Remarks
+	}
+	return ""
+}
+
 // Evidence records a piece of data collected during assessment.
-// Mirrors go-gemara Evidence with minimal fields; extensible for
-// ADR 0023 EvidenceMapping origin fields in a future revision.
+// Mirrors go-gemara Evidence; see Gemara #Evidence schema.
 type Evidence struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Unique identifier for this evidence entry
@@ -707,14 +795,16 @@ type Evidence struct {
 	// Raw evidence data collected
 	Payload []byte `protobuf:"bytes,4,opt,name=payload,proto3" json:"payload,omitempty"`
 	// Timestamp when the evidence was gathered (RFC 3339)
-	CollectedAt   string `protobuf:"bytes,5,opt,name=collected_at,json=collectedAt,proto3" json:"collected_at,omitempty"`
+	CollectedAt string `protobuf:"bytes,5,opt,name=collected_at,json=collectedAt,proto3" json:"collected_at,omitempty"`
+	// Identifies the artifact or system from which this evidence was collected
+	Source        *EvidenceMapping `protobuf:"bytes,6,opt,name=source,proto3" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Evidence) Reset() {
 	*x = Evidence{}
-	mi := &file_plugin_proto_msgTypes[8]
+	mi := &file_plugin_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -726,7 +816,7 @@ func (x *Evidence) String() string {
 func (*Evidence) ProtoMessage() {}
 
 func (x *Evidence) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[8]
+	mi := &file_plugin_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -739,7 +829,7 @@ func (x *Evidence) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Evidence.ProtoReflect.Descriptor instead.
 func (*Evidence) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{8}
+	return file_plugin_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Evidence) GetId() string {
@@ -777,6 +867,13 @@ func (x *Evidence) GetCollectedAt() string {
 	return ""
 }
 
+func (x *Evidence) GetSource() *EvidenceMapping {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
 // DescribeRequest is sent to discover plugin identity and requirements.
 type DescribeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -786,7 +883,7 @@ type DescribeRequest struct {
 
 func (x *DescribeRequest) Reset() {
 	*x = DescribeRequest{}
-	mi := &file_plugin_proto_msgTypes[9]
+	mi := &file_plugin_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -798,7 +895,7 @@ func (x *DescribeRequest) String() string {
 func (*DescribeRequest) ProtoMessage() {}
 
 func (x *DescribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[9]
+	mi := &file_plugin_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -811,7 +908,7 @@ func (x *DescribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeRequest.ProtoReflect.Descriptor instead.
 func (*DescribeRequest) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{9}
+	return file_plugin_proto_rawDescGZIP(), []int{10}
 }
 
 // DescribeResponse reports plugin identity, health, and declared variable
@@ -842,7 +939,7 @@ type DescribeResponse struct {
 
 func (x *DescribeResponse) Reset() {
 	*x = DescribeResponse{}
-	mi := &file_plugin_proto_msgTypes[10]
+	mi := &file_plugin_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -854,7 +951,7 @@ func (x *DescribeResponse) String() string {
 func (*DescribeResponse) ProtoMessage() {}
 
 func (x *DescribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_plugin_proto_msgTypes[10]
+	mi := &file_plugin_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -867,7 +964,7 @@ func (x *DescribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeResponse.ProtoReflect.Descriptor instead.
 func (*DescribeResponse) Descriptor() ([]byte, []int) {
-	return file_plugin_proto_rawDescGZIP(), []int{10}
+	return file_plugin_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DescribeResponse) GetHealthy() bool {
@@ -963,13 +1060,22 @@ const file_plugin_proto_rawDesc = "" +
 	"\x04Step\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x123\n" +
 	"\x06result\x18\x02 \x01(\x0e2\x1b.complyctl.plugin.v1.ResultR\x06result\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"\x8d\x01\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\xa1\x01\n" +
+	"\x0fEvidenceMapping\x12!\n" +
+	"\freference_id\x18\x01 \x01(\tR\vreferenceId\x12\x1e\n" +
+	"\n" +
+	"coordinate\x18\x02 \x01(\tR\n" +
+	"coordinate\x12\x19\n" +
+	"\bentry_id\x18\x03 \x01(\tR\aentryId\x12\x16\n" +
+	"\x06digest\x18\x04 \x01(\tR\x06digest\x12\x18\n" +
+	"\aremarks\x18\x05 \x01(\tR\aremarks\"\xcb\x01\n" +
 	"\bEvidence\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x18\n" +
 	"\apayload\x18\x04 \x01(\fR\apayload\x12!\n" +
-	"\fcollected_at\x18\x05 \x01(\tR\vcollectedAt\"\x11\n" +
+	"\fcollected_at\x18\x05 \x01(\tR\vcollectedAt\x12<\n" +
+	"\x06source\x18\x06 \x01(\v2$.complyctl.plugin.v1.EvidenceMappingR\x06source\"\x11\n" +
 	"\x0fDescribeRequest\"\xc1\x02\n" +
 	"\x10DescribeResponse\x12\x18\n" +
 	"\ahealthy\x18\x01 \x01(\bR\ahealthy\x12\x18\n" +
@@ -1008,7 +1114,7 @@ func file_plugin_proto_rawDescGZIP() []byte {
 }
 
 var file_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_plugin_proto_goTypes = []any{
 	(ConfidenceLevel)(0),            // 0: complyctl.plugin.v1.ConfidenceLevel
 	(Result)(0),                     // 1: complyctl.plugin.v1.Result
@@ -1020,37 +1126,39 @@ var file_plugin_proto_goTypes = []any{
 	(*ScanResponse)(nil),            // 7: complyctl.plugin.v1.ScanResponse
 	(*AssessmentLog)(nil),           // 8: complyctl.plugin.v1.AssessmentLog
 	(*Step)(nil),                    // 9: complyctl.plugin.v1.Step
-	(*Evidence)(nil),                // 10: complyctl.plugin.v1.Evidence
-	(*DescribeRequest)(nil),         // 11: complyctl.plugin.v1.DescribeRequest
-	(*DescribeResponse)(nil),        // 12: complyctl.plugin.v1.DescribeResponse
-	nil,                             // 13: complyctl.plugin.v1.GenerateRequest.GlobalVariablesEntry
-	nil,                             // 14: complyctl.plugin.v1.GenerateRequest.TargetVariablesEntry
-	nil,                             // 15: complyctl.plugin.v1.AssessmentConfiguration.ParametersEntry
-	nil,                             // 16: complyctl.plugin.v1.Target.VariablesEntry
+	(*EvidenceMapping)(nil),         // 10: complyctl.plugin.v1.EvidenceMapping
+	(*Evidence)(nil),                // 11: complyctl.plugin.v1.Evidence
+	(*DescribeRequest)(nil),         // 12: complyctl.plugin.v1.DescribeRequest
+	(*DescribeResponse)(nil),        // 13: complyctl.plugin.v1.DescribeResponse
+	nil,                             // 14: complyctl.plugin.v1.GenerateRequest.GlobalVariablesEntry
+	nil,                             // 15: complyctl.plugin.v1.GenerateRequest.TargetVariablesEntry
+	nil,                             // 16: complyctl.plugin.v1.AssessmentConfiguration.ParametersEntry
+	nil,                             // 17: complyctl.plugin.v1.Target.VariablesEntry
 }
 var file_plugin_proto_depIdxs = []int32{
-	13, // 0: complyctl.plugin.v1.GenerateRequest.global_variables:type_name -> complyctl.plugin.v1.GenerateRequest.GlobalVariablesEntry
+	14, // 0: complyctl.plugin.v1.GenerateRequest.global_variables:type_name -> complyctl.plugin.v1.GenerateRequest.GlobalVariablesEntry
 	3,  // 1: complyctl.plugin.v1.GenerateRequest.configurations:type_name -> complyctl.plugin.v1.AssessmentConfiguration
-	14, // 2: complyctl.plugin.v1.GenerateRequest.target_variables:type_name -> complyctl.plugin.v1.GenerateRequest.TargetVariablesEntry
-	15, // 3: complyctl.plugin.v1.AssessmentConfiguration.parameters:type_name -> complyctl.plugin.v1.AssessmentConfiguration.ParametersEntry
+	15, // 2: complyctl.plugin.v1.GenerateRequest.target_variables:type_name -> complyctl.plugin.v1.GenerateRequest.TargetVariablesEntry
+	16, // 3: complyctl.plugin.v1.AssessmentConfiguration.parameters:type_name -> complyctl.plugin.v1.AssessmentConfiguration.ParametersEntry
 	6,  // 4: complyctl.plugin.v1.ScanRequest.targets:type_name -> complyctl.plugin.v1.Target
-	16, // 5: complyctl.plugin.v1.Target.variables:type_name -> complyctl.plugin.v1.Target.VariablesEntry
+	17, // 5: complyctl.plugin.v1.Target.variables:type_name -> complyctl.plugin.v1.Target.VariablesEntry
 	8,  // 6: complyctl.plugin.v1.ScanResponse.assessments:type_name -> complyctl.plugin.v1.AssessmentLog
 	9,  // 7: complyctl.plugin.v1.AssessmentLog.steps:type_name -> complyctl.plugin.v1.Step
 	0,  // 8: complyctl.plugin.v1.AssessmentLog.confidence:type_name -> complyctl.plugin.v1.ConfidenceLevel
-	10, // 9: complyctl.plugin.v1.AssessmentLog.evidence:type_name -> complyctl.plugin.v1.Evidence
+	11, // 9: complyctl.plugin.v1.AssessmentLog.evidence:type_name -> complyctl.plugin.v1.Evidence
 	1,  // 10: complyctl.plugin.v1.Step.result:type_name -> complyctl.plugin.v1.Result
-	2,  // 11: complyctl.plugin.v1.Plugin.Generate:input_type -> complyctl.plugin.v1.GenerateRequest
-	5,  // 12: complyctl.plugin.v1.Plugin.Scan:input_type -> complyctl.plugin.v1.ScanRequest
-	11, // 13: complyctl.plugin.v1.Plugin.Describe:input_type -> complyctl.plugin.v1.DescribeRequest
-	4,  // 14: complyctl.plugin.v1.Plugin.Generate:output_type -> complyctl.plugin.v1.GenerateResponse
-	7,  // 15: complyctl.plugin.v1.Plugin.Scan:output_type -> complyctl.plugin.v1.ScanResponse
-	12, // 16: complyctl.plugin.v1.Plugin.Describe:output_type -> complyctl.plugin.v1.DescribeResponse
-	14, // [14:17] is the sub-list for method output_type
-	11, // [11:14] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	10, // 11: complyctl.plugin.v1.Evidence.source:type_name -> complyctl.plugin.v1.EvidenceMapping
+	2,  // 12: complyctl.plugin.v1.Plugin.Generate:input_type -> complyctl.plugin.v1.GenerateRequest
+	5,  // 13: complyctl.plugin.v1.Plugin.Scan:input_type -> complyctl.plugin.v1.ScanRequest
+	12, // 14: complyctl.plugin.v1.Plugin.Describe:input_type -> complyctl.plugin.v1.DescribeRequest
+	4,  // 15: complyctl.plugin.v1.Plugin.Generate:output_type -> complyctl.plugin.v1.GenerateResponse
+	7,  // 16: complyctl.plugin.v1.Plugin.Scan:output_type -> complyctl.plugin.v1.ScanResponse
+	13, // 17: complyctl.plugin.v1.Plugin.Describe:output_type -> complyctl.plugin.v1.DescribeResponse
+	15, // [15:18] is the sub-list for method output_type
+	12, // [12:15] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_plugin_proto_init() }
@@ -1064,7 +1172,7 @@ func file_plugin_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_plugin_proto_rawDesc), len(file_plugin_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   15,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

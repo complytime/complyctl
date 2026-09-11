@@ -360,6 +360,138 @@ func TestMarkdown_EvidenceEmptyDescriptionOmitted(t *testing.T) {
 		"evidence with empty description should fall back to ID")
 }
 
+func TestMarkdown_EvidenceSourceWithCoordinate(t *testing.T) {
+	outDir := t.TempDir()
+	log := &gemara.EvaluationLog{
+		Metadata: gemara.Metadata{Id: "pol"},
+		Result:   gemara.Failed,
+		Evaluations: []*gemara.ControlEvaluation{
+			{
+				Name:   "ctrl-1",
+				Result: gemara.Failed,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-1"},
+						Result:      gemara.Failed,
+						Message:     "violation",
+						Evidence: []gemara.Evidence{
+							{
+								Id:          "ev-src",
+								Type:        "config-file",
+								Description: "app config",
+								CollectedAt: "2026-06-23T14:00:00Z",
+								Source: gemara.EvidenceMapping{
+									ReferenceId: "config-repo",
+									Coordinate:  "/app/config.yaml",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	md := output.NewMarkdown("pol", log)
+
+	path, err := md.Write(outDir)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+
+	assert.Contains(t, content, "source: config-repo @ /app/config.yaml",
+		"evidence with source + coordinate should render both with @ separator")
+}
+
+func TestMarkdown_EvidenceSourceWithoutCoordinate(t *testing.T) {
+	outDir := t.TempDir()
+	log := &gemara.EvaluationLog{
+		Metadata: gemara.Metadata{Id: "pol"},
+		Result:   gemara.Failed,
+		Evaluations: []*gemara.ControlEvaluation{
+			{
+				Name:   "ctrl-1",
+				Result: gemara.Failed,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-1"},
+						Result:      gemara.Failed,
+						Message:     "violation",
+						Evidence: []gemara.Evidence{
+							{
+								Id:          "ev-src-only",
+								Type:        "scan-result",
+								Description: "scanner output",
+								Source: gemara.EvidenceMapping{
+									ReferenceId: "scan-output",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	md := output.NewMarkdown("pol", log)
+
+	path, err := md.Write(outDir)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+
+	assert.Contains(t, content, "source: scan-output",
+		"evidence with source only (no coordinate) should render reference-id alone")
+	assert.NotContains(t, content, "@ ",
+		"should not include @ separator when coordinate is empty")
+}
+
+func TestMarkdown_EvidenceWithoutSourceRendersUnchanged(t *testing.T) {
+	outDir := t.TempDir()
+	log := &gemara.EvaluationLog{
+		Metadata: gemara.Metadata{Id: "pol"},
+		Result:   gemara.Failed,
+		Evaluations: []*gemara.ControlEvaluation{
+			{
+				Name:   "ctrl-1",
+				Result: gemara.Failed,
+				AssessmentLogs: []*gemara.AssessmentLog{
+					{
+						Requirement: gemara.EntryMapping{EntryId: "req-1"},
+						Result:      gemara.Failed,
+						Message:     "violation",
+						Evidence: []gemara.Evidence{
+							{
+								Id:          "ev-no-src",
+								Type:        "config-file",
+								Description: "TLS certificate config",
+								CollectedAt: "2026-01-01T00:00:00Z",
+								// Source is zero-value — no provenance info.
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	md := output.NewMarkdown("pol", log)
+
+	path, err := md.Write(outDir)
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	content := string(data)
+
+	assert.Contains(t, content, "TLS certificate config")
+	assert.Contains(t, content, "config-file")
+	assert.Contains(t, content, "collected: 2026-01-01T00:00:00Z")
+	assert.NotContains(t, content, "source:",
+		"evidence without source should not include source text")
+}
+
 func TestMarkdown_ZeroEvaluations(t *testing.T) {
 	outDir := t.TempDir()
 	log := &gemara.EvaluationLog{

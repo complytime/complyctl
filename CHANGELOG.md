@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- Evidence source provenance via `EvidenceMapping`: providers can now
+  report **where** evidence was collected from using the new `source`
+  field on the proto `Evidence` message (field 6). New `EvidenceSource`
+  SDK type in `pkg/provider/` with `ReferenceID`, `Coordinate`,
+  `EntryID`, `Digest`, and `Remarks` fields. Evidence source is mapped
+  through the evaluator to `gemara.EvidenceMapping` and rendered in
+  Markdown reports. Backward-compatible -- providers that do not send
+  `source` are unaffected. (#841)
+
 ### Changed
 
 - RPM spec modernized for Fedora Go packaging guidelines: switch to

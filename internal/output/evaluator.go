@@ -225,6 +225,18 @@ func (e *Evaluator) providerToGemaraAssessment(a *provider.AssessmentLog) (*gema
 				Payload:     payloadToString(ev.Payload),
 				CollectedAt: gemara.Datetime(ev.CollectedAt),
 			}
+			// Map provider EvidenceSource to gemara EvidenceMapping when present.
+			// When Source is nil, leave the gemara field at zero value so
+			// goccy/go-yaml omits it via omitempty (design decision D3).
+			if ev.Source != nil {
+				gemaraEvidence[i].Source = gemara.EvidenceMapping{
+					ReferenceId: ev.Source.ReferenceID,
+					Coordinate:  ev.Source.Coordinate,
+					EntryId:     ev.Source.EntryID,
+					Digest:      ev.Source.Digest,
+					Remarks:     ev.Source.Remarks,
+				}
+			}
 		}
 		gemaraLog.Evidence = gemaraEvidence
 	}
