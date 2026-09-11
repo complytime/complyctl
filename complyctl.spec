@@ -38,6 +38,15 @@ Providers are distributed separately via the complytime-providers package.
 %setup -q -T -D -a1 %{forgesetupargs}
 %autopatch -p1
 
+# Lower the go.mod directive to match the system Go version so
+# rpmbuild succeeds with GOTOOLCHAIN=local. This handles cases where
+# the system Go has the same major.minor but an older patch version
+# than what go.mod requires (e.g., system Go 1.26.7 vs go.mod 1.26.8).
+# Reference: https://packages.fedoraproject.org/pkgs/golang/golang/
+SYSTEM_GO_VERSION=$(go version | grep -oP 'go\K[0-9]+\.[0-9]+\.[0-9]+')
+sed -i "s/^go [0-9].*/go ${SYSTEM_GO_VERSION}/" go.mod
+sed -i "/^## explicit; go /s/go [0-9]\..*/go ${SYSTEM_GO_VERSION}/" vendor/modules.txt
+
 %generate_buildrequires
 %go_vendor_license_buildrequires -c %{S:2}
 
