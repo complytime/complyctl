@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/gemaraproj/go-gemara"
+
+	"github.com/complytime/complyctl/internal/complytime"
 )
 
 // UnsetEnvVarFails verifies config loading fails with a descriptive error
@@ -31,7 +33,12 @@ targets:
       secret_token: ${COMPLYTIME_E2E_NONEXISTENT_VAR}
 `, ctx.RegistryURL, ctx.PolicyID, ctx.PolicyID, ctx.PolicyID)
 
-	if err := os.WriteFile(filepath.Join(ctx.WorkDir, "complytime.yaml"), []byte(configYAML), 0600); err != nil {
+	configDir := filepath.Join(ctx.WorkDir, complytime.WorkspaceDir)
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return gemara.Unknown, "failed to create workspace dir: " + err.Error(), gemara.Undetermined
+	}
+	configPath := filepath.Join(configDir, complytime.WorkspaceConfigFile)
+	if err := os.WriteFile(configPath, []byte(configYAML), 0600); err != nil {
 		return gemara.Unknown, "failed to write config: " + err.Error(), gemara.Undetermined
 	}
 
@@ -68,7 +75,12 @@ targets:
       env: ${COMPLYTIME_E2E_TEST_ENV}
 `, ctx.RegistryURL, ctx.PolicyID, ctx.PolicyID, ctx.PolicyID)
 
-	if err := os.WriteFile(filepath.Join(ctx.WorkDir, "complytime.yaml"), []byte(configYAML), 0600); err != nil {
+	configDir := filepath.Join(ctx.WorkDir, complytime.WorkspaceDir)
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return gemara.Unknown, "failed to create workspace dir: " + err.Error(), gemara.Undetermined
+	}
+	configPath := filepath.Join(configDir, complytime.WorkspaceConfigFile)
+	if err := os.WriteFile(configPath, []byte(configYAML), 0600); err != nil {
 		return gemara.Unknown, "failed to write config: " + err.Error(), gemara.Undetermined
 	}
 

@@ -93,14 +93,59 @@ func StartMockRegistry() *httptest.Server {
 		repos[repoName] = repo
 	}
 
-	policyLayer := []byte(`- id: AC-1-impl
-  evaluator_id: test
-  parameters:
-    control_id: AC-1
-- id: AC-2-impl
-  evaluator_id: test
-  parameters:
-    control_id: AC-2
+	policyLayer := []byte(`title: NIST 800-53 Rev 5 Behavioral Test Policy
+metadata:
+    id: nist-800-53-r5-policy
+    type: Policy
+    gemara-version: 1.0.0
+    description: Minimal policy for behavioral assessment tests
+    author:
+        id: complytime
+        name: ComplyTime
+        type: Software Assisted
+    mapping-references:
+        - id: nist-800-53-r5
+          title: NIST SP 800-53 Rev 5
+          version: "5.0"
+          description: Security and Privacy Controls
+contacts:
+    responsible:
+        - name: test-team
+    accountable:
+        - name: test-team
+scope:
+    in:
+        technologies:
+            - linux
+imports:
+    catalogs:
+        - reference-id: nist-800-53-r5
+adherence:
+    evaluation-methods:
+        - id: test-eval
+          type: Behavioral
+          mode: Automated
+          executor:
+              id: test
+    assessment-plans:
+        - id: AC-1-impl
+          requirement-id: AC-1
+          frequency: on-demand
+          evaluation-methods:
+              - id: test-eval
+                type: Behavioral
+                mode: Automated
+                executor:
+                    id: test
+        - id: AC-2-impl
+          requirement-id: AC-2
+          frequency: on-demand
+          evaluation-methods:
+              - id: test-eval
+                type: Behavioral
+                mode: Automated
+                executor:
+                    id: test
 `)
 	catalogLayer := []byte(`id: nist-800-53-r5
 title: NIST SP 800-53 Rev 5

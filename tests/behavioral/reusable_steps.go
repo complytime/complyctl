@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/gemaraproj/go-gemara"
+
+	"github.com/complytime/complyctl/internal/complytime"
 )
 
 // WriteConfig writes a standard complytime.yaml to the context's WorkDir.
@@ -29,7 +31,11 @@ targets:
       env: test
 `, ctx.RegistryURL, ctx.PolicyID, ctx.PolicyID, ctx.PolicyID)
 
-	path := filepath.Join(ctx.WorkDir, "complytime.yaml")
+	configDir := filepath.Join(ctx.WorkDir, complytime.WorkspaceDir)
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return gemara.Unknown, "failed to create workspace dir: " + err.Error(), gemara.Undetermined
+	}
+	path := filepath.Join(configDir, complytime.WorkspaceConfigFile)
 	if err := os.WriteFile(path, []byte(configYAML), 0600); err != nil {
 		return gemara.Unknown, "failed to write config: " + err.Error(), gemara.Undetermined
 	}

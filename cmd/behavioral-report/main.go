@@ -93,7 +93,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := writeSARIF(evalLog, *artifactURI, *outDir, catalog); err != nil {
+	// SARIF output excludes Passed evaluations to avoid noise in
+	// GitHub Code Scanning. Passed controls are still recorded in
+	// the full EvaluationLog YAML for audit completeness.
+	sarifLog := gemara.EvaluationLog{
+		Evaluations: filterNonPassed(controlEvals),
+		Metadata:    evalLog.Metadata,
+	}
+	if err := writeSARIF(sarifLog, *artifactURI, *outDir, catalog); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to write SARIF: %v\n", err)
 		os.Exit(1)
 	}
@@ -195,6 +202,20 @@ func printSummary(evals []*gemara.ControlEvaluation) {
 	fmt.Fprintf(os.Stderr,
 		"\nbehavioral assessment: %d total, %d passed, %d failed, %d other\n",
 		total, passed, failed, other)
+}
+
+// filterNonPassed returns evaluations whose result is not Passed.
+// This keeps Failed, Unknown, NeedsReview, NotRun, and NotApplicable
+// results in the SARIF output while suppressing Passed controls
+// that would otherwise appear as noise in GitHub Code Scanning.
+func filterNonPassed(evals []*gemara.ControlEvaluation) []*gemara.ControlEvaluation {
+	filtered := make([]*gemara.ControlEvaluation, 0, len(evals))
+	for _, e := range evals {
+		if e.Result != gemara.Passed {
+			filtered = append(filtered, e)
+		}
+	}
+	return filtered
 }
 
 func sortedKeys(m map[string][]gemara.AssessmentStep) []string {
