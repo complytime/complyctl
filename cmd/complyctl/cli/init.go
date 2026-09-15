@@ -84,21 +84,39 @@ func (o *initOptions) run() error {
 
 // emptyConfigTemplate is the YAML written when init is run with no policies.
 // Comments show the expected structure so users can fill it in manually.
+// Covers policies, complypacks, targets, variables, and verification
+// so users can discover these features without consulting external docs.
 const emptyConfigTemplate = `# complytime.yaml - workspace configuration
-# See: complyctl init --help
+# See: docs/QUICK_START.md, man complyctl, or complyctl init --help
 #
-# Add policies using the format below:
+# policies — OCI references to Gemara policy bundles (required, at least one)
 #   policies:
 #     - url: registry.example.com/policies/my-policy:v1.0
 #       id: my-policy    # optional; auto-derived from URL path if omitted
 #
-# Add targets that reference policies by effective ID:
+# complypacks — provider-specific content bundles (optional)
+#   complypacks:
+#     - url: registry.example.com/complypacks/my-complypack:v1.0
+#       id: my-complypack
+#
+# targets — systems to evaluate (reference policies by their effective ID)
 #   targets:
 #     - id: local
 #       policies:
 #         - my-policy
-#       variables:
+#       variables:           # provider-specific; run 'complyctl doctor --verbose'
 #         profile: my-profile
+#         api_token: ${MY_TOKEN}  # ${VAR} expanded from environment
+#
+# variables — workspace-scoped constants (no ${VAR} expansion)
+#   variables:
+#     output_dir: /tmp/results
+#
+# verification — OCI signature verification (optional)
+#   verification:
+#     issuer: https://token.actions.githubusercontent.com
+#     identity: https://github.com/org/repo/.github/workflows/release.yml@refs/tags/*
+#   # or keyed: key: /path/to/cosign.pub
 policies: []
 targets: []
 `

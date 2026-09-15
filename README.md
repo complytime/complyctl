@@ -253,8 +253,14 @@ policies:
   - url: registry.example.com/policies/nist-800-53-r5:v1.0.0
     id: nist
   - url: registry.example.com/policies/cis-benchmark
+complypacks:
+  - url: registry.example.com/complypacks/ampel-bp:v1.0.0
+    id: ampel-bp-pack
 variables:
   output_dir: /tmp/scan-results
+verification:
+  issuer: https://token.actions.githubusercontent.com
+  identity: https://github.com/myorg/myrepo/.github/workflows/release.yml@refs/tags/*
 targets:
   - id: production-cluster
     policies:
@@ -266,12 +272,25 @@ targets:
 
 | Field | Description |
 | :--- | :--- |
-| `policies[].url` | Full OCI reference (registry + repository + optional `:tag`) |
+| `policies[].url` | Full OCI reference (registry + repository + optional `:tag` or `@digest`) |
 | `policies[].id` | Optional shortname; if omitted, derived from last path segment of URL |
-| `variables` | Workspace-scoped constants passed to providers via Generate RPC |
-| `targets[].id` | Scan target identifier |
+| `policies[].verification` | Per-entry verification override (same fields as workspace `verification`) |
+| `policies[].skip_verify` | Set to `true` to skip verification for this entry |
+| `complypacks[].url` | OCI reference to a provider-specific content bundle |
+| `complypacks[].id` | Optional shortname; matched to a provider by evaluator-id |
+| `variables` | Workspace-scoped constants passed to providers (no `${VAR}` expansion) |
+| `verification.issuer` | OIDC issuer URL for keyless verification (requires `identity`) |
+| `verification.identity` | Expected SAN identity in the signing certificate |
+| `verification.key` | Path to PEM public key for keyed verification (mutually exclusive with `issuer`) |
+| `verification.trusted_root` | Path to `trusted_root.json` for private Sigstore instances (requires `issuer` and `identity`; mutually exclusive with `key`) |
+| `targets[].id` | Scan target identifier (must be unique) |
 | `targets[].policies` | List of effective policy IDs to evaluate against this target |
 | `targets[].variables` | Provider-specific key-value pairs; supports `${VAR}` env substitution |
+
+See [Quick Start](./docs/QUICK_START.md) for concrete examples with
+all providers, or `man complyctl` (CONFIGURATION section) for the full
+schema reference. Run `complyctl doctor --verbose` to discover the
+target variables required by each provider.
 
 ## Contributing
 
