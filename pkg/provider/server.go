@@ -116,9 +116,25 @@ func internalEvidenceToProto(evidence []Evidence) []*proto.Evidence {
 			Description: ev.Description,
 			Payload:     ev.Payload,
 			CollectedAt: ev.CollectedAt,
+			Source:      internalEvidenceSourceToProto(ev.Source),
 		}
 	}
 	return pe
+}
+
+func internalEvidenceSourceToProto(
+	src *EvidenceSource,
+) *proto.EvidenceMapping {
+	if src == nil {
+		return nil
+	}
+	return &proto.EvidenceMapping{
+		ReferenceId: src.ReferenceID,
+		Coordinate:  src.Coordinate,
+		EntryId:     src.EntryID,
+		Digest:      src.Digest,
+		Remarks:     src.Remarks,
+	}
 }
 
 func internalResultToProto(r Result) proto.Result {
