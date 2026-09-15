@@ -119,25 +119,45 @@ type VersionResolver interface {
 
 const registryTimeout = 5 * time.Second
 
+// RunOptions bundles the parameters for Run, replacing a 9-parameter
+// function signature per AP-001 (Options struct pattern).
+type RunOptions struct {
+	// Config is the parsed workspace configuration. May be nil when the
+	// config file is missing or unparseable.
+	Config *complytime.WorkspaceConfig
+	// ConfigPath is the filesystem path to complytime.yaml.
+	ConfigPath string
+	// ProviderDir is the user XDG provider directory
+	// (e.g. ~/.local/share/complytime/providers).
+	ProviderDir string
+	// CacheDir is the root cache directory
+	// (e.g. ~/.cache/complytime on Linux) where policy blobs reside.
+	CacheDir string
+	// DataDir is the XDG data directory
+	// (e.g. ~/.local/share/complytime on Linux) where state.json lives.
+	DataDir string
+	// Resolver enables policy → evaluator → target mapping for variable
+	// validation (R51, R52). Pass nil if the policy cache is unavailable.
+	Resolver PolicyGraphResolver
+	// VersionResolver checks policy versions against the registry.
+	VersionResolver VersionResolver
+	// Verbose expands per-provider variable detail (R55).
+	Verbose bool
+	// ProviderLogger is the hclog.Logger for provider manager and
+	// go-plugin client logging.
+	ProviderLogger hclog.Logger
+}
+
 // Run orchestrates all diagnostic checks and returns a slice of results.
-// The resolver parameter enables policy → evaluator → target mapping for
-// variable validation (R51, R52). Pass nil if the policy cache is not
-// available — CheckCache will report the failure. providerLogger is the
-// hclog.Logger used for provider manager and go-plugin client logging.
-// When verbose is true, CheckVariables expands per-provider variable detail
-// to show individual key status (R55).
-// cacheDir is the root cache directory (e.g. ~/.cache/complytime on Linux) where
-// policy blobs reside. dataDir is the XDG data directory (e.g. ~/.local/share/complytime
-// on Linux) where state.json is persisted.
 // See FR-039, R44, R51, R52, R55: specs/001-gemara-native-workflow/spec.md
-func Run(cfg *complytime.WorkspaceConfig, configPath, providerDir, cacheDir, dataDir string, resolver PolicyGraphResolver, versionResolver VersionResolver, verbose bool, providerLogger hclog.Logger) []CheckResult {
-	policiesCacheDir := filepath.Join(cacheDir, complytime.PoliciesSubdir)
+func Run(opts RunOptions) []CheckResult {
+	policiesCacheDir := filepath.Join(opts.CacheDir, complytime.PoliciesSubdir)
 
 	// Collect flat results from each Check* function.
-	providerResults, healthData := CheckProviders(providerDir, providerLogger)
-	varResults := CheckVariables(cfg, healthData, resolver, verbose)
-	policyResults := CheckPolicyVersions(cfg, dataDir, versionResolver)
-	activeResults := CheckPolicyActivePeriod(cfg, resolver, verbose)
+	providerResults, healthData := CheckProviders(opts.ProviderDir, opts.ProviderLogger)
+	varResults := CheckVariables(opts.Config, healthData, opts.Resolver, opts.Verbose)
+	policyResults := CheckPolicyVersions(opts.Config, opts.DataDir, opts.VersionResolver)
+	activeResults := CheckPolicyActivePeriod(opts.Config, opts.Resolver, opts.Verbose)
 
 	// Assemble tree: nest variables under providers, active-period under policies.
 	providerResults, unmatchedVars := attachByEvaluatorID(providerResults, varResults)
@@ -158,10 +178,10 @@ func Run(cfg *complytime.WorkspaceConfig, configPath, providerDir, cacheDir, dat
 	results = append(results, policyResults...)
 	results = append(results, unmatchedActive...)
 	results = append(results, CheckCache(policiesCacheDir))
-	results = append(results, CheckComplypacks(cfg, cacheDir, dataDir, resolver)...)
-	results = append(results, CheckConfig(configPath))
-	results = append(results, CheckVerification(dataDir))
-	results = append(results, CheckDirectoryLayout(cacheDir, dataDir))
+	results = append(results, CheckComplypacks(opts.Config, opts.CacheDir, opts.DataDir, opts.Resolver)...)
+	results = append(results, CheckConfig(opts.ConfigPath))
+	results = append(results, CheckVerification(opts.DataDir))
+	results = append(results, CheckDirectoryLayout(opts.CacheDir, opts.DataDir))
 
 	return results
 }
@@ -678,73 +698,7 @@ func CheckVariables(cfg *complytime.WorkspaceConfig, healthData []ProviderHealth
 		}}
 	}
 
-	evaluatorTargets := make(map[string][]complytime.TargetConfig)
-	resolveFailures := 0
-	var resolveResults []CheckResult
-	if resolver != nil {
-		for _, target := range cfg.Targets {
-			for _, pid := range target.Policies {
-				entry, found := complytime.FindPolicy(cfg.Policies, pid)
-				if !found {
-					resolveFailures++
-					resolveResults = append(resolveResults, CheckResult{
-						Name:     fmt.Sprintf("variables/resolve/%s", pid),
-						Label:    pid,
-						Group:    GroupProviders,
-						Status:   StatusWarn,
-						Message:  fmt.Sprintf("policy %q referenced by target %q not found in config", pid, target.ID),
-						Blocking: false,
-					})
-					continue
-				}
-				ref, refErr := complytime.ParsePolicyRef(entry.URL)
-				if refErr != nil {
-					resolveFailures++
-					resolveResults = append(resolveResults, CheckResult{
-						Name:     fmt.Sprintf("variables/resolve/%s", entry.EffectiveID()),
-						Label:    entry.EffectiveID(),
-						Group:    GroupProviders,
-						Status:   StatusWarn,
-						Message:  fmt.Sprintf("invalid policy reference for %q: %v", entry.EffectiveID(), refErr),
-						Blocking: false,
-					})
-					continue
-				}
-				version, err := resolver.ResolveVersion(ref.Repository, ref.VersionString())
-				if err != nil {
-					resolveFailures++
-					resolveResults = append(resolveResults, CheckResult{
-						Name:     fmt.Sprintf("variables/resolve/%s", entry.EffectiveID()),
-						Label:    entry.EffectiveID(),
-						Group:    GroupProviders,
-						Status:   StatusWarn,
-						Message:  fmt.Sprintf("cannot resolve version for policy %q: %v", entry.EffectiveID(), err),
-						Blocking: false,
-					})
-					continue
-				}
-				graph, err := resolver.ResolvePolicyGraph(ref.Repository, version)
-				if err != nil {
-					resolveFailures++
-					resolveResults = append(resolveResults, CheckResult{
-						Name:     fmt.Sprintf("variables/resolve/%s", entry.EffectiveID()),
-						Label:    entry.EffectiveID(),
-						Group:    GroupProviders,
-						Status:   StatusWarn,
-						Message:  fmt.Sprintf("cannot resolve policy graph for %q: %v", entry.EffectiveID(), err),
-						Blocking: false,
-					})
-					continue
-				}
-				configs := policy.ExtractAssessmentConfigs(graph)
-				groups := policy.GroupByEvaluator(configs, graph)
-				for evalID := range groups {
-					evaluatorTargets[evalID] = append(evaluatorTargets[evalID], target)
-				}
-			}
-		}
-	}
-
+	evaluatorTargets, resolveFailures, resolveResults := resolveEvaluatorTargets(cfg, resolver)
 	effectiveGlobalVars := effectiveGlobals(cfg.Variables)
 
 	var results []CheckResult
@@ -755,167 +709,293 @@ func CheckVariables(cfg *complytime.WorkspaceConfig, healthData []ProviderHealth
 
 		// Skip providers with no required variables, no optional groups,
 		// and no policy mapping — nothing to validate.
-		hasTargetVarReqs := len(ph.RequiredTargetVariables) > 0 || len(ph.OptionalTargetVariableGroups) > 0
+		hasTargetVarReqs := len(ph.RequiredTargetVariables) > 0 ||
+			len(ph.OptionalTargetVariableGroups) > 0
 		if len(ph.RequiredGlobalVariables) == 0 && !hasTargetVarReqs && len(targets) == 0 {
 			continue
 		}
 
-		globalResolved, globalTotal := countResolved(ph.RequiredGlobalVariables, effectiveGlobalVars)
-		var missingGlobals []string
-		for _, v := range ph.RequiredGlobalVariables {
-			if _, ok := effectiveGlobalVars[v]; !ok {
-				missingGlobals = append(missingGlobals, v)
-			}
-		}
-
-		unmappedTargetVars := hasTargetVarReqs && len(targets) == 0
-
-		targetTotal := 0
-		targetResolved := 0
-		var missingTargetVars []string
-		for _, target := range targets {
-			for _, reqVar := range ph.RequiredTargetVariables {
-				targetTotal++
-				if _, ok := target.Variables[reqVar]; ok {
-					targetResolved++
-				} else {
-					missingTargetVars = append(missingTargetVars,
-						fmt.Sprintf("%s for target %q", reqVar, target.ID))
-				}
-			}
-			for _, group := range ph.OptionalTargetVariableGroups {
-				members := strings.Split(group, "|")
-				targetTotal++
-				found := false
-				for _, m := range members {
-					if _, ok := target.Variables[m]; ok {
-						found = true
-						break
-					}
-				}
-				if found {
-					targetResolved++
-				} else {
-					missingTargetVars = append(missingTargetVars,
-						fmt.Sprintf("one of (%s) for target %q", group, target.ID))
-				}
-			}
-		}
-
-		allGlobalPresent := globalResolved == globalTotal
-		allTargetPresent := targetResolved == targetTotal
-		if unmappedTargetVars && (resolver == nil || resolveFailures > 0) {
-			allTargetPresent = false
-		}
-		name := fmt.Sprintf("variables/%s", ph.EvaluatorID)
-
-		var summary CheckResult
-		if allGlobalPresent && allTargetPresent {
-			var msg string
-			if unmappedTargetVars {
-				msg = fmt.Sprintf("%d/%d global vars, no target mapping for this evaluator",
-					globalResolved, globalTotal)
-			} else {
-				msg = fmt.Sprintf("%d/%d global vars, %d/%d target vars",
-					globalResolved, globalTotal, targetResolved, targetTotal)
-			}
-			summary = CheckResult{
-				Name: name, Label: "variables", Group: GroupVariables, Status: StatusPass, Message: msg, Blocking: true,
-			}
-		} else {
-			var globalPart, targetPart string
-			if allGlobalPresent {
-				globalPart = fmt.Sprintf("%d/%d global vars", globalResolved, globalTotal)
-			} else {
-				globalPart = fmt.Sprintf("%d/%d global vars — missing %s",
-					globalResolved, globalTotal, joinNames(missingGlobals))
-			}
-			if unmappedTargetVars {
-				targetPart = fmt.Sprintf("target vars not validated — %s",
-					unmappedReason(resolver, resolveFailures))
-			} else if allTargetPresent {
-				targetPart = fmt.Sprintf("%d/%d target vars", targetResolved, targetTotal)
-			} else {
-				targetPart = fmt.Sprintf("%d/%d target vars — missing %s",
-					targetResolved, targetTotal, joinNames(missingTargetVars))
-			}
-			summary = CheckResult{
-				Name: name, Label: "variables", Group: GroupVariables, Status: StatusFail,
-				Message:  globalPart + ", " + targetPart,
-				Blocking: true,
-			}
-		}
-
-		if verbose {
-			var details []CheckResult
-			for _, v := range ph.RequiredGlobalVariables {
-				detailStatus := StatusPass
-				if _, ok := effectiveGlobalVars[v]; !ok {
-					detailStatus = StatusFail
-				}
-				details = append(details, CheckResult{
-					Name:    fmt.Sprintf("variables/%s/detail", ph.EvaluatorID),
-					Group:   GroupVariables,
-					Status:  detailStatus,
-					Message: fmt.Sprintf("global: %s", v),
-				})
-			}
-			if unmappedTargetVars {
-				for _, reqVar := range ph.RequiredTargetVariables {
-					details = append(details, CheckResult{
-						Name:    fmt.Sprintf("variables/%s/detail", ph.EvaluatorID),
-						Group:   GroupVariables,
-						Status:  StatusWarn,
-						Message: fmt.Sprintf("target: %s (not validated)", reqVar),
-					})
-				}
-				for _, group := range ph.OptionalTargetVariableGroups {
-					details = append(details, CheckResult{
-						Name:    fmt.Sprintf("variables/%s/detail", ph.EvaluatorID),
-						Group:   GroupVariables,
-						Status:  StatusWarn,
-						Message: fmt.Sprintf("target: one of (%s) (not validated)", group),
-					})
-				}
-			} else {
-				for _, target := range targets {
-					for _, reqVar := range ph.RequiredTargetVariables {
-						detailStatus := StatusPass
-						if _, ok := target.Variables[reqVar]; !ok {
-							detailStatus = StatusFail
-						}
-						details = append(details, CheckResult{
-							Name:    fmt.Sprintf("variables/%s/detail", ph.EvaluatorID),
-							Group:   GroupVariables,
-							Status:  detailStatus,
-							Message: fmt.Sprintf("target[%s]: %s", target.ID, reqVar),
-						})
-					}
-					for _, group := range ph.OptionalTargetVariableGroups {
-						members := strings.Split(group, "|")
-						detailStatus := StatusFail
-						for _, m := range members {
-							if _, ok := target.Variables[m]; ok {
-								detailStatus = StatusPass
-								break
-							}
-						}
-						details = append(details, CheckResult{
-							Name:    fmt.Sprintf("variables/%s/detail", ph.EvaluatorID),
-							Group:   GroupVariables,
-							Status:  detailStatus,
-							Message: fmt.Sprintf("target[%s]: one of (%s)", target.ID, group),
-						})
-					}
-				}
-			}
-			summary.Children = details
-		}
-
-		results = append(results, summary)
+		result := validateProviderVariables(
+			ph, targets, effectiveGlobalVars,
+			resolver, resolveFailures, verbose,
+		)
+		results = append(results, result)
 	}
 
 	return results
+}
+
+// resolveEvaluatorTargets maps evaluator IDs to their relevant target configs
+// by walking the policy dependency graph for each target's policy references.
+// Returns the evaluator-to-targets mapping, a count of resolution failures,
+// and any diagnostic results from failed resolutions.
+func resolveEvaluatorTargets(
+	cfg *complytime.WorkspaceConfig,
+	resolver PolicyGraphResolver,
+) (map[string][]complytime.TargetConfig, int, []CheckResult) {
+	evaluatorTargets := make(map[string][]complytime.TargetConfig)
+	resolveFailures := 0
+	var resolveResults []CheckResult
+
+	if resolver == nil {
+		return evaluatorTargets, resolveFailures, resolveResults
+	}
+
+	for _, target := range cfg.Targets {
+		for _, pid := range target.Policies {
+			entry, found := complytime.FindPolicy(cfg.Policies, pid)
+			if !found {
+				resolveFailures++
+				resolveResults = append(resolveResults, CheckResult{
+					Name:    fmt.Sprintf("variables/resolve/%s", pid),
+					Label:   pid,
+					Group:   GroupProviders,
+					Status:  StatusWarn,
+					Message: fmt.Sprintf("policy %q referenced by target %q not found in config", pid, target.ID),
+				})
+				continue
+			}
+			ref, refErr := complytime.ParsePolicyRef(entry.URL)
+			if refErr != nil {
+				resolveFailures++
+				resolveResults = append(resolveResults, CheckResult{
+					Name:    fmt.Sprintf("variables/resolve/%s", entry.EffectiveID()),
+					Label:   entry.EffectiveID(),
+					Group:   GroupProviders,
+					Status:  StatusWarn,
+					Message: fmt.Sprintf("invalid policy reference for %q: %v", entry.EffectiveID(), refErr),
+				})
+				continue
+			}
+			version, err := resolver.ResolveVersion(ref.Repository, ref.VersionString())
+			if err != nil {
+				resolveFailures++
+				resolveResults = append(resolveResults, CheckResult{
+					Name:    fmt.Sprintf("variables/resolve/%s", entry.EffectiveID()),
+					Label:   entry.EffectiveID(),
+					Group:   GroupProviders,
+					Status:  StatusWarn,
+					Message: fmt.Sprintf("cannot resolve version for policy %q: %v", entry.EffectiveID(), err),
+				})
+				continue
+			}
+			graph, err := resolver.ResolvePolicyGraph(ref.Repository, version)
+			if err != nil {
+				resolveFailures++
+				resolveResults = append(resolveResults, CheckResult{
+					Name:    fmt.Sprintf("variables/resolve/%s", entry.EffectiveID()),
+					Label:   entry.EffectiveID(),
+					Group:   GroupProviders,
+					Status:  StatusWarn,
+					Message: fmt.Sprintf("cannot resolve policy graph for %q: %v", entry.EffectiveID(), err),
+				})
+				continue
+			}
+			configs := policy.ExtractAssessmentConfigs(graph)
+			groups := policy.GroupByEvaluator(configs, graph)
+			for evalID := range groups {
+				evaluatorTargets[evalID] = append(evaluatorTargets[evalID], target)
+			}
+		}
+	}
+
+	return evaluatorTargets, resolveFailures, resolveResults
+}
+
+// validateProviderVariables checks one provider's declared required variables
+// against the workspace config and returns a summary CheckResult with optional
+// verbose detail children.
+func validateProviderVariables(
+	ph ProviderHealth,
+	targets []complytime.TargetConfig,
+	effectiveGlobalVars map[string]string,
+	resolver PolicyGraphResolver,
+	resolveFailures int,
+	verbose bool,
+) CheckResult {
+	globalResolved, globalTotal := countResolved(ph.RequiredGlobalVariables, effectiveGlobalVars)
+	var missingGlobals []string
+	for _, v := range ph.RequiredGlobalVariables {
+		if _, ok := effectiveGlobalVars[v]; !ok {
+			missingGlobals = append(missingGlobals, v)
+		}
+	}
+
+	hasTargetVarReqs := len(ph.RequiredTargetVariables) > 0 ||
+		len(ph.OptionalTargetVariableGroups) > 0
+	unmappedTargetVars := hasTargetVarReqs && len(targets) == 0
+
+	targetTotal := 0
+	targetResolved := 0
+	var missingTargetVars []string
+	for _, target := range targets {
+		for _, reqVar := range ph.RequiredTargetVariables {
+			targetTotal++
+			if _, ok := target.Variables[reqVar]; ok {
+				targetResolved++
+			} else {
+				missingTargetVars = append(missingTargetVars,
+					fmt.Sprintf("%s for target %q", reqVar, target.ID))
+			}
+		}
+		for _, group := range ph.OptionalTargetVariableGroups {
+			members := strings.Split(group, "|")
+			targetTotal++
+			found := false
+			for _, m := range members {
+				if _, ok := target.Variables[m]; ok {
+					found = true
+					break
+				}
+			}
+			if found {
+				targetResolved++
+			} else {
+				missingTargetVars = append(missingTargetVars,
+					fmt.Sprintf("one of (%s) for target %q", group, target.ID))
+			}
+		}
+	}
+
+	allGlobalPresent := globalResolved == globalTotal
+	allTargetPresent := targetResolved == targetTotal
+	if unmappedTargetVars && (resolver == nil || resolveFailures > 0) {
+		allTargetPresent = false
+	}
+	name := fmt.Sprintf("variables/%s", ph.EvaluatorID)
+
+	summary := buildVariableSummary(
+		name, globalResolved, globalTotal, targetResolved, targetTotal,
+		allGlobalPresent, allTargetPresent, unmappedTargetVars,
+		missingGlobals, missingTargetVars, resolver, resolveFailures,
+	)
+
+	if verbose {
+		summary.Children = buildVariableDetails(
+			ph, targets, effectiveGlobalVars, unmappedTargetVars,
+		)
+	}
+
+	return summary
+}
+
+// buildVariableSummary constructs the pass/fail summary CheckResult for a
+// single provider's variable validation.
+func buildVariableSummary(
+	name string,
+	globalResolved, globalTotal, targetResolved, targetTotal int,
+	allGlobalPresent, allTargetPresent, unmappedTargetVars bool,
+	missingGlobals, missingTargetVars []string,
+	resolver PolicyGraphResolver,
+	resolveFailures int,
+) CheckResult {
+	if allGlobalPresent && allTargetPresent {
+		var msg string
+		if unmappedTargetVars {
+			msg = fmt.Sprintf("%d/%d global vars, no target mapping for this evaluator",
+				globalResolved, globalTotal)
+		} else {
+			msg = fmt.Sprintf("%d/%d global vars, %d/%d target vars",
+				globalResolved, globalTotal, targetResolved, targetTotal)
+		}
+		return CheckResult{
+			Name: name, Label: "variables", Group: GroupVariables,
+			Status: StatusPass, Message: msg, Blocking: true,
+		}
+	}
+
+	var globalPart, targetPart string
+	if allGlobalPresent {
+		globalPart = fmt.Sprintf("%d/%d global vars", globalResolved, globalTotal)
+	} else {
+		globalPart = fmt.Sprintf("%d/%d global vars — missing %s",
+			globalResolved, globalTotal, joinNames(missingGlobals))
+	}
+	if unmappedTargetVars {
+		targetPart = fmt.Sprintf("target vars not validated — %s",
+			unmappedReason(resolver, resolveFailures))
+	} else if allTargetPresent {
+		targetPart = fmt.Sprintf("%d/%d target vars", targetResolved, targetTotal)
+	} else {
+		targetPart = fmt.Sprintf("%d/%d target vars — missing %s",
+			targetResolved, targetTotal, joinNames(missingTargetVars))
+	}
+	return CheckResult{
+		Name: name, Label: "variables", Group: GroupVariables,
+		Status: StatusFail, Message: globalPart + ", " + targetPart,
+		Blocking: true,
+	}
+}
+
+// buildVariableDetails generates verbose per-key status lines for a single
+// provider's variables.
+func buildVariableDetails(
+	ph ProviderHealth,
+	targets []complytime.TargetConfig,
+	effectiveGlobalVars map[string]string,
+	unmappedTargetVars bool,
+) []CheckResult {
+	detailName := fmt.Sprintf("variables/%s/detail", ph.EvaluatorID)
+	var details []CheckResult
+
+	for _, v := range ph.RequiredGlobalVariables {
+		detailStatus := StatusPass
+		if _, ok := effectiveGlobalVars[v]; !ok {
+			detailStatus = StatusFail
+		}
+		details = append(details, CheckResult{
+			Name: detailName, Group: GroupVariables,
+			Status: detailStatus, Message: fmt.Sprintf("global: %s", v),
+		})
+	}
+
+	if unmappedTargetVars {
+		for _, reqVar := range ph.RequiredTargetVariables {
+			details = append(details, CheckResult{
+				Name: detailName, Group: GroupVariables,
+				Status: StatusWarn, Message: fmt.Sprintf("target: %s (not validated)", reqVar),
+			})
+		}
+		for _, group := range ph.OptionalTargetVariableGroups {
+			details = append(details, CheckResult{
+				Name: detailName, Group: GroupVariables,
+				Status:  StatusWarn,
+				Message: fmt.Sprintf("target: one of (%s) (not validated)", group),
+			})
+		}
+		return details
+	}
+
+	for _, target := range targets {
+		for _, reqVar := range ph.RequiredTargetVariables {
+			detailStatus := StatusPass
+			if _, ok := target.Variables[reqVar]; !ok {
+				detailStatus = StatusFail
+			}
+			details = append(details, CheckResult{
+				Name: detailName, Group: GroupVariables,
+				Status:  detailStatus,
+				Message: fmt.Sprintf("target[%s]: %s", target.ID, reqVar),
+			})
+		}
+		for _, group := range ph.OptionalTargetVariableGroups {
+			members := strings.Split(group, "|")
+			detailStatus := StatusFail
+			for _, m := range members {
+				if _, ok := target.Variables[m]; ok {
+					detailStatus = StatusPass
+					break
+				}
+			}
+			details = append(details, CheckResult{
+				Name: detailName, Group: GroupVariables,
+				Status:  detailStatus,
+				Message: fmt.Sprintf("target[%s]: one of (%s)", target.ID, group),
+			})
+		}
+	}
+
+	return details
 }
 
 // CheckPolicyActivePeriod resolves each policy's implementation-plan from the
