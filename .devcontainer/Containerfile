@@ -16,8 +16,8 @@ RUN dnf install -y \
 # Create non-root user for container security best practice.
 # devcontainer.json sets remoteUser=root for DevPod/Codespaces
 # compatibility, but the default container user is non-root.
-RUN useradd -m -s /bin/bash devuser
-USER devuser
+RUN useradd -u 1000 -m -s /bin/bash devuser
+USER 1000
 
 # Allow go install to fetch newer toolchains when dependencies
 # require a Go version newer than the system-packaged one.
