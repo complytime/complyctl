@@ -102,6 +102,21 @@ type Evidence struct {
 	Description string
 	Payload     []byte
 	CollectedAt string
+	Source      *EvidenceSource
+}
+
+// EvidenceSource identifies where evidence was collected from.
+// Maps to proto EvidenceMapping and gemara EvidenceMapping.
+// Design decision D2: named EvidenceSource (not EvidenceMapping) to avoid
+// import ambiguity with the go-gemara type of the same name.
+// Design decision D3: pointer field on Evidence so nil clearly signals
+// "no source provided" vs. zero-value struct with all empty strings.
+type EvidenceSource struct {
+	ReferenceID string
+	Coordinate  string
+	EntryID     string
+	Digest      string
+	Remarks     string
 }
 
 // Result is the outcome of a single assessment step.
@@ -272,9 +287,25 @@ func protoEvidenceToInternal(pe []*pluginv2.Evidence) []Evidence {
 			Description: e.GetDescription(),
 			Payload:     e.GetPayload(),
 			CollectedAt: e.GetCollectedAt(),
+			Source:      protoEvidenceMappingToInternal(e.GetSource()),
 		}
 	}
 	return evidence
+}
+
+func protoEvidenceMappingToInternal(
+	em *pluginv2.EvidenceMapping,
+) *EvidenceSource {
+	if em == nil {
+		return nil
+	}
+	return &EvidenceSource{
+		ReferenceID: em.GetReferenceId(),
+		Coordinate:  em.GetCoordinate(),
+		EntryID:     em.GetEntryId(),
+		Digest:      em.GetDigest(),
+		Remarks:     em.GetRemarks(),
+	}
 }
 
 func protoResultToInternal(r pluginv2.Result) Result {

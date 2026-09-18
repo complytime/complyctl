@@ -276,6 +276,16 @@ func formatEvidenceMeta(ev gemara.Evidence) string {
 	if string(ev.CollectedAt) != "" {
 		parts = append(parts, "collected: "+string(ev.CollectedAt))
 	}
+	// Append source provenance when reference-id is present.
+	// Shows "source: <ref> @ <coord>" when both fields are set,
+	// or "source: <ref>" when only reference-id is available.
+	if ev.Source.ReferenceId != "" {
+		src := "source: " + ev.Source.ReferenceId
+		if ev.Source.Coordinate != "" {
+			src += " @ " + ev.Source.Coordinate
+		}
+		parts = append(parts, src)
+	}
 	return strings.Join(parts, ", ")
 }
 

@@ -84,6 +84,11 @@ func (t *testEvaluator) Scan(_ context.Context, req *provider.ScanRequest) (*pro
 					Description: "test evidence for " + matchID,
 					Payload:     []byte("sample payload"),
 					CollectedAt: time.Now().Format(time.RFC3339),
+					Source: &provider.EvidenceSource{
+						ReferenceID: "test-policy",
+						Coordinate:  "/checks/" + matchID,
+						Digest:      "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+					},
 				},
 			},
 			Recommendation: "No action needed",
