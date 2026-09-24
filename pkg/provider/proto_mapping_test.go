@@ -307,3 +307,164 @@ func TestInternalEvidenceToProto(t *testing.T) {
 		assert.Empty(t, src.GetRemarks())
 	})
 }
+
+func TestInternalMappingRefsToProto_NilInput(t *testing.T) {
+	got := internalMappingRefsToProto(nil)
+	assert.Nil(t, got)
+}
+
+func TestInternalMappingRefsToProto_EmptyInput(t *testing.T) {
+	got := internalMappingRefsToProto([]MappingReference{})
+	assert.Nil(t, got)
+}
+
+func TestInternalMappingRefsToProto_FullyPopulated(t *testing.T) {
+	input := []MappingReference{
+		{
+			ID:          "nist-800-53",
+			Title:       "NIST SP 800-53",
+			Version:     "rev5",
+			Description: "Security and Privacy Controls",
+			URL:         "https://csrc.nist.gov/800-53",
+		},
+		{
+			ID:          "cis-k8s",
+			Title:       "CIS Kubernetes Benchmark",
+			Version:     "1.8.0",
+			Description: "Hardening guide for Kubernetes",
+			URL:         "https://www.cisecurity.org/benchmark/kubernetes",
+		},
+	}
+
+	got := internalMappingRefsToProto(input)
+	require.Len(t, got, 2)
+
+	assert.Equal(t, "nist-800-53", got[0].GetId())
+	assert.Equal(t, "NIST SP 800-53", got[0].GetTitle())
+	assert.Equal(t, "rev5", got[0].GetVersion())
+	assert.Equal(t, "Security and Privacy Controls", got[0].GetDescription())
+	assert.Equal(t, "https://csrc.nist.gov/800-53", got[0].GetUrl())
+
+	assert.Equal(t, "cis-k8s", got[1].GetId())
+	assert.Equal(t, "CIS Kubernetes Benchmark", got[1].GetTitle())
+	assert.Equal(t, "1.8.0", got[1].GetVersion())
+	assert.Equal(t, "Hardening guide for Kubernetes", got[1].GetDescription())
+	assert.Equal(t, "https://www.cisecurity.org/benchmark/kubernetes", got[1].GetUrl())
+}
+
+func TestInternalMappingRefsToProto_PartialFields(t *testing.T) {
+	input := []MappingReference{
+		{
+			ID:    "partial-ref",
+			Title: "Partial Reference",
+		},
+	}
+
+	got := internalMappingRefsToProto(input)
+	require.Len(t, got, 1)
+	assert.Equal(t, "partial-ref", got[0].GetId())
+	assert.Equal(t, "Partial Reference", got[0].GetTitle())
+	assert.Empty(t, got[0].GetVersion())
+	assert.Empty(t, got[0].GetDescription())
+	assert.Empty(t, got[0].GetUrl())
+}
+
+func TestProtoMappingRefsToInternal_NilInput(t *testing.T) {
+	got := protoMappingRefsToInternal(nil)
+	assert.Nil(t, got)
+}
+
+func TestProtoMappingRefsToInternal_EmptyInput(t *testing.T) {
+	got := protoMappingRefsToInternal([]*pluginv2.MappingReference{})
+	assert.Nil(t, got)
+}
+
+func TestProtoMappingRefsToInternal_FullyPopulated(t *testing.T) {
+	input := []*pluginv2.MappingReference{
+		{
+			Id:          "nist-800-53",
+			Title:       "NIST SP 800-53",
+			Version:     "rev5",
+			Description: "Security and Privacy Controls",
+			Url:         "https://csrc.nist.gov/800-53",
+		},
+		{
+			Id:          "cis-k8s",
+			Title:       "CIS Kubernetes Benchmark",
+			Version:     "1.8.0",
+			Description: "Hardening guide for Kubernetes",
+			Url:         "https://www.cisecurity.org/benchmark/kubernetes",
+		},
+	}
+
+	got := protoMappingRefsToInternal(input)
+	require.Len(t, got, 2)
+
+	assert.Equal(t, "nist-800-53", got[0].ID)
+	assert.Equal(t, "NIST SP 800-53", got[0].Title)
+	assert.Equal(t, "rev5", got[0].Version)
+	assert.Equal(t, "Security and Privacy Controls", got[0].Description)
+	assert.Equal(t, "https://csrc.nist.gov/800-53", got[0].URL)
+
+	assert.Equal(t, "cis-k8s", got[1].ID)
+	assert.Equal(t, "CIS Kubernetes Benchmark", got[1].Title)
+	assert.Equal(t, "1.8.0", got[1].Version)
+	assert.Equal(t, "Hardening guide for Kubernetes", got[1].Description)
+	assert.Equal(t, "https://www.cisecurity.org/benchmark/kubernetes", got[1].URL)
+}
+
+func TestProtoMappingRefsToInternal_PartialFields(t *testing.T) {
+	input := []*pluginv2.MappingReference{
+		{
+			Id:    "partial-ref",
+			Title: "Partial Reference",
+		},
+	}
+
+	got := protoMappingRefsToInternal(input)
+	require.Len(t, got, 1)
+	assert.Equal(t, "partial-ref", got[0].ID)
+	assert.Equal(t, "Partial Reference", got[0].Title)
+	assert.Empty(t, got[0].Version)
+	assert.Empty(t, got[0].Description)
+	assert.Empty(t, got[0].URL)
+}
+
+func TestMappingRefsRoundTrip_FullyPopulated(t *testing.T) {
+	original := []MappingReference{
+		{
+			ID:          "nist-800-53",
+			Title:       "NIST SP 800-53",
+			Version:     "rev5",
+			Description: "Security and Privacy Controls",
+			URL:         "https://csrc.nist.gov/800-53",
+		},
+	}
+
+	protoRefs := internalMappingRefsToProto(original)
+	roundTripped := protoMappingRefsToInternal(protoRefs)
+
+	require.Len(t, roundTripped, 1)
+	assert.Equal(t, original[0], roundTripped[0])
+}
+
+func TestMappingRefsRoundTrip_PartialFields(t *testing.T) {
+	original := []MappingReference{
+		{
+			ID:    "partial-only",
+			Title: "Only ID and Title",
+		},
+	}
+
+	protoRefs := internalMappingRefsToProto(original)
+	roundTripped := protoMappingRefsToInternal(protoRefs)
+
+	require.Len(t, roundTripped, 1)
+	assert.Equal(t, original[0], roundTripped[0])
+}
+
+func TestMappingRefsRoundTrip_Empty(t *testing.T) {
+	protoRefs := internalMappingRefsToProto(nil)
+	roundTripped := protoMappingRefsToInternal(protoRefs)
+	assert.Nil(t, roundTripped)
+}

@@ -445,7 +445,12 @@ func runScanAndReport(ctx context.Context, format, logFormat string, mgr *provid
 func processScanOutput(format, logFormat string, scanOut *scanOutput, repository string, mappings *resolvedMappings, mappingRefs []gemara.MappingReference, policyTargets []complytime.TargetConfig, eid string, targetIDs []string, baseDir string, showPassing bool) error {
 	reportOperationalWarnings(scanOut.errors)
 
-	evaluators := buildEvaluators(repository, mappings, mappingRefs, policyTargets, scanOut.assessments, scanOut.assessmentTargets)
+	mergedRefs, collisions := output.MergeMappingReferences(
+		mappingRefs, scanOut.mappingReferences,
+	)
+	reportMappingCollisions(collisions)
+
+	evaluators := buildEvaluators(repository, mappings, mergedRefs, policyTargets, scanOut.assessments, scanOut.assessmentTargets)
 
 	outDir := filepath.Join(baseDir, complytime.WorkspaceDir, complytime.ScanOutputDir)
 	for _, eval := range evaluators {
@@ -467,6 +472,23 @@ func processScanOutput(format, logFormat string, scanOut *scanOutput, repository
 func reportOperationalWarnings(errors []string) {
 	if warnings := output.FormatOperationalWarnings(errors); warnings != "" {
 		fmt.Fprint(os.Stderr, warnings)
+	}
+}
+
+// reportMappingCollisions prints mapping reference collisions as WARNING lines
+// to stderr and logs each collision via the structured logger. No output is
+// produced when collisions is empty.
+func reportMappingCollisions(collisions []output.MappingCollision) {
+	if warnings := output.FormatMappingCollisions(collisions); warnings != "" {
+		fmt.Fprint(os.Stderr, warnings)
+	}
+	for _, c := range collisions {
+		logger.Warn("mapping reference collision",
+			"id", c.ID,
+			"retained", c.RetainedTitle,
+			"discarded", c.DiscardedTitle,
+			"policy_wins", c.PolicyWins,
+		)
 	}
 }
 
@@ -672,7 +694,7 @@ func scanAllTargets(ctx context.Context, mgr *provider.Manager, groups map[strin
 	out := &scanOutput{}
 
 	for _, target := range policyTargets {
-		results, opErrors, err := scanSingleTarget(ctx, mgr, groups, target)
+		results, opErrors, mappingRefs, err := scanSingleTarget(ctx, mgr, groups, target)
 		if err != nil {
 			return nil, err
 		}
@@ -681,6 +703,7 @@ func scanAllTargets(ctx context.Context, mgr *provider.Manager, groups map[strin
 			out.assessmentTargets = append(out.assessmentTargets, target.ID)
 		}
 		out.errors = append(out.errors, opErrors...)
+		out.mappingReferences = append(out.mappingReferences, mappingRefs...)
 	}
 
 	return out, nil
@@ -692,25 +715,40 @@ type scanOutput struct {
 	assessments       []provider.AssessmentLog
 	assessmentTargets []string
 	errors            []string
+	mappingReferences []provider.MappingReference
 }
 
-func scanSingleTarget(ctx context.Context, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, target complytime.TargetConfig) ([]provider.AssessmentLog, []string, error) {
+func scanSingleTarget(
+	ctx context.Context,
+	mgr *provider.Manager,
+	groups map[string]policy.EvaluatorGroup,
+	target complytime.TargetConfig,
+) ([]provider.AssessmentLog, []string, []provider.MappingReference, error) {
 	providerTargets := []provider.Target{{
 		TargetID:  target.ID,
 		Variables: target.Variables,
 	}}
 
+	// Sort evaluator IDs for deterministic iteration order (D6).
+	evalIDs := make([]string, 0, len(groups))
+	for evalID := range groups {
+		evalIDs = append(evalIDs, evalID)
+	}
+	slices.Sort(evalIDs)
+
 	var results []provider.AssessmentLog
 	var operationalErrors []string
-	for evalID := range groups {
+	var mappingRefs []provider.MappingReference
+	for _, evalID := range evalIDs {
 		scanResult, routeErr := mgr.RouteScanResult(ctx, evalID, providerTargets)
 		if routeErr != nil {
-			return nil, nil, routeErr
+			return nil, nil, nil, routeErr
 		}
 		results = append(results, scanResult.Assessments...)
 		operationalErrors = append(operationalErrors, scanResult.Errors...)
+		mappingRefs = append(mappingRefs, scanResult.MappingReferences...)
 	}
-	return results, operationalErrors, nil
+	return results, operationalErrors, mappingRefs, nil
 }
 
 func writeScanReports(format, logFormat string, eval *output.Evaluator, outDir, repository string) error {

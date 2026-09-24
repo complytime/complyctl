@@ -94,7 +94,15 @@ func (t *testEvaluator) Scan(_ context.Context, req *provider.ScanRequest) (*pro
 			Recommendation: "No action needed",
 		})
 	}
-	return &provider.ScanResponse{Assessments: assessments}, nil
+	return &provider.ScanResponse{
+		Assessments: assessments,
+		MappingReferences: []provider.MappingReference{
+			{
+				ID:    "test-source",
+				Title: "Test Data Source",
+			},
+		},
+	}, nil
 }
 
 func main() {

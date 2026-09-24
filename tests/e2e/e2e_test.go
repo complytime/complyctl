@@ -95,8 +95,16 @@ func TestE2E_FullWorkflow(t *testing.T) {
 		assert.Contains(t, out, "requirements:")
 
 		evalDir := filepath.Join(scanDir, complytime.WorkspaceDir, complytime.ScanOutputDir)
-		assertOutputFile(t, evalDir, "evaluation-log-", ".yaml")
+		evalLogFile := assertOutputFile(t, evalDir, "evaluation-log-", ".yaml")
 		oscalFile := assertOutputFile(t, evalDir, "assessment-results-", ".json")
+
+		// Verify provider-reported mapping references appear in the EvaluationLog.
+		// The test provider emits {ID:"test-source"} — this validates the full
+		// pipeline from provider ScanResponse through merge to YAML output.
+		evalLogData, err := os.ReadFile(evalLogFile)
+		require.NoError(t, err)
+		assert.Contains(t, string(evalLogData), "test-source",
+			"EvaluationLog must contain provider-reported mapping reference")
 
 		data, err := os.ReadFile(oscalFile)
 		require.NoError(t, err)

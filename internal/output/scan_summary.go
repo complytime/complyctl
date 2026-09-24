@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/charmbracelet/log"
 	"github.com/gemaraproj/go-gemara"
 
 	"github.com/complytime/complyctl/internal/complytime"
@@ -195,6 +196,160 @@ func FormatOperationalWarnings(errors []string) string {
 	fmt.Fprintf(&b, "\nWARNING: %d operational %s during scan:\n", len(errors), noun)
 	for _, e := range errors {
 		fmt.Fprintf(&b, "  - %s\n", e)
+	}
+	fmt.Fprintln(&b)
+	return b.String()
+}
+
+// MappingCollision records a single merge collision between mapping
+// references sharing the same ID. It captures enough context for
+// formatting user-facing warnings.
+type MappingCollision struct {
+	ID             string // colliding reference ID
+	RetainedTitle  string // title of the entry that was kept
+	DiscardedTitle string // title of the entry that was dropped
+	// PolicyWins is true when a policy ref beat a provider ref,
+	// false when an earlier provider ref beat a later one.
+	PolicyWins bool
+}
+
+// MergeMappingReferences combines policy-defined and provider-reported
+// mapping references into a single deduplicated slice. Policy refs
+// always take priority: when a provider ref shares an ID with a policy
+// ref, the policy ref is retained. Among provider refs, first-wins.
+// A collision note is prepended to the retained entry's Description
+// and a MappingCollision is recorded for warning channels.
+func MergeMappingReferences(
+	policyRefs []gemara.MappingReference,
+	providerRefs []provider.MappingReference,
+) ([]gemara.MappingReference, []MappingCollision) {
+	seen := make(map[string]int)
+	isPolicyOrigin := make(map[string]bool)
+	var result []gemara.MappingReference
+	var collisions []MappingCollision
+
+	// Policy refs take priority — add them first.
+	for _, pr := range policyRefs {
+		seen[pr.Id] = len(result)
+		isPolicyOrigin[pr.Id] = true
+		result = append(result, pr)
+	}
+
+	// Process provider refs: convert, deduplicate, record collisions.
+	for _, pr := range providerRefs {
+		if pr.ID == "" {
+			log.Warn(
+				"discarding provider mapping reference"+
+					" with empty id",
+				"title", pr.Title,
+			)
+			continue
+		}
+
+		idx, exists := seen[pr.ID]
+		if exists {
+			retainedBy := "policy ref"
+			policyWins := isPolicyOrigin[pr.ID]
+			if !policyWins {
+				retainedBy = "earlier provider ref"
+			}
+
+			collisions = append(collisions, MappingCollision{
+				ID:             pr.ID,
+				RetainedTitle:  result[idx].Title,
+				DiscardedTitle: pr.Title,
+				PolicyWins:     policyWins,
+			})
+
+			note := buildCollisionNote(
+				pr.ID, pr.Title, retainedBy,
+			)
+			result[idx].Description = note +
+				result[idx].Description
+			continue
+		}
+
+		seen[pr.ID] = len(result)
+		result = append(result, providerRefToGemara(pr))
+	}
+
+	return result, collisions
+}
+
+// providerRefToGemara converts a provider.MappingReference to the
+// equivalent gemara.MappingReference type.
+func providerRefToGemara(
+	pr provider.MappingReference,
+) gemara.MappingReference {
+	return gemara.MappingReference{
+		Id:          pr.ID,
+		Title:       pr.Title,
+		Version:     pr.Version,
+		Description: pr.Description,
+		Url:         pr.URL,
+	}
+}
+
+// buildCollisionNote constructs a human-readable prefix for the
+// Description field of a retained mapping reference when a collision
+// occurs. When title is non-empty it is included in the note.
+func buildCollisionNote(
+	id, title, retainedBy string,
+) string {
+	if title != "" {
+		return fmt.Sprintf(
+			"collision: provider ref '%s' (id: '%s')"+
+				" discarded in favor of %s; ",
+			title, id, retainedBy,
+		)
+	}
+	return fmt.Sprintf(
+		"collision: provider ref (id: '%s')"+
+			" discarded in favor of %s; ",
+		id, retainedBy,
+	)
+}
+
+// FormatMappingCollisions formats mapping reference collisions as a
+// distinct warnings block for stderr. Returns empty string when there
+// are no collisions.
+func FormatMappingCollisions(
+	collisions []MappingCollision,
+) string {
+	if len(collisions) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	noun := "collisions"
+	if len(collisions) == 1 {
+		noun = "collision"
+	}
+	fmt.Fprintf(
+		&b,
+		"\nWARNING: %d mapping reference %s"+
+			" during merge:\n",
+		len(collisions), noun,
+	)
+	for _, c := range collisions {
+		retained := "policy ref"
+		if !c.PolicyWins {
+			retained = "earlier provider ref"
+		}
+		if c.DiscardedTitle != "" {
+			fmt.Fprintf(
+				&b,
+				"  - id '%s': provider ref '%s'"+
+					" discarded in favor of %s\n",
+				c.ID, c.DiscardedTitle, retained,
+			)
+		} else {
+			fmt.Fprintf(
+				&b,
+				"  - id '%s': provider ref"+
+					" discarded in favor of %s\n",
+				c.ID, retained,
+			)
+		}
 	}
 	fmt.Fprintln(&b)
 	return b.String()

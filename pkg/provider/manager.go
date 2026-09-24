@@ -172,6 +172,9 @@ func (m *Manager) RouteGenerate(ctx context.Context, evaluatorID string, globalV
 type ScanResult struct {
 	Assessments []AssessmentLog
 	Errors      []string
+	// MappingReferences holds provider-declared external document
+	// references aggregated across providers.
+	MappingReferences []MappingReference
 	// rpcFailures tracks RPC-level errors with their evaluator context.
 	// RouteScan uses these to synthesize backward-compatible error assessments
 	// without re-injecting provider-reported operational errors.
@@ -234,8 +237,9 @@ func (m *Manager) RouteScanResult(ctx context.Context, evaluatorID string, targe
 			}, nil
 		}
 		return &ScanResult{
-			Assessments: resp.Assessments,
-			Errors:      resp.Errors,
+			Assessments:       resp.Assessments,
+			Errors:            resp.Errors,
+			MappingReferences: resp.MappingReferences,
 		}, nil
 	}
 
@@ -255,6 +259,9 @@ func (m *Manager) RouteScanResult(ctx context.Context, evaluatorID string, targe
 		}
 		result.Assessments = append(result.Assessments, resp.Assessments...)
 		result.Errors = append(result.Errors, resp.Errors...)
+		result.MappingReferences = append(
+			result.MappingReferences, resp.MappingReferences...,
+		)
 	}
 	return result, nil
 }

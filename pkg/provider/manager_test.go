@@ -358,6 +358,139 @@ func TestManager_RouteScan_DropsProviderErrors(t *testing.T) {
 	// The error is silently dropped (backwards-compatible behavior)
 }
 
+// mappingRefMockClient is a mock that returns mapping references
+// alongside assessments for testing RouteScanResult propagation.
+type mappingRefMockClient struct {
+	mockClient
+	refs []provider.MappingReference
+}
+
+func (m *mappingRefMockClient) Scan(
+	_ context.Context, _ *provider.ScanRequest,
+) (*provider.ScanResponse, error) {
+	return &provider.ScanResponse{
+		Assessments: []provider.AssessmentLog{{
+			PlanID:  "req-1",
+			Steps:   []provider.Step{{Name: "check", Result: provider.ResultPassed}},
+			Message: "evaluated",
+		}},
+		MappingReferences: m.refs,
+	}, nil
+}
+
+func TestScanResult_TargetedScanWithMappingRefs(t *testing.T) {
+	mgr, err := provider.NewManager(t.TempDir(), nil)
+	require.NoError(t, err)
+
+	refs := []provider.MappingReference{
+		{
+			ID:          "nist-800-53",
+			Title:       "NIST SP 800-53",
+			Version:     "rev5",
+			Description: "Security and Privacy Controls",
+			URL:         "https://csrc.nist.gov/800-53",
+		},
+	}
+	mock := &mappingRefMockClient{refs: refs}
+	lp := provider.NewMockLoadedProvider("ref-provider", "ref-eval", mock)
+	mgr.RegisterProviderForTest("ref-eval", lp)
+
+	result, err := mgr.RouteScanResult(
+		context.Background(), "ref-eval",
+		[]provider.Target{{TargetID: "t1"}},
+	)
+	require.NoError(t, err)
+	require.Len(t, result.MappingReferences, 1)
+	assert.Equal(t, "nist-800-53", result.MappingReferences[0].ID)
+	assert.Equal(t, "NIST SP 800-53", result.MappingReferences[0].Title)
+	assert.Equal(t, "rev5", result.MappingReferences[0].Version)
+	assert.Equal(t, "Security and Privacy Controls",
+		result.MappingReferences[0].Description)
+	assert.Equal(t, "https://csrc.nist.gov/800-53",
+		result.MappingReferences[0].URL)
+}
+
+func TestScanResult_BroadcastAggregatesMappingRefs(t *testing.T) {
+	mgr, err := provider.NewManager(t.TempDir(), nil)
+	require.NoError(t, err)
+
+	// First provider returns one reference
+	mock1 := &mappingRefMockClient{
+		refs: []provider.MappingReference{
+			{ID: "nist-800-53", Title: "NIST SP 800-53"},
+		},
+	}
+	lp1 := provider.NewMockLoadedProvider(
+		"provider-a", "eval-a", mock1,
+	)
+	mgr.RegisterProviderForTest("eval-a", lp1)
+
+	// Second provider returns a different reference
+	mock2 := &mappingRefMockClient{
+		refs: []provider.MappingReference{
+			{ID: "cis-k8s", Title: "CIS Kubernetes Benchmark"},
+		},
+	}
+	lp2 := provider.NewMockLoadedProvider(
+		"provider-b", "eval-b", mock2,
+	)
+	mgr.RegisterProviderForTest("eval-b", lp2)
+
+	// Broadcast mode: empty evaluatorID scans all providers
+	result, err := mgr.RouteScanResult(
+		context.Background(), "",
+		[]provider.Target{{TargetID: "t1"}},
+	)
+	require.NoError(t, err)
+
+	// Both providers' references should be aggregated
+	require.Len(t, result.MappingReferences, 2)
+	ids := []string{
+		result.MappingReferences[0].ID,
+		result.MappingReferences[1].ID,
+	}
+	assert.Contains(t, ids, "nist-800-53")
+	assert.Contains(t, ids, "cis-k8s")
+}
+
+func TestScanResult_NilMappingRefs(t *testing.T) {
+	mgr, err := provider.NewManager(t.TempDir(), nil)
+	require.NoError(t, err)
+
+	// Provider returns no mapping references (nil)
+	mock := &mappingRefMockClient{refs: nil}
+	lp := provider.NewMockLoadedProvider("no-ref-provider", "no-ref-eval", mock)
+	mgr.RegisterProviderForTest("no-ref-eval", lp)
+
+	result, err := mgr.RouteScanResult(
+		context.Background(), "no-ref-eval",
+		[]provider.Target{{TargetID: "t1"}},
+	)
+	require.NoError(t, err)
+	assert.Nil(t, result.MappingReferences,
+		"nil provider refs should produce nil ScanResult refs")
+}
+
+func TestScanResult_EmptyMappingRefs(t *testing.T) {
+	mgr, err := provider.NewManager(t.TempDir(), nil)
+	require.NoError(t, err)
+
+	// Provider returns empty (not nil) mapping references
+	mock := &mappingRefMockClient{refs: []provider.MappingReference{}}
+	lp := provider.NewMockLoadedProvider(
+		"empty-ref-provider", "empty-ref-eval", mock,
+	)
+	mgr.RegisterProviderForTest("empty-ref-eval", lp)
+
+	result, err := mgr.RouteScanResult(
+		context.Background(), "empty-ref-eval",
+		[]provider.Target{{TargetID: "t1"}},
+	)
+	require.NoError(t, err)
+	assert.Empty(t, result.MappingReferences,
+		"empty provider refs should produce empty ScanResult refs")
+}
+
 func TestScanResult_HasErrors_EdgeCases(t *testing.T) {
 	// nil Errors slice
 	nilResult := &provider.ScanResult{Errors: nil}

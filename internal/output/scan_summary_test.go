@@ -473,3 +473,407 @@ func TestFormatScanSummary_AllFailed_ShowPassingTrue(t *testing.T) {
 	assert.Contains(t, output, "REQ-3")
 	assert.Contains(t, output, "3 requirements: 0 passed, 3 failed, 0 not applicable, 0 skipped, 0 errors")
 }
+
+func TestMergeMappingReferences(t *testing.T) {
+	tests := []struct {
+		name           string
+		policyRefs     []gemara.MappingReference
+		providerRefs   []provider.MappingReference
+		wantLen        int
+		wantCollisions int
+		verify         func(
+			t *testing.T,
+			merged []gemara.MappingReference,
+			collisions []MappingCollision,
+		)
+	}{
+		{
+			name: "no_collision",
+			policyRefs: []gemara.MappingReference{
+				{Id: "pol-1", Title: "Policy One"},
+			},
+			providerRefs: []provider.MappingReference{
+				{ID: "prov-1", Title: "Provider One"},
+			},
+			wantLen:        2,
+			wantCollisions: 0,
+			verify: func(
+				t *testing.T,
+				merged []gemara.MappingReference,
+				_ []MappingCollision,
+			) {
+				assert.Equal(t, "pol-1", merged[0].Id)
+				assert.Equal(t, "prov-1", merged[1].Id)
+			},
+		},
+		{
+			name: "policy_provider_collision",
+			policyRefs: []gemara.MappingReference{
+				{
+					Id:    "shared-id",
+					Title: "Policy Version",
+				},
+			},
+			providerRefs: []provider.MappingReference{
+				{
+					ID:    "shared-id",
+					Title: "Provider Version",
+				},
+			},
+			wantLen:        1,
+			wantCollisions: 1,
+			verify: func(
+				t *testing.T,
+				merged []gemara.MappingReference,
+				collisions []MappingCollision,
+			) {
+				assert.Equal(t,
+					"Policy Version",
+					merged[0].Title,
+				)
+				assert.True(t, collisions[0].PolicyWins)
+				assert.Equal(t,
+					"shared-id",
+					collisions[0].ID,
+				)
+				assert.Equal(t,
+					"Provider Version",
+					collisions[0].DiscardedTitle,
+				)
+				assert.Contains(t,
+					merged[0].Description,
+					"collision:",
+				)
+				assert.Contains(t,
+					merged[0].Description,
+					"policy ref",
+				)
+			},
+		},
+		{
+			name:       "provider_provider_collision",
+			policyRefs: nil,
+			providerRefs: []provider.MappingReference{
+				{
+					ID:    "dup-id",
+					Title: "First Provider",
+				},
+				{
+					ID:    "dup-id",
+					Title: "Second Provider",
+				},
+			},
+			wantLen:        1,
+			wantCollisions: 1,
+			verify: func(
+				t *testing.T,
+				merged []gemara.MappingReference,
+				collisions []MappingCollision,
+			) {
+				assert.Equal(t,
+					"First Provider",
+					merged[0].Title,
+				)
+				assert.False(t, collisions[0].PolicyWins)
+				assert.Equal(t,
+					"Second Provider",
+					collisions[0].DiscardedTitle,
+				)
+				assert.Contains(t,
+					merged[0].Description,
+					"earlier provider ref",
+				)
+			},
+		},
+		{
+			name:           "empty_inputs",
+			policyRefs:     nil,
+			providerRefs:   nil,
+			wantLen:        0,
+			wantCollisions: 0,
+		},
+		{
+			name: "description_prepend_not_overwrite",
+			policyRefs: []gemara.MappingReference{
+				{
+					Id:          "ref-1",
+					Title:       "Original",
+					Description: "existing description",
+				},
+			},
+			providerRefs: []provider.MappingReference{
+				{
+					ID:    "ref-1",
+					Title: "Duplicate",
+				},
+			},
+			wantLen:        1,
+			wantCollisions: 1,
+			verify: func(
+				t *testing.T,
+				merged []gemara.MappingReference,
+				_ []MappingCollision,
+			) {
+				desc := merged[0].Description
+				assert.Contains(t, desc,
+					"existing description",
+					"original description preserved",
+				)
+				assert.Contains(t, desc,
+					"collision:",
+					"collision note prepended",
+				)
+				assert.True(t,
+					strings.HasPrefix(desc, "collision:"),
+					"collision note at start, got: %s",
+					desc,
+				)
+				assert.True(t,
+					strings.HasSuffix(desc,
+						"existing description"),
+					"original description at end",
+				)
+			},
+		},
+		{
+			name:       "empty_id_provider_ref_discarded",
+			policyRefs: nil,
+			providerRefs: []provider.MappingReference{
+				{ID: "", Title: "No ID Ref"},
+				{ID: "valid-1", Title: "Valid Ref"},
+			},
+			wantLen:        1,
+			wantCollisions: 0,
+			verify: func(
+				t *testing.T,
+				merged []gemara.MappingReference,
+				_ []MappingCollision,
+			) {
+				assert.Equal(t,
+					"valid-1", merged[0].Id,
+				)
+			},
+		},
+		{
+			name:       "same_provider_duplicate_ids",
+			policyRefs: nil,
+			providerRefs: []provider.MappingReference{
+				{
+					ID:      "dup",
+					Title:   "First",
+					Version: "1.0",
+				},
+				{
+					ID:      "dup",
+					Title:   "Second",
+					Version: "2.0",
+				},
+				{
+					ID:      "dup",
+					Title:   "Third",
+					Version: "3.0",
+				},
+			},
+			wantLen:        1,
+			wantCollisions: 2,
+			verify: func(
+				t *testing.T,
+				merged []gemara.MappingReference,
+				collisions []MappingCollision,
+			) {
+				// First-wins: version stays 1.0
+				assert.Equal(t, "1.0", merged[0].Version)
+				assert.Equal(t,
+					"First", merged[0].Title,
+				)
+				// Two collisions recorded
+				assert.False(t,
+					collisions[0].PolicyWins,
+				)
+				assert.Equal(t,
+					"Second",
+					collisions[0].DiscardedTitle,
+				)
+				assert.False(t,
+					collisions[1].PolicyWins,
+				)
+				assert.Equal(t,
+					"Third",
+					collisions[1].DiscardedTitle,
+				)
+			},
+		},
+		{
+			name:       "provider_ref_fields_converted",
+			policyRefs: nil,
+			providerRefs: []provider.MappingReference{
+				{
+					ID:          "conv-1",
+					Title:       "Converted",
+					Version:     "2.0",
+					Description: "provider desc",
+					URL:         "https://example.com",
+				},
+			},
+			wantLen:        1,
+			wantCollisions: 0,
+			verify: func(
+				t *testing.T,
+				merged []gemara.MappingReference,
+				_ []MappingCollision,
+			) {
+				ref := merged[0]
+				assert.Equal(t, "conv-1", ref.Id)
+				assert.Equal(t, "Converted", ref.Title)
+				assert.Equal(t, "2.0", ref.Version)
+				assert.Equal(t,
+					"provider desc", ref.Description,
+				)
+				assert.Equal(t,
+					"https://example.com", ref.Url,
+				)
+			},
+		},
+		{
+			name: "collision_note_includes_id_and_title",
+			policyRefs: []gemara.MappingReference{
+				{Id: "x-1", Title: "Policy X"},
+			},
+			providerRefs: []provider.MappingReference{
+				{ID: "x-1", Title: "Provider X"},
+			},
+			wantLen:        1,
+			wantCollisions: 1,
+			verify: func(
+				t *testing.T,
+				merged []gemara.MappingReference,
+				_ []MappingCollision,
+			) {
+				desc := merged[0].Description
+				assert.Contains(t, desc, "x-1")
+				assert.Contains(t, desc, "Provider X")
+			},
+		},
+		{
+			name: "collision_note_without_title",
+			policyRefs: []gemara.MappingReference{
+				{Id: "no-title"},
+			},
+			providerRefs: []provider.MappingReference{
+				{ID: "no-title", Title: ""},
+			},
+			wantLen:        1,
+			wantCollisions: 1,
+			verify: func(
+				t *testing.T,
+				merged []gemara.MappingReference,
+				_ []MappingCollision,
+			) {
+				desc := merged[0].Description
+				assert.Contains(t, desc, "no-title")
+				// No title in note when empty
+				assert.NotContains(t, desc, "''")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			merged, collisions := MergeMappingReferences(
+				tt.policyRefs, tt.providerRefs,
+			)
+			require.Len(t, merged, tt.wantLen)
+			require.Len(t,
+				collisions, tt.wantCollisions,
+			)
+			if tt.verify != nil {
+				tt.verify(t, merged, collisions)
+			}
+		})
+	}
+}
+
+func TestFormatMappingCollisions_Empty(t *testing.T) {
+	result := FormatMappingCollisions(nil)
+	assert.Empty(t, result)
+
+	result = FormatMappingCollisions(
+		[]MappingCollision{},
+	)
+	assert.Empty(t, result)
+}
+
+func TestFormatMappingCollisions_SingleCollision(t *testing.T) {
+	collisions := []MappingCollision{
+		{
+			ID:             "ref-1",
+			RetainedTitle:  "Policy Ref",
+			DiscardedTitle: "Provider Ref",
+			PolicyWins:     true,
+		},
+	}
+
+	result := FormatMappingCollisions(collisions)
+
+	assert.Contains(t, result,
+		"WARNING: 1 mapping reference collision"+
+			" during merge:",
+	)
+	assert.Contains(t, result, "ref-1")
+	assert.Contains(t, result, "Provider Ref")
+	assert.Contains(t, result, "policy ref")
+}
+
+func TestFormatMappingCollisions_MultipleCollisions(
+	t *testing.T,
+) {
+	collisions := []MappingCollision{
+		{
+			ID:             "ref-1",
+			DiscardedTitle: "Provider A",
+			PolicyWins:     true,
+		},
+		{
+			ID:             "ref-2",
+			DiscardedTitle: "Provider B",
+			PolicyWins:     false,
+		},
+	}
+
+	result := FormatMappingCollisions(collisions)
+
+	assert.Contains(t, result,
+		"WARNING: 2 mapping reference collisions"+
+			" during merge:",
+	)
+	assert.Contains(t, result,
+		"id 'ref-1': provider ref 'Provider A'"+
+			" discarded in favor of policy ref",
+	)
+	assert.Contains(t, result,
+		"id 'ref-2': provider ref 'Provider B'"+
+			" discarded in favor of"+
+			" earlier provider ref",
+	)
+}
+
+func TestFormatMappingCollisions_EmptyDiscardedTitle(
+	t *testing.T,
+) {
+	collisions := []MappingCollision{
+		{
+			ID:             "ref-1",
+			RetainedTitle:  "Policy Ref",
+			DiscardedTitle: "",
+			PolicyWins:     true,
+		},
+	}
+
+	result := FormatMappingCollisions(collisions)
+
+	assert.Contains(t, result,
+		"id 'ref-1': provider ref"+
+			" discarded in favor of policy ref",
+	)
+	assert.NotContains(t, result, "''")
+}

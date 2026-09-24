@@ -99,8 +99,9 @@ func (s *grpcServer) Scan(ctx context.Context, req *proto.ScanRequest) (*proto.S
 	}
 
 	return &proto.ScanResponse{
-		Assessments: protoAssessments,
-		Errors:      resp.Errors,
+		Assessments:       protoAssessments,
+		Errors:            resp.Errors,
+		MappingReferences: internalMappingRefsToProto(resp.MappingReferences),
 	}, nil
 }
 
@@ -135,6 +136,25 @@ func internalEvidenceSourceToProto(
 		Digest:      src.Digest,
 		Remarks:     src.Remarks,
 	}
+}
+
+func internalMappingRefsToProto(
+	refs []MappingReference,
+) []*proto.MappingReference {
+	if len(refs) == 0 {
+		return nil
+	}
+	pr := make([]*proto.MappingReference, len(refs))
+	for i, r := range refs {
+		pr[i] = &proto.MappingReference{
+			Id:          r.ID,
+			Title:       r.Title,
+			Version:     r.Version,
+			Description: r.Description,
+			Url:         r.URL,
+		}
+	}
+	return pr
 }
 
 func internalResultToProto(r Result) proto.Result {

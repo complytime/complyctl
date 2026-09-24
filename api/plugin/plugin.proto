@@ -107,6 +107,35 @@ message ScanResponse {
   // SHOULD continue scanning remaining targets and report partial
   // results in assessments alongside errors for failed targets.
   repeated string errors = 2;
+
+  // References to external documents discovered during scanning.
+  // Providers MAY populate this when they encounter mapping references
+  // not present in the policy metadata (e.g., from complypack content
+  // or provider-specific knowledge). These are merged with policy-level
+  // mapping references by complyctl, with policy entries taking priority
+  // on id collisions.
+  repeated MappingReference mapping_references = 3;
+}
+
+// MappingReference represents a reference to an external document
+// with full metadata. Mirrors go-gemara MappingReference.
+message MappingReference {
+  // id identifies this mapping reference within the artifact and,
+  // when url is absent, the referenced artifact's metadata.id.
+  string id = 1;
+
+  // title describes the purpose of this mapping reference at a glance
+  string title = 2;
+
+  // version is the version identifier of the artifact being mapped to
+  string version = 3;
+
+  // description is prose regarding the artifact's purpose or content
+  string description = 4;
+
+  // url is the path where the artifact may be retrieved; preferably
+  // responds with Gemara-compatible YAML/JSON
+  string url = 5;
 }
 
 // AssessmentLog contains results for a single requirement evaluation

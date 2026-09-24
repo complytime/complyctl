@@ -68,9 +68,12 @@ type Target struct {
 // ScanResponse carries assessment results from a provider scan.
 // Errors holds operational/infrastructure failures (coverage gaps).
 // Assessments holds actual evaluation results (compliance posture known).
+// MappingReferences holds provider-declared external document references
+// that are merged with policy-level references by complyctl.
 type ScanResponse struct {
-	Assessments []AssessmentLog
-	Errors      []string
+	Assessments       []AssessmentLog
+	Errors            []string
+	MappingReferences []MappingReference
 }
 
 // AssessmentLog holds the evaluation result for one provider assessment.
@@ -117,6 +120,17 @@ type EvidenceSource struct {
 	EntryID     string
 	Digest      string
 	Remarks     string
+}
+
+// MappingReference identifies an external document or artifact that a
+// provider's scan results map to. Mirrors proto MappingReference and
+// go-gemara MappingReference.
+type MappingReference struct {
+	ID          string
+	Title       string
+	Version     string
+	Description string
+	URL         string
 }
 
 // Result is the outcome of a single assessment step.
@@ -270,8 +284,9 @@ func (c *Client) Scan(ctx context.Context, req *ScanRequest) (*ScanResponse, err
 	}
 
 	return &ScanResponse{
-		Assessments: assessments,
-		Errors:      protoResp.GetErrors(),
+		Assessments:       assessments,
+		Errors:            protoResp.GetErrors(),
+		MappingReferences: protoMappingRefsToInternal(protoResp.GetMappingReferences()),
 	}, nil
 }
 
@@ -306,6 +321,25 @@ func protoEvidenceMappingToInternal(
 		Digest:      em.GetDigest(),
 		Remarks:     em.GetRemarks(),
 	}
+}
+
+func protoMappingRefsToInternal(
+	refs []*pluginv2.MappingReference,
+) []MappingReference {
+	if len(refs) == 0 {
+		return nil
+	}
+	mr := make([]MappingReference, len(refs))
+	for i, r := range refs {
+		mr[i] = MappingReference{
+			ID:          r.GetId(),
+			Title:       r.GetTitle(),
+			Version:     r.GetVersion(),
+			Description: r.GetDescription(),
+			URL:         r.GetUrl(),
+		}
+	}
+	return mr
 }
 
 func protoResultToInternal(r pluginv2.Result) Result {
