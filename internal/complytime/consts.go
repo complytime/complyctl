@@ -79,10 +79,10 @@ const SystemProviderDir = "/usr/libexec/complytime/providers"
 const SystemProviderDirEnvVar = "COMPLYTIME_SYSTEM_PROVIDER_DIR"
 
 // ResolveSystemProviderDir returns the system-wide provider directory:
-// the value of SystemProviderDirEnvVar when set and non-empty,
-// SystemProviderDir otherwise.
+// the value of SystemProviderDirEnvVar when it is set to an absolute path,
+// SystemProviderDir otherwise (matching ResolveDataDir's XDG_DATA_HOME check).
 func ResolveSystemProviderDir() string {
-	if dir := os.Getenv(SystemProviderDirEnvVar); dir != "" {
+	if dir := os.Getenv(SystemProviderDirEnvVar); dir != "" && filepath.IsAbs(dir) {
 		return dir
 	}
 	return SystemProviderDir

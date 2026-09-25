@@ -36,7 +36,7 @@
   hosts with providers installed in `/usr/libexec/complytime/providers`
   (e.g., from RPM packages). The system-wide provider directory can now
   be overridden with the `COMPLYTIME_SYSTEM_PROVIDER_DIR` environment
-  variable, which the tests use to isolate discovery from the host. (#881)
+  variable (absolute paths only), which the tests use to isolate discovery from the host. (#881)
 
 ### Security
 

@@ -354,7 +354,7 @@ func CheckConfig(configPath string) CheckResult {
 // Returns both diagnostic results and Describe data for variable validation (R51).
 // providerLogger is passed to the provider Manager for go-plugin client logging.
 // Discovery scans both the user directory (providerDir) and the system-wide
-// directory (complytime.ResolveSystemProviderDir) so RPM-installed providers are found
+// directory (resolved via complytime.ResolveSystemProviderDir()) so RPM-installed providers are found
 // even when the user directory does not exist.
 func CheckProviders(providerDir string, providerLogger hclog.Logger) ([]CheckResult, []ProviderHealth) {
 	mgr, err := provider.NewManager(providerDir, providerLogger)

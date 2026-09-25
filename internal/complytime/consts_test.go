@@ -170,3 +170,8 @@ func TestResolveSystemProviderDir_EnvOverride(t *testing.T) {
 	t.Setenv(SystemProviderDirEnvVar, "/custom/providers")
 	assert.Equal(t, "/custom/providers", ResolveSystemProviderDir())
 }
+
+func TestResolveSystemProviderDir_RelativeIgnored(t *testing.T) {
+	t.Setenv(SystemProviderDirEnvVar, "../../tmp/providers")
+	assert.Equal(t, SystemProviderDir, ResolveSystemProviderDir())
+}
