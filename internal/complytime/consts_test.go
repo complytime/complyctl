@@ -160,3 +160,13 @@ func TestResolveProviderDir_CustomXDGDataHome(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join("/custom/data", xdgAppName, providerSubdir), dir)
 }
+
+func TestResolveSystemProviderDir_Default(t *testing.T) {
+	t.Setenv(SystemProviderDirEnvVar, "")
+	assert.Equal(t, SystemProviderDir, ResolveSystemProviderDir())
+}
+
+func TestResolveSystemProviderDir_EnvOverride(t *testing.T) {
+	t.Setenv(SystemProviderDirEnvVar, "/custom/providers")
+	assert.Equal(t, "/custom/providers", ResolveSystemProviderDir())
+}

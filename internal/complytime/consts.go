@@ -69,7 +69,24 @@ const ProviderExecutablePrefix = "complyctl-provider-"
 // SystemProviderDir is the system-wide provider directory where
 // package managers (e.g., RPM) install provider binaries.
 // Discovery checks this path as a fallback after the user directory.
+// Use ResolveSystemProviderDir to honor SystemProviderDirEnvVar.
 const SystemProviderDir = "/usr/libexec/complytime/providers"
+
+// SystemProviderDirEnvVar is the environment variable that overrides
+// SystemProviderDir. It lets tests isolate discovery from providers
+// installed on the host, and lets packagers or users point discovery
+// at a different system-wide location.
+const SystemProviderDirEnvVar = "COMPLYTIME_SYSTEM_PROVIDER_DIR"
+
+// ResolveSystemProviderDir returns the system-wide provider directory:
+// the value of SystemProviderDirEnvVar when set and non-empty,
+// SystemProviderDir otherwise.
+func ResolveSystemProviderDir() string {
+	if dir := os.Getenv(SystemProviderDirEnvVar); dir != "" {
+		return dir
+	}
+	return SystemProviderDir
+}
 
 // Gemara OCI layer media types for identifying layer content within multi-layer OCI manifests.
 const (

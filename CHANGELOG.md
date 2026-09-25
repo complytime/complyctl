@@ -32,6 +32,12 @@
   corrects a semantic error in upstream `go-gemara` result
   aggregation fixed in v0.9.0. (#813)
 
+- Provider discovery and `complyctl doctor` unit tests no longer fail on
+  hosts with providers installed in `/usr/libexec/complytime/providers`
+  (e.g., from RPM packages). The system-wide provider directory can now
+  be overridden with the `COMPLYTIME_SYSTEM_PROVIDER_DIR` environment
+  variable, which the tests use to isolate discovery from the host. (#881)
+
 ### Security
 
 - Transitive `oras-go` bump via `go-gemara` v0.9.1 addresses

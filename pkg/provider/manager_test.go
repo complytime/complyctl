@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/complytime/complyctl/pkg/provider"
 )
 
@@ -65,6 +66,8 @@ func TestManager_ListProviders(t *testing.T) {
 }
 
 func TestManager_EmptyProviderDir(t *testing.T) {
+	// Keep providers installed on the host out of discovery.
+	t.Setenv(complytime.SystemProviderDirEnvVar, t.TempDir())
 	tmpDir := t.TempDir()
 
 	mgr, err := provider.NewManager(tmpDir, nil)
