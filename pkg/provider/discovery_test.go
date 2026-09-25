@@ -16,6 +16,7 @@ import (
 // --- T157: DiscoverProviders tests ---
 
 func TestDiscoverProviders_EmptyDir(t *testing.T) {
+	isolateSystemProviderDir(t)
 	dir := t.TempDir()
 	d := NewDiscovery(dir)
 	providers, err := d.DiscoverProviders()
@@ -24,6 +25,7 @@ func TestDiscoverProviders_EmptyDir(t *testing.T) {
 }
 
 func TestDiscoverProviders_NonPrefixedExecutables(t *testing.T) {
+	isolateSystemProviderDir(t)
 	dir := t.TempDir()
 	createExecutable(t, dir, "some-other-tool")
 
@@ -34,6 +36,7 @@ func TestDiscoverProviders_NonPrefixedExecutables(t *testing.T) {
 }
 
 func TestDiscoverProviders_ValidProvider(t *testing.T) {
+	isolateSystemProviderDir(t)
 	dir := t.TempDir()
 	createExecutable(t, dir, complytime.ProviderExecutablePrefix+"mock")
 
@@ -43,6 +46,27 @@ func TestDiscoverProviders_ValidProvider(t *testing.T) {
 	require.Len(t, providers, 1)
 	assert.Equal(t, "mock", providers[0].EvaluatorID)
 	assert.Equal(t, filepath.Join(dir, complytime.ProviderExecutablePrefix+"mock"), providers[0].ExecutablePath)
+}
+
+func TestDiscoverProviders_SystemDirFromEnv(t *testing.T) {
+	userDir := t.TempDir()
+	sysDir := isolateSystemProviderDir(t)
+	createExecutable(t, userDir, complytime.ProviderExecutablePrefix+"openscap")
+	createExecutable(t, sysDir, complytime.ProviderExecutablePrefix+"openscap")
+	createExecutable(t, sysDir, complytime.ProviderExecutablePrefix+"sys-only")
+
+	d := NewDiscovery(userDir)
+	providers, err := d.DiscoverProviders()
+	require.NoError(t, err)
+	require.Len(t, providers, 2)
+
+	idPaths := make(map[string]string)
+	for _, p := range providers {
+		idPaths[p.EvaluatorID] = p.ExecutablePath
+	}
+	assert.Equal(t, filepath.Join(userDir, complytime.ProviderExecutablePrefix+"openscap"), idPaths["openscap"],
+		"user-dir openscap should take precedence over system-dir")
+	assert.Equal(t, filepath.Join(sysDir, complytime.ProviderExecutablePrefix+"sys-only"), idPaths["sys-only"])
 }
 
 // --- T158: scanDir tests ---
@@ -150,6 +174,16 @@ func TestScanDir_UserDirPrecedence(t *testing.T) {
 	assert.Equal(t, filepath.Join(userDir, complytime.ProviderExecutablePrefix+"openscap"), idPaths["openscap"],
 		"user-dir openscap should take precedence over system-dir")
 	assert.Equal(t, filepath.Join(sysDir, complytime.ProviderExecutablePrefix+"sys-only"), idPaths["sys-only"])
+}
+
+// isolateSystemProviderDir points system-wide provider discovery at an
+// empty temporary directory so tests do not pick up providers installed
+// on the host (e.g., from RPM packages). It returns that directory.
+func isolateSystemProviderDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv(complytime.SystemProviderDirEnvVar, dir)
+	return dir
 }
 
 func createExecutable(t *testing.T, dir, name string) {

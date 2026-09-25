@@ -383,6 +383,13 @@ cache (\(ti/.cache/complytime/complypacks/).
 Default: \f[B]1\f[R].
 Values less than 1 are clamped to 1.
 .TP
+\f[B]COMPLYTIME_SYSTEM_PROVIDER_DIR\f[R]
+Override the system\-wide provider directory that is scanned after the
+user provider directory.
+Providers in the user directory take precedence.
+Must be an absolute path; a relative path is ignored.
+Default: \f[B]/usr/libexec/complytime/providers\f[R].
+.TP
 \f[B]NO_COLOR\f[R]
 When set (any non\-empty value), \f[B]complyctl doctor\f[R]
 automatically selects \f[B]text\f[R] format instead of the default

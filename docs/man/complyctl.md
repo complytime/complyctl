@@ -397,6 +397,12 @@ Default: **yaml**. The **--log-format** flag takes precedence.
 local cache (~/.cache/complytime/complypacks/). Default: **1**.
 Values less than 1 are clamped to 1.
 
+**COMPLYTIME_SYSTEM_PROVIDER_DIR**
+: Override the system-wide provider directory that is scanned after
+the user provider directory. Providers in the user directory take
+precedence. Must be an absolute path; a relative path is ignored.
+Default: **/usr/libexec/complytime/providers**.
+
 **NO_COLOR**
 : When set (any non-empty value), **complyctl doctor** automatically
 selects **text** format instead of the default human-readable emoji

@@ -109,9 +109,11 @@ func TestCheckProviders_NonExistentUserDir(t *testing.T) {
 	// Simulates RPM-only install where the user XDG provider directory
 	// does not exist. The discovery layer should tolerate the missing
 	// user directory and fall through to the system directory scan.
-	// On dev machines where /usr/libexec/complytime/providers also
-	// does not exist, the result should be a non-blocking WARN
-	// (not the previous blocking FAIL with "directory not found").
+	// When the system directory has no providers either, the result
+	// should be a non-blocking WARN (not the previous blocking FAIL
+	// with "directory not found").
+	sysDir := filepath.Join(t.TempDir(), "no-system-providers")
+	t.Setenv(complytime.SystemProviderDirEnvVar, sysDir)
 	nonExistent := filepath.Join(t.TempDir(), "does-not-exist")
 	results, healthData := CheckProviders(nonExistent, hclog.NewNullLogger())
 
@@ -119,13 +121,14 @@ func TestCheckProviders_NonExistentUserDir(t *testing.T) {
 	assert.Equal(t, StatusWarn, results[0].Status)
 	assert.False(t, results[0].Blocking)
 	assert.Contains(t, results[0].Message, "no providers found")
-	assert.Contains(t, results[0].Message, complytime.SystemProviderDir)
+	assert.Contains(t, results[0].Message, sysDir)
 	assert.Nil(t, healthData)
 }
 
 func TestCheckProviders_EmptyUserDir(t *testing.T) {
 	// User directory exists but is empty. Same outcome: no providers
-	// discovered from either directory on a dev machine.
+	// discovered from either directory.
+	t.Setenv(complytime.SystemProviderDirEnvVar, t.TempDir())
 	emptyDir := t.TempDir()
 	results, healthData := CheckProviders(emptyDir, hclog.NewNullLogger())
 

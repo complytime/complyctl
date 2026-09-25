@@ -1061,6 +1061,8 @@ func TestInitOptions_Run_AlreadyExists(t *testing.T) {
 // --- providersOptions tests ---
 
 func TestProvidersOptions_Run_EmptyProviderDir(t *testing.T) {
+	// Keep providers installed on the host out of discovery.
+	t.Setenv(complytime.SystemProviderDirEnvVar, t.TempDir())
 	tmpDir := t.TempDir()
 	o := &providersOptions{
 		Common:      &Common{},

@@ -30,7 +30,8 @@ func NewDiscovery(providerDir string) *Discovery {
 }
 
 // DiscoverProviders scans the user provider directory and the system-wide
-// provider directory for executables matching the naming convention.
+// provider directory (see complytime.ResolveSystemProviderDir) for
+// executables matching the naming convention.
 // User-directory providers take precedence over system-installed ones.
 func (d *Discovery) DiscoverProviders() ([]ProviderInfo, error) {
 	seen := make(map[string]bool)
@@ -45,7 +46,7 @@ func (d *Discovery) DiscoverProviders() ([]ProviderInfo, error) {
 		providers = append(providers, p)
 	}
 
-	sysProviders, err := scanDir(complytime.SystemProviderDir)
+	sysProviders, err := scanDir(complytime.ResolveSystemProviderDir())
 	if err != nil {
 		return nil, err
 	}

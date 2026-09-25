@@ -243,6 +243,7 @@ Lists discovered scanning providers with their evaluator ID, path, health status
 | `COMPLYTIME_SHOW_PASSING` | Set to `false` to exclude passing controls from scan summary (default: `true`) |
 | `COMPLYTIME_LOG_FORMAT` | EvaluationLog format: `yaml` or `json` (default: `yaml`) |
 | `COMPLYTIME_CACHE_VERSIONS` | Complypack versions to retain per evaluator-id (default: `1`) |
+| `COMPLYTIME_SYSTEM_PROVIDER_DIR` | Override the system-wide provider directory scanned after the user provider directory; must be an absolute path (default: `/usr/libexec/complytime/providers`) |
 | `NO_COLOR` | Disables emoji output in `complyctl doctor` (selects `text` format) |
 
 ## Workspace Configuration
