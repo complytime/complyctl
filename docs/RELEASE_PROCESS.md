@@ -11,29 +11,32 @@ complyctl uses the org-wide release infrastructure from [org-infra](https://gith
 
 GoReleaser is configured in [.goreleaser.yaml](https://github.com/complytime/complyctl/blob/main/.goreleaser.yaml).
 
-3. **Homebrew Formula Publishing** -- after the release job completes, a third job downloads the source tarball for the tag, computes its SHA256, templates a source-build Homebrew Formula, and pushes it to `complytime/homebrew-tap`.
+3. **Homebrew Formula Publishing** -- after the release job completes, a third job downloads the source tarball for the tag, computes its SHA256, templates a source-build Homebrew Formula, and opens a PR in `complytime/homebrew-tap`. A maintainer merges the PR to publish the formula.
 
 ### Homebrew Formula Publishing
 
-The `homebrew` job in the release workflow automatically publishes or updates `Formula/complyctl.rb` in the [homebrew-tap](https://github.com/complytime/homebrew-tap) repository.
+The `homebrew` job in the release workflow opens a PR with `Formula/complyctl.rb` in the [homebrew-tap](https://github.com/complytime/homebrew-tap) repository. The PR must be merged by a maintainer to publish the formula update.
 
 **Prerequisites:**
-- The GitHub App (secrets: `APP_ID_HOMEBREW_FORMULA_PUBLISHER`, `PRIVATE_KEY_APP_HOMEBREW_FORMULA_PUBLISHER`) must have `Contents:write` permission on `complytime/homebrew-tap`
+- The GitHub App (secrets: `APP_ID_HOMEBREW_FORMULA_PUBLISHER`, `PRIVATE_KEY_APP_HOMEBREW_FORMULA_PUBLISHER`) must have `Contents:write` and `Pull requests:write` permissions on `complytime/homebrew-tap`
 - If the App installation is scoped to specific repos, `homebrew-tap` must be included
 
 **Failure modes:**
 - Tarball download failure (HTTP != 200) -- the step exits with an error
 - SHA256 length mismatch -- the step exits with an error
 - GitHub App token generation failure -- the step fails visibly
-- No changes to commit (re-run of the same version) -- exits 0 silently, which is safe
+- No changes to commit (re-run after PR was merged) -- exits 0 silently, which is safe
+- PR already exists for this version (re-run before PR was merged) -- exits 0 with a notice
 
-**Re-runs:** Safe. If the Formula is already up-to-date, `git commit` exits with "No changes to commit" and the job succeeds without pushing.
+**Re-runs:** Safe. If a PR for this version is already open, the job skips with a notice. If the PR was already merged and the formula matches main, `git commit` exits with "No changes to commit" and the job succeeds.
 
-**Manual recovery:** If the automation fails, manually create and push the Formula:
+**Post-release step:** After the release workflow completes, merge the formula PR in the [homebrew-tap](https://github.com/complytime/homebrew-tap/pulls) repository.
+
+**Manual recovery:** If the automation fails, manually create the Formula PR:
 1. Download the source tarball: `curl -sL -o source.tar.gz https://github.com/complytime/complyctl/archive/refs/tags/vX.Y.Z.tar.gz`
 2. Compute SHA256: `sha256sum source.tar.gz`
 3. Update `Formula/complyctl.rb` in the `homebrew-tap` repo with the new `url` and `sha256`
-4. Commit and push
+4. Open a PR and merge
 
 ### Creating a Release
 
@@ -43,6 +46,7 @@ To create a release, a project maintainer triggers the workflow manually:
 2. Enter the tag (e.g., `v1.2.3`) -- must be a valid semver greater than the latest existing tag
 3. The preflight job validates all conditions and creates the annotated tag automatically
 4. The release job builds and publishes artifacts to the [releases page](https://github.com/complytime/complyctl/releases)
+5. The homebrew job opens a formula PR in [homebrew-tap](https://github.com/complytime/homebrew-tap/pulls) -- merge it to publish the Homebrew formula
 
 > **Note:** Tags are created automatically by the preflight job. Do not create tags manually.
 

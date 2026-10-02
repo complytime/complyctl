@@ -9,8 +9,9 @@
 # re-run resilience), semver ordering, CI check status,
 # and unreleased commits before creating an annotated tag.
 #
-# After release, publishes a source-build Homebrew Formula
-# to complytime/homebrew-tap for macOS/Linux installation.
+# After release, opens a PR with the source-build Homebrew
+# Formula in complytime/homebrew-tap for macOS/Linux
+# installation. A maintainer merges the PR to publish.
 #
 # See: https://github.com/complytime/complyctl/issues/699
 # Fixes: https://github.com/complytime/complyctl/issues/654
@@ -84,6 +85,7 @@ jobs:
                   repositories: homebrew-tap
                   owner: complytime # zizmor: ignore[github-app] — scoped by repositories: homebrew-tap above
                   permission-contents: write
+                  permission-pull-requests: write
 
             - name: Publish Homebrew formula
               env:
@@ -100,6 +102,7 @@ jobs:
                   fi
 
                   VERSION="${TAG#v}"
+                  BRANCH="formula/complyctl-${VERSION}"
 
                   TARBALL_URL="https://github.com/complytime/complyctl/archive/refs/tags/${TAG}.tar.gz"
                   HTTP_CODE=$(curl -sL -o /tmp/source.tar.gz -w "%{http_code}" --fail --retry 3 "${TARBALL_URL}")
@@ -152,14 +155,42 @@ jobs:
                   # the token in git config or process arguments.
                   GH_TOKEN="${TAP_TOKEN}" gh repo clone complytime/homebrew-tap tap-repo -- --depth 1
                   cd tap-repo
+
+                  # Re-run resilience: if a PR already exists for this
+                  # version, skip creation and exit successfully.
+                  EXISTING_PR=$(GH_TOKEN="${TAP_TOKEN}" gh pr list \
+                      --repo complytime/homebrew-tap \
+                      --head "${BRANCH}" \
+                      --state open \
+                      --json number \
+                      --jq '.[0].number // empty')
+                  if [ -n "${EXISTING_PR}" ]; then
+                      echo "::notice::PR #${EXISTING_PR} already exists for ${BRANCH} — skipping"
+                      exit 0
+                  fi
+
                   mkdir -p Formula
                   cp ../complyctl.rb Formula/complyctl.rb
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
                   git add Formula/complyctl.rb
+
+                  # If the formula already matches main (re-run after PR
+                  # was merged), there is nothing to do.
                   git commit -m "complyctl ${VERSION}" || { echo "No changes to commit"; exit 0; }
-                  # gh configures a credential helper that supplies the
-                  # token via GH_TOKEN without persisting it in git config.
+
+                  # Push to a feature branch and open a PR instead of
+                  # pushing directly to main, which is blocked by the
+                  # organization branch protection ruleset.
+                  git checkout -b "${BRANCH}"
                   GH_TOKEN="${TAP_TOKEN}" gh auth setup-git
-                  git push origin main
-                  echo "::notice::Published Formula for complyctl ${VERSION} to homebrew-tap"
+                  git push origin "${BRANCH}"
+                  PR_URL=$(GH_TOKEN="${TAP_TOKEN}" gh pr create \
+                      --repo complytime/homebrew-tap \
+                      --title "complyctl ${VERSION}" \
+                      --body "Automated formula update for complyctl ${VERSION}.
+
+                  Source: https://github.com/complytime/complyctl/releases/tag/${TAG}" \
+                      --base main \
+                      --head "${BRANCH}")
+                  echo "::notice::Opened ${PR_URL} for complyctl ${VERSION}"
