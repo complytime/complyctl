@@ -73,6 +73,27 @@ complyctl get --skip-verify
 **--skip-verify**
 : Skip signature verification for fetched artifacts.
 
+### Offline policy-cache seeding
+
+On a disconnected system, `complyctl scan` can use a manually seeded policy OCI
+layout. From a directory containing `catalog.yaml` and `policy.yaml`, use `oras`
+to write to the cache:
+
+```
+oras push --oci-layout \
+  "${XDG_CACHE_HOME:-$HOME/.cache}/complytime/policies/acme/policies/baseline:v1.2.3" \
+  catalog.yaml:application/vnd.gemara.catalog.v1+yaml \
+  policy.yaml:application/vnd.gemara.policy.v1+yaml
+```
+
+The ORAS destination is an OCI `directory:tag` reference. Its repository path
+after the registry host and its tag MUST match the policy URL in
+`.complytime/complytime.yaml`. Manual seeding does not populate `state.json` or
+detect later manual policy-layout changes from digest freshness. It also does
+not perform signature verification; use `complyctl get` where verification
+metadata is required. A supported import workflow is tracked in
+[#892](https://github.com/complytime/complyctl/issues/892).
+
 ## list
 
 List cached Gemara policies with their evaluator, control count,

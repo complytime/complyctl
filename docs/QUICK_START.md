@@ -265,6 +265,54 @@ complyctl get
 
 When a verifier is configured in `complytime.yaml`, local cache hits are re-verified via the registry API before being accepted.
 
+### Pre-seed a policy cache for offline scans
+
+To scan without registry access or `complyctl get`, pre-seed the policy's OCI
+layout. The cache location is
+`$XDG_CACHE_HOME/complytime/policies/<repository>/`; when
+`XDG_CACHE_HOME` is unset, it is `~/.cache/complytime/policies/<repository>/`.
+
+From a directory containing the Gemara `catalog.yaml` and `policy.yaml` files,
+use `oras` to package them directly into the cache. For a policy configured as
+`ghcr.io/acme/policies/baseline:v1.2.3`, the repository is
+`acme/policies/baseline` (everything after the registry host). `oras push
+--oci-layout` accepts an OCI reference in `directory:tag` format, so retain the
+`:v1.2.3` tag in the destination and match it to the configured policy version:
+
+```bash
+oras push --oci-layout \
+  "${XDG_CACHE_HOME:-$HOME/.cache}/complytime/policies/acme/policies/baseline:v1.2.3" \
+  catalog.yaml:application/vnd.gemara.catalog.v1+yaml \
+  policy.yaml:application/vnd.gemara.policy.v1+yaml
+```
+
+The destination repository path and tag must match the policy's configured OCI
+reference. Keep the configuration registry-qualified, even though a scan reads
+the local OCI layout and does not contact that registry:
+
+```yaml
+policies:
+  - id: baseline
+    url: ghcr.io/acme/policies/baseline:v1.2.3
+```
+
+Validate the pre-seeded layout on the disconnected system:
+
+```bash
+complyctl list
+complyctl scan --policy-id baseline
+```
+
+There is no supported cache-import command (see
+[#892](https://github.com/complytime/complyctl/issues/892)). Manually seeding a
+policy layout does not populate `$XDG_DATA_HOME/complytime/state.json`, so
+`list` shows reduced metadata and digest information. Because `state.json` is
+not populated, the scanner cannot detect later manual changes to the policy
+layout from digest freshness; regenerate artifacts after replacing the layout.
+A seeded layout is not signature verification: configured verification runs with
+`complyctl get`, not during an offline scan. This policy example does not seed
+complypack caches; they use a separate cache structure.
+
 ## Step 5: Verify cache
 
 ```bash

@@ -66,6 +66,31 @@ Maximum time for the get operation (default: \f[B]5m\f[R]).
 .TP
 \f[B]\(enskip\-verify\f[R]
 Skip signature verification for fetched artifacts.
+.SS Offline policy\-cache seeding
+.PP
+On a disconnected system, \f[B]complyctl scan\f[R] can use a manually seeded
+policy OCI layout.
+From a directory containing \f[B]catalog.yaml\f[R] and \f[B]policy.yaml\f[R],
+use \f[B]oras\f[R] to write to the cache:
+.IP
+.EX
+oras push \-\-oci\-layout \e
+  "${XDG_CACHE_HOME:\-$HOME/.cache}/complytime/policies/acme/policies/baseline:v1.2.3" \e
+  catalog.yaml:application/vnd.gemara.catalog.v1+yaml \e
+  policy.yaml:application/vnd.gemara.policy.v1+yaml
+.EE
+.PP
+The ORAS destination is an OCI \f[B]directory:tag\f[R] reference.
+Its repository path after the registry host and its tag MUST match the policy
+URL in \f[B].complytime/complytime.yaml\f[R].
+Manual seeding does not populate \f[B]state.json\f[R] or detect later manual
+policy\-layout changes from digest freshness.
+It also does not perform signature verification; use \f[B]complyctl get\f[R]
+where verification metadata is required.
+A supported import workflow is tracked in \c
+.UR https://github.com/complytime/complyctl/issues/892
+.UE \c
+.
 .SS list
 List cached Gemara policies with their evaluator, control count, digest,
 and verification status.
