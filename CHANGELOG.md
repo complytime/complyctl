@@ -4,6 +4,12 @@
 
 ### Added
 
+- Evidence source provenance documentation: new `docs/EVIDENCE.md`
+  reference document with auditor-narrative walkthrough, field
+  reference table, and report format visibility guide. Updated
+  `docs/QUICK_START.md` with "Understanding Scan Output" subsection
+  and `docs/man/complyctl.md` with OUTPUT section covering evidence
+  fields and report filename patterns. (#876)
 - Multi-format scan output: `--format` flag now accepts multiple values
   via comma-separated syntax (`--format oscal,sarif`) or repeated flags
   (`--format oscal --format sarif`). New `--format all` convenience
