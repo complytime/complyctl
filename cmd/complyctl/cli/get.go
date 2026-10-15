@@ -4,13 +4,16 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/spf13/cobra"
 	"oras.land/oras-go/v2/registry/remote/auth"
 
@@ -19,6 +22,8 @@ import (
 	"github.com/complytime/complyctl/internal/policy"
 	"github.com/complytime/complyctl/internal/registry"
 )
+
+var localLayoutReadFile = os.ReadFile
 
 // verifierBuilder constructs a VerifyFunc from a VerificationConfig.
 // Extracted as a function type so tests can inject a mock that avoids
@@ -34,12 +39,17 @@ type verifierBuilder func(
 // package-level logger and lw. Tests restore the original in t.Cleanup.
 var defaultVerifierBuilder verifierBuilder = buildVerifierFromConfig
 
+var defaultCredentialFuncBuilder = registry.NewCredentialFunc
+
+var defaultRegistryClientBuilder = registry.NewClient
+
 type getOptions struct {
 	*Common
-	timeout    time.Duration
-	cacheDir   string
-	dataDir    string
-	skipVerify bool
+	timeout       time.Duration
+	cacheDir      string
+	dataDir       string
+	skipVerify    bool
+	fromOCILayout string
 }
 
 func getCmd(common *Common) *cobra.Command {
@@ -71,6 +81,7 @@ during generate and scan operations.`,
 	}
 	cmd.Flags().DurationVarP(&o.timeout, "timeout", "t", complytime.DefaultCommandTimeout, "Maximum time for the get operation (e.g. 5m, 10m, 1h)")
 	cmd.Flags().BoolVar(&o.skipVerify, "skip-verify", false, "Skip signature verification for fetched artifacts")
+	cmd.Flags().StringVar(&o.fromOCILayout, "from-oci-layout", "", "Import configured artifacts from a local OCI image layout")
 	return cmd
 }
 
@@ -104,6 +115,11 @@ func (o *getOptions) run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if o.fromOCILayout != "" {
+		if err := validateLocalOCILayout(ctx, o.fromOCILayout); err != nil {
+			return err
+		}
+	}
 
 	// When --skip-verify is set, pass nil workspace config and nil cache
 	// so resolveVerifier returns nil for every entry (FR-003).
@@ -123,6 +139,77 @@ func (o *getOptions) run(ctx context.Context) error {
 	return o.syncAll(ctx, cfg, baseDir, cfg.Verification, nil)
 }
 
+func validateLocalOCILayout(ctx context.Context, layoutPath string) error {
+	cleanPath := filepath.Clean(layoutPath)
+	info, err := os.Stat(cleanPath)
+	if err != nil {
+		return fmt.Errorf("local OCI layout %q: %w", cleanPath, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("local OCI layout %q is not a directory", cleanPath)
+	}
+
+	marker, err := readLocalLayoutFile(ctx, filepath.Join(cleanPath, "oci-layout"))
+	if err != nil {
+		return fmt.Errorf("local OCI layout %q requires a readable oci-layout: %w", cleanPath, err)
+	}
+	var imageLayout ocispec.ImageLayout
+	if err := json.Unmarshal(marker, &imageLayout); err != nil || imageLayout.Version != ocispec.ImageLayoutVersion {
+		return fmt.Errorf("invalid local OCI layout %q: invalid oci-layout marker", cleanPath)
+	}
+
+	index, err := readLocalLayoutFile(ctx, filepath.Join(cleanPath, "index.json"))
+	if err != nil {
+		return fmt.Errorf("local OCI layout %q requires a readable index.json: %w", cleanPath, err)
+	}
+	var imageIndex ocispec.Index
+	if err := json.Unmarshal(index, &imageIndex); err != nil {
+		return fmt.Errorf("invalid local OCI layout %q: invalid index.json: %w", cleanPath, err)
+	}
+	return nil
+}
+
+func readLocalLayoutFile(ctx context.Context, path string) ([]byte, error) {
+	type result struct {
+		contents []byte
+		err      error
+	}
+
+	readResult := make(chan result, 1)
+	go func() {
+		contents, err := localLayoutReadFile(path)
+		readResult <- result{contents: contents, err: err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case result := <-readResult:
+		return result.contents, result.err
+	}
+}
+
+func entryVerificationConfigured(
+	entry complytime.PolicyEntry,
+	workspaceVerification *complytime.VerificationConfig,
+) bool {
+	if entry.SkipVerify {
+		return false
+	}
+	if entry.Verification != nil && entry.Verification.IsConfigured() {
+		return true
+	}
+	return workspaceVerification != nil && workspaceVerification.IsConfigured()
+}
+
+func localVerificationUnsupportedError(entryType, entryID string) error {
+	return fmt.Errorf(
+		"%s %s: offline signature verification is not supported; use --skip-verify to import from a local OCI layout",
+		entryType,
+		entryID,
+	)
+}
+
 // syncAll runs policy sync followed by complypack sync. Creates the
 // verifier cache (D4) shared across all entries within this invocation.
 // wsCfg is nil when --skip-verify is set (FR-003).
@@ -133,6 +220,9 @@ func (o *getOptions) syncAll(
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
 ) error {
+	if o.skipVerify {
+		cfg = skipVerificationConfig(cfg)
+	}
 	// Lazy-init verifier cache on first call. When --skip-verify
 	// is set both wsCfg and vfCache are nil; resolveVerifier
 	// handles nil cache by skipping the lookup.
@@ -149,6 +239,19 @@ func (o *getOptions) syncAll(
 		ctx, cfg, baseDir, wsCfg, vfCache,
 	)
 	return errors.Join(policyErr, complypackErr)
+}
+
+func skipVerificationConfig(cfg *complytime.WorkspaceConfig) *complytime.WorkspaceConfig {
+	copyConfig := *cfg
+	copyConfig.Policies = append([]complytime.PolicyEntry(nil), cfg.Policies...)
+	copyConfig.Complypacks = append([]complytime.PolicyEntry(nil), cfg.Complypacks...)
+	for index := range copyConfig.Policies {
+		copyConfig.Policies[index].SkipVerify = true
+	}
+	for index := range copyConfig.Complypacks {
+		copyConfig.Complypacks[index].SkipVerify = true
+	}
+	return &copyConfig
 }
 
 // resolveVerifier determines the effective verifier for a single
@@ -242,7 +345,14 @@ func (o *getOptions) syncPolicies(
 		return fmt.Errorf("failed to load cache state: %w", err)
 	}
 
-	credFunc, err := registry.NewCredentialFunc()
+	if o.fromOCILayout != "" {
+		return syncAllPolicies(
+			ctx, cacheMgr, state, nil,
+			cfg.Policies, o.dataDir, wsCfg, vfCache, o.fromOCILayout,
+		)
+	}
+
+	credFunc, err := defaultCredentialFuncBuilder()
 	if err != nil {
 		logger.Error("Credential resolution failed", "error", err)
 		return fmt.Errorf("authentication setup failed: %w", err)
@@ -250,7 +360,7 @@ func (o *getOptions) syncPolicies(
 
 	return syncAllPolicies(
 		ctx, cacheMgr, state, credFunc,
-		cfg.Policies, o.dataDir, wsCfg, vfCache,
+		cfg.Policies, o.dataDir, wsCfg, vfCache, "",
 	)
 }
 
@@ -276,7 +386,18 @@ func (o *getOptions) syncComplypacks(
 		return fmt.Errorf("failed to load cache state: %w", err)
 	}
 
-	credFunc, err := registry.NewCredentialFunc()
+	if o.fromOCILayout != "" {
+		if err := syncAllComplypacks(
+			ctx, state, nil,
+			cfg.Complypacks, o.cacheDir, o.dataDir, baseDir,
+			wsCfg, vfCache, o.fromOCILayout,
+		); err != nil {
+			return err
+		}
+		return validateUniqueEvaluatorIDs(state, cfg.Complypacks)
+	}
+
+	credFunc, err := defaultCredentialFuncBuilder()
 	if err != nil {
 		logger.Error("Credential resolution failed", "error", err)
 		return fmt.Errorf("authentication setup failed: %w", err)
@@ -285,7 +406,7 @@ func (o *getOptions) syncComplypacks(
 	if err := syncAllComplypacks(
 		ctx, state, credFunc,
 		cfg.Complypacks, o.cacheDir, o.dataDir, baseDir,
-		wsCfg, vfCache,
+		wsCfg, vfCache, "",
 	); err != nil {
 		return err
 	}
@@ -307,7 +428,12 @@ func syncAllPolicies(
 	dataDir string,
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+	localLayoutPaths ...string,
 ) error {
+	localLayoutPath := ""
+	if len(localLayoutPaths) > 0 {
+		localLayoutPath = localLayoutPaths[0]
+	}
 	logger.Info("Starting policy synchronization",
 		"policy_count", len(policies))
 
@@ -321,7 +447,7 @@ func syncAllPolicies(
 	for i, entry := range policies {
 		if err := syncSinglePolicy(
 			ctx, cacheMgr, state, credFunc,
-			entry, i+1, total, dataDir, wsCfg, vfCache,
+			entry, i+1, total, dataDir, wsCfg, vfCache, localLayoutPath,
 			resolver,
 		); err != nil {
 			eid := entry.EffectiveID()
@@ -361,6 +487,7 @@ func syncSinglePolicy(
 	dataDir string,
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+	localLayoutPath string,
 	resolver *policy.Resolver,
 ) error {
 	ref, err := complytime.ParsePolicyRef(entry.URL)
@@ -370,22 +497,27 @@ func syncSinglePolicy(
 	}
 	version := ref.VersionString()
 
-	// Resolve per-entry verification (FR-001, FR-002, FR-003).
-	syncOpts, err := resolveVerifier(entry, wsCfg, vfCache)
-	if err != nil {
-		return fmt.Errorf("policy %s: %w",
-			entry.EffectiveID(), err)
+	var syncOpts []cache.SyncOption
+	var source cache.PolicySource
+	if localLayoutPath != "" {
+		if entryVerificationConfigured(entry, wsCfg) {
+			return localVerificationUnsupportedError("policy", entry.EffectiveID())
+		}
+		source = cache.NewLocalPolicySource(localLayoutPath)
+	} else {
+		syncOpts, err = resolveVerifier(entry, wsCfg, vfCache)
+		if err != nil {
+			return fmt.Errorf("policy %s: %w", entry.EffectiveID(), err)
+		}
+		client := defaultRegistryClientBuilder(ref.Registry, credFunc)
+		source = cache.NewRegistrySource(client)
+		if version == "" {
+			version = resolveLatestVersion(
+				ctx, client, ref.Repository, entry.EffectiveID(),
+			)
+		}
 	}
-
-	client := registry.NewClient(ref.Registry, credFunc)
-	source := cache.NewRegistrySource(client)
 	sync := cache.NewSync(cacheMgr, state, source, dataDir, ref.Registry, syncOpts...)
-
-	if version == "" {
-		version = resolveLatestVersion(
-			ctx, client, ref.Repository, entry.EffectiveID(),
-		)
-	}
 
 	fmt.Fprintf(os.Stderr, "Syncing policy %d/%d: %s... ",
 		index, total, entry.EffectiveID())
@@ -514,7 +646,12 @@ func syncAllComplypacks(
 	cacheDir, dataDir, baseDir string,
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+	localLayoutPaths ...string,
 ) error {
+	localLayoutPath := ""
+	if len(localLayoutPaths) > 0 {
+		localLayoutPath = localLayoutPaths[0]
+	}
 	logger.Info("Starting complypack synchronization",
 		"complypack_count", len(complypacks))
 
@@ -524,7 +661,7 @@ func syncAllComplypacks(
 		if err := syncSingleComplypack(
 			ctx, state, credFunc,
 			entry, i+1, total, cacheDir, dataDir, baseDir,
-			wsCfg, vfCache,
+			wsCfg, vfCache, localLayoutPath,
 		); err != nil {
 			eid := entry.EffectiveID()
 			fmt.Fprintf(os.Stderr,
@@ -554,6 +691,7 @@ func syncSingleComplypack(
 	cacheDir, dataDir, baseDir string,
 	wsCfg *complytime.VerificationConfig,
 	vfCache map[complytime.VerificationConfig]cache.VerifyFunc,
+	localLayoutPath string,
 ) error {
 	ref, err := complytime.ParsePolicyRef(entry.URL)
 	if err != nil {
@@ -564,25 +702,30 @@ func syncSingleComplypack(
 	}
 	version := ref.VersionString()
 
-	// Resolve per-entry verification (FR-001, FR-002, FR-003).
-	syncOpts, err := resolveVerifier(entry, wsCfg, vfCache)
-	if err != nil {
-		return fmt.Errorf("complypack %s: %w",
-			entry.EffectiveID(), err)
+	var syncOpts []cache.SyncOption
+	var source cache.ComplypackSource
+	if localLayoutPath != "" {
+		if entryVerificationConfigured(entry, wsCfg) {
+			return localVerificationUnsupportedError("complypack", entry.EffectiveID())
+		}
+		source = cache.NewLocalComplypackSource(localLayoutPath)
+	} else {
+		syncOpts, err = resolveVerifier(entry, wsCfg, vfCache)
+		if err != nil {
+			return fmt.Errorf("complypack %s: %w", entry.EffectiveID(), err)
+		}
+		client := defaultRegistryClientBuilder(ref.Registry, credFunc)
+		source = cache.NewRegistryComplypackSource(client)
+		if version == "" {
+			version = resolveLatestVersion(
+				ctx, client, ref.Repository, entry.EffectiveID(),
+			)
+		}
 	}
-
-	client := registry.NewClient(ref.Registry, credFunc)
-	source := cache.NewRegistryComplypackSource(client)
 	complypackCache := cache.NewComplypackCache(cacheDir, state)
 	cpSync := cache.NewComplypackSync(
 		complypackCache, state, source, dataDir, ref.Registry, syncOpts...,
 	)
-
-	if version == "" {
-		version = resolveLatestVersion(
-			ctx, client, ref.Repository, entry.EffectiveID(),
-		)
-	}
 
 	fmt.Fprintf(os.Stderr, "Syncing complypack %d/%d: %s... ",
 		index, total, entry.EffectiveID())
