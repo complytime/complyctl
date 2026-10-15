@@ -68,6 +68,10 @@ const LogFileName = "complyctl.log"
 // This flows through gRPC to the provider subprocess without additional capping.
 const DefaultCommandTimeout = 5 * time.Minute
 
+// MaxOCILayoutMetadataSize bounds OCI layout metadata read from user-provided
+// local layouts before decoding it.
+const MaxOCILayoutMetadataSize = 1 << 20
+
 const ProviderExecutablePrefix = "complyctl-provider-"
 
 // SystemProviderDir is the system-wide provider directory where

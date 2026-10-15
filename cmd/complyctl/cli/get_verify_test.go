@@ -351,7 +351,7 @@ func TestSyncAllPolicies_AllSucceed(t *testing.T) {
 
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
-		stubCredFunc, nil, cacheDir, nil, vfCache,
+		stubCredFunc, nil, cacheDir, nil, vfCache, "",
 	)
 	assert.NoError(t, err)
 }
@@ -376,7 +376,7 @@ func TestSyncAllPolicies_ErrorCollection(t *testing.T) {
 
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
-		stubCredFunc, policies, cacheDir, nil, vfCache,
+		stubCredFunc, policies, cacheDir, nil, vfCache, "",
 	)
 	require.Error(t, err)
 
@@ -409,7 +409,7 @@ func TestSyncAllPolicies_PartialFailure(t *testing.T) {
 
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
-		stubCredFunc, policies, cacheDir, nil, vfCache,
+		stubCredFunc, policies, cacheDir, nil, vfCache, "",
 	)
 	require.Error(t, err)
 
@@ -433,7 +433,7 @@ func TestSyncAllPolicies_ErrorsUnwrappable(t *testing.T) {
 
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
-		stubCredFunc, policies, cacheDir, nil, vfCache,
+		stubCredFunc, policies, cacheDir, nil, vfCache, "",
 	)
 	require.Error(t, err)
 
@@ -470,7 +470,7 @@ func TestSyncAllComplypacks_ErrorCollection(t *testing.T) {
 	err := syncAllComplypacks(
 		context.Background(), state,
 		stubCredFunc, complypacks, cacheDir, cacheDir, t.TempDir(),
-		nil, vfCache,
+		nil, vfCache, "",
 	)
 	require.Error(t, err)
 
@@ -493,7 +493,7 @@ func TestSyncAllComplypacks_AllSucceed_Empty(t *testing.T) {
 	err := syncAllComplypacks(
 		context.Background(), state,
 		stubCredFunc, nil, t.TempDir(), t.TempDir(), t.TempDir(),
-		nil, vfCache,
+		nil, vfCache, "",
 	)
 	assert.NoError(t, err)
 }
@@ -516,7 +516,7 @@ func TestSyncAllComplypacks_ErrorsContainPolicyID(t *testing.T) {
 	err := syncAllComplypacks(
 		context.Background(), state,
 		stubCredFunc, complypacks, cacheDir, cacheDir, t.TempDir(),
-		nil, vfCache,
+		nil, vfCache, "",
 	)
 	require.Error(t, err)
 
@@ -593,7 +593,7 @@ func TestSyncAllPolicies_VerificationError(t *testing.T) {
 
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
-		stubCredFunc, policies, cacheDir, wsCfg, vfCache,
+		stubCredFunc, policies, cacheDir, wsCfg, vfCache, "",
 	)
 	require.Error(t, err)
 
@@ -823,7 +823,7 @@ func TestSyncAllPolicies_SelectiveVerificationError(
 
 	err := syncAllPolicies(
 		context.Background(), cacheMgr, state,
-		stubCredFunc, policies, cacheDir, wsCfg, vfCache,
+		stubCredFunc, policies, cacheDir, wsCfg, vfCache, "",
 	)
 	require.Error(t, err)
 
@@ -1075,7 +1075,7 @@ func TestSyncAllComplypacks_SelectiveVerificationError(
 	err := syncAllComplypacks(
 		context.Background(), state,
 		stubCredFunc, complypacks, cacheDir, cacheDir, t.TempDir(),
-		wsCfg, vfCache,
+		wsCfg, vfCache, "",
 	)
 	require.Error(t, err)
 

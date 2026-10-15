@@ -4,6 +4,10 @@
 
 ### Added
 
+- `complyctl get --from-oci-layout <path>` imports digest-pinned policies and
+  complypacks from a local OCI image layout without registry or credential
+  initialization. Imports with configured verification require explicit
+  `--skip-verify` and are recorded as unverified. (#913)
 - Multi-format scan output: `--format` flag now accepts multiple values
   via comma-separated syntax (`--format oscal,sarif`) or repeated flags
   (`--format oscal --format sarif`). New `--format all` convenience
@@ -264,9 +268,9 @@
   Previously, a deleted cache directory caused the sync to be permanently
   skipped until the user manually cleared state (#649).
 
-- Devcontainer `post-create.sh` now automatically restarts the mock OCI 
+- Devcontainer `post-create.sh` now automatically restarts the mock OCI
   registry when new bundles are detected in `/bundles/`, ensuring bundles
-  are re-seeded without requiring manual `pkill` commands. The restart 
+  are re-seeded without requiring manual `pkill` commands. The restart
   only occurs when new bundles are found during `post-create.sh` execution,
   maintaining fast re-execution when no changes are present. Additionally,
   `complytime.yaml` is now preserved across runs instead of being overwritten
@@ -407,5 +411,3 @@
   exclusively a digest separator. A deprecation warning is now emitted
   when `@version` syntax is detected. `@version` support will be removed
   in a future release. (#600)
-
-

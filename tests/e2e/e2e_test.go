@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/complytime/complyctl/internal/cache"
 	"github.com/complytime/complyctl/internal/complytime"
 )
 
@@ -196,6 +197,52 @@ func TestE2E_PolicyCache(t *testing.T) {
 	require.True(t, ok, "state.json must track policy %s", testPolicyID)
 	assert.NotEmpty(t, policyState["digest"])
 	assert.NotEmpty(t, policyState["version"])
+}
+
+// TestE2E_LocalOCIImport verifies that a digest-pinned local OCI layout can
+// provision policy and complypack caches without a registry, then support scan.
+func TestE2E_LocalOCIImport(t *testing.T) {
+	binary := locateBinary(t)
+	homeDir := t.TempDir()
+	workDir := t.TempDir()
+	installTestPlugin(t, homeDir)
+	layoutPath, policyDigest, complypackDigest := createLocalOCIImportLayout(t)
+	writeLocalOCIImportWorkspaceConfig(t, workDir, policyDigest, complypackDigest)
+	env := buildEnv(homeDir)
+
+	out := runComplytime(t, binary, workDir, env, "get", "--from-oci-layout", layoutPath)
+	t.Log(out)
+	assert.Contains(t, out, "Synchronization completed.")
+	assert.Contains(t, out, "Complypack synchronization completed.")
+
+	policyCache := filepath.Join(cacheDir(homeDir), "policies", "policies", "local-policy")
+	assert.FileExists(t, filepath.Join(policyCache, "oci-layout"))
+
+	state, err := cache.LoadState(dataDir(homeDir))
+	require.NoError(t, err)
+	policyState, found := state.GetPolicyState("policies/local-policy")
+	require.True(t, found)
+	assert.Equal(t, policyDigest, policyState.Digest)
+	assert.Equal(t, policyDigest, policyState.Version)
+	assert.False(t, policyState.Verified)
+
+	complypackState, found := state.GetComplypackState("complypacks/local-import")
+	require.True(t, found)
+	assert.Equal(t, complypackDigest, complypackState.Digest)
+	assert.Equal(t, "1.0.0", complypackState.Version)
+	assert.Equal(t, "io.complytime.test", complypackState.EvaluatorID)
+	assert.False(t, complypackState.Verified)
+	assert.FileExists(t, filepath.Join(
+		cacheDir(homeDir), "complypacks", "io.complytime.test", "1.0.0", "content.tar.gz",
+	))
+
+	listOut := runComplytime(t, binary, workDir, env, "list")
+	assert.Contains(t, listOut, "local-policy")
+	assert.Contains(t, listOut, "No")
+
+	scanOut := runComplytime(t, binary, workDir, env, "scan", "--policy-id", "local-policy")
+	assert.Contains(t, scanOut, "requirements:")
+	assertOutputFile(t, filepath.Join(workDir, complytime.WorkspaceDir, complytime.ScanOutputDir), "evaluation-log-", ".yaml")
 }
 
 // TestE2E_MultiplePolicies verifies fetching and listing multiple policies.
