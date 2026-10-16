@@ -8,6 +8,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -20,8 +21,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/complytime/complypack/pkg/complypack"
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"oras.land/oras-go/v2"
+	ocistore "oras.land/oras-go/v2/content/oci"
 )
 
 // Complypack OCI media types — must match the constants in
@@ -497,6 +503,91 @@ targets:
 	configDir := filepath.Join(dir, ".complytime")
 	require.NoError(t, os.MkdirAll(configDir, 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(configDir, "complytime.yaml"), []byte(yaml), 0644))
+}
+
+// createLocalOCIImportLayout creates a local OCI layout containing a complete
+// policy and complypack suitable for exercising an offline get followed by scan.
+func createLocalOCIImportLayout(t *testing.T) (string, string, string) {
+	t.Helper()
+
+	layoutPath := t.TempDir()
+	store, err := ocistore.New(layoutPath)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	catalog := []byte(`id: local-policy
+title: Local Policy Catalog
+controls:
+  - id: AC-1
+    title: Access Control Policy
+  - id: AC-2
+    title: Account Management
+`)
+	catalogDescriptor := pushOCIContent(t, ctx, store, "application/vnd.gemara.catalog.v1+yaml", catalog)
+	policyDescriptor := pushOCIContent(t, ctx, store, "application/vnd.gemara.policy.v1+yaml", testPolicyYAML)
+	policyManifest, err := oras.PackManifest(
+		ctx,
+		store,
+		oras.PackManifestVersion1_1,
+		"application/vnd.complytime.policy.v1",
+		oras.PackManifestOptions{Layers: []ocispec.Descriptor{catalogDescriptor, policyDescriptor}},
+	)
+	require.NoError(t, err)
+
+	complypackManifest, err := complypack.Pack(
+		ctx,
+		store,
+		complypack.Config{
+			ID:          "io.complytime.local-import",
+			EvaluatorID: "io.complytime.test",
+			Version:     "1.0.0",
+		},
+		bytes.NewReader(buildDummyTarGz("local-policy.yaml", []byte("package local"))),
+	)
+	require.NoError(t, err)
+
+	return layoutPath, policyManifest.Digest.String(), complypackManifest.Digest.String()
+}
+
+func pushOCIContent(
+	t *testing.T,
+	ctx context.Context,
+	store *ocistore.Store,
+	mediaType string,
+	content []byte,
+) ocispec.Descriptor {
+	t.Helper()
+
+	descriptor := ocispec.Descriptor{
+		MediaType: mediaType,
+		Digest:    digest.FromBytes(content),
+		Size:      int64(len(content)),
+	}
+	require.NoError(t, store.Push(ctx, descriptor, bytes.NewReader(content)))
+	return descriptor
+}
+
+// writeLocalOCIImportWorkspaceConfig configures digest-pinned policy and
+// complypack entries. The non-routable hostname verifies imports need no registry.
+func writeLocalOCIImportWorkspaceConfig(t *testing.T, dir, policyDigest, complypackDigest string) {
+	t.Helper()
+
+	yaml := fmt.Sprintf(`policies:
+  - url: registry.invalid/policies/local-policy@%s
+    id: local-policy
+complypacks:
+  - url: registry.invalid/complypacks/local-import@%s
+    id: local-import
+targets:
+  - id: local-import-target
+    policies:
+      - local-policy
+    variables:
+      env: test
+`, policyDigest, complypackDigest)
+	configDir := filepath.Join(dir, ".complytime")
+	require.NoError(t, os.MkdirAll(configDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "complytime.yaml"), []byte(yaml), 0o644))
 }
 
 // copyWorkspaceConfig copies .complytime/complytime.yaml from src to dst directory.

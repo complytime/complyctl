@@ -96,6 +96,9 @@ func (s *ComplypackSync) SyncComplypack(ctx context.Context, repository, version
 
 	remoteDigest, remoteVersion, err := s.source.DefinitionVersion(ctx, lookupRef)
 	if err != nil {
+		if _, isLocalSource := s.source.(*LocalComplypackSource); isLocalSource {
+			return false, fmt.Errorf("complypack %s: %w", repository, err)
+		}
 		// Registry unreachable: attempt to serve from local cache
 		// before failing. If the repository has a cached entry with
 		// existing content on disk, the user can continue working

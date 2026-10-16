@@ -265,53 +265,59 @@ complyctl get
 
 When a verifier is configured in `complytime.yaml`, local cache hits are re-verified via the registry API before being accepted.
 
-### Pre-seed a policy cache for offline scans
+### Import policies and complypacks from an OCI layout
 
-To scan without registry access or `complyctl get`, pre-seed the policy's OCI
-layout. The cache location is
-`$XDG_CACHE_HOME/complytime/policies/<repository>/`; when
-`XDG_CACHE_HOME` is unset, it is `~/.cache/complytime/policies/<repository>/`.
+Use `complyctl get --from-oci-layout` to provision a disconnected system from a
+local OCI image layout. This is the primary offline provisioning path: it imports
+configured policies and complypacks into their normal caches and records their
+state, so subsequent `generate` and `scan` commands use them normally.
 
-From a directory containing the Gemara `catalog.yaml` and `policy.yaml` files,
-use `oras` to package them directly into the cache. For a policy configured as
-`ghcr.io/acme/policies/baseline:v1.2.3`, the repository is
-`acme/policies/baseline` (everything after the registry host). `oras push
---oci-layout` accepts an OCI reference in `directory:tag` format, so retain the
-`:v1.2.3` tag in the destination and match it to the configured policy version:
-
-```bash
-oras push --oci-layout \
-  "${XDG_CACHE_HOME:-$HOME/.cache}/complytime/policies/acme/policies/baseline:v1.2.3" \
-  catalog.yaml:application/vnd.gemara.catalog.v1+yaml \
-  policy.yaml:application/vnd.gemara.policy.v1+yaml
-```
-
-The destination repository path and tag must match the policy's configured OCI
-reference. Keep the configuration registry-qualified, even though a scan reads
-the local OCI layout and does not contact that registry:
+The layout must contain an `oci-layout` marker and a readable `index.json`. Each
+configured policy or complypack URL must be pinned to the digest of its manifest
+in that layout; tags cannot select local content. The registry and repository in
+the URL identify the cached entry, but complyctl selects the local artifact only
+by digest and does not contact that registry.
 
 ```yaml
 policies:
   - id: baseline
-    url: ghcr.io/acme/policies/baseline:v1.2.3
+    url: ghcr.io/acme/policies/baseline@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+complypacks:
+  - id: baseline-pack
+    url: ghcr.io/acme/complypacks/baseline@sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
 ```
 
-Validate the pre-seeded layout on the disconnected system:
+Run the import with the path to the transferred layout:
+
+```bash
+complyctl get --from-oci-layout /path/to/oci-layout
+```
+
+Local imports do not perform offline signature verification. If effective
+workspace- or entry-level verification applies to an entry, complyctl rejects
+that entry before it initializes verification, registry credentials, or cache
+state. To import such entries, explicitly bypass verification for this command:
+
+```bash
+complyctl get --from-oci-layout /path/to/oci-layout --skip-verify
+```
+
+`--skip-verify` applies to every entry in the invocation and prints a warning.
+Permitted local imports are recorded as unverified. Confirm the imported policy
+and its `VERIFIED` value with:
 
 ```bash
 complyctl list
-complyctl scan --policy-id baseline
 ```
 
-There is no supported cache-import command (see
-[#892](https://github.com/complytime/complyctl/issues/892)). Manually seeding a
-policy layout does not populate `$XDG_DATA_HOME/complytime/state.json`, so
-`list` shows reduced metadata and digest information. Because `state.json` is
-not populated, the scanner cannot detect later manual changes to the policy
-layout from digest freshness; regenerate artifacts after replacing the layout.
-A seeded layout is not signature verification: configured verification runs with
-`complyctl get`, not during an offline scan. This policy example does not seed
-complypack caches; they use a separate cache structure.
+Entries import independently. complyctl reports each failed policy or complypack
+but continues importing other entries, then exits non-zero if any entry failed.
+Rerun the same command after fixing a layout or configuration problem: unchanged
+digests are skipped, while failed or changed entries are imported safely.
+
+> **Note:** You can still manually pre-seed a policy cache with `oras push
+> --oci-layout` when needed. That workaround is no longer the only offline
+> option, does not populate `state.json`, and does not import complypacks.
 
 ## Step 5: Verify cache
 

@@ -152,14 +152,18 @@ func (s *Sync) SyncPolicy(ctx context.Context, policyID, version string) (bool, 
 		verifyResult = vr
 	}
 
-	localStore, err := s.cache.NewPolicyStore(policyID)
+	localStore, stagedStore, err := s.cache.newStagedPolicyStore(policyID)
 	if err != nil {
-		return false, fmt.Errorf("failed to open local store for policy %s: %w", policyID, err)
+		return false, fmt.Errorf("create staged local store for policy %s: %w", policyID, err)
 	}
+	defer stagedStore.discard()
 
 	_, err = s.source.CopyPolicy(ctx, policyID, version, localStore)
 	if err != nil {
 		return false, fmt.Errorf("policy %s@%s: copy failed: %w", policyID, version, err)
+	}
+	if err := stagedStore.install(ctx); err != nil {
+		return false, fmt.Errorf("policy %s@%s: install failed: %w", policyID, version, err)
 	}
 
 	if err := s.state.UpdatePolicyStateWithVerification(policyID, version, remoteDigest, verifyResult); err != nil {
