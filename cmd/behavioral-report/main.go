@@ -49,6 +49,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "binary not found at %s — run 'make build' first\n", binaryAbs)
 		os.Exit(1)
 	}
+	if _, err := os.Stat(testProviderAbs); err != nil {
+		fmt.Fprintf(os.Stderr,
+			"test provider not found at %s — run 'make build-test-provider' first\n",
+			testProviderAbs)
+		os.Exit(1)
+	}
 
 	var catalog *gemara.ControlCatalog
 	if *catalogPath != "" {
