@@ -81,9 +81,6 @@ install -p -m 0644 docs/man/complyctl.1 %{buildroot}%{_mandir}/man1/complyctl.1
 %dir %{_libexecdir}/%{app_dir}/providers
 
 %changelog
-* Wed Oct 14 2026 Hannah Braswell <hbraswel@redhat.com> - 1.0.0-1
-- Update complyctl summary for consistency with rpm description
-
 * Tue Aug 25 2026 Marcus Burghardt <maburgha@redhat.com> - 1.0.0-1
 - Bump to upstream version v1.0.0
 - Modernize spec for Fedora Go packaging guidelines
