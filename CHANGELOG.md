@@ -4,6 +4,9 @@
 
 ### Added
 
+- `complyctl get --from-oci-layout <path>` imports digest-pinned configured
+  policies and complypacks from a local OCI image layout for air-gapped
+  provisioning. (#892)
 - Multi-format scan output: `--format` flag now accepts multiple values
   via comma-separated syntax (`--format oscal,sarif`) or repeated flags
   (`--format oscal --format sarif`). New `--format all` convenience
@@ -407,5 +410,4 @@
   exclusively a digest separator. A deprecation warning is now emitted
   when `@version` syntax is detected. `@version` support will be removed
   in a future release. (#600)
-
 

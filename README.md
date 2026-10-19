@@ -133,14 +133,20 @@ Creates a workspace configuration file (`.complytime/complytime.yaml`). Errors i
 ```bash
 complyctl get
 complyctl get --skip-verify
+complyctl get --from-oci-layout /path/to/oci-layout
 ```
 
-Performs incremental sync from the OCI registry defined in `complytime.yaml`. Only downloads new or modified content. Uses Docker credential helpers for authentication — if `docker login` works, `complyctl get` works.
+Performs incremental sync from the OCI registry defined in `complytime.yaml`.
+Only downloads new or modified content. Uses Docker credential helpers for
+authentication — if `docker login` works, `complyctl get` works. For
+disconnected provisioning, `--from-oci-layout` imports digest-pinned configured
+policies and complypacks without contacting the registry.
 
 | Flag | Short | Description |
 | :--- | :--- | :--- |
 | `--timeout` | `-t` | Maximum time for the get operation (default: 5m) |
 | `--skip-verify` | | Skip signature verification for fetched artifacts |
+| `--from-oci-layout` | | Import configured artifacts from a local OCI image layout |
 
 ### `list`
 

@@ -58,13 +58,14 @@ complyctl init
 
 ## get
 
-Fetch policies and complypacks from OCI registries into the local
-cache. Performs incremental sync — only downloads new or modified
-content. Uses Docker credential helpers for authentication.
+Fetch policies and complypacks from OCI registries or a local OCI image
+layout into the local cache. Registry sync performs incremental downloads and
+uses Docker credential helpers for authentication.
 
 ```
 complyctl get
 complyctl get --skip-verify
+complyctl get --from-oci-layout /path/to/oci-layout
 ```
 
 **-t**, **--timeout** *duration*
@@ -73,26 +74,22 @@ complyctl get --skip-verify
 **--skip-verify**
 : Skip signature verification for fetched artifacts.
 
-### Offline policy-cache seeding
+**--from-oci-layout** *path*
+: Import digest-pinned configured policies and complypacks from a local OCI image layout.
 
-On a disconnected system, `complyctl scan` can use a manually seeded policy OCI
-layout. From a directory containing `catalog.yaml` and `policy.yaml`, use `oras`
-to write to the cache:
+### Offline provisioning
 
+On a disconnected system, configure policies and complypacks with digest-pinned
+URLs, then import a local OCI image layout:
+
+```bash
+complyctl get --from-oci-layout /path/to/oci-layout
 ```
-oras push --oci-layout \
-  "${XDG_CACHE_HOME:-$HOME/.cache}/complytime/policies/acme/policies/baseline:v1.2.3" \
-  catalog.yaml:application/vnd.gemara.catalog.v1+yaml \
-  policy.yaml:application/vnd.gemara.policy.v1+yaml
-```
 
-The ORAS destination is an OCI `directory:tag` reference. Its repository path
-after the registry host and its tag MUST match the policy URL in
-`.complytime/complytime.yaml`. Manual seeding does not populate `state.json` or
-detect later manual policy-layout changes from digest freshness. It also does
-not perform signature verification; use `complyctl get` where verification
-metadata is required. A supported import workflow is tracked in
-[#892](https://github.com/complytime/complyctl/issues/892).
+The configured digest selects each artifact from the layout without contacting
+the registry. If verification is configured, add `--skip-verify`; offline
+signature verification is not yet supported and imported entries remain
+unverified.
 
 ## list
 

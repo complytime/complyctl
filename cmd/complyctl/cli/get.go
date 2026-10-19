@@ -58,15 +58,18 @@ func getCmd(common *Common) *cobra.Command {
 	}
 	cmd := &cobra.Command{
 		Use:   "get [flags]",
-		Short: "Fetch policies and complypacks from OCI registries",
-		Long: `Fetch new or modified policies from OCI registries and update the local cache.
+		Short: "Fetch policies and complypacks into the local cache",
+		Long: `Fetch new or modified policies and complypacks from OCI registries and update the local cache.
 
 If the workspace configuration (complytime.yaml) includes a complypacks section,
 complypack artifacts are also fetched and cached alongside policies. Complypacks
 provide provider-specific content bundles that are resolved by evaluator ID
-during generate and scan operations.`,
+during generate and scan operations.
+
+Use --from-oci-layout to import digest-pinned configured artifacts from a local
+OCI image layout for air-gapped environments.`,
 		SilenceUsage:      true,
-		Example:           "complyctl get",
+		Example:           "complyctl get\ncomplyctl get --from-oci-layout /media/usb0/oci-layout",
 		Args:              cobra.NoArgs,
 		ValidArgsFunction: cobra.NoFileCompletions,
 		RunE: func(cmd *cobra.Command, _ []string) error {
