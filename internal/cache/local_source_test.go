@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/complytime/complyctl/internal/cache"
@@ -154,6 +155,55 @@ func TestLocalPolicySourceDefinitionVersion_RejectsSpecialBlobFile(t *testing.T)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not a regular file")
+}
+
+func TestLocalPolicySourceDefinitionVersion_RejectsUnsafeIndexMetadata(t *testing.T) {
+	ctx := context.Background()
+
+	for _, test := range []struct {
+		name    string
+		prepare func(t *testing.T, layoutPath string)
+	}{
+		{
+			name: "symlink",
+			prepare: func(t *testing.T, layoutPath string) {
+				t.Helper()
+				indexPath := filepath.Join(layoutPath, ocispec.ImageIndexFile)
+				targetPath := filepath.Join(layoutPath, "index-target")
+				require.NoError(t, os.Rename(indexPath, targetPath))
+				if err := os.Symlink(targetPath, indexPath); err != nil {
+					t.Skipf("symlinks are unavailable: %v", err)
+				}
+			},
+		},
+		{
+			name: "oversized",
+			prepare: func(t *testing.T, layoutPath string) {
+				t.Helper()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(layoutPath, ocispec.ImageIndexFile),
+					[]byte(strings.Repeat(" ", 4*1024*1024+1)),
+					0o600,
+				))
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			layoutPath, manifestDigest, _ := createLocalPolicyLayout(t, ctx)
+			test.prepare(t, layoutPath)
+
+			_, _, err := cache.NewLocalPolicySource(layoutPath).DefinitionVersion(
+				ctx, "example.test/policies/test@"+manifestDigest,
+			)
+
+			require.Error(t, err)
+			if test.name == "symlink" {
+				assert.Contains(t, err.Error(), "not a regular file")
+			} else {
+				assert.Contains(t, err.Error(), "exceeds maximum size")
+			}
+		})
+	}
 }
 
 func TestLocalComplypackSourceDefinitionVersion_DigestFound(t *testing.T) {

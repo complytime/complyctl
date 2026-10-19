@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -73,6 +74,39 @@ func TestValidateLocalOCILayout_InvalidPaths(t *testing.T) {
 			},
 			errorPart: "invalid local OCI layout",
 		},
+		{
+			name: "symlinked marker",
+			prepare: func(t *testing.T) string {
+				path := t.TempDir()
+				targetPath := filepath.Join(path, "marker")
+				require.NoError(t, os.WriteFile(
+					targetPath, []byte(`{"imageLayoutVersion":"1.0.0"}`), 0o600,
+				))
+				if err := os.Symlink(targetPath, filepath.Join(path, "oci-layout")); err != nil {
+					t.Skipf("symlinks are unavailable: %v", err)
+				}
+				return path
+			},
+			errorPart: "not a regular file",
+		},
+		{
+			name: "oversized index",
+			prepare: func(t *testing.T) string {
+				path := t.TempDir()
+				require.NoError(t, os.WriteFile(
+					filepath.Join(path, "oci-layout"),
+					[]byte(`{"imageLayoutVersion":"1.0.0"}`),
+					0o600,
+				))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(path, "index.json"),
+					make([]byte, 4*1024*1024+1),
+					0o600,
+				))
+				return path
+			},
+			errorPart: "exceeds maximum size",
+		},
 	}
 
 	for _, test := range tests {
@@ -86,11 +120,11 @@ func TestValidateLocalOCILayout_InvalidPaths(t *testing.T) {
 }
 
 func TestValidateLocalOCILayout_ContextCancellationDuringMetadataRead(t *testing.T) {
-	originalReadFile := localLayoutReadFile
-	t.Cleanup(func() { localLayoutReadFile = originalReadFile })
+	originalReader := localLayoutMetadataReader
+	t.Cleanup(func() { localLayoutMetadataReader = originalReader })
 	readStarted := make(chan struct{})
 	releaseRead := make(chan struct{})
-	localLayoutReadFile = func(string) ([]byte, error) {
+	localLayoutMetadataReader = func(context.Context, fs.FS, string) ([]byte, error) {
 		close(readStarted)
 		<-releaseRead
 		return nil, context.Canceled

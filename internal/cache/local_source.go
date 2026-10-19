@@ -41,6 +41,8 @@ var _ ComplypackSource = (*LocalComplypackSource)(nil)
 
 type localStoreOpener func(context.Context, fs.FS) (oras.ReadOnlyTarget, error)
 
+const maxOCIMetadataBytes int64 = 4 * 1024 * 1024
+
 // NewLocalPolicySource creates a policy source for the OCI image layout at layoutPath.
 func NewLocalPolicySource(layoutPath string) *LocalPolicySource {
 	return newLocalPolicySource(layoutPath, openLocalStore)
@@ -124,7 +126,7 @@ func indexManifestDescriptor(
 	layoutFS fs.FS,
 	requestedDigest digest.Digest,
 ) (ocispec.Descriptor, error) {
-	indexBytes, err := readFileContext(ctx, layoutFS, ocispec.ImageIndexFile)
+	indexBytes, err := ReadOCILayoutMetadata(ctx, layoutFS, ocispec.ImageIndexFile)
 	if err != nil {
 		return ocispec.Descriptor{}, fmt.Errorf("read OCI layout index: %w", err)
 	}
@@ -327,24 +329,44 @@ func openLocalStore(ctx context.Context, layoutFS fs.FS) (oras.ReadOnlyTarget, e
 	})
 }
 
-func readFileContext(ctx context.Context, layoutFS fs.FS, name string) ([]byte, error) {
-	type readResult struct {
-		contents []byte
-		err      error
+// ReadOCILayoutMetadata reads a regular OCI layout metadata file within the
+// project's metadata-size bound. It rejects symlinks and special files before
+// parsing so local layouts cannot redirect metadata reads outside the layout.
+func ReadOCILayoutMetadata(ctx context.Context, layoutFS fs.FS, name string) ([]byte, error) {
+	if !fs.ValidPath(name) {
+		return nil, fmt.Errorf("invalid OCI layout metadata path %q", name)
+	}
+	linkFS, ok := layoutFS.(fs.ReadLinkFS)
+	if !ok {
+		return nil, fmt.Errorf("OCI layout filesystem does not support safe metadata inspection")
+	}
+	info, err := linkFS.Lstat(name)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("OCI layout metadata %s is not a regular file", name)
+	}
+	if info.Size() > maxOCIMetadataBytes {
+		return nil, fmt.Errorf("OCI layout metadata %s exceeds maximum size of %d bytes", name, maxOCIMetadataBytes)
 	}
 
-	result := make(chan readResult, 1)
-	go func() {
-		contents, err := fs.ReadFile(layoutFS, name)
-		result <- readResult{contents: contents, err: err}
-	}()
+	return awaitContext(ctx, func() ([]byte, error) {
+		file, openErr := layoutFS.Open(name)
+		if openErr != nil {
+			return nil, openErr
+		}
+		defer file.Close()
 
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case read := <-result:
-		return read.contents, read.err
-	}
+		contents, readErr := io.ReadAll(io.LimitReader(file, maxOCIMetadataBytes+1))
+		if readErr != nil {
+			return nil, readErr
+		}
+		if int64(len(contents)) > maxOCIMetadataBytes {
+			return nil, fmt.Errorf("OCI layout metadata %s exceeds maximum size of %d bytes", name, maxOCIMetadataBytes)
+		}
+		return contents, nil
+	})
 }
 
 func awaitContext[T any](ctx context.Context, operation func() (T, error)) (T, error) {

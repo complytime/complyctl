@@ -23,7 +23,7 @@ import (
 	"github.com/complytime/complyctl/internal/registry"
 )
 
-var localLayoutReadFile = os.ReadFile
+var localLayoutMetadataReader = cache.ReadOCILayoutMetadata
 
 // verifierBuilder constructs a VerifyFunc from a VerificationConfig.
 // Extracted as a function type so tests can inject a mock that avoids
@@ -152,7 +152,7 @@ func validateLocalOCILayout(ctx context.Context, layoutPath string) error {
 		return fmt.Errorf("local OCI layout %q is not a directory", cleanPath)
 	}
 
-	marker, err := readLocalLayoutFile(ctx, filepath.Join(cleanPath, "oci-layout"))
+	marker, err := readLocalLayoutFile(ctx, cleanPath, "oci-layout")
 	if err != nil {
 		return fmt.Errorf("local OCI layout %q requires a readable oci-layout: %w", cleanPath, err)
 	}
@@ -161,7 +161,7 @@ func validateLocalOCILayout(ctx context.Context, layoutPath string) error {
 		return fmt.Errorf("invalid local OCI layout %q: invalid oci-layout marker", cleanPath)
 	}
 
-	index, err := readLocalLayoutFile(ctx, filepath.Join(cleanPath, "index.json"))
+	index, err := readLocalLayoutFile(ctx, cleanPath, "index.json")
 	if err != nil {
 		return fmt.Errorf("local OCI layout %q requires a readable index.json: %w", cleanPath, err)
 	}
@@ -172,7 +172,7 @@ func validateLocalOCILayout(ctx context.Context, layoutPath string) error {
 	return nil
 }
 
-func readLocalLayoutFile(ctx context.Context, path string) ([]byte, error) {
+func readLocalLayoutFile(ctx context.Context, layoutPath, name string) ([]byte, error) {
 	type result struct {
 		contents []byte
 		err      error
@@ -180,7 +180,7 @@ func readLocalLayoutFile(ctx context.Context, path string) ([]byte, error) {
 
 	readResult := make(chan result, 1)
 	go func() {
-		contents, err := localLayoutReadFile(path)
+		contents, err := localLayoutMetadataReader(ctx, os.DirFS(layoutPath), name)
 		readResult <- result{contents: contents, err: err}
 	}()
 

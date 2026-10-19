@@ -75,6 +75,40 @@ func TestStagedPolicyStoreInstall_RetainsBackupWhenRestoreFails(t *testing.T) {
 	assert.Equal(t, []byte("old"), contents)
 }
 
+func TestStagedPolicyStoreInstall_RestoresActiveStoreWhenDescendantRestoreFails(t *testing.T) {
+	cacheRoot := t.TempDir()
+	activePath := filepath.Join(cacheRoot, "policy")
+	stagingPath := filepath.Join(cacheRoot, "staging")
+	descendantPath := filepath.Join(activePath, "child")
+	require.NoError(t, os.MkdirAll(descendantPath, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(activePath, "oci-layout"), []byte("old"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(descendantPath, "oci-layout"), []byte("old child"), 0o600))
+	require.NoError(t, os.MkdirAll(stagingPath, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(stagingPath, "oci-layout"), []byte("new"), 0o600))
+
+	store := stagedPolicyStore{
+		activePath:  activePath,
+		stagingPath: stagingPath,
+		rename: func(oldPath, newPath string) error {
+			if filepath.Base(oldPath) != "previous" && newPath == filepath.Join(activePath, "child") {
+				return errors.New("descendant install blocked")
+			}
+			return os.Rename(oldPath, newPath)
+		},
+	}
+
+	err := store.install(context.Background())
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "preserve cached descendant policy stores")
+	contents, readErr := os.ReadFile(filepath.Join(activePath, "oci-layout"))
+	require.NoError(t, readErr)
+	assert.Equal(t, []byte("old"), contents)
+	descendantContents, descendantReadErr := os.ReadFile(filepath.Join(activePath, "child", "oci-layout"))
+	require.NoError(t, descendantReadErr)
+	assert.Equal(t, []byte("old child"), descendantContents)
+}
+
 func TestOutermostPaths_RetainsSiblingStore(t *testing.T) {
 	rootPath := t.TempDir()
 	paths := []string{filepath.Join(rootPath, "policy"), filepath.Join(rootPath, "policy-child")}

@@ -113,8 +113,11 @@ func (s *stagedPolicyStore) install(ctx context.Context) error {
 		return restoreErr
 	}
 	if err := s.restoreDescendantStores(backupPath); err != nil {
-		return fmt.Errorf("preserve cached descendant policy stores; previous store retained at %s: %w",
-			backupPath, err)
+		restored, restoreErr := s.restoreBackup(backupPath, fmt.Errorf(
+			"preserve cached descendant policy stores: %w", err,
+		))
+		backupRetained = !restored
+		return restoreErr
 	}
 	backupRetained = false
 
@@ -143,6 +146,9 @@ func policyStoreBackupContentPath(backupPath string) string {
 func (s *stagedPolicyStore) restoreBackup(backupPath string, installErr error) (bool, error) {
 	if backupPath == "" {
 		return true, installErr
+	}
+	if err := os.RemoveAll(s.activePath); err != nil {
+		return false, fmt.Errorf("%w; remove incomplete policy store: %w", installErr, err)
 	}
 	if err := s.renamePath(policyStoreBackupContentPath(backupPath), s.activePath); err != nil {
 		return false, fmt.Errorf("%w; restore previous policy store: %w", installErr, err)
