@@ -250,12 +250,27 @@ func openSelectedLocalStore(
 	manifest ocispec.Descriptor,
 	openStore localStoreOpener,
 ) (oras.ReadOnlyTarget, error) {
+	if err := validateOCIBlobFiles(layoutFS); err != nil {
+		return nil, err
+	}
 	index := ocispec.Index{Manifests: []ocispec.Descriptor{manifest}}
 	indexBytes, err := json.Marshal(index)
 	if err != nil {
 		return nil, fmt.Errorf("encode selected OCI index: %w", err)
 	}
 	return openStore(ctx, selectedIndexFS{FS: layoutFS, index: indexBytes})
+}
+
+func validateOCIBlobFiles(layoutFS fs.FS) error {
+	return fs.WalkDir(layoutFS, ocispec.ImageBlobsDir, func(blobPath string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return fmt.Errorf("walk OCI blob %s: %w", blobPath, walkErr)
+		}
+		if entry.IsDir() || entry.Type()&fs.ModeType == 0 {
+			return nil
+		}
+		return fmt.Errorf("OCI blob %s is not a regular file", blobPath)
+	})
 }
 
 type selectedIndexFS struct {

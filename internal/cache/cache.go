@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/complytime/complyctl/internal/complytime"
 	"oras.land/oras-go/v2/content/oci"
@@ -24,6 +26,7 @@ type Cache struct {
 type stagedPolicyStore struct {
 	activePath  string
 	stagingPath string
+	rename      func(string, string) error
 }
 
 func NewCache(cacheDir string) *Cache {
@@ -85,24 +88,35 @@ func (s *stagedPolicyStore) install(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	backupRetained := false
 	defer func() {
-		if backupPath != "" {
+		if backupPath != "" && !backupRetained {
 			_ = os.RemoveAll(backupPath) // A stale backup does not affect the installed cache.
 		}
 	}()
 
 	if backupPath != "" {
-		if err := os.Rename(s.activePath, policyStoreBackupContentPath(backupPath)); err != nil {
+		if err := s.renamePath(s.activePath, policyStoreBackupContentPath(backupPath)); err != nil {
 			return fmt.Errorf("back up existing policy store: %w", err)
 		}
+		backupRetained = true
 	}
 
 	if err := ctx.Err(); err != nil {
-		return s.restoreBackup(backupPath, err)
+		restored, restoreErr := s.restoreBackup(backupPath, err)
+		backupRetained = !restored
+		return restoreErr
 	}
-	if err := os.Rename(s.stagingPath, s.activePath); err != nil {
-		return s.restoreBackup(backupPath, fmt.Errorf("install staged policy store: %w", err))
+	if err := s.renamePath(s.stagingPath, s.activePath); err != nil {
+		restored, restoreErr := s.restoreBackup(backupPath, fmt.Errorf("install staged policy store: %w", err))
+		backupRetained = !restored
+		return restoreErr
 	}
+	if err := s.restoreDescendantStores(backupPath); err != nil {
+		return fmt.Errorf("preserve cached descendant policy stores; previous store retained at %s: %w",
+			backupPath, err)
+	}
+	backupRetained = false
 
 	return nil
 }
@@ -126,14 +140,111 @@ func policyStoreBackupContentPath(backupPath string) string {
 	return filepath.Join(backupPath, "previous")
 }
 
-func (s *stagedPolicyStore) restoreBackup(backupPath string, installErr error) error {
+func (s *stagedPolicyStore) restoreBackup(backupPath string, installErr error) (bool, error) {
 	if backupPath == "" {
-		return installErr
+		return true, installErr
 	}
-	if err := os.Rename(policyStoreBackupContentPath(backupPath), s.activePath); err != nil {
-		return fmt.Errorf("%w; restore previous policy store: %w", installErr, err)
+	if err := s.renamePath(policyStoreBackupContentPath(backupPath), s.activePath); err != nil {
+		return false, fmt.Errorf("%w; restore previous policy store: %w", installErr, err)
 	}
-	return installErr
+	return true, installErr
+}
+
+func (s *stagedPolicyStore) restoreDescendantStores(backupPath string) error {
+	if backupPath == "" {
+		return nil
+	}
+
+	descendants, err := policyStoreDescendants(policyStoreBackupContentPath(backupPath))
+	if err != nil {
+		return err
+	}
+	backupContentPath := policyStoreBackupContentPath(backupPath)
+	for _, descendant := range descendants {
+		if err := s.restoreDescendantStore(backupContentPath, descendant); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func policyStoreDescendants(backupContentPath string) ([]string, error) {
+	var descendants []string
+	err := filepath.WalkDir(backupContentPath, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.Name() != "oci-layout" || entry.IsDir() {
+			return nil
+		}
+		storePath := filepath.Dir(path)
+		if storePath == backupContentPath {
+			return nil
+		}
+		descendants = append(descendants, storePath)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("find cached descendant policy stores: %w", err)
+	}
+
+	sort.Strings(descendants)
+	return outermostPaths(descendants), nil
+}
+
+func outermostPaths(paths []string) []string {
+	var outermost []string
+	for _, candidate := range paths {
+		isDescendant := false
+		for _, parent := range outermost {
+			relativePath, err := filepath.Rel(parent, candidate)
+			if err == nil && relativePath != "." && relativePath != ".." &&
+				!strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) &&
+				!filepath.IsAbs(relativePath) {
+				isDescendant = true
+				break
+			}
+		}
+		if !isDescendant {
+			outermost = append(outermost, candidate)
+		}
+	}
+	return outermost
+}
+
+func (s *stagedPolicyStore) restoreDescendantStore(backupContentPath, sourcePath string) error {
+	relativePath, err := filepath.Rel(backupContentPath, sourcePath)
+	if err != nil {
+		return fmt.Errorf("resolve cached descendant policy store path: %w", err)
+	}
+	targetPath := filepath.Join(s.activePath, relativePath)
+	temporaryParent := filepath.Dir(targetPath)
+	if err := os.MkdirAll(temporaryParent, 0o700); err != nil {
+		return fmt.Errorf("create cached descendant policy store parent: %w", err)
+	}
+	temporaryPath, err := os.MkdirTemp(temporaryParent, ".policy-descendant-staging-*")
+	if err != nil {
+		return fmt.Errorf("create cached descendant policy store staging directory: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(temporaryPath) }()
+
+	if err := os.CopyFS(temporaryPath, os.DirFS(sourcePath)); err != nil {
+		return fmt.Errorf("copy cached descendant policy store %s: %w", relativePath, err)
+	}
+	if err := os.RemoveAll(targetPath); err != nil {
+		return fmt.Errorf("replace cached descendant policy store %s: %w", relativePath, err)
+	}
+	if err := s.renamePath(temporaryPath, targetPath); err != nil {
+		return fmt.Errorf("install cached descendant policy store %s: %w", relativePath, err)
+	}
+	return nil
+}
+
+func (s *stagedPolicyStore) renamePath(oldPath, newPath string) error {
+	if s.rename != nil {
+		return s.rename(oldPath, newPath)
+	}
+	return os.Rename(oldPath, newPath)
 }
 
 func (c *Cache) PolicyStoreExists(policyID string) bool {
