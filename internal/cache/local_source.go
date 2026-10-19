@@ -179,25 +179,9 @@ func copyLocalManifest(
 		return ocispec.Descriptor{}, err
 	}
 
-	stagingPath, err := os.MkdirTemp("", "complyctl-local-policy-*")
-	if err != nil {
-		return ocispec.Descriptor{}, fmt.Errorf("create temporary OCI store: %w", err)
-	}
-	defer os.RemoveAll(stagingPath)
-	stagingStore, err := ocistore.New(stagingPath)
-	if err != nil {
-		return ocispec.Descriptor{}, fmt.Errorf("open temporary OCI store: %w", err)
-	}
-
-	descriptor, err := oras.Copy(ctx, store, manifestDigest.String(), stagingStore, manifestDigest.String(), oras.CopyOptions{})
+	descriptor, err := oras.Copy(ctx, store, manifestDigest.String(), dst, manifestDigest.String(), oras.CopyOptions{})
 	if err != nil {
 		return ocispec.Descriptor{}, fmt.Errorf("copy manifest %s from OCI layout: %w", manifestDigest, err)
-	}
-	if err := ctx.Err(); err != nil {
-		return ocispec.Descriptor{}, err
-	}
-	if _, err := oras.Copy(ctx, stagingStore, manifestDigest.String(), dst, manifestDigest.String(), oras.CopyOptions{}); err != nil {
-		return ocispec.Descriptor{}, fmt.Errorf("copy staged manifest %s to destination: %w", manifestDigest, err)
 	}
 	return descriptor, nil
 }

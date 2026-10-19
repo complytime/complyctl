@@ -54,7 +54,7 @@ func (c *Cache) NewPolicyStore(policyID string) (*oci.Store, error) {
 func (c *Cache) newStagedPolicyStore(policyID string) (*oci.Store, *stagedPolicyStore, error) {
 	activePath := c.PolicyStorePath(policyID)
 	parentPath := filepath.Dir(activePath)
-	if err := os.MkdirAll(parentPath, 0700); err != nil {
+	if err := os.MkdirAll(parentPath, 0o700); err != nil {
 		return nil, nil, fmt.Errorf("create policy store parent directory %s: %w", parentPath, err)
 	}
 
@@ -92,7 +92,7 @@ func (s *stagedPolicyStore) install(ctx context.Context) error {
 	}()
 
 	if backupPath != "" {
-		if err := os.Rename(s.activePath, backupPath); err != nil {
+		if err := os.Rename(s.activePath, policyStoreBackupContentPath(backupPath)); err != nil {
 			return fmt.Errorf("back up existing policy store: %w", err)
 		}
 	}
@@ -119,17 +119,18 @@ func policyStoreBackupPath(activePath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("create policy store backup directory: %w", err)
 	}
-	if err := os.Remove(backupPath); err != nil {
-		return "", fmt.Errorf("prepare policy store backup directory: %w", err)
-	}
 	return backupPath, nil
+}
+
+func policyStoreBackupContentPath(backupPath string) string {
+	return filepath.Join(backupPath, "previous")
 }
 
 func (s *stagedPolicyStore) restoreBackup(backupPath string, installErr error) error {
 	if backupPath == "" {
 		return installErr
 	}
-	if err := os.Rename(backupPath, s.activePath); err != nil {
+	if err := os.Rename(policyStoreBackupContentPath(backupPath), s.activePath); err != nil {
 		return fmt.Errorf("%w; restore previous policy store: %w", installErr, err)
 	}
 	return installErr
