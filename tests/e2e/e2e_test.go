@@ -224,6 +224,10 @@ func TestE2E_LocalOCIImport(t *testing.T) {
 	require.True(t, found)
 	assert.Equal(t, policyDigest, policyState.Digest)
 	assert.Equal(t, policyDigest, policyState.Version)
+	assert.Equal(t, "Test Policy", policyState.PolicyTitle)
+	assert.Equal(t, "test", policyState.PolicyEvaluator)
+	assert.Equal(t, 2, policyState.ControlCount)
+	assert.Equal(t, 2, policyState.AssessmentCount)
 	assert.False(t, policyState.Verified)
 
 	complypackState, found := state.GetComplypackState("complypacks/local-import")
