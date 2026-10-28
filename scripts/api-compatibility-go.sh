@@ -5,7 +5,8 @@
 set -euo pipefail
 
 readonly APIDIFF_MODULE="golang.org/x/exp"
-readonly APIDIFF_VERSION="v0.0.0-20251023183803-a4bb9ffd2546"
+# The pinned public module revision resembles a generic API key to secret scanners.
+readonly APIDIFF_VERSION="v0.0.0-20251023183803-a4bb9ffd2546" #gitleaks:allow
 readonly PROVIDER_PACKAGE="github.com/complytime/complyctl/pkg/provider"
 
 die() {
@@ -30,7 +31,7 @@ write_export_data() {
 
     (
         cd "${repository_dir}"
-        "${apidiff_path}" -w "${export_file}" "${PROVIDER_PACKAGE}"
+        GOWORK=off "${apidiff_path}" -w "${export_file}" "${PROVIDER_PACKAGE}"
     ) || die "package loading: cannot load ${label} ${PROVIDER_PACKAGE}"
 }
 

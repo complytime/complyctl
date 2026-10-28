@@ -54,7 +54,8 @@ assert_failure() {
 }
 
 configure_origin() {
-    local repository="$1" remote="${repository}-origin.git"
+    local repository="$1"
+    local remote="${repository}-origin.git"
 
     git init --bare -q "${remote}"
     git -C "${repository}" remote add origin "${remote}"
@@ -107,8 +108,7 @@ test_protobuf_compatibility() {
 }
 
 test_go_api_compatibility() {
-    local baseline="${test_root}/go-baseline"
-    local candidate="${test_root}/go-candidate"
+    local baseline="${test_root}/go-baseline" candidate="${test_root}/go-candidate" workspace
 
     write_provider_package "${baseline}" $'package provider\n\nfunc Stable() {}'
     write_provider_package "${candidate}" \
@@ -119,6 +119,15 @@ test_go_api_compatibility() {
     # apidiff emits the incompatible exported symbol before the summary error.
     assert_failure 'incompatible Go API detected' 'Stable' -- \
         "${GO_SCRIPT}" "${candidate}" "${baseline}"
+
+    mkdir "${test_root}/go-workspace"
+    workspace="${test_root}/go-workspace/go.work"
+    (
+        cd "${test_root}/go-workspace"
+        go work init "${candidate}"
+    )
+    assert_failure 'incompatible Go API detected' 'Stable' -- \
+        env GOWORK="${workspace}" "${GO_SCRIPT}" "${candidate}" "${baseline}"
 }
 
 test_operational_failures_are_classified() {
