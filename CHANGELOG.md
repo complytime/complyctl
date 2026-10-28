@@ -4,6 +4,12 @@
 
 ### Added
 
+- Provider API compatibility guardrail: `api-compatibility` compares the
+  protobuf and exported Go contracts with the latest stable release in the
+  current major version, failing closed on analysis errors. `apidiff` detects
+  exported API comparability changes; downstream validation remains required
+  for unkeyed composite literals and provider interoperability. Spec:
+  `openspec/changes/public-api-compatibility-guardrails/`.
 - `complyctl get --from-oci-layout <path>` imports digest-pinned configured
   policies and complypacks from a local OCI image layout for air-gapped
   provisioning. (#892)
@@ -273,9 +279,9 @@
   Previously, a deleted cache directory caused the sync to be permanently
   skipped until the user manually cleared state (#649).
 
-- Devcontainer `post-create.sh` now automatically restarts the mock OCI 
+- Devcontainer `post-create.sh` now automatically restarts the mock OCI
   registry when new bundles are detected in `/bundles/`, ensuring bundles
-  are re-seeded without requiring manual `pkill` commands. The restart 
+  are re-seeded without requiring manual `pkill` commands. The restart
   only occurs when new bundles are found during `post-create.sh` execution,
   maintaining fast re-execution when no changes are present. Additionally,
   `complytime.yaml` is now preserved across runs instead of being overwritten
@@ -416,4 +422,3 @@
   exclusively a digest separator. A deprecation warning is now emitted
   when `@version` syntax is detected. `@version` support will be removed
   in a future release. (#600)
-
