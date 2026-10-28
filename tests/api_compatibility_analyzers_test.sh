@@ -158,6 +158,7 @@ EOF
 
 test_combined_check_uses_one_baseline() {
     local repository="${test_root}/combined" output output_without_baseline
+    local -x API_COMPATIBILITY_REMOTE=origin
 
     write_buf_config "${repository}"
     write_provider_package "${repository}" $'package provider\n\nfunc Stable() {}'
@@ -186,6 +187,7 @@ test_combined_check_uses_one_baseline() {
 
 test_make_targets_fail_closed() {
     local repository="${test_root}/make-targets" target
+    local -x API_COMPATIBILITY_REMOTE=origin
 
     write_buf_config "${repository}"
     write_provider_package "${repository}" $'package provider\n\nfunc Stable() {}'

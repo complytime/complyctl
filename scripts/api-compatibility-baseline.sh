@@ -6,6 +6,7 @@ set -euo pipefail
 
 readonly FALLBACK_REMOTE="origin"
 readonly PREFERRED_REMOTE="upstream"
+readonly CANONICAL_REPOSITORY="github.com/complytime/complyctl"
 readonly WORKTREE_PREFIX="complyctl-api-baseline"
 
 die() {
@@ -21,9 +22,23 @@ Set API_COMPATIBILITY_CANDIDATE_VERSION to select the candidate semantic-version
 major. When it is unset, the nearest semantic-version Git tag selects the major.
 
 Set API_COMPATIBILITY_REMOTE to select the Git remote used for authoritative
-release tags. When it is unset, upstream is preferred and origin is the fallback.
+release tags, including an explicit override for a noncanonical repository.
+When unset, upstream then origin are considered only if their URL identifies
+the canonical github.com/complytime/complyctl repository.
 EOF
     exit 2
+}
+
+is_canonical_remote() {
+    local remote_url
+
+    remote_url="$(git -C "${repo}" remote get-url "$1" 2>/dev/null)" || return 1
+    case "${remote_url%.git}" in
+        "https://${CANONICAL_REPOSITORY}" | \
+        "git@${CANONICAL_REPOSITORY/\//:}" | \
+        "ssh://git@${CANONICAL_REPOSITORY}") return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 is_semantic_version() {
@@ -105,10 +120,12 @@ candidate_major="${candidate_version%%.*}"
 
 remote="${API_COMPATIBILITY_REMOTE:-}"
 if [[ -z "${remote}" ]]; then
-    if git -C "${repo}" remote get-url "${PREFERRED_REMOTE}" >/dev/null 2>&1; then
+    if is_canonical_remote "${PREFERRED_REMOTE}"; then
         remote="${PREFERRED_REMOTE}"
-    else
+    elif is_canonical_remote "${FALLBACK_REMOTE}"; then
         remote="${FALLBACK_REMOTE}"
+    else
+        die "no canonical remote found; configure upstream or origin for ${CANONICAL_REPOSITORY}, or explicitly set API_COMPATIBILITY_REMOTE"
     fi
 fi
 

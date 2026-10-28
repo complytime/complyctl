@@ -16,6 +16,18 @@ fail() {
     exit 1
 }
 
+# Substitute only reported URLs so canonical selection uses local Git transports.
+git() {
+    local reported_url
+    if [[ $# -eq 5 && "$1" == -C && "$3" == remote && "$4" == get-url ]] &&
+        reported_url="$(command git -C "$2" config --get "remote.$5.test-url")"; then
+        printf '%s\n' "${reported_url}"
+    else
+        command git "$@"
+    fi
+}
+export -f git
+
 create_repository() {
     local name="$1" repository remote
 
@@ -27,6 +39,8 @@ create_repository() {
     git -C "${repository}" config user.email "baseline-test@example.com"
     git -C "${repository}" config user.name "Baseline Test"
     git -C "${repository}" remote add origin "${remote}"
+    git -C "${repository}" config remote.origin.test-url \
+        https://github.com/complytime/complyctl.git
     printf 'initial\n' > "${repository}/fixture"
     git -C "${repository}" add fixture
     git -C "${repository}" commit -qm initial
@@ -70,6 +84,8 @@ test_upstream_remote_is_preferred() {
     upstream="${test_root}/upstream-preferred.git"
     git init --bare -q "${upstream}"
     git -C "${repository}" remote add upstream "${upstream}"
+    git -C "${repository}" config remote.upstream.test-url \
+        git@github.com:complytime/complyctl.git
     commit_and_tag "${repository}" v1.0.0 upstream
     expected_commit="$(git -C "${repository}" rev-parse 'v1.0.0^{commit}')"
     commit_and_tag "${repository}" v1.2.0 origin
@@ -91,6 +107,69 @@ test_origin_remote_is_used_without_upstream() {
     assert_contains "${output}" "Selected baseline commit: ${expected_commit}"
 }
 
+test_noncanonical_remotes_fail_closed() {
+    local repository output remote_url marker
+
+    repository="$(create_repository noncanonical-remotes)"
+    commit_and_tag "${repository}" v1.0.0
+    marker="${test_root}/unexpected-command"
+    for remote_url in \
+        https://github.com/contributor/complyctl.git \
+        https://github.com/complytime/complyctl-fork.git \
+        https://github.com.evil.example/complytime/complyctl.git \
+        https://github.com/complytime/complyctl.git/other; do
+        git -C "${repository}" config remote.origin.test-url "${remote_url}"
+        if output="$(API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 \
+            bash "${HELPER}" --repo "${repository}" -- touch "${marker}" 2>&1)"; then
+            fail "expected noncanonical origin to fail: ${remote_url}"
+        fi
+        assert_contains "${output}" 'no canonical remote found'
+        assert_contains "${output}" 'API_COMPATIBILITY_REMOTE'
+    done
+
+    git -C "${repository}" remote add upstream "${test_root}/misleading-upstream.git"
+    git -C "${repository}" config remote.upstream.test-url \
+        git@github.com:contributor/complyctl.git
+    if output="$(API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 \
+        bash "${HELPER}" --repo "${repository}" -- touch "${marker}" 2>&1)"; then
+        fail 'expected misleading upstream and noncanonical origin to fail'
+    fi
+    assert_contains "${output}" 'no canonical remote found'
+    [[ ! -e "${marker}" ]] || fail 'command ran despite noncanonical baseline'
+}
+
+test_canonical_origin_is_used_with_noncanonical_upstream() {
+    local repository output
+
+    repository="$(create_repository misleading-upstream)"
+    commit_and_tag "${repository}" v1.0.0
+    git -C "${repository}" remote add upstream "${test_root}/unavailable-upstream.git"
+    git -C "${repository}" config remote.upstream.test-url \
+        https://github.com/contributor/complyctl.git
+    output="$(API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 \
+        bash "${HELPER}" --repo "${repository}" -- true)"
+    assert_contains "${output}" 'Selected baseline tag: v1.0.0'
+}
+
+test_canonical_url_forms_are_accepted() {
+    local repository remote_url output
+
+    repository="$(create_repository canonical-url-forms)"
+    commit_and_tag "${repository}" v1.0.0
+    for remote_url in \
+        https://github.com/complytime/complyctl \
+        https://github.com/complytime/complyctl.git \
+        git@github.com:complytime/complyctl \
+        git@github.com:complytime/complyctl.git \
+        ssh://git@github.com/complytime/complyctl \
+        ssh://git@github.com/complytime/complyctl.git; do
+        git -C "${repository}" config remote.origin.test-url "${remote_url}"
+        output="$(API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 \
+            bash "${HELPER}" --repo "${repository}" -- true)"
+        assert_contains "${output}" 'Selected baseline tag: v1.0.0'
+    done
+}
+
 test_remote_environment_override_is_used() {
     local repository upstream output
 
@@ -100,6 +179,8 @@ test_remote_environment_override_is_used() {
     git -C "${repository}" remote add upstream "${upstream}"
     commit_and_tag "${repository}" v1.0.0 upstream
     commit_and_tag "${repository}" v1.2.0 origin
+    git -C "${repository}" config remote.origin.test-url \
+        https://github.com/contributor/complyctl.git
 
     output="$(API_COMPATIBILITY_CANDIDATE_VERSION=v1.3.0 API_COMPATIBILITY_REMOTE=origin \
         bash "${HELPER}" --repo "${repository}" -- true)"
@@ -192,6 +273,9 @@ test_worktree_is_cleaned_up() {
 test_highest_stable_tag_is_selected
 test_upstream_remote_is_preferred
 test_origin_remote_is_used_without_upstream
+test_noncanonical_remotes_fail_closed
+test_canonical_origin_is_used_with_noncanonical_upstream
+test_canonical_url_forms_are_accepted
 test_remote_environment_override_is_used
 test_prerelease_tag_is_excluded
 test_leading_zero_versions_are_rejected
