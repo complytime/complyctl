@@ -53,6 +53,19 @@ being treated as a compatible API. Install Buf `1.50.0` and the pinned
 `golang.org/x/exp` `apidiff` tool (`v0.0.0-20251023183803-a4bb9ffd2546`)
 before running the relevant target.
 
+By default, release tags come from `upstream`, or from `origin` if only that
+remote points to `github.com/complytime/complyctl`. The checks accept HTTPS and
+SSH URLs and reject automatic selection of a fork. For a fork-based checkout,
+add the canonical remote before running the checks:
+
+```bash
+git remote add upstream https://github.com/complytime/complyctl.git
+```
+
+Set `API_COMPATIBILITY_REMOTE` to explicitly trust another configured remote
+for release tags. This selects the baseline source; it does not disable the
+compatibility checks.
+
 Local CI runs the `api-compatibility` job for pull requests and pushes to
 `main`, the supported release line. The job uses SHA-pinned checkout, Buf, and
 Go setup actions, Buf `1.50.0`, and the pinned `apidiff` version above. It

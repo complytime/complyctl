@@ -6,7 +6,9 @@
 
 - Provider API compatibility guardrail: `api-compatibility` compares the
   protobuf and exported Go contracts with the latest stable release in the
-  current major version, failing closed on analysis errors. `apidiff` detects
+  current major version, failing closed on analysis errors. Default baseline
+  remotes must identify the canonical repository; other sources require an
+  explicit `API_COMPATIBILITY_REMOTE` selection. `apidiff` detects
   exported API comparability changes; downstream validation remains required
   for unkeyed composite literals and provider interoperability. Spec:
   `openspec/changes/public-api-compatibility-guardrails/`.
