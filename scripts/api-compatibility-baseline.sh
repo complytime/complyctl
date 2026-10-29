@@ -152,7 +152,7 @@ for tag in "${tags[@]}"; do
 done
 [[ -n "${baseline_tag}" ]] || die "no stable v${candidate_major} baseline tag is available"
 
-git -C "${repo}" fetch --no-tags "${remote}" "refs/tags/${baseline_tag}" ||
+git -C "${repo}" fetch --quiet --no-tags "${remote}" "refs/tags/${baseline_tag}" ||
     die "failed to fetch selected tag ${baseline_tag}"
 baseline_commit="$(git -C "${repo}" rev-parse 'FETCH_HEAD^{commit}')" ||
     die "failed to resolve selected tag ${baseline_tag} to a commit"
@@ -166,7 +166,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-git -C "${repo}" worktree add --detach "${baseline_dir}" "${baseline_commit}" >/dev/null ||
+git -C "${repo}" worktree add --quiet --detach "${baseline_dir}" "${baseline_commit}" >/dev/null ||
     die "failed to materialize baseline worktree"
 
 printf 'Selected baseline tag: %s\n' "${baseline_tag}"

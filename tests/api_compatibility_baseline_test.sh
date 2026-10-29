@@ -8,13 +8,11 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 readonly REPO_ROOT
 readonly HELPER="${REPO_ROOT}/scripts/api-compatibility-baseline.sh"
 
+# shellcheck source=tests/api_compat_helpers.sh
+source "${REPO_ROOT}/tests/api_compat_helpers.sh"
+
 test_root="$(mktemp -d)"
 trap 'rm -rf "${test_root}"' EXIT
-
-fail() {
-    printf 'FAIL: %s\n' "$*" >&2
-    exit 1
-}
 
 # Substitute only reported URLs so canonical selection uses local Git transports.
 git() {
@@ -27,41 +25,6 @@ git() {
     fi
 }
 export -f git
-
-create_repository() {
-    local name="$1" repository remote
-
-    repository="${test_root}/${name}"
-    remote="${test_root}/${name}-origin.git"
-
-    git init -q "${repository}"
-    git init --bare -q "${remote}"
-    git -C "${repository}" config user.email "baseline-test@example.com"
-    git -C "${repository}" config user.name "Baseline Test"
-    git -C "${repository}" remote add origin "${remote}"
-    git -C "${repository}" config remote.origin.test-url \
-        https://github.com/complytime/complyctl.git
-    printf 'initial\n' > "${repository}/fixture"
-    git -C "${repository}" add fixture
-    git -C "${repository}" commit -qm initial
-    git -C "${repository}" push -q origin HEAD:main
-    printf '%s\n' "${repository}"
-}
-
-commit_and_tag() {
-    local repository="$1" tag="$2" remote="${3:-origin}"
-
-    printf '%s\n' "${tag}" >> "${repository}/fixture"
-    git -C "${repository}" add fixture
-    git -C "${repository}" commit -qm "${tag}"
-    git -C "${repository}" tag -a -m "${tag}" "${tag}"
-    git -C "${repository}" push -q "${remote}" HEAD:main "refs/tags/${tag}"
-}
-
-assert_contains() {
-    local output="$1" expected="$2"
-    [[ "${output}" == *"${expected}"* ]] || fail "expected output to contain: ${expected}"
-}
 
 test_highest_stable_tag_is_selected() {
     local repository output expected_commit
@@ -270,6 +233,25 @@ test_worktree_is_cleaned_up() {
         fail "baseline worktree remains registered: ${recorded_path}"
 }
 
+test_progress_is_quiet_and_errors_remain_visible() {
+    local repository output
+
+    repository="$(create_repository quiet-diagnostics)"
+    commit_and_tag "${repository}" v1.0.0
+    output="$(API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 \
+        bash "${HELPER}" --repo "${repository}" -- true 2>&1)"
+    assert_contains "${output}" 'Selected baseline tag: v1.0.0'
+    assert_contains "${output}" 'Selected baseline commit:'
+    [[ "${output}" != *'From '* && "${output}" != *'Preparing worktree'* ]] ||
+        fail "routine Git progress leaked: ${output}"
+
+    git -C "${repository}" remote add unavailable "${repository}/missing.git"
+    assert_failure 'fatal:' 'baseline resolution: failed to list tags' -- \
+        env API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 \
+        API_COMPATIBILITY_REMOTE=unavailable \
+        bash "${HELPER}" --repo "${repository}" -- true
+}
+
 test_highest_stable_tag_is_selected
 test_upstream_remote_is_preferred
 test_origin_remote_is_used_without_upstream
@@ -282,4 +264,5 @@ test_leading_zero_versions_are_rejected
 test_remote_tags_are_authoritative
 test_missing_stable_baseline_fails
 test_worktree_is_cleaned_up
+test_progress_is_quiet_and_errors_remain_visible
 printf 'PASS: API compatibility baseline helper tests\n'

@@ -47,6 +47,9 @@
 
 ### Changed
 
+- Local provider API compatibility checks accept stable Buf versions from
+  `1.50.0` onward, avoiding a downgrade for contributors with newer tools.
+  CI retains Buf `1.50.0`, and `apidiff` retains its exact revision. (#880)
 - RPM spec modernized for Fedora Go packaging guidelines: switch to
   `%gobuild` macro for debuginfo generation, adopt `go-vendor-tools`
   for vendored license verification, use `%gocheck2` for unit tests,
