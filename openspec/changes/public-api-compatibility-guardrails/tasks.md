@@ -31,6 +31,26 @@ Local CI-parity verification completed on 2026-10-28: Buf 1.50.0 and
 integration checks also passed. GitHub check and preflight behavior remain
 post-push verification.
 
+## 5. Review feedback: local Buf minimum version
+
+- [ ] 5.1 Commit and push the revised proposal, design, requirements, and
+  tasks before changing analyzer source or tests.
+- [ ] 5.2 Replace local Buf equality validation with validated semantic
+  version comparison accepting stable versions at or above `1.50.0`.
+  Report older versions as `buf >= 1.50.0 required, found <version>`;
+  retain fail-closed tool-setup and analyzer errors.
+- [ ] 5.3 Add regression coverage for the minimum, newer patch/minor/major
+  versions, numeric ordering, valid build metadata, older versions,
+  malformed versions, prereleases, missing tools, and version-command
+  failures. Verify accepted versions still run analysis and propagate
+  incompatibility and operational failures.
+- [ ] 5.4 Update contributor and release guidance plus the changelog to
+  distinguish local Buf minimum-version support from pinned CI execution;
+  preserve the existing exact `apidiff` revision.
+- [ ] 5.5 Run the compatibility regression suites and applicable CI-parity
+  checks. Confirm CI still installs Buf `1.50.0`, apidiff remains pinned,
+  and required compatibility checks remain enforced.
+
 ## Workflow follow-up
 
 - Run `/uf.review-council` and resolve any request-for-changes verdict before PR submission.

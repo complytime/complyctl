@@ -75,11 +75,27 @@ Alternatives considered:
 
 ### Make compatibility tools explicit and strict
 
-New Make targets shall invoke the baseline helper and pinned Buf and Go API
-tool versions. Unlike optional developer convenience targets, missing tools or
-failed installation shall return non-zero. The exact analyzer version and its
-installation method shall be pinned and recorded for automated dependency
-updates.
+New Make targets SHALL invoke the baseline helper and validate the
+installed compatibility tools. Local protobuf analysis MUST accept a
+stable Buf semantic version greater than or equal to `1.50.0`, so
+contributors can use newer installations without downgrading. Version
+comparison MUST use numeric major, minor, and patch components after
+validating the complete version. Valid build metadata MUST NOT affect
+precedence. Prereleases and malformed versions MUST be rejected.
+
+When an older stable version is installed, the tool-setup error SHALL
+state the minimum and detected versions, for example:
+`buf >= 1.50.0 required, found 1.49.0`. A missing executable or failed
+version command MUST still return non-zero with a tool-setup diagnostic.
+Passing version validation MUST NOT suppress incompatibility or analyzer
+operational failures.
+
+CI MUST continue installing exactly Buf `1.50.0` for reproducible merge
+and release evidence. Local runs with newer Buf versions do not replace
+the required CI result. The Go API analyzer MUST retain its exact
+`golang.org/x/exp` module revision; this change does not introduce
+minimum-version acceptance for `apidiff`. CI installation versions and
+methods SHALL remain recorded for automated dependency updates.
 
 The helper shall report baseline resolution, tool setup, package loading, and
 incompatible API failures. The current CI policy fails closed on every failure.
@@ -90,6 +106,11 @@ Alternatives considered:
   installation hint and does not perform breaking analysis.
 - Add the analyzer to application dependencies: rejected because it is CI and
   development tooling, not a runtime dependency.
+- Require exactly Buf `1.50.0` locally: rejected because it prevents
+  contributors from using newer installed versions. CI retains the exact
+  installation for reproducibility.
+- Accept any Buf version: rejected because older, malformed, or prerelease
+  versions do not satisfy the supported local tooling requirement.
 
 ### Add one required compatibility job
 
@@ -126,6 +147,9 @@ Alternatives considered:
 
 ## Risks / Trade-offs
 
+- [Newer local Buf versions can differ from CI] → Keep the exact CI
+  installation as the required merge and release result; document the
+  distinction without claiming identical analyzer behavior across versions.
 - [Future major authorization requires repository configuration] → Defer its
   design and configuration until a major migration is approved; current CI has
   no authorization path.
