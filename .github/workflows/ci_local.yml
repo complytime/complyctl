@@ -31,9 +31,63 @@ jobs:
 
             - name: Set up buf
               uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
+              with:
+                  version: "1.50.0"
 
             - name: Run buf lint
               run: buf lint
+
+    api-compatibility:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - name: Checkout code and release tags
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - name: Set up buf
+              uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
+              with:
+                  version: "1.50.0"
+
+            - name: Set up Go
+              uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+              with:
+                  go-version-file: './go.mod'
+
+            - name: Install apidiff
+              env:
+                  GOBIN: ${{ github.workspace }}/.bin
+              run: |
+                  go install golang.org/x/exp/cmd/apidiff@v0.0.0-20251023183803-a4bb9ffd2546
+                  echo "${GOBIN}" >> "$GITHUB_PATH"
+
+            - name: Run API compatibility analysis
+              run: |
+                  set -euo pipefail
+                  make api-compatibility 2>&1 | tee api-compatibility.log
+
+            - name: Publish compatibility diagnostics
+              if: always()
+              run: |
+                  {
+                      echo '## API compatibility'
+                      echo
+                      echo '### Selected baseline'
+                      grep -E '^Selected baseline (tag|commit):' api-compatibility.log || true
+                      echo
+                      echo '### Diagnostics'
+                      echo '```text'
+                      if [[ -f api-compatibility.log ]]; then
+                          cat api-compatibility.log
+                      else
+                          echo 'Compatibility analysis did not produce diagnostics.'
+                      fi
+                      echo '```'
+                  } >> "$GITHUB_STEP_SUMMARY"
 
     unit-test:
         runs-on: ubuntu-latest

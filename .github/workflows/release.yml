@@ -49,7 +49,7 @@ jobs:
         uses: complytime/org-infra/.github/workflows/reusable_release_preflight.yml@8f347ba1aa2c7e9eb3b70e69c1709ddb456cd64a # v0.9.0
         with:
             tag: ${{ inputs.tag }}
-            ci_checks: '["buf-lint", "unit-test", "e2e-test", "integration-test"]'
+            ci_checks: '["buf-lint", "api-compatibility", "unit-test", "e2e-test", "integration-test"]'
             skip_semver_check: ${{ inputs.skip_semver_check }}
             skip_ci_checks: ${{ inputs.skip_ci_checks }}
             skip_unreleased_check: ${{ inputs.skip_unreleased_check }}

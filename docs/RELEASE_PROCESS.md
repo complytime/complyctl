@@ -58,7 +58,64 @@ For the full release process reference, see the [org-infra release process](http
 
 ## Tests
 
-Tests relevant for releases are incorporated in CI tests for every PR. The preflight job verifies that the following CI checks have passed on HEAD before allowing a release: `buf-lint`, `unit-test`, `e2e-test`, `integration-test`.
+Tests relevant for releases are incorporated in CI tests for every PR. The
+preflight job verifies that the following CI checks have passed on HEAD before
+allowing a release: `buf-lint`, `api-compatibility`, `unit-test`, `e2e-test`,
+and `integration-test`.
+
+### Provider API Compatibility
+
+Before releasing a change to the provider-facing API, run the local combined
+comparison from the release candidate commit:
+
+```bash
+make api-compatibility
+```
+
+The command compares the `api/plugin` protobuf contract and exported
+`pkg/provider` Go API with the highest stable tag in the candidate's major
+version. It ignores prerelease tags, reports the chosen tag and commit, and
+fails closed if baseline resolution, tool setup, package loading, or analysis
+cannot complete. Run `make api-compatibility-proto` or
+`make api-compatibility-go` to diagnose an individual contract.
+
+The `api-compatibility` CI job runs the combined command for pull requests and
+pushes to `main`. It uses SHA-pinned checkout, Buf, and Go setup actions; Buf
+`1.50.0`; and `apidiff`
+`v0.0.0-20251023183803-a4bb9ffd2546`. The job publishes the selected baseline
+and complete compatibility diagnostics to its GitHub Actions job summary, even
+when analysis fails.
+
+Local protobuf analysis accepts stable Buf versions at or above `1.50.0`;
+it rejects older, malformed, and prerelease versions. CI continues installing
+exactly Buf `1.50.0` for reproducible release evidence, and the `apidiff` module
+revision remains exact for both local and CI execution. Use the CI versions
+when reproducing a release check; newer local Buf versions can differ in
+analyzer behavior and do not replace required CI evidence.
+
+The `api-compatibility` check is required merge and release evidence for
+provider-facing API changes. Release preflight lists that exact job ID in its
+explicit CI checks and rejects the release when the check fails. After pushing
+the workflow configuration, a maintainer must confirm GitHub's emitted check
+name is `api-compatibility` and that a failed run blocks preflight; this
+post-push validation confirms the configured job ID matches the GitHub check.
+
+Static analysis does not replace provider validation. `apidiff` detects
+exported API changes that affect struct comparability, but it cannot detect
+downstream use of unkeyed composite literals. It also cannot verify provider
+builds, protocol interoperability, or runtime behavior. Coordinate downstream
+provider build and integration validation through
+[complytime-providers#187](https://github.com/complytime/complytime-providers/issues/187).
+
+### Future major-version breaking changes
+
+The current release process has no breaking-change override. An incompatible
+provider API fails the `api-compatibility` check on `main`, the current
+supported release line. When maintainers approve a future major migration, they
+must design and review a protected authorization workflow before enabling it.
+The future workflow must preserve analyzer diagnostics, bind authorization to a
+reviewed commit, document consumer impact and migration steps, coordinate
+downstream provider validation, and reject operational analyzer failures.
 
 ## Cadence
 
