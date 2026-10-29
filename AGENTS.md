@@ -71,6 +71,18 @@ make test-acceptance-verify
 make test-acceptance-all
 ```
 
+### Provider API Compatibility
+
+```bash
+make api-compatibility        # regression suites plus protobuf and Go API comparison
+make api-compatibility-proto  # protobuf comparison only
+make api-compatibility-go     # Go API comparison only
+make test-api-compatibility   # compatibility regression suites only
+```
+
+See [contributor guidance](docs/CONTRIBUTING.md#provider-api-compatibility)
+for tool versions, baseline selection, and analysis limits.
+
 ### Lint & Format
 
 ```bash
@@ -94,7 +106,7 @@ make crapload-check     # check for CRAP regressions against baseline
 | Workflow               | File                            | Purpose                                                                                           |
 | ----------             | ------                          | ---------                                                                                         |
 | CI                     | `ci_checks.yml`                 | Standardized CI via org-infra reusable workflow                                                   |
-| Local CI               | `ci_local.yml`                  | Consolidated local test jobs: buf-lint, unit-test, e2e-test, integration-test                     |
+| Local CI               | `ci_local.yml`                  | Consolidated jobs: buf-lint, api-compatibility, unit-test, e2e-test, integration-test                |
 | Cross-Repo Integration | `ci_cross_repo_integration.yml` | Cross-repo integration tests with complytime-providers + EvaluationLog schema validation          |
 | CRAP Load              | `ci_crapload.yml`               | CRAP analysis on PRs (reusable from org-infra)                                                    |
 | Security               | `ci_security.yml`               | Security scanning                                                                                 |

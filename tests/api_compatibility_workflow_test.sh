@@ -9,6 +9,9 @@ readonly REPO_ROOT
 readonly WORKFLOW_PATH="${REPO_ROOT}/.github/workflows/ci_local.yml"
 readonly RELEASE_WORKFLOW_PATH="${REPO_ROOT}/.github/workflows/release.yml"
 
+# Public caller configuration must not change the baseline suite's fixtures.
+API_COMPATIBILITY_REMOTE=origin bash "${REPO_ROOT}/tests/api_compatibility_baseline_test.sh"
+
 python3 - "${WORKFLOW_PATH}" "${RELEASE_WORKFLOW_PATH}" <<'PY'
 import json
 import os

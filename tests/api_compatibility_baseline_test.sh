@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+# Default-selection scenarios must not inherit the caller's explicit override.
+unset API_COMPATIBILITY_REMOTE
+
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 readonly REPO_ROOT
 readonly HELPER="${REPO_ROOT}/scripts/api-compatibility-baseline.sh"

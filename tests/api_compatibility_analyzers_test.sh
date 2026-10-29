@@ -135,7 +135,8 @@ test_combined_check_uses_one_baseline() {
 }
 
 test_make_targets_fail_closed() {
-    local repository target
+    local repository target utility
+    local missing_tools_bin="${test_root}/missing-tools-bin"
     local -x API_COMPATIBILITY_REMOTE=origin
 
     repository="$(create_repository make-targets)"
@@ -151,14 +152,19 @@ test_make_targets_fail_closed() {
     done
 
     commit_and_tag "${repository}" v1.0.0
+    # Provide fixture utilities without relying on where the host installs analyzers.
+    mkdir "${missing_tools_bin}"
+    for utility in bash dirname git make mktemp rm; do
+        ln -s "$(type -P "${utility}")" "${missing_tools_bin}/${utility}"
+    done
     assert_failure 'protobuf compatibility: tool setup: buf is not installed' -- \
-        env PATH=/usr/bin:/bin API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 make -s -f "${MAKEFILE}" \
+        env PATH="${missing_tools_bin}" API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 make -s -f "${MAKEFILE}" \
             "API_COMPATIBILITY_REPO=${repository}" api-compatibility-proto
     assert_failure 'Go API compatibility: tool setup: apidiff is not installed' -- \
-        env PATH=/usr/bin:/bin API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 make -s -f "${MAKEFILE}" \
+        env PATH="${missing_tools_bin}" API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 make -s -f "${MAKEFILE}" \
             "API_COMPATIBILITY_REPO=${repository}" api-compatibility-go
     assert_failure 'protobuf compatibility: tool setup: buf is not installed' -- \
-        env PATH=/usr/bin:/bin API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 make -s -f "${MAKEFILE}" \
+        env PATH="${missing_tools_bin}" API_COMPATIBILITY_CANDIDATE_VERSION=v1.1.0 make -s -f "${MAKEFILE}" \
             "API_COMPATIBILITY_REPO=${repository}" api-compatibility-analysis
 }
 
