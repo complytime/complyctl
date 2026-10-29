@@ -74,7 +74,7 @@ jobs:
                   version: v0.2.6
 
             - name: Install ampel
-              uses: carabiner-dev/actions/install/ampel@a206c75025db8588f1b065e0630ef3e7fca0fcc4 # post-v1.3.0 (policylabs org support)
+              uses: carabiner-dev/actions/install/ampel@63b3d286aec3a0cec3a194ed632d08cbf69fd412 # post-v1.3.0 (policylabs org support)
               with:
                   install-dir: /home/runner/.carabiner
                   # renovate: datasource=github-releases depName=policylabs/ampel
