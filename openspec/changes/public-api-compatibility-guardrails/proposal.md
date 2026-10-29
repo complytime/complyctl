@@ -20,9 +20,9 @@ major-version migration.
 - Fail checks when baseline resolution, tool installation, package loading, or
   analysis fails; these failures MUST NOT be treated as compatible APIs.
 - Require compatibility results during pull-request CI and release preflight.
-- Define an auditable, maintainer-authorized exception process for intentional
-  breaks on a designated next-major development path. Exceptions preserve
-  diagnostics and cannot suppress tool or baseline failures.
+- Record policy requirements for a future maintainer-authorized major
+  migration. This change implements no breaking-change override; future
+  authorization must retain diagnostics and reject operational failures.
 - Document compatibility-tool limitations, including unkeyed composite literals
   and runtime interoperability, and link the downstream validation work in
   complytime-providers#187.
@@ -37,8 +37,8 @@ this change only; it does not authorize a future compatibility exception.
 
 ### New Capabilities
 
-- `public-api-compatibility`: Release-relative compatibility enforcement and
-  intentional-breaking-change authorization for provider-facing public APIs.
+- `public-api-compatibility`: Release-relative compatibility enforcement
+  and future major-migration policy guidance for provider-facing APIs.
 
 ### Modified Capabilities
 
