@@ -49,9 +49,17 @@ API_COMPATIBILITY_CANDIDATE_VERSION=v1.2.0 make api-compatibility
 
 These commands fail closed. An unavailable baseline, missing or wrong-version
 tool, package-loading error, or analyzer error fails the command instead of
-being treated as a compatible API. Install Buf `1.50.0` and the pinned
+being treated as a compatible API. Install stable Buf `1.50.0` or newer and the pinned
 `golang.org/x/exp` `apidiff` tool (`v0.0.0-20251023183803-a4bb9ffd2546`)
 before running the relevant target.
+
+Local Buf versions are compared numerically after semantic-version validation;
+prerelease and malformed versions are rejected. For an older version, the error
+reports `buf >= 1.50.0 required, found <version>`. Valid build metadata does not
+affect version precedence. CI still installs exactly Buf `1.50.0`, so use that
+version to reproduce CI's analyzer behavior. A passing local run with a newer
+Buf does not replace the required CI result. The `apidiff` revision remains an
+exact requirement locally and in CI.
 
 By default, release tags come from `upstream`, or from `origin` if only that
 remote points to `github.com/complytime/complyctl`. The checks accept HTTPS and

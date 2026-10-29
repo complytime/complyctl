@@ -86,6 +86,13 @@ pushes to `main`. It uses SHA-pinned checkout, Buf, and Go setup actions; Buf
 and complete compatibility diagnostics to its GitHub Actions job summary, even
 when analysis fails.
 
+Local protobuf analysis accepts stable Buf versions at or above `1.50.0`;
+it rejects older, malformed, and prerelease versions. CI continues installing
+exactly Buf `1.50.0` for reproducible release evidence, and the `apidiff` module
+revision remains exact for both local and CI execution. Use the CI versions
+when reproducing a release check; newer local Buf versions can differ in
+analyzer behavior and do not replace required CI evidence.
+
 The `api-compatibility` check is required merge and release evidence for
 provider-facing API changes. Release preflight lists that exact job ID in its
 explicit CI checks and rejects the release when the check fails. After pushing

@@ -35,32 +35,42 @@ post-push verification.
 
 - [x] 5.1 Commit and push the revised proposal, design, requirements, and
   tasks before changing analyzer source or tests.
-- [ ] 5.2 Replace local Buf equality validation with validated semantic
+- [x] 5.2 Replace local Buf equality validation with validated semantic
   version comparison accepting stable versions at or above `1.50.0`.
   Report older versions as `buf >= 1.50.0 required, found <version>`;
   retain fail-closed tool-setup and analyzer errors.
-- [ ] 5.3 Add regression coverage for the minimum, newer patch/minor/major
+- [x] 5.3 Add regression coverage for the minimum, newer patch/minor/major
   versions, numeric ordering, valid build metadata, older versions,
   malformed versions, prereleases, missing tools, and version-command
   failures. Verify accepted versions still run analysis and propagate
   incompatibility and operational failures.
-- [ ] 5.4 Update contributor and release guidance plus the changelog to
+- [x] 5.4 Update contributor and release guidance plus the changelog to
   distinguish local Buf minimum-version support from pinned CI execution;
   preserve the existing exact `apidiff` revision.
-- [ ] 5.5 Run the compatibility regression suites and applicable CI-parity
+- [x] 5.5 Run the compatibility regression suites and applicable CI-parity
   checks. Confirm CI still installs Buf `1.50.0`, apidiff remains pinned,
   and required compatibility checks remain enforced.
 
 ## 6. Review feedback: diagnostics and test helpers
 
-- [ ] 6.1 Add quiet Git fetch and worktree creation to baseline resolution;
+- [x] 6.1 Add quiet Git fetch and worktree creation to baseline resolution;
   verify routine progress is absent while baseline and failure diagnostics
   remain visible.
-- [ ] 6.2 Extract shared test-only assertions and Git-fixture helpers;
+- [x] 6.2 Extract shared test-only assertions and Git-fixture helpers;
   reuse them in the baseline and analyzer suites without changing fixture
   semantics. Retain explicit per-suite temporary directories and cleanup.
-- [ ] 6.3 Run all compatibility regression suites and shell lint; verify
+- [x] 6.3 Run all compatibility regression suites and shell lint; verify
   production scripts do not depend on test helpers.
+
+Review-feedback verification on 2026-10-29: `make api-compatibility`,
+`make lint`, `buf lint`, compatibility-script ShellCheck, OpenSpec strict
+validation, and changed contributor/release Markdown lint passed. The
+unchanged CI workflow still installs Buf `1.50.0`; the Go analyzer and CI
+retain the same exact `apidiff` revision. Repository-wide YAML lint and
+pre-commit hooks encounter existing vendored/style issues; their automatic
+unrelated edits were restored. Changelog duplicate-heading lint failures
+also exist at the PR base. Gaze quality/classification cannot complete
+because its analyzer was built with an older Go version.
 
 ## Workflow follow-up
 
