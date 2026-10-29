@@ -112,6 +112,17 @@ Alternatives considered:
 - Accept any Buf version: rejected because older, malformed, or prerelease
   versions do not satisfy the supported local tooling requirement.
 
+### Share test helpers without runtime dependencies
+
+Compatibility shell suites SHALL share assertion and Git-fixture helpers
+in a test-only module. Each suite SHALL own its temporary directory and
+cleanup trap. Sourcing helpers MUST NOT create repositories, export Git
+wrappers, install tools, or run tests. The baseline suite's canonical-URL
+wrapper remains specific to its remote-selection scenarios.
+
+Production analyzers MUST NOT source test helpers. Only the Buf analyzer
+needs minimum-version comparison; the Go analyzer retains its exact pin.
+
 ### Add one required compatibility job
 
 `ci_local.yml` shall add a dedicated, SHA-pinned `api-compatibility` job that

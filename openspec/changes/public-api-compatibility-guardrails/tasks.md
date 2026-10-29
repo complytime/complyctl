@@ -33,7 +33,7 @@ post-push verification.
 
 ## 5. Review feedback: local Buf minimum version
 
-- [ ] 5.1 Commit and push the revised proposal, design, requirements, and
+- [x] 5.1 Commit and push the revised proposal, design, requirements, and
   tasks before changing analyzer source or tests.
 - [ ] 5.2 Replace local Buf equality validation with validated semantic
   version comparison accepting stable versions at or above `1.50.0`.
@@ -50,6 +50,17 @@ post-push verification.
 - [ ] 5.5 Run the compatibility regression suites and applicable CI-parity
   checks. Confirm CI still installs Buf `1.50.0`, apidiff remains pinned,
   and required compatibility checks remain enforced.
+
+## 6. Review feedback: diagnostics and test helpers
+
+- [ ] 6.1 Add quiet Git fetch and worktree creation to baseline resolution;
+  verify routine progress is absent while baseline and failure diagnostics
+  remain visible.
+- [ ] 6.2 Extract shared test-only assertions and Git-fixture helpers;
+  reuse them in the baseline and analyzer suites without changing fixture
+  semantics. Retain explicit per-suite temporary directories and cleanup.
+- [ ] 6.3 Run all compatibility regression suites and shell lint; verify
+  production scripts do not depend on test helpers.
 
 ## Workflow follow-up
 
