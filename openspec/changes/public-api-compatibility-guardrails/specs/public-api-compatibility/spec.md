@@ -42,6 +42,53 @@ when either analysis identifies an incompatible change or cannot complete.
 - **WHEN** baseline retrieval, tool installation, package loading, or analysis fails
 - **THEN** the compatibility check MUST fail and identify the failed operation
 
+### Requirement: Supported local Buf versions
+Local protobuf analysis MUST accept stable Buf semantic versions greater
+than or equal to `1.50.0`. It MUST validate the complete version before
+comparing numeric major, minor, and patch components. Valid build metadata
+MUST NOT affect precedence. It MUST reject older, malformed, and
+prerelease versions with a tool-setup diagnostic.
+
+Version validation MUST NOT bypass compatibility or operational failures.
+
+#### Scenario: Local Buf meets the minimum
+- **GIVEN** a stable Buf version equal to or newer than `1.50.0`
+- **WHEN** a contributor runs the protobuf compatibility command
+- **THEN** tool-version validation SHALL pass
+- **AND** the command MUST run compatibility analysis and preserve its
+  success or failure result
+
+#### Scenario: Local Buf is older than the minimum
+- **GIVEN** Buf `1.49.0` is installed
+- **WHEN** a contributor runs the protobuf compatibility command
+- **THEN** the command MUST fail during tool setup
+- **AND** the diagnostic MUST include
+  `buf >= 1.50.0 required, found 1.49.0`
+
+#### Scenario: Local Buf reports an unsupported version
+- **GIVEN** Buf reports a malformed version or a prerelease such as
+  `1.73.0-rc.1`
+- **WHEN** a contributor runs the protobuf compatibility command
+- **THEN** the command MUST fail with a tool-setup diagnostic
+- **AND** it MUST NOT run compatibility analysis
+
+#### Scenario: Local Buf cannot report its version
+- **GIVEN** Buf is missing or its version command fails
+- **WHEN** a contributor runs the protobuf compatibility command
+- **THEN** the command MUST fail with a tool-setup diagnostic
+
+### Requirement: Reproducible CI analyzer installation
+CI MUST continue installing exactly Buf `1.50.0` for required compatibility
+evidence. The Go API analyzer MUST retain its exact pinned module revision
+in local and CI execution.
+
+#### Scenario: CI produces compatibility evidence
+- **GIVEN** CI evaluates a pull request or supported release-line push
+- **WHEN** it installs the compatibility tools
+- **THEN** it MUST install exactly Buf `1.50.0`
+- **AND** it MUST install the existing exact `apidiff` module revision
+- **AND** it MUST run the required compatibility analysis
+
 ### Requirement: Merge and release compatibility evidence
 The system MUST make successful compatibility analysis available as a required
 pull-request and release-preflight check for supported release lines. The check

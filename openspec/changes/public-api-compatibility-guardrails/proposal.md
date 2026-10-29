@@ -12,6 +12,9 @@ major-version migration.
 
 - Add strict local and CI compatibility checks for `api/plugin` protobuf
   contracts and the `pkg/provider` public Go API.
+- Accept stable local Buf versions at or above `1.50.0`, with validated
+  semantic-version comparison and clear tool-setup errors. CI continues
+  installing exactly Buf `1.50.0`; apidiff retains its exact revision.
 - Resolve one comparison baseline: the latest stable release in the current
   major version. Ignore prerelease tags and report the selected tag and commit.
 - Fail checks when baseline resolution, tool installation, package loading, or
@@ -45,7 +48,8 @@ this change only; it does not authorize a future compatibility exception.
 
 - Affects `Makefile`, `.github/workflows/ci_local.yml`, and
   `.github/workflows/release.yml`.
-- Adds pinned compatibility-analysis tooling for local and CI use.
+- Pins compatibility-analysis tooling in CI and the local Go API analyzer;
+  local protobuf checks accept supported Buf versions from `1.50.0` onward.
 - Covers the public `pkg/provider` Go package and `api/plugin` protobuf
   contract; it does not replace provider-side build and integration validation
   tracked by complytime-providers#187.
