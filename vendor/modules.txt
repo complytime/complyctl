@@ -692,7 +692,7 @@ k8s.io/klog/v2/internal/dbg
 k8s.io/klog/v2/internal/serialize
 k8s.io/klog/v2/internal/severity
 k8s.io/klog/v2/internal/sloghandler
-# oras.land/oras-go/v2 v2.6.4
+# oras.land/oras-go/v2 v2.7.0
 ## explicit; go 1.26.0
 oras.land/oras-go/v2
 oras.land/oras-go/v2/content
