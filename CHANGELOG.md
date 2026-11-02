@@ -70,6 +70,21 @@
 
 ### Security
 
+- Bumped transitive `golang.org/x/net` from v0.61.0 to v0.62.0,
+  clearing two advisories in `golang.org/x/net/html`:
+  [GO-2026-6866](https://pkg.go.dev/vuln/GO-2026-6866) (missed
+  ancestor namespace transitions when rendering raw text) and
+  [GO-2026-6860](https://pkg.go.dev/vuln/GO-2026-6860) (quadratic
+  complexity when coalescing text nodes). `govulncheck` reports
+  neither as reachable from complyctl code (`x/net/html` is not in
+  the build graph); this is dependency hygiene, not a live exploit
+  path. v0.62.0 requires the same `x/crypto`, `x/sys`, `x/term`,
+  and `x/text` pins already in place, so there is no transitive
+  drift. `golang.org/x/crypto/openpgp`
+  ([GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932), unmaintained
+  by design, no fixed version) remains flagged at the module level
+  only; its packages are absent from the build graph and `govulncheck`
+  reports 0 reachable symbols, so no action is required.
 - Transitive `oras-go` bump via `go-gemara` v0.9.1 addresses
   CVE-2026-50163. (#813)
 
