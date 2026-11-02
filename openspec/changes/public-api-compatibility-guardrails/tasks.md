@@ -24,6 +24,7 @@
 
 - [x] 4.1 Run the compatibility targets against unchanged APIs and controlled incompatible Go and protobuf changes; verify pass and fail behavior matches `public-api-compatibility` scenarios.
 - [x] 4.2 Run CI-parity checks required by the changed workflows and record locally verified configuration. Remote validation remains a workflow follow-up authorized by the maintainer.
+- [ ] 4.3 Configure `api-compatibility` as a required status check in branch protection and verify a failing check blocks merging and release preflight.
 
 Local CI-parity verification completed on 2026-10-28: Buf 1.50.0 and
 `apidiff` v0.0.0-20251023183803-a4bb9ffd2546 passed through

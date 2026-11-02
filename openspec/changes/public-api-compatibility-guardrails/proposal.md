@@ -29,9 +29,9 @@ major-version migration.
 
 ## Maintainer Authorization
 
-The user stated in this session, "I'm a maintainer, I approve," authorizing
-implementation of #880 CI/release gate changes. This authorization applies to
-this change only; it does not authorize a future compatibility exception.
+PR author and maintainer Yvonne Devlin confirmed approval of this scope during
+PR #944 feedback triage on 2026-11-02. This authorization applies only to this
+change and does not authorize a future compatibility exception.
 
 ## Capabilities
 

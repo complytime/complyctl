@@ -4,9 +4,10 @@
 
 set -euo pipefail
 
-readonly APIDIFF_MODULE="golang.org/x/exp"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # The pinned public module revision resembles a generic API key to secret scanners.
-readonly APIDIFF_VERSION="v0.0.0-20251023183803-a4bb9ffd2546" #gitleaks:allow
+# shellcheck source=api-compatibility-versions.sh
+source "${SCRIPT_DIR}/api-compatibility-versions.sh"
 readonly PROVIDER_PACKAGE="github.com/complytime/complyctl/pkg/provider"
 
 die() {

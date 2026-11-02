@@ -62,7 +62,8 @@ jobs:
               env:
                   GOBIN: ${{ github.workspace }}/.bin
               run: |
-                  go install golang.org/x/exp/cmd/apidiff@v0.0.0-20251023183803-a4bb9ffd2546
+                  source scripts/api-compatibility-versions.sh
+                  go install "${APIDIFF_MODULE}/cmd/apidiff@${APIDIFF_VERSION}"
                   echo "${GOBIN}" >> "$GITHUB_PATH"
 
             - name: Run API compatibility analysis
