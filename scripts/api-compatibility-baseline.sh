@@ -59,10 +59,11 @@ is_semantic_version() {
 }
 
 is_stable_tag_in_major() {
-    local tag="$1" candidate_major="$2" version
+    local tag="$1" candidate_major="$2" version core_version
 
     version="${tag#v}"
-    is_semantic_version "${version}" && [[ "${version}" != *-* ]] &&
+    core_version="${version%%+*}"
+    is_semantic_version "${version}" && [[ "${core_version}" != *-* ]] &&
         [[ "${version%%.*}" == "${candidate_major}" ]]
 }
 
