@@ -8,8 +8,9 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 readonly REPO_ROOT
 readonly WORKFLOW_PATH="${REPO_ROOT}/.github/workflows/ci_local.yml"
 readonly RELEASE_WORKFLOW_PATH="${REPO_ROOT}/.github/workflows/release.yml"
+readonly VERSIONS_PATH="${REPO_ROOT}/scripts/api-compatibility-versions.sh"
 
-python3 - "${WORKFLOW_PATH}" "${RELEASE_WORKFLOW_PATH}" <<'PY'
+python3 - "${WORKFLOW_PATH}" "${RELEASE_WORKFLOW_PATH}" "${VERSIONS_PATH}" <<'PY'
 import json
 import os
 import pathlib
@@ -22,6 +23,7 @@ workflow_path = pathlib.Path(sys.argv[1])
 workflow = workflow_path.read_text(encoding="utf-8")
 release_workflow_path = pathlib.Path(sys.argv[2])
 release_workflow = release_workflow_path.read_text(encoding="utf-8")
+versions = pathlib.Path(sys.argv[3]).read_text(encoding="utf-8")
 job_start = workflow.index("    api-compatibility:\n")
 job_end = workflow.index("    unit-test:\n", job_start)
 job = workflow[job_start:job_end]
@@ -43,6 +45,7 @@ for required_value in (
     "if: always()",
     "Selected baseline",
     "Compatibility analysis did not produce diagnostics.",
+    'version: "1.50.0"',
 ):
     if required_value not in job:
         raise SystemExit(f"FAIL: missing fail-closed diagnostics behavior: {required_value}")
@@ -53,8 +56,13 @@ if not re.search(r"^\s*branches:\s*\n\s*- main\s*$", workflow, re.MULTILINE):
     raise SystemExit("FAIL: api compatibility must run on pushes to main")
 if "needs:" in job or "environment:" in job:
     raise SystemExit("FAIL: api compatibility must not depend on override orchestration")
-if not re.search(r'uses: bufbuild/buf-setup-action@\S+\s+# v1\.50\.0\n\s+with:\n\s+version: "[^"]+"', job):
-    raise SystemExit("FAIL: api compatibility must pin a Buf version")
+if not re.search(r'uses: bufbuild/buf-setup-action@\S+\s+# v1\.50\.0\n\s+with:\n\s+version: "1\.50\.0"', job):
+    raise SystemExit("FAIL: api compatibility must install Buf 1.50.0")
+if 'readonly APIDIFF_VERSION="v0.0.0-20251023183803-a4bb9ffd2546"' not in versions:
+    raise SystemExit("FAIL: compatibility versions must pin the apidiff revision")
+if 'source scripts/api-compatibility-versions.sh' not in job or \
+        'go install "${APIDIFF_MODULE}/cmd/apidiff@${APIDIFF_VERSION}"' not in job:
+    raise SystemExit("FAIL: api compatibility must install the pinned apidiff revision")
 
 ci_checks_match = re.search(
     r"^\s*ci_checks:\s*'(?P<checks>\[.*\])'\s*$", release_workflow, re.MULTILINE

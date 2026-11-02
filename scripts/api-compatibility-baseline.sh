@@ -78,8 +78,20 @@ version_is_higher() {
     IFS=. read -r _ candidate_minor candidate_patch <<<"${candidate_version}"
     IFS=. read -r _ current_minor current_patch <<<"${current_version}"
 
-    ((10#${candidate_minor} > 10#${current_minor})) ||
-        ((10#${candidate_minor} == 10#${current_minor} && 10#${candidate_patch} > 10#${current_patch}))
+    decimal_is_higher "${candidate_minor}" "${current_minor}" || {
+        [[ "${candidate_minor}" == "${current_minor}" ]] &&
+            decimal_is_higher "${candidate_patch}" "${current_patch}"
+    }
+}
+
+decimal_is_higher() {
+    local candidate="$1" current="$2"
+
+    if ((${#candidate} != ${#current})); then
+        ((${#candidate} > ${#current}))
+        return
+    fi
+    [[ "${candidate}" > "${current}" ]]
 }
 
 repo=""

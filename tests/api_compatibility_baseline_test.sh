@@ -43,6 +43,18 @@ test_highest_stable_tag_is_selected() {
     assert_contains "${output}" "Selected baseline commit: ${expected_commit}"
 }
 
+test_highest_stable_tag_with_large_component_is_selected() {
+    local repository output
+
+    repository="$(create_repository large-component-selection)"
+    commit_and_tag "${repository}" v1.18446744073709551616.0
+    commit_and_tag "${repository}" v1.18446744073709551617.0
+
+    output="$(API_COMPATIBILITY_CANDIDATE_VERSION=v1.18446744073709551618.0 \
+        bash "${HELPER}" --repo "${repository}" -- true)"
+    assert_contains "${output}" 'Selected baseline tag: v1.18446744073709551617.0'
+}
+
 test_upstream_remote_is_preferred() {
     local repository upstream output expected_commit
 
@@ -256,6 +268,7 @@ test_progress_is_quiet_and_errors_remain_visible() {
 }
 
 test_highest_stable_tag_is_selected
+test_highest_stable_tag_with_large_component_is_selected
 test_upstream_remote_is_preferred
 test_origin_remote_is_used_without_upstream
 test_noncanonical_remotes_fail_closed
