@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # The pinned public module revision resembles a generic API key to secret scanners.
-# shellcheck source=api-compatibility-versions.sh
+# shellcheck source=scripts/api-compatibility-versions.sh
 source "${SCRIPT_DIR}/api-compatibility-versions.sh"
 readonly PROVIDER_PACKAGE="github.com/complytime/complyctl/pkg/provider"
 

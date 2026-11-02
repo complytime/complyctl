@@ -58,7 +58,7 @@ if "needs:" in job or "environment:" in job:
     raise SystemExit("FAIL: api compatibility must not depend on override orchestration")
 if not re.search(r'uses: bufbuild/buf-setup-action@\S+\s+# v1\.50\.0\n\s+with:\n\s+version: "1\.50\.0"', job):
     raise SystemExit("FAIL: api compatibility must install Buf 1.50.0")
-if 'readonly APIDIFF_VERSION="v0.0.0-20251023183803-a4bb9ffd2546"' not in versions:
+if 'readonly APIDIFF_VERSION="v0.0.0-20251023183803-a4bb9ffd2546"' not in versions:  # gitleaks:allow
     raise SystemExit("FAIL: compatibility versions must pin the apidiff revision")
 if 'source scripts/api-compatibility-versions.sh' not in job or \
         'go install "${APIDIFF_MODULE}/cmd/apidiff@${APIDIFF_VERSION}"' not in job:
