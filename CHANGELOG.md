@@ -62,6 +62,12 @@
   be overridden with the `COMPLYTIME_SYSTEM_PROVIDER_DIR` environment
   variable (absolute paths only), which the tests use to isolate discovery from the host. (#881)
 
+- **ci**: Pinned the `carabiner-dev/actions` install steps (`snappy`,
+  `ampel`) in `ci_cross_repo_integration.yml` to the v1.3.1 release tag.
+  The previous pin tracked an untagged post-v1.3.0 commit whose free-form
+  version comment pinact v4 `--verify` rejects, which failed the
+  `Standardized CI / Verify action versions` job on `main` and on every PR.
+
 ### Security
 
 - Transitive `oras-go` bump via `go-gemara` v0.9.1 addresses
