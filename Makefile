@@ -1,5 +1,6 @@
 GO_BUILD_PACKAGES := ./cmd/...
 GO_BUILD_BINDIR :=./bin
+API_COMPATIBILITY_REPO ?= .
 GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GIT_TAG ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
 GIT_TREE_STATE ?= $(shell test -n "`git status --porcelain 2>/dev/null`" && echo "dirty" || echo "clean")
@@ -219,6 +220,31 @@ clean:
 .PHONY: clean
 
 ##@ Testing
+
+api-compatibility-proto: ## check protobuf compatibility against the latest stable same-major release
+	bash ./scripts/api-compatibility-baseline.sh --repo "$(API_COMPATIBILITY_REPO)" -- \
+		bash -c './scripts/api-compatibility-proto.sh "$$1" "$$BASELINE_DIR"' -- \
+		"$(API_COMPATIBILITY_REPO)"
+.PHONY: api-compatibility-proto
+
+api-compatibility-go: ## check Go API compatibility against latest stable same-major release
+	bash ./scripts/api-compatibility-baseline.sh --repo "$(API_COMPATIBILITY_REPO)" -- \
+		bash -c './scripts/api-compatibility-go.sh "$$1" "$$BASELINE_DIR"' -- \
+		"$(API_COMPATIBILITY_REPO)"
+.PHONY: api-compatibility-go
+
+test-api-compatibility: ## run API compatibility regression suites
+	bash ./tests/api_compatibility_baseline_test.sh
+	bash ./tests/api_compatibility_analyzers_test.sh
+	bash ./tests/api_compatibility_workflow_test.sh
+.PHONY: test-api-compatibility
+
+api-compatibility-analysis: ## run protobuf and Go API compatibility analysis against one release baseline
+	./scripts/api-compatibility-check.sh --repo "$(API_COMPATIBILITY_REPO)"
+.PHONY: api-compatibility-analysis
+
+api-compatibility: test-api-compatibility api-compatibility-analysis ## run strict API compatibility checks
+.PHONY: api-compatibility
 
 test-unit:
 	go test -race -v -coverprofile=coverage.out ./...
