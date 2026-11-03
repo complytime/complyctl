@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -158,8 +157,8 @@ func TestAcceptance_OCILifecycle(t *testing.T) {
 
 // TestAcceptance_FormatInterop validates that artifacts pushed by the oras CLI
 // are correctly consumed by complyctl's oras-go client. Verifies the OSCAL
-// assessment-results output contains correct control and requirement IDs
-// from the seeded policy.
+// assessment-results output contains the control-level finding and its
+// assessment observations from the seeded policy.
 func TestAcceptance_FormatInterop(t *testing.T) {
 	env := loadTestEnv(t)
 	workDir := t.TempDir()
@@ -183,29 +182,28 @@ func TestAcceptance_FormatInterop(t *testing.T) {
 	findings := parseOSCALFindings(t, oscalFile)
 	require.NotEmpty(t, findings, "OSCAL output must contain findings")
 
-	// Verify the block-force-push requirement appears in findings
-	foundBlockForcePush := false
+	// Verify the force-push-protection control appears in findings.
+	foundForcePushProtection := false
 	for _, finding := range findings {
 		target, ok := finding["target"].(map[string]interface{})
 		if !ok {
 			continue
 		}
 		targetID, _ := target["target-id"].(string)
-		if targetID == "block-force-push" {
-			foundBlockForcePush = true
+		if targetID == "force-push-protection" {
+			foundForcePushProtection = true
 
 			// Verify result state
 			status, ok := target["status"].(map[string]interface{})
 			require.True(t, ok, "finding target must have status")
 			assert.Equal(t, "satisfied", status["state"],
-				"block-force-push must be satisfied")
+				"force-push-protection must be satisfied")
 
-			// Verify finding title format
-			title, _ := finding["title"].(string)
-			assert.True(t, strings.Contains(title, "block-force-push"),
-				"finding title must reference block-force-push")
+			relatedObservations, ok := finding["related-observations"].([]interface{})
+			require.True(t, ok, "control finding must link to assessment observations")
+			assert.NotEmpty(t, relatedObservations)
 		}
 	}
-	assert.True(t, foundBlockForcePush,
-		"OSCAL findings must contain block-force-push requirement")
+	assert.True(t, foundForcePushProtection,
+		"OSCAL findings must contain force-push-protection control")
 }
