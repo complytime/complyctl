@@ -179,12 +179,27 @@ func TestAcceptance_FormatInterop(t *testing.T) {
 	assertOutputFile(t, scanDir, "evaluation-log-", ".yaml")
 	oscalFile := assertOutputFile(t, scanDir, "assessment-results-", ".json")
 
-	findings := parseOSCALFindings(t, oscalFile)
+	result := parseOSCALResult(t, oscalFile)
+	findings, ok := result["findings"].([]interface{})
+	require.True(t, ok, "OSCAL result must contain findings")
 	require.NotEmpty(t, findings, "OSCAL output must contain findings")
+	observations, ok := result["observations"].([]interface{})
+	require.True(t, ok, "OSCAL result must contain observations")
+
+	observationsByUUID := make(map[string]map[string]interface{}, len(observations))
+	for _, rawObservation := range observations {
+		observation, ok := rawObservation.(map[string]interface{})
+		require.True(t, ok, "each observation must be an object")
+		observationUUID, ok := observation["uuid"].(string)
+		require.True(t, ok, "each observation must have a UUID")
+		observationsByUUID[observationUUID] = observation
+	}
 
 	// Verify the force-push-protection control appears in findings.
 	foundForcePushProtection := false
-	for _, finding := range findings {
+	for _, rawFinding := range findings {
+		finding, ok := rawFinding.(map[string]interface{})
+		require.True(t, ok, "each finding must be an object")
 		target, ok := finding["target"].(map[string]interface{})
 		if !ok {
 			continue
@@ -202,6 +217,28 @@ func TestAcceptance_FormatInterop(t *testing.T) {
 			relatedObservations, ok := finding["related-observations"].([]interface{})
 			require.True(t, ok, "control finding must link to assessment observations")
 			assert.NotEmpty(t, relatedObservations)
+			for _, rawRelatedObservation := range relatedObservations {
+				relatedObservation, ok := rawRelatedObservation.(map[string]interface{})
+				require.True(t, ok, "each related observation must be an object")
+				observationUUID, ok := relatedObservation["observation-uuid"].(string)
+				require.True(t, ok, "each related observation must reference a UUID")
+
+				observation, found := observationsByUUID[observationUUID]
+				require.True(t, found, "related observation must exist in the result")
+				properties, ok := observation["props"].([]interface{})
+				require.True(t, ok, "related observation must include properties")
+
+				foundRequirementID := false
+				for _, rawProperty := range properties {
+					property, ok := rawProperty.(map[string]interface{})
+					require.True(t, ok, "each observation property must be an object")
+					if property["name"] == "requirement-id" && property["value"] == "block-force-push" {
+						foundRequirementID = true
+					}
+				}
+				assert.True(t, foundRequirementID,
+					"related observation must retain the block-force-push requirement ID")
+			}
 		}
 	}
 	assert.True(t, foundForcePushProtection,

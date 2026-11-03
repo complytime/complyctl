@@ -110,6 +110,7 @@ func TestToOSCAL_EvidencePreservesSourceProvenance(t *testing.T) {
 		Source: gemara.EvidenceMapping{
 			ReferenceId: "scanner-output",
 			Coordinate:  "$.configuration.required",
+			EntryId:     "requirement-configuration",
 			Digest:      "sha256:0123456789abcdef",
 			Remarks:     "Collected during the compliance scan.",
 		},
@@ -141,6 +142,11 @@ func TestToOSCAL_EvidencePreservesSourceProvenance(t *testing.T) {
 	assert.Contains(t, *evidence.Props, oscalTypes.Property{
 		Name:  "source-coordinate",
 		Value: "$.configuration.required",
+		Ns:    "https://github.com/gemaraproj/go-gemara/ns/oscal",
+	})
+	assert.Contains(t, *evidence.Props, oscalTypes.Property{
+		Name:  "source-entry-id",
+		Value: "requirement-configuration",
 		Ns:    "https://github.com/gemaraproj/go-gemara/ns/oscal",
 	})
 	assert.Contains(t, *evidence.Props, oscalTypes.Property{
