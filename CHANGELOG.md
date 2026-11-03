@@ -11,6 +11,7 @@
   `requirement-id` property on each observation. Evidence now appears in the
   observation's `relevant-evidence` entries. See `docs/EVIDENCE.md` for the
   migration details.
+  Spec: `openspec/changes/delegate-oscal-conversion/specs/oscal-assessment-results/spec.md`
 
 ### Added
 

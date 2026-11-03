@@ -149,16 +149,27 @@ func TestToOSCAL_EvidencePreservesSourceProvenance(t *testing.T) {
 		Ns:    "https://github.com/gemaraproj/go-gemara/ns/oscal",
 	})
 	require.NotNil(t, evidence.Links)
-	assert.Len(t, *evidence.Links, 1)
+	require.Len(t, *evidence.Links, 1)
 	assert.Equal(t, "resource", (*evidence.Links)[0].Rel)
+
+	require.NotNil(t, doc.AssessmentResults.BackMatter)
+	require.NotNil(t, doc.AssessmentResults.BackMatter.Resources)
+	require.Len(t, *doc.AssessmentResults.BackMatter.Resources, 1)
+	mappingResource := (*doc.AssessmentResults.BackMatter.Resources)[0]
+	assert.Equal(t, "#"+mappingResource.UUID, (*evidence.Links)[0].Href)
+	require.NotNil(t, mappingResource.Props)
+	assert.Contains(t, *mappingResource.Props, oscalTypes.Property{
+		Name:  "id",
+		Value: "scanner-output",
+		Ns:    "https://github.com/gemaraproj/go-gemara/ns/oscal",
+	})
 }
 
 func TestToOSCAL_ControlFindingLinksEveryAssessmentObservation(t *testing.T) {
 	outDir := t.TempDir()
 	log := mockGemaraEvalLog()
-	log.Evaluations = log.Evaluations[:1]
 	log.Evaluations[0].AssessmentLogs = append(log.Evaluations[0].AssessmentLogs, &gemara.AssessmentLog{
-		Requirement:     gemara.EntryMapping{ReferenceId: "test-policy", EntryId: "req-2"},
+		Requirement:     gemara.EntryMapping{ReferenceId: "test-policy", EntryId: "req-3"},
 		Description:     "second assessment",
 		Result:          gemara.Passed,
 		Message:         "passed",
@@ -180,24 +191,44 @@ func TestToOSCAL_ControlFindingLinksEveryAssessmentObservation(t *testing.T) {
 	require.Len(t, doc.AssessmentResults.Results, 1)
 	result := doc.AssessmentResults.Results[0]
 	require.NotNil(t, result.Findings)
-	require.Len(t, *result.Findings, 1)
+	require.Len(t, *result.Findings, 2)
 	require.NotNil(t, result.Observations)
-	require.Len(t, *result.Observations, 2)
+	require.Len(t, *result.Observations, 3)
 
-	observationUUIDs := make(map[string]struct{}, len(*result.Observations))
+	observationUUIDsByControl := make(map[string]map[string]struct{})
 	for _, observation := range *result.Observations {
-		observationUUIDs[observation.UUID] = struct{}{}
-	}
+		require.NotNil(t, observation.Props)
 
-	relatedObservations := (*result.Findings)[0].RelatedObservations
-	require.NotNil(t, relatedObservations)
-	require.Len(t, *relatedObservations, len(observationUUIDs))
-	for _, relatedObservation := range *relatedObservations {
-		_, found := observationUUIDs[relatedObservation.ObservationUuid]
-		assert.True(t, found, "finding must link to every assessment observation")
-		delete(observationUUIDs, relatedObservation.ObservationUuid)
+		var controlID string
+		for _, property := range *observation.Props {
+			if property.Name == "control-id" {
+				controlID = property.Value
+				break
+			}
+		}
+		require.NotEmpty(t, controlID)
+
+		if observationUUIDsByControl[controlID] == nil {
+			observationUUIDsByControl[controlID] = make(map[string]struct{})
+		}
+		observationUUIDsByControl[controlID][observation.UUID] = struct{}{}
 	}
-	assert.Empty(t, observationUUIDs, "every assessment observation must be linked")
+	require.Len(t, observationUUIDsByControl, 2)
+
+	for _, finding := range *result.Findings {
+		expectedObservationUUIDs, found := observationUUIDsByControl[finding.Target.TargetId]
+		require.True(t, found, "finding must target a control with assessment observations")
+
+		relatedObservations := finding.RelatedObservations
+		require.NotNil(t, relatedObservations)
+		actualObservationUUIDs := make(map[string]struct{}, len(*relatedObservations))
+		for _, relatedObservation := range *relatedObservations {
+			actualObservationUUIDs[relatedObservation.ObservationUuid] = struct{}{}
+		}
+
+		assert.Equal(t, expectedObservationUUIDs, actualObservationUUIDs,
+			"finding must link exclusively to its control's assessment observations")
+	}
 }
 
 func TestToOSCAL_NilOrIncompleteLogReturnsErrorWithoutWritingReport(t *testing.T) {
