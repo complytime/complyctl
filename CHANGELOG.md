@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- **BREAKING**: OSCAL assessment-results reports now represent each control
+  evaluation as one finding and its assessment logs as linked observations.
+  Consumers that count or associate findings by requirement ID MUST instead
+  follow `related-observations` from each control-level finding and read the
+  `requirement-id` property on each observation. Evidence now appears in the
+  observation's `relevant-evidence` entries. See `docs/EVIDENCE.md` for the
+  migration details.
+
 ### Added
 
 - Provider API compatibility guardrail: `api-compatibility` compares the

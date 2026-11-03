@@ -298,12 +298,35 @@ for users who need the complete provenance chain.
 
 ### OSCAL
 
-Evidence source fields are not currently included in complyctl's
-OSCAL assessment-results output. The `go-gemara` library's OSCAL
-converter does map evidence source to OSCAL properties, but
-complyctl's `ToOSCAL()` function builds findings directly from
-assessment logs without using this converter. This is tracked in
-[go-gemara#127](https://github.com/gemaraproj/go-gemara/issues/127).
+OSCAL assessment-results reports preserve evidence on assessment
+observations. Each control evaluation produces one finding, and each
+assessment log produces one observation. The finding's
+`related-observations` entries identify the observations created for
+that control.
+
+Each observation records its requirement and control IDs as Gemara
+properties. Evidence is emitted in the observation's
+`relevant-evidence` entries. Those entries retain the evidence
+description, map available source identifiers and locations to
+properties, and link to a matching mapping reference when one exists.
+
+#### Migrating requirement-level finding parsers
+
+This report structure is a breaking change for consumers that treat an
+OSCAL finding as a requirement-level result. Update those consumers to:
+
+1. Treat `results[].findings[]` as control-level findings. The finding
+   target ID identifies the control, not an individual requirement.
+2. Follow each finding's `related-observations[].observation-uuid` to
+   the matching item in `results[].observations[]`.
+3. Read the observation property named `requirement-id` to identify the
+   requirement and the `result` property to identify its result.
+4. Read `relevant-evidence` from that observation instead of expecting
+   evidence on the finding.
+
+Do not derive requirement counts from finding counts. A control with
+multiple assessment logs has one finding and one linked observation per
+assessment log.
 
 ### SARIF
 

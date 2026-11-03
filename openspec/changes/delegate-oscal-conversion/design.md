@@ -58,9 +58,11 @@ tailoring-specific remarks. Tests will assert the pinned converter's observable
 result status and reason values rather than encode a second mapping table.
 
 The prior requirement-level finding structure changes to a control-level
-finding with linked observations. This is an intentional compatibility change
-required to represent evidence correctly and to avoid parallel conversion
-models.
+finding with linked observations. This is an intentional breaking report
+contract change required to represent evidence correctly and to avoid parallel
+conversion models. The release notes and OSCAL output documentation MUST tell
+consumers to update parsers that depend on requirement-level finding counts or
+relationships before adopting this version.
 
 ### Test the serialized report contract
 
@@ -79,13 +81,16 @@ contract instead.
   spec, update assertions to the upstream contract, and retain schema checks.
 - [A future dependency upgrade changes OSCAL output] -> Keep focused wrapper
   tests for evidence, links, report delivery, and expected result semantics.
-- [Nil or incomplete evaluation data changes behavior] -> Retain and run
-  package tests against representative logs before merging.
+- [Nil or incomplete evaluation data changes behavior] -> `ToOSCAL` MUST
+  return the converter error and MUST NOT write a partial report. Add a
+  focused regression test for that delivery contract.
 
 ## Migration Plan
 
 1. Replace the local model construction with the upstream conversion call.
 2. Update OSCAL tests to validate the new serialized structure and evidence.
 3. Run formatting, targeted tests, and the CI-equivalent unit test command.
-4. Roll back by restoring the prior local converter if a downstream consumer
+4. Add a `CHANGELOG.md` breaking-change entry and update `docs/EVIDENCE.md`
+   with the control-level finding and observation-link migration guidance.
+5. Roll back by restoring the prior local converter if a downstream consumer
    cannot accept the documented output structure change.

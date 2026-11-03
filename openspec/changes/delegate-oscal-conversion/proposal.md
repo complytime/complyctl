@@ -24,14 +24,12 @@ complyctl.
 
 ## Capabilities
 
-### New Capabilities
-
-- `oscal-assessment-results`: Generate valid OSCAL assessment-results reports
-  from evaluation logs, including evidence and finding-to-observation links.
-
 ### Modified Capabilities
 
-None.
+- `oscal-assessment-results`: Modify the existing OSCAL export required by
+  `specs/001-gemara-native-workflow/spec.md` FR-014 to delegate model
+  conversion to go-gemara while preserving report delivery and adding evidence
+  and finding-to-observation links.
 
 ## Impact
 
