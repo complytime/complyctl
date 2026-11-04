@@ -22,6 +22,9 @@ func ToOSCAL(log *gemara.EvaluationLog, outDir string) (string, error) {
 	if log.Metadata.Id == "" {
 		return "", fmt.Errorf("convert EvaluationLog to OSCAL assessment results: evaluation log policy ID is required")
 	}
+	if len(log.Evaluations) == 0 {
+		return "", fmt.Errorf("convert EvaluationLog to OSCAL assessment results: evaluation log has no evaluations")
+	}
 	policyID := log.Metadata.Id
 
 	assessmentResults, err := gemaraconv.EvaluationLogToOSCALAssessmentResults(

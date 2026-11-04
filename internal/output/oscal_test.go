@@ -266,6 +266,20 @@ func TestToOSCAL_NilOrIncompleteLogReturnsErrorWithoutWritingReport(t *testing.T
 	}
 }
 
+func TestToOSCAL_ZeroEvaluationsReturnsErrorWithoutWritingReport(t *testing.T) {
+	outDir := t.TempDir()
+	eval := output.NewEvaluator("review-policy", "review-target", nil, nil, nil, nil)
+	eval.AddTarget(nil)
+
+	path, err := output.ToOSCAL(eval.GemaraLog(), outDir)
+
+	require.ErrorContains(t, err, "evaluation log has no evaluations")
+	assert.Empty(t, path)
+	entries, readErr := os.ReadDir(outDir)
+	require.NoError(t, readErr)
+	assert.Empty(t, entries)
+}
+
 func TestToOSCAL_NotApplicableUsesGemaraConverterStatus(t *testing.T) {
 	outDir := t.TempDir()
 	log := mockGemaraEvalLog()
