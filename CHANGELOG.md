@@ -10,7 +10,10 @@
   follow `related-observations` from each control-level finding and read the
   `requirement-id` property on each observation. Evidence now appears in the
   observation's `relevant-evidence` entries. See `docs/EVIDENCE.md` for the
-  migration details.
+  migration details. `NotApplicable` now uses `not-satisfied` with the
+  `not-applicable` reason, and `NotRun` uses `not-run` rather than `unknown`.
+  Consumers MUST NOT treat every `not-satisfied` finding as a failed
+  assessment.
   Spec: `openspec/changes/delegate-oscal-conversion/specs/oscal-assessment-results/spec.md`
 
 ### Added

@@ -328,6 +328,14 @@ Do not derive requirement counts from finding counts. A control with
 multiple assessment logs has one finding and one linked observation per
 assessment log.
 
+#### Interpreting non-passing status
+
+Do not treat every OSCAL `not-satisfied` finding as a failed assessment.
+`NotApplicable` uses `not-satisfied` with the `not-applicable` reason, and
+`NotRun` uses `not-satisfied` with the `not-run` reason rather than `unknown`.
+Read each linked observation's `result` property and the finding status reason
+to distinguish failed, not-applicable, and not-run assessments.
+
 ### SARIF
 
 Evidence source fields are not currently included in complyctl's

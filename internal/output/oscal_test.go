@@ -171,6 +171,29 @@ func TestToOSCAL_EvidencePreservesSourceProvenance(t *testing.T) {
 	})
 }
 
+func TestToOSCAL_InvalidEvidenceCoordinateReturnsErrorWithoutWritingReport(t *testing.T) {
+	outDir := t.TempDir()
+	log := mockGemaraEvalLog()
+	log.Evaluations = log.Evaluations[:1]
+	log.Evaluations[0].AssessmentLogs[0].Evidence = []gemara.Evidence{{
+		Id:          "evidence-1",
+		Type:        gemara.EvidenceType("command-output"),
+		CollectedAt: gemara.Datetime("2026-01-01T00:00:00Z"),
+		Description: "The scanner found the required configuration.",
+		Source: gemara.EvidenceMapping{
+			Coordinate: " $.configuration.required ",
+		},
+	}}
+
+	path, err := output.ToOSCAL(log, outDir)
+
+	require.ErrorContains(t, err, "validate OSCAL assessment results")
+	assert.Empty(t, path)
+	entries, readErr := os.ReadDir(outDir)
+	require.NoError(t, readErr)
+	assert.Empty(t, entries)
+}
+
 func TestToOSCAL_ControlFindingLinksEveryAssessmentObservation(t *testing.T) {
 	outDir := t.TempDir()
 	log := mockGemaraEvalLog()

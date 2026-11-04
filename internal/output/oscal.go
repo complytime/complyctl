@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	oscalValidation "github.com/defenseunicorns/go-oscal/src/pkg/validation"
+
 	"github.com/gemaraproj/go-gemara"
 	"github.com/gemaraproj/go-gemara/gemaraconv"
 
@@ -46,6 +48,13 @@ func ToOSCAL(log *gemara.EvaluationLog, outDir string) (string, error) {
 	}
 	doc := oscalTypes.OscalModels{
 		AssessmentResults: &assessmentResults,
+	}
+	validator, err := oscalValidation.NewValidatorDesiredVersion(doc, oscalTypes.Version)
+	if err != nil {
+		return "", fmt.Errorf("create OSCAL schema validator: %w", err)
+	}
+	if err := validator.Validate(); err != nil {
+		return "", fmt.Errorf("validate OSCAL assessment results: %w", err)
 	}
 
 	data, err := json.MarshalIndent(doc, "", "  ")
