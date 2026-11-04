@@ -249,6 +249,14 @@ func TestToOSCAL_NilOrIncompleteLogReturnsErrorWithoutWritingReport(t *testing.T
 			name: "missing policy ID",
 			log:  &gemara.EvaluationLog{},
 		},
+		{
+			name: "nil evaluation",
+			log: func() *gemara.EvaluationLog {
+				log := mockGemaraEvalLog()
+				log.Evaluations = []*gemara.ControlEvaluation{nil}
+				return log
+			}(),
+		},
 	}
 
 	for _, tt := range tests {
