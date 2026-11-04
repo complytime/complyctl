@@ -36,7 +36,7 @@ complyctl.
 - Affects `internal/output/oscal.go` and `internal/output/oscal_test.go`.
 - Retains the public `output.ToOSCAL` function signature and report filename
   behavior.
-- Uses the already pinned `github.com/gemaraproj/go-gemara` dependency; no
-  dependency update is required.
+- Updates `github.com/gemaraproj/go-gemara` to the revision that emits
+  OSCAL-token-valid result status reasons.
 - Changes the OSCAL document structure from requirement-level findings to
   control-level findings with associated assessment observations.

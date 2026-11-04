@@ -294,7 +294,7 @@ func TestToOSCAL_NotApplicableUsesGemaraConverterStatus(t *testing.T) {
 
 	assert.Equal(t, "ctrl-2", findings[1].Target.TargetId)
 	assert.Equal(t, "not-satisfied", findings[1].Target.Status.State)
-	assert.Equal(t, "Not Applicable", findings[1].Target.Status.Reason)
+	assert.Equal(t, "not-applicable", findings[1].Target.Status.Reason)
 	assert.Empty(t, findings[1].Remarks)
 	assert.Equal(t, "tailored", findings[1].Description)
 	assert.Equal(t, "tailored", observations[1].Description)
@@ -332,10 +332,10 @@ func TestToOSCAL_AllResultMappings(t *testing.T) {
 	}{
 		{"passed", gemara.Passed, "satisfied", ""},
 		{"failed", gemara.Failed, "not-satisfied", ""},
-		{"not applicable", gemara.NotApplicable, "not-satisfied", "Not Applicable"},
-		{"unknown", gemara.Unknown, "not-satisfied", "Unknown"},
-		{"not run", gemara.NotRun, "not-satisfied", "Not Run"},
-		{"needs review", gemara.NeedsReview, "not-satisfied", "Needs Review"},
+		{"not applicable", gemara.NotApplicable, "not-satisfied", "not-applicable"},
+		{"unknown", gemara.Unknown, "not-satisfied", "unknown"},
+		{"not run", gemara.NotRun, "not-satisfied", "not-run"},
+		{"needs review", gemara.NeedsReview, "not-satisfied", "needs-review"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -346,6 +346,7 @@ func TestToOSCAL_AllResultMappings(t *testing.T) {
 					GemaraVersion: gemara.SchemaVersion,
 					Author:        gemara.Actor{Id: "test", Name: "test", Type: gemara.Software},
 				},
+				Target: gemara.Resource{Id: "test-target", Name: "test-target", Type: gemara.Software},
 				Evaluations: []*gemara.ControlEvaluation{{
 					Name:    "ctrl-1",
 					Result:  tt.result,
@@ -375,6 +376,7 @@ func TestToOSCAL_AllResultMappings(t *testing.T) {
 
 			assert.Equal(t, tt.expectedState, findings[0].Target.Status.State, "state mismatch")
 			assert.Equal(t, tt.expectedReason, findings[0].Target.Status.Reason, "reason mismatch")
+			assertValidOSCALSchema(t, doc)
 		})
 	}
 }
