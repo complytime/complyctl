@@ -8,10 +8,10 @@ evaluation evidence and link each finding to its underlying observations.
 ## ADDED Requirements
 
 ### Requirement: Evidence-preserving OSCAL assessment results
-The system MUST write a valid OSCAL 1.1.3 assessment-results document for an
-evaluation log. Each assessment that contains evidence MUST produce an
-observation with `relevant-evidence` entries that retain the evidence
-description and available source provenance.
+For a valid, complete evaluation log, the system MUST write a valid OSCAL
+1.1.3 assessment-results document. Each assessment that contains evidence
+MUST produce an observation with `relevant-evidence` entries that retain the
+evidence description and available source provenance.
 
 #### Scenario: Assessment contains evidence
 - **WHEN** an assessment log contains one or more evidence entries
@@ -24,6 +24,18 @@ description and available source provenance.
 - **THEN** the OSCAL report remains valid without `relevant-evidence` for
   that observation
 
+#### Scenario: Evidence produces invalid OSCAL
+- **WHEN** evidence in an otherwise complete evaluation log produces an
+  OSCAL-invalid document
+- **THEN** the system returns an error before creating an output directory or
+  writing a report
+
+#### Scenario: Evaluation log is empty or incomplete
+- **WHEN** an evaluation log has no evaluations or contains an incomplete
+  evaluation or assessment
+- **THEN** the system returns an error before creating an output directory or
+  writing a report
+
 ### Requirement: Findings relate to assessment observations
 The system MUST represent each control evaluation as an OSCAL finding and
 MUST link that finding to the observations produced for its assessment logs.
@@ -34,10 +46,11 @@ MUST link that finding to the observations produced for its assessment logs.
 - **AND** the finding links to every observation for that control
 
 ### Requirement: Stable report delivery
-The system MUST preserve the OSCAL report delivery contract: it MUST use the
-configured output directory, create it when absent, write the report with
-owner-only file permissions, and use a policy- and target-specific filename.
-The report MUST reference the policy-specific assessment plan.
+For a successful conversion, the system MUST preserve the OSCAL report
+delivery contract: it MUST use the configured output directory, create it
+when absent, write the report with owner-only file permissions, and use a
+policy- and target-specific filename. The report MUST reference the
+policy-specific assessment plan.
 
 #### Scenario: Separate scan targets
 - **WHEN** the system writes OSCAL reports for the same policy and two
