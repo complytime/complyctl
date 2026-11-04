@@ -29,6 +29,11 @@ func ToOSCAL(log *gemara.EvaluationLog, outDir string) (string, error) {
 		if evaluation == nil {
 			return "", fmt.Errorf("convert EvaluationLog to OSCAL assessment results: evaluation log contains an incomplete evaluation")
 		}
+		for _, assessment := range evaluation.AssessmentLogs {
+			if assessment == nil {
+				return "", fmt.Errorf("convert EvaluationLog to OSCAL assessment results: evaluation log contains an incomplete assessment")
+			}
+		}
 	}
 	policyID := log.Metadata.Id
 

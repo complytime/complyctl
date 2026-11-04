@@ -257,6 +257,14 @@ func TestToOSCAL_NilOrIncompleteLogReturnsErrorWithoutWritingReport(t *testing.T
 				return log
 			}(),
 		},
+		{
+			name: "nil assessment",
+			log: func() *gemara.EvaluationLog {
+				log := mockGemaraEvalLog()
+				log.Evaluations[0].AssessmentLogs = []*gemara.AssessmentLog{nil}
+				return log
+			}(),
+		},
 	}
 
 	for _, tt := range tests {
