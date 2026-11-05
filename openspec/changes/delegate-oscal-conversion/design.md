@@ -24,7 +24,8 @@ specification for the required behavior.
 
 **Non-Goals:**
 
-- Upgrade go-gemara or alter its conversion behavior.
+- Upgrade go-gemara beyond the version that introduces the required converter
+  or alter its conversion behavior.
 - Change the public `output.ToOSCAL` function signature or CLI flags.
 - Add OSCAL catalog or profile generation.
 

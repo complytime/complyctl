@@ -174,7 +174,7 @@ func TestToOSCAL_EvidencePreservesSourceProvenance(t *testing.T) {
 }
 
 func TestToOSCAL_InvalidEvidenceCoordinateReturnsErrorWithoutWritingReport(t *testing.T) {
-	outDir := t.TempDir()
+	outDir := filepath.Join(t.TempDir(), "reports")
 	log := mockGemaraEvalLog()
 	log.Evaluations = log.Evaluations[:1]
 	log.Evaluations[0].AssessmentLogs[0].Evidence = []gemara.Evidence{{
@@ -191,9 +191,8 @@ func TestToOSCAL_InvalidEvidenceCoordinateReturnsErrorWithoutWritingReport(t *te
 
 	require.ErrorContains(t, err, "validate OSCAL assessment results")
 	assert.Empty(t, path)
-	entries, readErr := os.ReadDir(outDir)
-	require.NoError(t, readErr)
-	assert.Empty(t, entries)
+	_, statErr := os.Stat(outDir)
+	assert.True(t, os.IsNotExist(statErr))
 }
 
 func TestToOSCAL_ControlFindingLinksEveryAssessmentObservation(t *testing.T) {
@@ -341,21 +340,20 @@ func TestToOSCAL_NilOrIncompleteLogReturnsErrorWithoutWritingReport(t *testing.T
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			outDir := t.TempDir()
+			outDir := filepath.Join(t.TempDir(), "reports")
 
 			path, err := output.ToOSCAL(tt.log, outDir)
 
 			require.Error(t, err)
 			assert.Empty(t, path)
-			entries, readErr := os.ReadDir(outDir)
-			require.NoError(t, readErr)
-			assert.Empty(t, entries)
+			_, statErr := os.Stat(outDir)
+			assert.True(t, os.IsNotExist(statErr))
 		})
 	}
 }
 
 func TestToOSCAL_ZeroEvaluationsReturnsErrorWithoutWritingReport(t *testing.T) {
-	outDir := t.TempDir()
+	outDir := filepath.Join(t.TempDir(), "reports")
 	eval := output.NewEvaluator("review-policy", "review-target", nil, nil, nil, nil)
 	eval.AddTarget(nil)
 
@@ -363,9 +361,8 @@ func TestToOSCAL_ZeroEvaluationsReturnsErrorWithoutWritingReport(t *testing.T) {
 
 	require.ErrorContains(t, err, "evaluation log has no evaluations")
 	assert.Empty(t, path)
-	entries, readErr := os.ReadDir(outDir)
-	require.NoError(t, readErr)
-	assert.Empty(t, entries)
+	_, statErr := os.Stat(outDir)
+	assert.True(t, os.IsNotExist(statErr))
 }
 
 func TestToOSCAL_NotApplicableUsesGemaraConverterStatus(t *testing.T) {
