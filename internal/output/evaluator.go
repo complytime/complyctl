@@ -101,7 +101,7 @@ func (e *Evaluator) AddTarget(assessments []provider.AssessmentLog) {
 		ce.AssessmentLogs = append(ce.AssessmentLogs, gemaraAssessment)
 		e.controlStepNames[controlID] = append(e.controlStepNames[controlID], stepNames)
 		aggregateResult := gemara.UpdateAggregateResult(ce.Result, gemaraAssessment.Result)
-		if aggregateResult != ce.Result {
+		if aggregateResult != ce.Result || ce.Message == "" {
 			ce.Result = aggregateResult
 			ce.Message = gemaraAssessment.Message
 		}
@@ -133,6 +133,7 @@ func (e *Evaluator) GemaraLog() *gemara.EvaluationLog {
 		Metadata: gemara.Metadata{
 			Id:                e.policyID,
 			Type:              gemara.EvaluationLogArtifact,
+			Version:           oscalReportVersion,
 			GemaraVersion:     gemara.SchemaVersion,
 			Description:       "Compliance scan evaluation log",
 			MappingReferences: e.mappingReferences,

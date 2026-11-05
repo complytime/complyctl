@@ -16,6 +16,8 @@ import (
 	oscalTypes "github.com/defenseunicorns/go-oscal/src/types/oscal-1-1-3"
 )
 
+const oscalReportVersion = "1.0.0"
+
 // ToOSCAL converts a gemara.EvaluationLog to OSCAL assessment-results format.
 func ToOSCAL(log *gemara.EvaluationLog, outDir string) (string, error) {
 	if log == nil {
@@ -38,9 +40,13 @@ func ToOSCAL(log *gemara.EvaluationLog, outDir string) (string, error) {
 		}
 	}
 	policyID := log.Metadata.Id
+	evaluationLog := *log
+	if evaluationLog.Metadata.Version == "" {
+		evaluationLog.Metadata.Version = oscalReportVersion
+	}
 
 	assessmentResults, err := gemaraconv.EvaluationLogToOSCALAssessmentResults(
-		*log,
+		evaluationLog,
 		gemaraconv.WithImportApHref(fmt.Sprintf("file://assessment-plan-%s.json", policyID)),
 	)
 	if err != nil {
