@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/complytime/complyctl/internal/output"
+	"github.com/complytime/complyctl/pkg/provider"
 )
 
 func mockGemaraEvalLog() *gemara.EvaluationLog {
@@ -258,6 +259,53 @@ func TestToOSCAL_ControlFindingLinksEveryAssessmentObservation(t *testing.T) {
 		assert.Equal(t, expectedObservationUUIDs, actualObservationUUIDs,
 			"finding must link exclusively to its control's assessment observations")
 	}
+}
+
+func TestToOSCAL_FailedControlKeepsFailureDescription(t *testing.T) {
+	outDir := t.TempDir()
+	eval := output.NewEvaluator(
+		"test-policy",
+		"web-server",
+		map[string]string{"req-1": "ctrl-1", "req-2": "ctrl-1"},
+		nil,
+		nil,
+		nil,
+	)
+	eval.AddTarget([]provider.AssessmentLog{
+		{
+			RequirementID: "req-1",
+			Steps: []provider.Step{{
+				Result:  provider.ResultFailed,
+				Message: "Encryption is disabled",
+			}},
+		},
+		{
+			RequirementID: "req-2",
+			Steps: []provider.Step{{
+				Result:  provider.ResultPassed,
+				Message: "TLS is enabled",
+			}},
+		},
+	})
+
+	log := eval.GemaraLog()
+	require.Len(t, log.Evaluations, 1)
+	assert.Equal(t, gemara.Failed, log.Evaluations[0].Result)
+	assert.Equal(t, "Encryption is disabled", log.Evaluations[0].Message)
+
+	path, err := output.ToOSCAL(log, outDir)
+	require.NoError(t, err)
+
+	doc := readOSCALDocument(t, path)
+	assertValidOSCALSchema(t, doc)
+	require.Len(t, doc.AssessmentResults.Results, 1)
+	result := doc.AssessmentResults.Results[0]
+	require.NotNil(t, result.Findings)
+	require.Len(t, *result.Findings, 1)
+	assert.Equal(t, "not-satisfied", (*result.Findings)[0].Target.Status.State)
+	assert.Equal(t, "Encryption is disabled", (*result.Findings)[0].Description)
+	require.NotNil(t, result.Observations)
+	assert.Len(t, *result.Observations, 2)
 }
 
 func TestToOSCAL_NilOrIncompleteLogReturnsErrorWithoutWritingReport(t *testing.T) {
