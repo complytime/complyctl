@@ -39,9 +39,7 @@ func ToOSCAL(log *gemara.EvaluationLog, outDir string) (string, error) {
 	}
 	policyID := log.Metadata.Id
 	evaluationLog := *log
-	if evaluationLog.Metadata.Version == "" {
-		evaluationLog.Metadata.Version = oscalReportVersion
-	}
+	evaluationLog.Metadata.Version = oscalReportVersion
 
 	assessmentResults, err := gemaraconv.EvaluationLogToOSCALAssessmentResults(
 		evaluationLog,

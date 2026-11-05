@@ -101,8 +101,10 @@ func (e *Evaluator) AddTarget(assessments []provider.AssessmentLog) {
 		ce.AssessmentLogs = append(ce.AssessmentLogs, gemaraAssessment)
 		e.controlStepNames[controlID] = append(e.controlStepNames[controlID], stepNames)
 		aggregateResult := gemara.UpdateAggregateResult(ce.Result, gemaraAssessment.Result)
-		if aggregateResult != ce.Result || ce.Message == "" {
+		if aggregateResult != ce.Result {
 			ce.Result = aggregateResult
+			ce.Message = gemaraAssessment.Message
+		} else if ce.Message == "" && gemaraAssessment.Result == aggregateResult {
 			ce.Message = gemaraAssessment.Message
 		}
 	}

@@ -97,6 +97,19 @@ func TestToOSCAL_EvidenceFreeReportValidatesAgainstSchema(t *testing.T) {
 	assertValidOSCALSchema(t, doc)
 }
 
+func TestToOSCAL_UsesReportVersionWhenInputVersionIsSet(t *testing.T) {
+	log := mockGemaraEvalLog()
+	log.Evaluations = log.Evaluations[:1]
+	log.Metadata.Version = "1.0.0"
+
+	path, err := output.ToOSCAL(log, t.TempDir())
+	require.NoError(t, err)
+
+	doc := readOSCALDocument(t, path)
+	require.NotNil(t, doc.AssessmentResults)
+	assert.Equal(t, "2.0.0", doc.AssessmentResults.Metadata.Version)
+}
+
 func TestToOSCAL_EvidencePreservesSourceProvenance(t *testing.T) {
 	outDir := t.TempDir()
 	log := mockGemaraEvalLog()
@@ -277,10 +290,7 @@ func TestToOSCAL_FailedControlKeepsFailureDescription(t *testing.T) {
 	eval.AddTarget([]provider.AssessmentLog{
 		{
 			RequirementID: "req-1",
-			Steps: []provider.Step{{
-				Result:  provider.ResultFailed,
-				Message: "Encryption is disabled",
-			}},
+			Steps:         []provider.Step{{Result: provider.ResultFailed}},
 		},
 		{
 			RequirementID: "req-2",
@@ -294,7 +304,7 @@ func TestToOSCAL_FailedControlKeepsFailureDescription(t *testing.T) {
 	log := eval.GemaraLog()
 	require.Len(t, log.Evaluations, 1)
 	assert.Equal(t, gemara.Failed, log.Evaluations[0].Result)
-	assert.Equal(t, "Encryption is disabled", log.Evaluations[0].Message)
+	assert.Empty(t, log.Evaluations[0].Message)
 
 	path, err := output.ToOSCAL(log, outDir)
 	require.NoError(t, err)
@@ -306,7 +316,7 @@ func TestToOSCAL_FailedControlKeepsFailureDescription(t *testing.T) {
 	require.NotNil(t, result.Findings)
 	require.Len(t, *result.Findings, 1)
 	assert.Equal(t, "not-satisfied", (*result.Findings)[0].Target.Status.State)
-	assert.Equal(t, "Encryption is disabled", (*result.Findings)[0].Description)
+	assert.Equal(t, "Evaluation of control ctrl-1", (*result.Findings)[0].Description)
 	require.NotNil(t, result.Observations)
 	assert.Len(t, *result.Observations, 2)
 }
