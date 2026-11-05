@@ -315,6 +315,9 @@ properties, and link to a matching mapping reference when one exists.
 This report structure is a breaking change for consumers that treat an
 OSCAL finding as a requirement-level result. Update those consumers to:
 
+OSCAL reports using this structure have `metadata.version` `2.0.0`; consumers
+MUST select the control-level parser for that version.
+
 1. Treat `results[].findings[]` as control-level findings. The finding
    target ID identifies the control, not an individual requirement.
 2. Follow each finding's `related-observations[].observation-uuid` to

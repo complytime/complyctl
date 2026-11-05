@@ -14,7 +14,7 @@ import (
 	"github.com/gemaraproj/go-gemara/gemaraconv"
 )
 
-const oscalReportVersion = "1.0.0"
+const oscalReportVersion = "2.0.0"
 
 // ToOSCAL converts a gemara.EvaluationLog to OSCAL assessment-results format.
 func ToOSCAL(log *gemara.EvaluationLog, outDir string) (string, error) {

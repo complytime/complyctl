@@ -13,7 +13,8 @@
   migration details. `NotApplicable` now uses `not-satisfied` with the
   `not-applicable` reason, and `NotRun` uses `not-run` rather than `unknown`.
   Consumers MUST NOT treat every `not-satisfied` finding as a failed
-  assessment.
+  assessment. The report `metadata.version` is now `2.0.0` so automated
+  consumers can select the control-level format.
   Spec: `openspec/changes/delegate-oscal-conversion/specs/oscal-assessment-results/spec.md`
 
 ### Added

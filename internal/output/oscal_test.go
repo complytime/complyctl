@@ -88,7 +88,7 @@ func TestToOSCAL_EvidenceFreeReportValidatesAgainstSchema(t *testing.T) {
 
 	require.NotNil(t, doc.AssessmentResults, "assessment-results must be present")
 	assert.Equal(t, oscalTypes.Version, doc.AssessmentResults.Metadata.OscalVersion)
-	assert.Equal(t, "1.0.0", doc.AssessmentResults.Metadata.Version)
+	assert.Equal(t, "2.0.0", doc.AssessmentResults.Metadata.Version)
 	assert.NotEmpty(t, doc.AssessmentResults.UUID)
 	assert.NotEmpty(t, doc.AssessmentResults.Results)
 
