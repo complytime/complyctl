@@ -133,7 +133,6 @@ func (e *Evaluator) GemaraLog() *gemara.EvaluationLog {
 		Metadata: gemara.Metadata{
 			Id:                e.policyID,
 			Type:              gemara.EvaluationLogArtifact,
-			Version:           oscalReportVersion,
 			GemaraVersion:     gemara.SchemaVersion,
 			Description:       "Compliance scan evaluation log",
 			MappingReferences: e.mappingReferences,
