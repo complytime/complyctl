@@ -9,11 +9,9 @@ import (
 	"path/filepath"
 
 	oscalValidation "github.com/defenseunicorns/go-oscal/src/pkg/validation"
-
+	oscalTypes "github.com/defenseunicorns/go-oscal/src/types/oscal-1-1-3"
 	"github.com/gemaraproj/go-gemara"
 	"github.com/gemaraproj/go-gemara/gemaraconv"
-
-	oscalTypes "github.com/defenseunicorns/go-oscal/src/types/oscal-1-1-3"
 )
 
 const oscalReportVersion = "1.0.0"

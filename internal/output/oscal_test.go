@@ -73,13 +73,16 @@ func mockGemaraEvalLog() *gemara.EvaluationLog {
 }
 
 func TestToOSCAL_EvidenceFreeReportValidatesAgainstSchema(t *testing.T) {
-	outDir := t.TempDir()
+	outDir := filepath.Join(t.TempDir(), "reports")
 	log := mockGemaraEvalLog()
 	log.Evaluations = log.Evaluations[:1]
 
 	path, err := output.ToOSCAL(log, outDir)
 	require.NoError(t, err)
 	assert.FileExists(t, path)
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 
 	doc := readOSCALDocument(t, path)
 
