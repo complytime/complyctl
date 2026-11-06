@@ -19,6 +19,9 @@
 
 ### Added
 
+- Maintainers can preview generated release notes for committed HEAD with
+  `make release-notes-preview` before selecting a tag or publishing. Spec:
+  `openspec/changes/release-notes-preview/`.
 - Provider API compatibility guardrail: `api-compatibility` compares the
   protobuf and exported Go contracts with the latest stable release in the
   current major version, failing closed on analysis errors. Default baseline
