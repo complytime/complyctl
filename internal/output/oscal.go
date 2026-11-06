@@ -7,75 +7,56 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
-	"github.com/gemaraproj/go-gemara"
-
-	oscalUUID "github.com/defenseunicorns/go-oscal/src/pkg/uuid"
+	oscalValidation "github.com/defenseunicorns/go-oscal/src/pkg/validation"
 	oscalTypes "github.com/defenseunicorns/go-oscal/src/types/oscal-1-1-3"
+	"github.com/gemaraproj/go-gemara"
+	"github.com/gemaraproj/go-gemara/gemaraconv"
 )
 
-// FIXME(jpower432): This would probably make more sense in go-gemara/gemaraconv
+const oscalReportVersion = "2.0.0"
 
 // ToOSCAL converts a gemara.EvaluationLog to OSCAL assessment-results format.
 func ToOSCAL(log *gemara.EvaluationLog, outDir string) (string, error) {
-	now := time.Now().UTC()
-	policyID := log.Metadata.Id
-
-	findings := make([]oscalTypes.Finding, 0)
-	for _, ce := range log.Evaluations {
-		for _, al := range ce.AssessmentLogs {
-			mapped := gemaraResultToOSCAL(al.Result)
-			remarks := al.Message
-			if mapped.Reason == "not-applicable" {
-				remarks = fmt.Sprintf("Skipped due to Tailoring: %s", al.Message)
+	if log == nil {
+		return "", fmt.Errorf("convert EvaluationLog to OSCAL assessment results: evaluation log is required")
+	}
+	if log.Metadata.Id == "" {
+		return "", fmt.Errorf("convert EvaluationLog to OSCAL assessment results: evaluation log policy ID is required")
+	}
+	if len(log.Evaluations) == 0 {
+		return "", fmt.Errorf("convert EvaluationLog to OSCAL assessment results: evaluation log has no evaluations")
+	}
+	for _, evaluation := range log.Evaluations {
+		if evaluation == nil {
+			return "", fmt.Errorf("convert EvaluationLog to OSCAL assessment results: evaluation log contains an incomplete evaluation")
+		}
+		for _, assessment := range evaluation.AssessmentLogs {
+			if assessment == nil {
+				return "", fmt.Errorf("convert EvaluationLog to OSCAL assessment results: evaluation log contains an incomplete assessment")
 			}
-			findings = append(findings, oscalTypes.Finding{
-				UUID:        newUUID(),
-				Title:       fmt.Sprintf("Assessment: %s", al.Requirement.EntryId),
-				Description: al.Message,
-				Target: oscalTypes.FindingTarget{
-					Type:     "objective-id",
-					TargetId: al.Requirement.EntryId,
-					Status: oscalTypes.ObjectiveStatus{
-						State:  mapped.State,
-						Reason: mapped.Reason,
-					},
-				},
-				Remarks: remarks,
-			})
 		}
 	}
+	policyID := log.Metadata.Id
+	evaluationLog := *log
+	evaluationLog.Metadata.Version = oscalReportVersion
 
-	result := oscalTypes.Result{
-		UUID:        newUUID(),
-		Title:       fmt.Sprintf("Policy: %s", policyID),
-		Description: fmt.Sprintf("Assessment results for policy %s", policyID),
-		Start:       now,
-		ReviewedControls: oscalTypes.ReviewedControls{
-			ControlSelections: []oscalTypes.AssessedControls{
-				{Description: "All controls assessed for policy " + policyID},
-			},
-		},
+	assessmentResults, err := gemaraconv.EvaluationLogToOSCALAssessmentResults(
+		evaluationLog,
+		gemaraconv.WithImportApHref(fmt.Sprintf("file://assessment-plan-%s.json", policyID)),
+	)
+	if err != nil {
+		return "", fmt.Errorf("convert EvaluationLog to OSCAL assessment results: %w", err)
 	}
-	if len(findings) > 0 {
-		result.Findings = &findings
-	}
-
 	doc := oscalTypes.OscalModels{
-		AssessmentResults: &oscalTypes.AssessmentResults{
-			UUID: newUUID(),
-			Metadata: oscalTypes.Metadata{
-				Title:        fmt.Sprintf("Compliance scan: %s", policyID),
-				LastModified: now,
-				Version:      "1.0.0",
-				OscalVersion: oscalTypes.Version,
-			},
-			ImportAp: oscalTypes.ImportAp{
-				Href: fmt.Sprintf("file://assessment-plan-%s.json", policyID),
-			},
-			Results: []oscalTypes.Result{result},
-		},
+		AssessmentResults: &assessmentResults,
+	}
+	validator, err := oscalValidation.NewValidatorDesiredVersion(doc, oscalTypes.Version)
+	if err != nil {
+		return "", fmt.Errorf("create OSCAL schema validator: %w", err)
+	}
+	if err := validator.Validate(); err != nil {
+		return "", fmt.Errorf("validate OSCAL assessment results: %w", err)
 	}
 
 	data, err := json.MarshalIndent(doc, "", "  ")
@@ -96,28 +77,4 @@ func ToOSCAL(log *gemara.EvaluationLog, outDir string) (string, error) {
 		return "", fmt.Errorf("failed to write OSCAL file: %w", err)
 	}
 	return path, nil
-}
-
-func newUUID() string {
-	return oscalUUID.NewUUID()
-}
-
-type oscalState struct {
-	State  string
-	Reason string
-}
-
-func gemaraResultToOSCAL(r gemara.Result) oscalState {
-	switch r {
-	case gemara.Passed:
-		return oscalState{State: "satisfied"}
-	case gemara.Failed:
-		return oscalState{State: "not-satisfied"}
-	case gemara.NotApplicable:
-		return oscalState{State: "satisfied", Reason: "not-applicable"}
-	case gemara.Unknown:
-		return oscalState{State: "not-satisfied", Reason: "unknown"}
-	default:
-		return oscalState{State: "not-satisfied", Reason: "unknown"}
-	}
 }

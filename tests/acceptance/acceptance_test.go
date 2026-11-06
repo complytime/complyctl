@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -158,8 +157,8 @@ func TestAcceptance_OCILifecycle(t *testing.T) {
 
 // TestAcceptance_FormatInterop validates that artifacts pushed by the oras CLI
 // are correctly consumed by complyctl's oras-go client. Verifies the OSCAL
-// assessment-results output contains correct control and requirement IDs
-// from the seeded policy.
+// assessment-results output contains the control-level finding and its
+// assessment observations from the seeded policy.
 func TestAcceptance_FormatInterop(t *testing.T) {
 	env := loadTestEnv(t)
 	workDir := t.TempDir()
@@ -180,32 +179,68 @@ func TestAcceptance_FormatInterop(t *testing.T) {
 	assertOutputFile(t, scanDir, "evaluation-log-", ".yaml")
 	oscalFile := assertOutputFile(t, scanDir, "assessment-results-", ".json")
 
-	findings := parseOSCALFindings(t, oscalFile)
+	result := parseOSCALResult(t, oscalFile)
+	findings, ok := result["findings"].([]interface{})
+	require.True(t, ok, "OSCAL result must contain findings")
 	require.NotEmpty(t, findings, "OSCAL output must contain findings")
+	observations, ok := result["observations"].([]interface{})
+	require.True(t, ok, "OSCAL result must contain observations")
 
-	// Verify the block-force-push requirement appears in findings
-	foundBlockForcePush := false
-	for _, finding := range findings {
+	observationsByUUID := make(map[string]map[string]interface{}, len(observations))
+	for _, rawObservation := range observations {
+		observation, ok := rawObservation.(map[string]interface{})
+		require.True(t, ok, "each observation must be an object")
+		observationUUID, ok := observation["uuid"].(string)
+		require.True(t, ok, "each observation must have a UUID")
+		observationsByUUID[observationUUID] = observation
+	}
+
+	// Verify the force-push-protection control appears in findings.
+	foundForcePushProtection := false
+	for _, rawFinding := range findings {
+		finding, ok := rawFinding.(map[string]interface{})
+		require.True(t, ok, "each finding must be an object")
 		target, ok := finding["target"].(map[string]interface{})
 		if !ok {
 			continue
 		}
 		targetID, _ := target["target-id"].(string)
-		if targetID == "block-force-push" {
-			foundBlockForcePush = true
+		if targetID == "force-push-protection" {
+			foundForcePushProtection = true
 
 			// Verify result state
 			status, ok := target["status"].(map[string]interface{})
 			require.True(t, ok, "finding target must have status")
 			assert.Equal(t, "satisfied", status["state"],
-				"block-force-push must be satisfied")
+				"force-push-protection must be satisfied")
 
-			// Verify finding title format
-			title, _ := finding["title"].(string)
-			assert.True(t, strings.Contains(title, "block-force-push"),
-				"finding title must reference block-force-push")
+			relatedObservations, ok := finding["related-observations"].([]interface{})
+			require.True(t, ok, "control finding must link to assessment observations")
+			assert.NotEmpty(t, relatedObservations)
+			for _, rawRelatedObservation := range relatedObservations {
+				relatedObservation, ok := rawRelatedObservation.(map[string]interface{})
+				require.True(t, ok, "each related observation must be an object")
+				observationUUID, ok := relatedObservation["observation-uuid"].(string)
+				require.True(t, ok, "each related observation must reference a UUID")
+
+				observation, found := observationsByUUID[observationUUID]
+				require.True(t, found, "related observation must exist in the result")
+				properties, ok := observation["props"].([]interface{})
+				require.True(t, ok, "related observation must include properties")
+
+				foundRequirementID := false
+				for _, rawProperty := range properties {
+					property, ok := rawProperty.(map[string]interface{})
+					require.True(t, ok, "each observation property must be an object")
+					if property["name"] == "requirement-id" && property["value"] == "block-force-push" {
+						foundRequirementID = true
+					}
+				}
+				assert.True(t, foundRequirementID,
+					"related observation must retain the block-force-push requirement ID")
+			}
 		}
 	}
-	assert.True(t, foundBlockForcePush,
-		"OSCAL findings must contain block-force-push requirement")
+	assert.True(t, foundForcePushProtection,
+		"OSCAL findings must contain force-push-protection control")
 }

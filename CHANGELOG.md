@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- **BREAKING**: OSCAL assessment-results reports now represent each control
+  evaluation as one finding and its assessment logs as linked observations.
+  Consumers that count or associate findings by requirement ID MUST instead
+  follow `related-observations` from each control-level finding and read the
+  `requirement-id` property on each observation. Evidence now appears in the
+  observation's `relevant-evidence` entries. See `docs/EVIDENCE.md` for the
+  migration details. `NotApplicable` now uses `not-satisfied` with the
+  `not-applicable` reason, and `NotRun` uses `not-run` rather than `unknown`.
+  Consumers MUST NOT treat every `not-satisfied` finding as a failed
+  assessment. The report `metadata.version` is now `2.0.0` so automated
+  consumers can select the control-level format.
+  Spec: `openspec/changes/delegate-oscal-conversion/specs/oscal-assessment-results/spec.md`
+
 ### Added
 
 - Provider API compatibility guardrail: `api-compatibility` compares the

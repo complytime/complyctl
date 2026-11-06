@@ -106,10 +106,9 @@ func assertOutputFile(t *testing.T, dir, prefix, suffix string) string {
 	return ""
 }
 
-// parseOSCALFindings reads an OSCAL assessment-results JSON file and
-// returns the findings array from the first result. Fails the test if
-// the structure is invalid.
-func parseOSCALFindings(t *testing.T, path string) []map[string]interface{} {
+// parseOSCALResult reads an OSCAL assessment-results JSON file and returns
+// its first result. Fails the test if the structure is invalid.
+func parseOSCALResult(t *testing.T, path string) map[string]interface{} {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -127,14 +126,5 @@ func parseOSCALFindings(t *testing.T, path string) []map[string]interface{} {
 	result0, ok := results[0].(map[string]interface{})
 	require.True(t, ok, "first result must be an object")
 
-	findingsRaw, ok := result0["findings"].([]interface{})
-	require.True(t, ok, "first result must have findings")
-
-	findings := make([]map[string]interface{}, 0, len(findingsRaw))
-	for _, f := range findingsRaw {
-		fm, ok := f.(map[string]interface{})
-		require.True(t, ok, "each finding must be an object")
-		findings = append(findings, fm)
-	}
-	return findings
+	return result0
 }

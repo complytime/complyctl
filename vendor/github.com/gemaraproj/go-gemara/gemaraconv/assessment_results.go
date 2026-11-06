@@ -361,17 +361,27 @@ func collectControlIds(log gemara.EvaluationLog) []string {
 	return ids
 }
 
+// mapResultToObjectiveStatus maps a Gemara result to an OSCAL objective status.
+// OSCAL types the reason as a token, so Result.String() ("Not Run") cannot be
+// used. OSCAL suggests pass, fail and other but accepts any token, so results
+// other than Passed and Failed get a descriptive reason. A value outside the
+// Result enum cannot come from a valid EvaluationLog, so it is "invalid".
 func mapResultToObjectiveStatus(r gemara.Result) oscal.ObjectiveStatus {
 	switch r {
 	case gemara.Passed:
 		return oscal.ObjectiveStatus{State: "satisfied"}
 	case gemara.Failed:
 		return oscal.ObjectiveStatus{State: "not-satisfied"}
+	case gemara.NotRun:
+		return oscal.ObjectiveStatus{State: "not-satisfied", Reason: "not-run"}
+	case gemara.NeedsReview:
+		return oscal.ObjectiveStatus{State: "not-satisfied", Reason: "needs-review"}
+	case gemara.NotApplicable:
+		return oscal.ObjectiveStatus{State: "not-satisfied", Reason: "not-applicable"}
+	case gemara.Unknown:
+		return oscal.ObjectiveStatus{State: "not-satisfied", Reason: "unknown"}
 	default:
-		return oscal.ObjectiveStatus{
-			State:  "not-satisfied",
-			Reason: r.String(),
-		}
+		return oscal.ObjectiveStatus{State: "not-satisfied", Reason: "invalid"}
 	}
 }
 

@@ -131,6 +131,8 @@ github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/gemaraproj/go-gemara v0.12.0 h1:H3tmwx3tcNrq8VrUCDh3j1o8WJI82VD6CIgNwRHNKSA=
 github.com/gemaraproj/go-gemara v0.12.0/go.mod h1:f2Z92OdIEsxvt6LYud/qxJ0gSRGsZUD6pv+epM2Iytw=
+github.com/gemaraproj/go-gemara v0.12.1-0.20261029224520-378b2c4112af h1:C5Vd602uRCAKUpTlNv8H/ngPCCWSK9bkTReHrZl9Eq4=
+github.com/gemaraproj/go-gemara v0.12.1-0.20261029224520-378b2c4112af/go.mod h1:t7GPzj5EEHw+GqjmN3Xe+OYlyNepN5QLRa/VSEQ1yRA=
 github.com/go-chi/chi/v5 v5.3.0 h1:halUjDxhshgXHMrao5bB8eNBXo/rnzwr8m5m36glehM=
 github.com/go-chi/chi/v5 v5.3.0/go.mod h1:R+tYY2hNuVUUjxoPtqUdgBqevM9s9njzkTLutVsOCto=
 github.com/go-jose/go-jose/v4 v4.1.4 h1:moDMcTHmvE6Groj34emNPLs/qtYXRVcd6S7NHbHz3kA=

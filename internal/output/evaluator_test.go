@@ -173,6 +173,19 @@ func TestGemaraLog_PassingAssessmentKeepsProviderMessage(t *testing.T) {
 	assert.Equal(t, "1 of 1 targets passed", log.Evaluations[0].AssessmentLogs[0].Message)
 }
 
+func TestGemaraLog_NotRunAssessmentKeepsProviderMessage(t *testing.T) {
+	eval := output.NewEvaluator("pol", "tgt", nil, nil, nil, nil)
+	eval.AddTarget([]provider.AssessmentLog{{
+		RequirementID: "REQ-1",
+		Message:       "Provider did not run the check",
+	}})
+
+	log := eval.GemaraLog()
+	require.Len(t, log.Evaluations, 1)
+	assert.Equal(t, gemara.NotRun, log.Evaluations[0].Result)
+	assert.Equal(t, "Provider did not run the check", log.Evaluations[0].Message)
+}
+
 func TestGemaraLog_PlanFieldPopulated(t *testing.T) {
 	reqToPlan := map[string]string{"req-1": "plan-1"}
 	eval := output.NewEvaluator("pol", "tgt", nil, reqToPlan, nil, nil)
