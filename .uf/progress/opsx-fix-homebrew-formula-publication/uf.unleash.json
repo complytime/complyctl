@@ -1,0 +1,43 @@
+{
+  "command": "uf.unleash",
+  "branch": "opsx-fix-homebrew-formula-publication",
+  "key": "opsx-fix-homebrew-formula-publication",
+  "current_step": "demo",
+  "completed_steps": [
+    "startup-cleanup",
+    "branch-safety-gate",
+    "resumability-detection",
+    "implement-phase-1",
+    "implement-phase-2",
+    "implement",
+    "demo"
+  ],
+  "data": {
+    "workflow_tier": "openspec",
+    "feature_dir": "openspec/changes/fix-homebrew-formula-publication/",
+    "resume_from": "spec_review",
+    "all_complete": false,
+    "phases": 2,
+    "tasks_completed": 3,
+    "change_name": "fix-homebrew-formula-publication"
+  },
+  "created_at": "2026-11-06T10:31:27.892Z",
+  "updated_at": "2026-11-06T14:07:04.139Z",
+  "phases": {
+    "1": {
+      "verdict": "green",
+      "inventory": [],
+      "recorded_at": "2026-11-06T13:34:26.152Z"
+    },
+    "2": {
+      "verdict": "green",
+      "inventory": [
+        {
+          "name": "make test-homebrew",
+          "classification": "environmental"
+        }
+      ],
+      "recorded_at": "2026-11-06T13:58:14.259Z"
+    }
+  }
+}
