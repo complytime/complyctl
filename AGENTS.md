@@ -67,6 +67,9 @@ make test-homebrew
 make test-homebrew-publish
 # → bash ./tests/homebrew_publish_test.sh
 
+# Offline release notes preview regression tests (requires Python 3.9+ and PyYAML)
+make test-release-notes-preview
+
 # Verification acceptance tests (requires Sigstore infrastructure)
 make test-acceptance-verify
 # → compose up --profile verification (zot + Sigstore + sign-seed + verify-sut)
@@ -86,6 +89,10 @@ make test-api-compatibility   # compatibility regression suites only
 
 See [contributor guidance](docs/CONTRIBUTING.md#provider-api-compatibility)
 for tool versions, baseline selection, and analysis limits.
+
+For a local release notes preview, run `make release-notes-preview`.
+See [release process](docs/RELEASE_PROCESS.md#previewing-release-notes)
+for prerequisites and committed-candidate limits.
 
 ### Lint & Format
 
