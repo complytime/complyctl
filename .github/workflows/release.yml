@@ -184,7 +184,7 @@ jobs:
                   git commit -m "complyctl ${VERSION}" || { echo "No changes to commit"; exit 0; }
 
                   GH_TOKEN="${TAP_TOKEN}" gh auth setup-git
-                  git push origin "${BRANCH}"
+                  GH_TOKEN="${TAP_TOKEN}" git push origin "${BRANCH}"
                   PR_URL=$(GH_TOKEN="${TAP_TOKEN}" gh pr create \
                       --repo complytime/homebrew-tap \
                       --title "complyctl ${VERSION}" \
