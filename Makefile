@@ -90,6 +90,10 @@ test-homebrew-formula-publication: ## verify formula publication credential scop
 	bash ./tests/homebrew_formula_publication_test.sh
 .PHONY: test-homebrew-formula-publication
 
+test-homebrew-publish: ## test Homebrew publishing offline (requires bash, python3, git, gh)
+	bash ./tests/homebrew_publish_test.sh
+.PHONY: test-homebrew-publish
+
 ACCEPTANCE_COMPOSE = $(COMPOSE) -f tests/acceptance/compose.yaml --profile lifecycle
 
 test-acceptance: build build-test-provider build-acceptance-test ## run container-based acceptance tests (requires podman-compose or docker compose)

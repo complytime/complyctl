@@ -21,22 +21,63 @@ The `homebrew` job in the release workflow opens a PR with `Formula/complyctl.rb
 - The GitHub App (secrets: `APP_ID_HOMEBREW_FORMULA_PUBLISHER`, `PRIVATE_KEY_APP_HOMEBREW_FORMULA_PUBLISHER`) must have `Contents:write` and `Pull requests:write` permissions on `complytime/homebrew-tap`
 - If the App installation is scoped to specific repos, `homebrew-tap` must be included
 
+**Authentication:** The publishing step exports the generated App token as
+step-scoped `GH_TOKEN`. Both GitHub CLI API commands and the credential helper
+spawned by `git push` must inherit it. A token assignment on an earlier `gh`
+command does not reach a later Git process. `gh auth setup-git` configures the
+helper; it does not persist an environment-supplied token. Keep credentials out
+of remote URLs, Git configuration, and logs. No additional secret or broader
+App permission is needed.
+
 **Failure modes:**
 - Tarball download failure (HTTP != 200) -- the step exits with an error
 - SHA256 length mismatch -- the step exits with an error
 - GitHub App token generation failure -- the step fails visibly
+- Missing publishing credential or failed push -- the step fails without
+  opening a PR or reporting PR creation success
 - No changes to commit (re-run after PR was merged) -- exits 0 silently, which is safe
 - PR already exists for this version (re-run before PR was merged) -- exits 0 with a notice
 
-**Re-runs:** Safe. If a PR for this version is already open, the job skips with a notice. If the PR was already merged and the formula matches main, `git commit` exits with "No changes to commit" and the job succeeds.
+**Re-runs:** An existing open formula PR produces a successful no-op with a
+notice. If the PR was already merged and the formula matches main, `git commit`
+exits with "No changes to commit" and the job succeeds. However, retrying an old
+failed Actions run uses its original workflow revision: it does not pick up a
+fix merged afterward. Future releases dispatched from a revision containing
+the fix use the corrected environment.
 
-**Post-release step:** After the release workflow completes, merge the formula PR in the [homebrew-tap](https://github.com/complytime/homebrew-tap/pulls) repository. If the PR has merge conflicts, delete the feature branch and re-run the release workflow to regenerate it. If the PR receives review feedback, address it directly in the `homebrew-tap` repository.
+**Post-release step:** After the release workflow completes, merge the formula
+PR in the [homebrew-tap](https://github.com/complytime/homebrew-tap/pulls)
+repository. Resolve conflicts and review feedback directly on the tap feature
+branch. Do not rerun the full release to repair only its formula publication.
 
-**Manual recovery:** If the automation fails, manually create the Formula PR:
-1. Download the source tarball: `curl -sL -o source.tar.gz https://github.com/complytime/complyctl/archive/refs/tags/vX.Y.Z.tar.gz`
-2. Compute SHA256: `sha256sum source.tar.gz`
-3. Update `Formula/complyctl.rb` in the `homebrew-tap` repo with the new `url` and `sha256`
-4. Open a PR and merge
+#### Recover an already-published release
+
+Recover formula publication through a tap PR, without recreating the release.
+The v1.1.0 and v1.2.0 runs failed because their Git credential helper could not
+inherit the App token. Retrying those old runs will not load the corrected
+workflow. For v1.2.0, obtain separate maintainer authorization for live tap
+pushes and PR operations, then:
+
+1. Confirm that the existing v1.2.0 release and tag are intact. Check for an
+   existing `formula/complyctl-1.2.0` PR before creating another one; update an
+   existing PR instead if necessary.
+2. Download the source archive at
+   <https://github.com/complytime/complyctl/archive/refs/tags/v1.2.0.tar.gz>
+   and compute its SHA256 locally. Use the same archive URL in the formula.
+3. Clone `complytime/homebrew-tap` using an authorized maintainer credential or
+   a fresh repository-scoped App token. For an App token, export `GH_TOKEN`
+   for the publishing session and configure Git with `gh auth setup-git`.
+   Never copy tokens from Actions logs or embed them in URLs or Git config.
+4. On `formula/complyctl-1.2.0`, update only `url` and `sha256` in
+   `Formula/complyctl.rb`, preserving the source-build formula. Commit, push
+   that feature branch, and open a PR against tap `main`.
+5. Review and merge the formula PR through the tap's normal protected-branch
+   process, then unset the session's `GH_TOKEN` if one was exported.
+
+Do not move or recreate the v1.2.0 tag, replace published release artifacts,
+bypass branch protection, or rerun the full release for this recovery. Offline
+regression tests do not prove server-side App authorization; live validation
+requires separate authorization. See [Tests](#tests) for the offline check.
 
 ### Creating a Release
 
@@ -62,6 +103,19 @@ Tests relevant for releases are incorporated in CI tests for every PR. The
 preflight job verifies that the following CI checks have passed on HEAD before
 allowing a release: `buf-lint`, `api-compatibility`, `unit-test`, `e2e-test`,
 and `integration-test`.
+
+For changes to Homebrew publishing, run the isolated offline regression test:
+
+```bash
+make test-homebrew-publish
+```
+
+It requires Bash, Python 3, Git, and GitHub CLI (`gh`), but no Homebrew
+installation, production credentials, or network operations. It exercises the
+workflow's actual publishing script, real Git/`gh` credential resolution,
+existing-PR no-op, push failure, and the original token-inheritance regression.
+It does not replace the separate `make test-homebrew` installation smoke test
+or validate live App permissions.
 
 ### Provider API Compatibility
 
