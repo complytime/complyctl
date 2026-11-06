@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Render the canonical release delta without publishing artifacts."""
 
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -10,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote, urlparse
 
 try:
@@ -20,6 +23,8 @@ except ImportError:
 
 UPSTREAM = "complytime/complyctl"
 API_ROOT = f"repos/{UPSTREAM}"
+GITHUB_HOST = "github.com"
+RELEASE_CONFIG = Path(".goreleaser.yaml")
 MIN_VERSION = (2, 20, 0)
 MIN_PYTHON_VERSION = (3, 9)
 COMMAND_TIMEOUT = 60
@@ -33,7 +38,7 @@ class PreviewError(Exception):
     """An actionable preview failure, without child process output."""
 
 
-def renderer_failure_hint(output):
+def renderer_failure_hint(output: str) -> str:
     """Translate renderer errors into safe diagnostics without echoing child output."""
     output = output.lower()
     if "rate limit" in output:
@@ -47,7 +52,33 @@ def renderer_failure_hint(output):
     return "Check GitHub access and the GoReleaser changelog configuration."
 
 
-def run(args, purpose, *, env=None, timeout=COMMAND_TIMEOUT, diagnose_renderer=False):
+def api_failure_hint(output: str, endpoint: str) -> str:
+    """Give safe, endpoint-specific guidance without echoing GitHub output."""
+    output = output.lower()
+    if "rate limit" in output:
+        return "GitHub rate limit reached; retry after the limit resets."
+    if any(
+        message in output for message in ("bad credentials", "http 401", "http 403")
+    ):
+        return "Check GitHub authentication and repository permissions."
+    if any(message in output for message in ("http 404", "not found")):
+        if endpoint.endswith("/releases/latest"):
+            return "No published stable release was found; check upstream releases and access."
+        return (
+            "Candidate or baseline unavailable on GitHub; push the candidate and retry."
+        )
+    return "Check GitHub authentication, repository access, and connectivity."
+
+
+def run(
+    args: list[str],
+    purpose: str,
+    *,
+    env: dict[str, str] | None = None,
+    timeout: int = COMMAND_TIMEOUT,
+    diagnose_renderer: bool = False,
+    api_endpoint: str = "",
+) -> str:
     """Run a bounded command without exposing its potentially secret output."""
     try:
         result = subprocess.run(
@@ -63,6 +94,11 @@ def run(args, purpose, *, env=None, timeout=COMMAND_TIMEOUT, diagnose_renderer=F
         if diagnose_renderer:
             hint = renderer_failure_hint(f"{error.stdout or ''}\n{error.stderr or ''}")
             raise PreviewError(f"{purpose} failed: {hint}") from error
+        if api_endpoint:
+            hint = api_failure_hint(
+                f"{error.stdout or ''}\n{error.stderr or ''}", api_endpoint
+            )
+            raise PreviewError(f"{purpose} failed: {hint}") from error
         raise PreviewError(
             f"{purpose} failed; check prerequisites and retry."
         ) from error
@@ -71,7 +107,7 @@ def run(args, purpose, *, env=None, timeout=COMMAND_TIMEOUT, diagnose_renderer=F
     return result.stdout.strip()
 
 
-def check_prerequisites():
+def check_prerequisites() -> None:
     if sys.version_info < MIN_PYTHON_VERSION:
         raise PreviewError("Python 3.9 or newer is required; upgrade Python and retry.")
     if yaml is None:
@@ -84,13 +120,20 @@ def check_prerequisites():
     if (
         not match
         or tuple(map(int, match.groups())) < MIN_VERSION
-        or match.group(1) != "2"
+        or int(match.group(1)) != MIN_VERSION[0]
     ):
-        raise PreviewError("Install open-source GoReleaser v2.20.0 or newer (v2 only).")
+        minimum = ".".join(map(str, MIN_VERSION))
+        raise PreviewError(
+            f"Install open-source GoReleaser v{minimum} or newer (v2 only)."
+        )
 
 
-def api_json(endpoint, purpose):
-    response = run(["gh", "api", "--hostname", "github.com", endpoint], purpose)
+def api_json(endpoint: str, purpose: str) -> dict[str, Any]:
+    response = run(
+        ["gh", "api", "--hostname", GITHUB_HOST, endpoint],
+        purpose,
+        api_endpoint=endpoint,
+    )
     try:
         value = json.loads(response)
     except json.JSONDecodeError as error:
@@ -100,7 +143,7 @@ def api_json(endpoint, purpose):
     return value
 
 
-def discover_comparison():
+def discover_comparison() -> tuple[str, str, str]:
     release = api_json(
         f"{API_ROOT}/releases/latest", "Latest upstream release discovery"
     )
@@ -131,17 +174,17 @@ def discover_comparison():
     return tag, head, status
 
 
-def canonical_url(url):
+def canonical_url(url: str) -> bool:
     """Accept only GitHub URLs identifying the canonical repository."""
     if re.fullmatch(
-        rf"(?:[^@/:]+@)?github\.com:{re.escape(UPSTREAM)}(?:\.git)?/?", url
+        rf"(?:[^@/:]+@)?{re.escape(GITHUB_HOST)}:{re.escape(UPSTREAM)}(?:\.git)?/?", url
     ):
         return True
     try:
         parsed = urlparse(url)
         return (
             parsed.scheme in ("https", "ssh", "git")
-            and parsed.hostname == "github.com"
+            and parsed.hostname == GITHUB_HOST
             and parsed.port is None
             and not parsed.query
             and not parsed.fragment
@@ -151,7 +194,7 @@ def canonical_url(url):
         return False
 
 
-def canonical_remote(env):
+def canonical_remote(env: dict[str, str]) -> str:
     remotes = run(["git", "remote"], "Git remote discovery", env=env).splitlines()
     canonical = []
     for remote in remotes:
@@ -161,14 +204,14 @@ def canonical_remote(env):
         if canonical_url(url):
             canonical.append(remote)
     if not canonical:
-        raise PreviewError(f"Add a Git remote for github.com/{UPSTREAM} and retry.")
+        raise PreviewError(f"Add a Git remote for {GITHUB_HOST}/{UPSTREAM} and retry.")
     for preferred in ("upstream", "origin"):
         if preferred in canonical:
             return preferred
     return sorted(canonical)[0]
 
 
-def renderer_environment(tag, head, token):
+def renderer_environment(tag: str, head: str, token: str) -> dict[str, str]:
     env = os.environ.copy()
     env.update(
         GORELEASER_PREVIOUS_TAG=tag,
@@ -199,7 +242,7 @@ def renderer_environment(tag, head, token):
     return env
 
 
-def load_release_config(path):
+def load_release_config(path: Path) -> dict[str, Any]:
     try:
         config = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError) as error:
@@ -221,7 +264,7 @@ def load_release_config(path):
     return config
 
 
-def preview_config(path, directory):
+def preview_config(path: Path, directory: Path) -> dict[str, Any]:
     config = load_release_config(path)
     return {
         "version": config["version"],
@@ -234,7 +277,7 @@ def preview_config(path, directory):
     }
 
 
-def render(tag, head, token):
+def render(tag: str, head: str, token: str) -> str:
     env = renderer_environment(tag, head, token)
     temp_root = Path(tempfile.gettempdir()).resolve()
     if temp_root.is_relative_to(Path.cwd().resolve()):
@@ -244,7 +287,7 @@ def render(tag, head, token):
     with tempfile.TemporaryDirectory(prefix="complyctl-release-preview-") as temp:
         directory = Path(temp).resolve()
         config_path = directory / "preview.yaml"
-        config = preview_config(Path(".goreleaser.yaml"), directory)
+        config = preview_config(RELEASE_CONFIG, directory)
         config_path.write_text(
             yaml.safe_dump(config, sort_keys=False), encoding="utf-8"
         )
@@ -269,15 +312,15 @@ def render(tag, head, token):
             ) from error
 
 
-def main():
+def main() -> None:
     if len(sys.argv) != 1:
         raise PreviewError(
             "No arguments are supported; the latest upstream release is automatic."
         )
     check_prerequisites()
-    load_release_config(Path(".goreleaser.yaml"))
+    load_release_config(RELEASE_CONFIG)
     token = run(
-        ["gh", "auth", "token", "--hostname", "github.com"],
+        ["gh", "auth", "token", "--hostname", GITHUB_HOST],
         "GitHub authentication (run gh auth login)",
     )
     if not token:

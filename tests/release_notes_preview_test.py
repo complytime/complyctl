@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Offline regression tests for the release notes preview coordinator."""
 
+from __future__ import annotations
+
 import contextlib
 import importlib.util
 import io
@@ -9,9 +11,11 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,7 +27,7 @@ SPEC.loader.exec_module(preview)
 
 
 class PrerequisiteTests(unittest.TestCase):
-    def test_missing_tools_yaml_and_unsupported_versions(self):
+    def test_missing_tools_yaml_and_unsupported_versions(self) -> None:
         with mock.patch.object(preview.sys, "version_info", (3, 8)):
             with self.assertRaisesRegex(preview.PreviewError, "Python 3.9"):
                 preview.check_prerequisites()
@@ -55,7 +59,7 @@ class PrerequisiteTests(unittest.TestCase):
             with mock.patch.object(preview, "run", return_value="GitVersion: 2.20.0"):
                 preview.check_prerequisites()
 
-    def test_failures_and_timeouts_never_print_child_output(self):
+    def test_failures_and_timeouts_never_print_child_output(self) -> None:
         secret = "secret-token"
         failures = (
             subprocess.CalledProcessError(1, ["gh"], output=secret, stderr=secret),
@@ -72,7 +76,7 @@ class PrerequisiteTests(unittest.TestCase):
                         )
                     self.assertNotIn(secret, str(context.exception))
 
-    def test_renderer_error_is_actionable_without_exposing_output(self):
+    def test_renderer_error_is_actionable_without_exposing_output(self) -> None:
         cases = (
             ("rate limit exceeded secret-token", "rate limit"),
             ("bad credentials secret-token", "authentication"),
@@ -91,11 +95,54 @@ class PrerequisiteTests(unittest.TestCase):
                 self.assertIn(hint, str(context.exception))
                 self.assertNotIn("secret-token", str(context.exception))
 
+    def test_api_failure_hints_are_specific_and_secret_safe(self) -> None:
+        cases = (
+            (
+                "repos/complytime/complyctl/releases/latest",
+                "HTTP 404",
+                "stable release",
+            ),
+            (
+                "repos/complytime/complyctl/compare/v1...abc",
+                "HTTP 404",
+                "push the candidate",
+            ),
+            ("latest", "HTTP 401", "authentication"),
+            ("latest", "rate limit exceeded", "rate limit"),
+        )
+        for endpoint, output, hint in cases:
+            failure = subprocess.CalledProcessError(
+                1, ["gh"], stderr=f"{output} secret-token"
+            )
+            with (
+                self.subTest(output=output, endpoint=endpoint),
+                mock.patch.object(preview.subprocess, "run", side_effect=failure),
+            ):
+                with self.assertRaises(preview.PreviewError) as context:
+                    preview.api_json(endpoint, "GitHub request")
+                self.assertIn(hint, str(context.exception))
+                self.assertNotIn("secret-token", str(context.exception))
+
+    def test_subprocess_receives_bounded_timeout(self) -> None:
+        result = subprocess.CompletedProcess(["git"], 0, stdout="result")
+        with mock.patch.object(
+            preview.subprocess, "run", return_value=result
+        ) as command:
+            self.assertEqual(preview.run(["git"], "check"), "result")
+            self.assertEqual(
+                command.call_args.kwargs["timeout"], preview.COMMAND_TIMEOUT
+            )
+            self.assertTrue(command.call_args.kwargs["check"])
+            preview.run(["git"], "check", timeout=preview.RENDER_TIMEOUT)
+            self.assertEqual(
+                command.call_args.kwargs["timeout"], preview.RENDER_TIMEOUT
+            )
+
 
 class DiscoveryTests(unittest.TestCase):
     head = "a" * 40
 
-    def test_latest_release_and_comparison_use_canonical_endpoints(self):
+    def test_latest_release_and_comparison_use_canonical_endpoints(self) -> None:
         release = json.dumps(
             {"tag_name": "v1.2.0", "draft": False, "prerelease": False}
         )
@@ -124,7 +171,7 @@ class DiscoveryTests(unittest.TestCase):
                     f"repos/complytime/complyctl/compare/v1.2.0...{self.head}",
                 )
 
-    def test_invalid_releases_comparisons_and_responses_fail(self):
+    def test_invalid_releases_comparisons_and_responses_fail(self) -> None:
         invalid_releases = [
             "[]",
             "bad-json",
@@ -164,7 +211,7 @@ class DiscoveryTests(unittest.TestCase):
 
 
 class RemoteTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.repo = Path(self.temp.name)
@@ -180,12 +227,14 @@ class RemoteTests(unittest.TestCase):
             "remote", "add", "upstream", "https://github.com/complytime/complyctl.git"
         )
 
-    def git(self, *args):
+    def git(self, *args: str) -> str:
         return subprocess.run(
             ["git", *args], check=True, capture_output=True, text=True
         ).stdout.strip()
 
-    def test_fork_branch_override_preserves_git_config_and_existing_entries(self):
+    def test_fork_branch_override_preserves_git_config_and_existing_entries(
+        self,
+    ) -> None:
         before = (self.repo / ".git" / "config").read_bytes()
         inherited = {
             "GIT_CONFIG_COUNT": "1",
@@ -204,16 +253,20 @@ class RemoteTests(unittest.TestCase):
         self.assertEqual(env["GORELEASER_CURRENT_TAG"], "a" * 40)
         self.assertEqual((self.repo / ".git" / "config").read_bytes(), before)
 
-    def test_detached_fork_fails_and_canonical_origin_succeeds(self):
+    def test_detached_fork_fails_and_canonical_origin_succeeds(self) -> None:
         self.git("checkout", "-q", "--detach")
         with self.assertRaisesRegex(preview.PreviewError, "not canonical"):
             preview.renderer_environment("v1", "a" * 40, "token")
         self.git(
             "remote", "set-url", "origin", "git@github.com:complytime/complyctl.git"
         )
-        preview.renderer_environment("v1", "a" * 40, "token")
+        with mock.patch.dict(os.environ, {}, clear=True):
+            env = preview.renderer_environment("v1", "a" * 40, "token")
+        self.assertNotIn("GIT_CONFIG_COUNT", env)
+        self.assertEqual(env["GORELEASER_PREVIOUS_TAG"], "v1")
+        self.assertEqual(env["GORELEASER_CURRENT_TAG"], "a" * 40)
 
-    def test_main_branch_prefers_upstream_even_when_origin_is_canonical(self):
+    def test_main_branch_prefers_upstream_even_when_origin_is_canonical(self) -> None:
         self.git("branch", "-m", "main")
         self.git(
             "remote", "set-url", "origin", "https://github.com/complytime/complyctl.git"
@@ -223,7 +276,7 @@ class RemoteTests(unittest.TestCase):
         self.assertEqual(env[f"GIT_CONFIG_KEY_{index}"], "branch.main.remote")
         self.assertEqual(env[f"GIT_CONFIG_VALUE_{index}"], "upstream")
 
-    def test_url_validation_and_missing_canonical_remote(self):
+    def test_url_validation_and_missing_canonical_remote(self) -> None:
         for url in (
             "https://github.com/complytime/complyctl.git",
             "ssh://git@github.com/complytime/complyctl",
@@ -242,7 +295,17 @@ class RemoteTests(unittest.TestCase):
 
 
 class RenderingTests(unittest.TestCase):
-    def test_configuration_copies_only_changelog_and_disables_builds(self):
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        old_cwd = Path.cwd()
+        os.chdir(self.temp.name)
+        self.addCleanup(os.chdir, old_cwd)
+        Path(".goreleaser.yaml").write_text(
+            "version: 2\nproject_name: example\nchangelog:\n  use: github\n"
+        )
+
+    def test_configuration_copies_only_changelog_and_disables_builds(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
             source = {
@@ -266,11 +329,23 @@ class RenderingTests(unittest.TestCase):
             config_path.write_bytes(b"\xff")
             with self.assertRaisesRegex(preview.PreviewError, "configuration"):
                 preview.preview_config(config_path, directory)
+            invalid_configs = (
+                "version: 1\nproject_name: x\nchangelog: {use: github}\n",
+                "version: 2\nproject_name: x\nchangelog: {use: git}\n",
+                "version: 2\nproject_name: ''\nchangelog: {use: github}\n",
+                "- version: 2\n",
+                "version: [2\n",
+            )
+            for invalid in invalid_configs:
+                with self.subTest(invalid=invalid):
+                    config_path.write_text(invalid)
+                    with self.assertRaises(preview.PreviewError):
+                        preview.preview_config(config_path, directory)
 
-    def test_renderer_success_failure_and_cleanup(self):
+    def test_renderer_success_failure_and_cleanup(self) -> None:
         observed = []
 
-        def fake_run(args, purpose, **kwargs):
+        def fake_run(args: list[str], purpose: str, **kwargs: Any) -> str:
             config_path = Path(args[3])
             observed.append(config_path.parent)
             config = preview.yaml.safe_load(config_path.read_text())
@@ -294,7 +369,7 @@ class RenderingTests(unittest.TestCase):
                 preview.render("v1", "a" * 40, "token")
         self.assertTrue(all(not directory.exists() for directory in observed))
 
-    def test_missing_changelog_fails_without_partial_stdout(self):
+    def test_missing_changelog_fails_without_partial_stdout(self) -> None:
         stdout = io.StringIO()
         with (
             contextlib.redirect_stdout(stdout),
@@ -305,7 +380,9 @@ class RenderingTests(unittest.TestCase):
                 preview.render("v1", "a" * 40, "token")
         self.assertEqual(stdout.getvalue(), "")
 
-    def test_temporary_directory_inside_checkout_is_rejected_before_creation(self):
+    def test_temporary_directory_inside_checkout_is_rejected_before_creation(
+        self,
+    ) -> None:
         with (
             mock.patch.object(preview, "renderer_environment", return_value={}),
             mock.patch.object(
@@ -319,7 +396,7 @@ class RenderingTests(unittest.TestCase):
                 preview.render("v1", "a" * 40, "token")
             temporary_directory.assert_not_called()
 
-    def test_arguments_and_authentication_fail_before_rendering(self):
+    def test_arguments_and_authentication_fail_before_rendering(self) -> None:
         with mock.patch.object(preview.sys, "argv", ["preview", "v1"]):
             with self.assertRaisesRegex(preview.PreviewError, "No arguments"):
                 preview.main()
@@ -333,7 +410,7 @@ class RenderingTests(unittest.TestCase):
                 preview.main()
             render.assert_not_called()
 
-    def test_main_output_channels_and_empty_delta(self):
+    def test_main_output_channels_and_empty_delta(self) -> None:
         for status in ("ahead", "identical"):
             with (
                 self.subTest(status=status),
@@ -356,6 +433,7 @@ class RenderingTests(unittest.TestCase):
                 ):
                     preview.main()
                 self.assertIn("v1", stderr.getvalue())
+                self.assertIn("a" * 40, stderr.getvalue())
                 self.assertIn("uncommitted changes excluded", stderr.getvalue())
                 if status == "identical":
                     self.assertEqual(stdout.getvalue(), "")
@@ -367,17 +445,20 @@ class RenderingTests(unittest.TestCase):
 
 class MakeInterfaceTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("make"), "make is not installed")
-    def test_phony_targets_help_and_redirectable_output(self):
+    def test_phony_targets_help_and_redirectable_output(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
             shutil.copy(ROOT / "Makefile", directory / "Makefile")
             (directory / "release-notes-preview").touch()
             (directory / "test-release-notes-preview").touch()
             executable = directory / "python3"
-            executable.write_text('#!/bin/sh\nprintf "# Markdown\\n"\n')
+            executable.write_text(
+                '#!/bin/sh\nprintf "%s\\n" "$@" > "$ARGS_FILE"\nprintf "# Markdown\\n"\n'
+            )
             executable.chmod(0o755)
             env = os.environ.copy()
             env["PATH"] = f"{directory}{os.pathsep}{env['PATH']}"
+            env["ARGS_FILE"] = str(directory / "args")
             for target in ("release-notes-preview", "test-release-notes-preview"):
                 with self.subTest(target=target):
                     result = subprocess.run(
@@ -391,6 +472,26 @@ class MakeInterfaceTests(unittest.TestCase):
                     )
                     self.assertEqual(result.stdout, "# Markdown\n")
                     self.assertEqual(result.stderr, "")
+                    arguments = (directory / "args").read_text().splitlines()
+                    if target == "release-notes-preview":
+                        self.assertEqual(
+                            arguments, ["scripts/release-notes-preview.py"]
+                        )
+                    else:
+                        self.assertEqual(
+                            arguments,
+                            [
+                                "-m",
+                                "unittest",
+                                "discover",
+                                "-s",
+                                "tests",
+                                "-p",
+                                "release_notes_preview_test.py",
+                                "-v",
+                            ],
+                        )
+                        self.assertTrue((ROOT / "tests" / arguments[-2]).is_file())
             help_output = subprocess.run(
                 ["make", "help"],
                 cwd=directory,
@@ -402,6 +503,76 @@ class MakeInterfaceTests(unittest.TestCase):
             ).stdout
             self.assertIn("release-notes-preview", help_output)
             self.assertIn("test-release-notes-preview", help_output)
+
+
+class EntrypointTests(unittest.TestCase):
+    def test_renderer_failure_exits_nonzero_without_partial_notes_or_token(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            (directory / ".goreleaser.yaml").write_text(
+                "version: 2\nproject_name: example\nchangelog:\n  use: github\n"
+            )
+            scripts = {
+                "goreleaser": (
+                    'if [ "$1" = "--version" ]; then echo "GitVersion: 2.20.0"; '
+                    'else mkdir -p "$(dirname "$3")/dist"; '
+                    'echo "partial notes" > "$(dirname "$3")/dist/CHANGELOG.md"; '
+                    'echo "bad credentials secret-token" >&2; exit 1; fi'
+                ),
+                "gh": (
+                    'if [ "$1" = "auth" ]; then echo secret-token; '
+                    'elif [ "${4##*/}" = "latest" ]; then '
+                    'echo \'{"tag_name":"v1","draft":false,"prerelease":false}\'; '
+                    'else echo \'{"status":"ahead"}\'; fi'
+                ),
+                "git": (
+                    'case "$1" in '
+                    f"rev-parse) echo {'a' * 40} ;; "
+                    "branch) echo fixture ;; "
+                    'remote) if [ "$#" = 1 ]; then echo upstream; '
+                    "else echo https://github.com/complytime/complyctl.git; fi ;; "
+                    "ls-remote) echo https://github.com/complytime/complyctl.git ;; esac"
+                ),
+            }
+            for name, body in scripts.items():
+                executable = directory / name
+                executable.write_text(f"#!/bin/sh\n{body}\n")
+                executable.chmod(0o755)
+            env = os.environ.copy()
+            env["PATH"] = f"{directory}{os.pathsep}{env['PATH']}"
+            script = str(ROOT / "scripts/release-notes-preview.py")
+            commands = (
+                ([sys.executable, script], "authentication"),
+                (
+                    [
+                        sys.executable,
+                        "-c",
+                        "import runpy, sys; from unittest.mock import patch; "
+                        "patch('tempfile.TemporaryDirectory', side_effect=OSError('secret-token'))"
+                        ".start(); sys.argv = [sys.argv[1]]; "
+                        "runpy.run_path(sys.argv[0], run_name='__main__')",
+                        script,
+                    ],
+                    "temporary file operation failed",
+                ),
+            )
+            for command, expected in commands:
+                with self.subTest(expected=expected):
+                    result = subprocess.run(
+                        command,
+                        cwd=directory,
+                        env=env,
+                        text=True,
+                        capture_output=True,
+                        timeout=30,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn("release-notes-preview:", result.stderr)
+                    self.assertIn(expected, result.stderr)
+                    self.assertNotIn("secret-token", result.stderr)
 
 
 if __name__ == "__main__":
