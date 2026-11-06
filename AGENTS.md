@@ -63,6 +63,10 @@ make test-acceptance
 make test-homebrew
 # → ./tests/homebrew_test.sh
 
+# Offline Homebrew publishing regression (requires bash, python3, git, gh)
+make test-homebrew-publish
+# → bash ./tests/homebrew_publish_test.sh
+
 # Verification acceptance tests (requires Sigstore infrastructure)
 make test-acceptance-verify
 # → compose up --profile verification (zot + Sigstore + sign-seed + verify-sut)

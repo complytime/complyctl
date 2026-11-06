@@ -77,6 +77,12 @@
 
 ### Fixed
 
+- Homebrew formula publishing now exports the App token as step-scoped
+  `GH_TOKEN`, allowing Git's credential helper to authenticate the formula
+  branch push as well as GitHub CLI API calls. The protected-branch PR flow
+  and App scope are unchanged. Added offline regression coverage and
+  existing-release recovery guidance in `docs/RELEASE_PROCESS.md`.
+
 - Scans where all controls are not-applicable now report
   `NotApplicable` aggregate result instead of `Passed`. This
   corrects a semantic error in upstream `go-gemara` result
