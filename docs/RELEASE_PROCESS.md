@@ -38,6 +38,46 @@ The `homebrew` job in the release workflow opens a PR with `Formula/complyctl.rb
 3. Update `Formula/complyctl.rb` in the `homebrew-tap` repo with the new `url` and `sha256`
 4. Open a PR and merge
 
+### Previewing Release Notes
+
+Before creating a release, preview the generated notes for committed HEAD:
+
+```bash
+make release-notes-preview
+```
+
+The command discovers the latest published stable release in
+`complytime/complyctl` and compares it with the checkout's committed HEAD.
+Push the candidate commit so GitHub can compare it. Uncommitted changes are
+not included. The command uses the checkout's GoReleaser changelog settings;
+it does not select a new tag, build artifacts, execute release hooks, or
+publish a release. It requires a canonical Git remote (preferably named
+`upstream`) even when `origin` points to a fork. A detached checkout requires
+its effective default remote to point to the canonical repository.
+
+Install Git, GitHub CLI (`gh`), Python 3.9 or newer with PyYAML, and open-source
+GoReleaser v2.20.0 or newer within v2. Authenticate GitHub CLI for github.com
+with `gh auth login`. The helper does not install dependencies. It writes the
+baseline, candidate, and diagnostics to standard error, and Markdown to
+standard output, which can be redirected:
+
+```bash
+make release-notes-preview > release-notes.md
+```
+
+If HEAD is already released, the command succeeds with a "No unreleased
+commits" diagnostic and no Markdown. Failed authentication, unavailable or
+diverged commits, missing tools, or renderer failures return a nonzero exit;
+fix the diagnostic and retry. No partial Markdown is emitted on failure.
+
+Run the offline coordinator regression suite with Python 3.9 or newer and PyYAML:
+
+```bash
+make test-release-notes-preview
+```
+
+The tests do not require GitHub access or GoReleaser.
+
 ### Creating a Release
 
 To create a release, a project maintainer triggers the workflow manually:

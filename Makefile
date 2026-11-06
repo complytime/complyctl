@@ -191,6 +191,10 @@ build-behavioral-report: prep-build-dir ## build behavioral report tool (go test
 
 ##@ Packaging
 
+release-notes-preview: ## preview generated release notes for committed HEAD
+	@python3 scripts/release-notes-preview.py
+.PHONY: release-notes-preview
+
 man: ## generate man pages
 	mkdir -p $(dir $(MAN_COMPLYCTL_OUTPUT))
 	pandoc -s -t man $(MAN_COMPLYCTL) -o $(MAN_COMPLYCTL_OUTPUT)
@@ -220,6 +224,10 @@ clean:
 .PHONY: clean
 
 ##@ Testing
+
+test-release-notes-preview: ## run offline release notes preview tests
+	@python3 -m unittest discover -s tests -p 'release_notes_preview_test.py' -v
+.PHONY: test-release-notes-preview
 
 api-compatibility-proto: ## check protobuf compatibility against the latest stable same-major release
 	bash ./scripts/api-compatibility-baseline.sh --repo "$(API_COMPATIBILITY_REPO)" -- \
