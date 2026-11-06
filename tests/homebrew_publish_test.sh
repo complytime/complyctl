@@ -20,11 +20,10 @@ import textwrap
 
 TIMEOUT = 20
 TAG = "v1.2.0"
-BRANCH = "formula/complyctl-1.2.0"
+BRANCH = f"formula/complyctl-{TAG[1:]}"
 TOKEN = "offline-credential-not-a-real-token"
 PR_URL = "https://github.com/complytime/homebrew-tap/pull/123"
 STEP_NAME = "Publish Homebrew formula"
-TEMP_DIRECTORY = "/tmp/opencode" if pathlib.Path("/tmp/opencode").is_dir() else None
 EXPRESSIONS = {
     "${{ steps.homebrew-token.outputs.token }}": TOKEN,
     "${{ needs.preflight.outputs.tag }}": TAG,
@@ -144,11 +143,14 @@ elif command == "git":
             fail("missing credential helper setup")
         # Reset all inherited helpers and disable prompts. gh reads GH_TOKEN
         # in the helper subprocess, not in the earlier API command's process.
-        helper = "!" + os.environ["REAL_GH"] + " auth git-credential"
         configured = real_git(["config", "--global", "--get-all",
                                "credential.https://github.com.helper"])
-        if configured.returncode or configured.stdout.splitlines() != ["", helper]:
+        helpers = [value for value in configured.stdout.splitlines() if value]
+        if (configured.returncode or not helpers
+                or not all(value.startswith("!") and value.endswith(" auth git-credential")
+                           for value in helpers)):
             fail("unexpected GitHub credential helper configuration")
+        helper = helpers[-1]
         result = real_git(["-c", "credential.helper=", "-c",
                            "credential.https://github.com.helper=" + helper,
                            "credential", "fill"],
@@ -162,7 +164,8 @@ elif command == "git":
         if os.environ["TEST_SCENARIO"] == "push-failure":
             fail("simulated push transport failure")
     elif (args in (["config", "user.name", "github-actions[bot]"],
-                   ["config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com"],
+                   ["config", "user.email",
+                    "41898282+github-actions[bot]@users.noreply.github.com"],
                    ["checkout", "-b", os.environ["TEST_BRANCH"]],
                    ["add", "Formula/complyctl.rb"], ["commit", "-m", "complyctl 1.2.0"])):
         event(args[0])
@@ -177,7 +180,7 @@ else:
 
 
 def run_step(environment, script, scenario):
-    with tempfile.TemporaryDirectory(prefix="homebrew-publish-", dir=TEMP_DIRECTORY) as directory:
+    with tempfile.TemporaryDirectory(prefix="homebrew-publish-") as directory:
         root = pathlib.Path(directory)
         binaries = root / "bin"
         binaries.mkdir()
@@ -199,6 +202,7 @@ def run_step(environment, script, scenario):
         process_environment = {
             "PATH": str(binaries), "HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
             "GH_CONFIG_DIR": str(home / "gh"), "GH_PROMPT_DISABLED": "1",
+            "GH_NO_UPDATE_NOTIFIER": "1", "GH_NO_EXTENSION_UPDATE_NOTIFIER": "1",
             "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": str(home / ".gitconfig"),
             "GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "/bin/false", "LC_ALL": "C",
             "GIT_ALLOW_PROTOCOL": "", "TEST_ROOT": str(root), "TEST_TOKEN": TOKEN,
@@ -226,7 +230,8 @@ def assert_success(environment, script):
     code, output, events, formula = run_step(environment, script, "success")
     require(code == 0, "new-formula success assertion failed: " + output)
     require(events == ["download", "clone", "pr-list", "config", "config", "checkout",
-                       "add", "commit", "setup-helper", "push", "credential-resolved", "pr-create"],
+                       "add", "commit", "setup-helper", "push", "credential-resolved",
+                       "pr-create"],
             "unexpected success operations")
     require(f"::notice::Opened {PR_URL}" in output, "missing PR success notice")
     require(f"/refs/tags/{TAG}.tar.gz" in formula and 'sha256 "' + "a" * 64 + '"' in formula,
@@ -274,14 +279,15 @@ def main():
                                "TAP_TOKEN: ${{ steps.homebrew-token.outputs.token }}")
     mutated = re.sub(r"\bgh (?=repo clone|pr list|auth setup-git|pr create)",
                      'GH_TOKEN="${TAP_TOKEN}" gh ', mutated)
-    with tempfile.TemporaryDirectory(prefix="homebrew-mutation-", dir=TEMP_DIRECTORY) as directory:
+    with tempfile.TemporaryDirectory(prefix="homebrew-mutation-") as directory:
         fixture = pathlib.Path(directory) / "release.yml"
         fixture.write_text(mutated, encoding="utf-8")
         legacy_environment, legacy_script = extract_step(fixture.read_text(encoding="utf-8"))
         code, output, events, _ = run_step(legacy_environment, legacy_script, "success")
         require(code != 0 and "Git credential helper could not resolve" in output,
                 "TAP_TOKEN-only mutation did not fail at credential lookup")
-        require("push" in events and "pr-create" not in events and "::notice::Opened" not in output,
+        require("push" in events and "pr-create" not in events
+                and "::notice::Opened" not in output,
                 "legacy mutation did not reach push or falsely reported success")
         try:
             assert_success(legacy_environment, legacy_script)
