@@ -45,13 +45,16 @@
 - [x] 3.1 Run `make test-release-notes-preview`, Python lint and format
   checks, and changed-file Markdown checks; verify positive and
   negative cases pass without network access or publishing tools.
-  - Python tests, Ruff lint, and Ruff formatting passed. Markdown lint
+  - Python tests passed. Ruff 0.15.22 checks used `ruff check` and
+    `ruff format --check` on the helper and test files. Markdown lint
     found six existing issues in `AGENTS.md` and `CHANGELOG.md`;
     comparison with the committed files found no new findings.
 - [x] 3.2 Run a real `make release-notes-preview` against automatic
   upstream discovery; verify the candidate and baseline diagnostics,
   Markdown or explicit empty result, and unchanged working-tree
   contents, tags, and persistent Git configuration.
+  - An isolated fork-origin fixture also succeeded with tracked and
+    untracked changes and Markdown redirected inside the checkout.
 - [x] 3.3 Verify non-empty rendering against generated published notes
   using an isolated historical fixture; compare after trimming
   trailing whitespace and confirm no public baseline override exists.
