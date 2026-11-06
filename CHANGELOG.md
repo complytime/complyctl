@@ -82,6 +82,7 @@
   branch push as well as GitHub CLI API calls. The protected-branch PR flow
   and App scope are unchanged. Added offline regression coverage and
   existing-release recovery guidance in `docs/RELEASE_PROCESS.md`.
+  Spec: `openspec/changes/fix-homebrew-publish-auth/specs/homebrew-publishing/spec.md`
 
 - Scans where all controls are not-applicable now report
   `NotApplicable` aggregate result instead of `Passed`. This

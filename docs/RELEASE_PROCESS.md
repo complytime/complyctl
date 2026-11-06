@@ -35,7 +35,9 @@ App permission is needed.
 - GitHub App token generation failure -- the step fails visibly
 - Missing publishing credential or failed push -- the step fails without
   opening a PR or reporting PR creation success
-- No changes to commit (re-run after PR was merged) -- exits 0 silently, which is safe
+- Commit failure -- the current catch-all handler reports "No changes to
+  commit" and exits 0, even for errors other than an unchanged formula.
+  Confirm the formula matches tap `main` before treating this as success
 - PR already exists for this version (re-run before PR was merged) -- exits 0 with a notice
 
 **Re-runs:** An existing open formula PR produces a successful no-op with a
@@ -44,6 +46,10 @@ exits with "No changes to commit" and the job succeeds. However, retrying an old
 failed Actions run uses its original workflow revision: it does not pick up a
 fix merged afterward. Future releases dispatched from a revision containing
 the fix use the corrected environment.
+
+If a prior run pushed the formula branch but did not open a PR, a retry can
+fail with a non-fast-forward push. Inspect and reuse the existing branch for
+the manual recovery below instead of force-pushing or rerunning the release.
 
 **Post-release step:** After the release workflow completes, merge the formula
 PR in the [homebrew-tap](https://github.com/complytime/homebrew-tap/pulls)
@@ -60,7 +66,8 @@ pushes and PR operations, then:
 
 1. Confirm that the existing v1.2.0 release and tag are intact. Check for an
    existing `formula/complyctl-1.2.0` PR before creating another one; update an
-   existing PR instead if necessary.
+   existing PR instead if necessary. If the branch exists without an open PR,
+   inspect its formula and reuse that branch rather than recreating it.
 2. Download the source archive at
    <https://github.com/complytime/complyctl/archive/refs/tags/v1.2.0.tar.gz>
    and compute its SHA256 locally. Use the same archive URL in the formula.
@@ -99,7 +106,7 @@ For the full release process reference, see the [org-infra release process](http
 
 ## Tests
 
-Tests relevant for releases are incorporated in CI tests for every PR. The
+Core release tests run in CI for every PR. The
 preflight job verifies that the following CI checks have passed on HEAD before
 allowing a release: `buf-lint`, `api-compatibility`, `unit-test`, `e2e-test`,
 and `integration-test`.
@@ -115,7 +122,9 @@ installation, production credentials, or network operations. It exercises the
 workflow's actual publishing script, real Git/`gh` credential resolution,
 existing-PR no-op, push failure, and the original token-inheritance regression.
 It does not replace the separate `make test-homebrew` installation smoke test
-or validate live App permissions.
+or validate live App permissions. This regression check runs locally only;
+it is not part of PR CI. Maintainers must run it when changing Homebrew
+publishing.
 
 ### Provider API Compatibility
 
