@@ -86,6 +86,10 @@ test-homebrew: ## verify Homebrew formula builds and installs from HEAD (require
 	$(if $(TIMEOUT),$(TIMEOUT) 300) ./tests/homebrew_test.sh
 .PHONY: test-homebrew
 
+test-homebrew-formula-publication: ## verify formula publication credential scoping
+	bash ./tests/homebrew_formula_publication_test.sh
+.PHONY: test-homebrew-formula-publication
+
 ACCEPTANCE_COMPOSE = $(COMPOSE) -f tests/acceptance/compose.yaml --profile lifecycle
 
 test-acceptance: build build-test-provider build-acceptance-test ## run container-based acceptance tests (requires podman-compose or docker compose)
