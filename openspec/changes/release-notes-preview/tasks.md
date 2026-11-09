@@ -70,6 +70,8 @@
 - [x] 3.5 Run strict OpenSpec validation and `git diff --check`;
   inspect the complete diff and provide local testing
   instructions; verify no PR has been opened.
+  - `openspec validate release-notes-preview --strict` passed with
+    OpenSpec 1.16.0 after rewording FR-007 and FR-008.
 
 ## Workflow follow-up
 

@@ -130,10 +130,9 @@ on successful or failed completion.
 
 ### Requirement: FR-007 Empty delta is explicit
 
-When the selected release and candidate identify the same commit,
-the command MUST succeed and report that no unreleased commits
-exist. It MUST NOT fall back to an earlier release to populate
-the preview.
+The command MUST succeed and report that no unreleased commits exist
+when the selected release and candidate identify the same commit.
+It MUST NOT fall back to an earlier release to populate the preview.
 
 #### Scenario: HEAD is already released
 
@@ -144,10 +143,10 @@ the preview.
 
 ### Requirement: FR-008 Actionable and bounded failures
 
-Missing prerequisites, authentication errors, invalid responses,
-timeouts, and renderer failures MUST produce nonzero exits and
-actionable diagnostics. Child commands MUST have finite timeouts.
-Diagnostics MUST NOT expose authentication tokens.
+The command MUST produce nonzero exits and actionable diagnostics for
+missing prerequisites, authentication errors, invalid responses,
+timeouts, and renderer failures. Child commands MUST have finite
+timeouts. Diagnostics MUST NOT expose authentication tokens.
 
 #### Scenario: A prerequisite is missing
 
