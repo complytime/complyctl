@@ -35,6 +35,7 @@ type testEnv struct {
 // any required variable is missing.
 func loadTestEnv(t *testing.T) testEnv {
 	t.Helper()
+	requireRegistry(t)
 	registryURL := os.Getenv("REGISTRY_URL")
 	require.NotEmpty(t, registryURL, "REGISTRY_URL must be set")
 	policyID := os.Getenv("TEST_POLICY_ID")

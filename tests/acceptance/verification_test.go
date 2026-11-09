@@ -25,6 +25,7 @@ func skipIfNoVerificationEnv(t *testing.T) {
 	if os.Getenv("COSIGN_KEY_PATH") == "" {
 		t.Skip("verification env vars not set")
 	}
+	requireRegistry(t)
 }
 
 // TestVerification_Keyed_HappyPath verifies that complyctl get with a

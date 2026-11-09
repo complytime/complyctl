@@ -93,8 +93,20 @@ optional, so a valid document may still have lost provider evidence.
 ## Migration Plan
 
 No report or configuration migration is required. Add the checks to
-the existing acceptance binary and run the CI-equivalent lifecycle
-command, `make test-acceptance COMPOSE="docker compose"`.
+the existing acceptance binary and verify the lifecycle stack using
+Docker Compose or Podman Compose. CI uses
+`make test-acceptance COMPOSE="docker compose"`; the Makefile also
+supports `podman-compose` and `podman compose`.
+
+Host-side verification MAY stage registry startup, seeding, and SUT
+execution separately when container orchestration or architecture
+compatibility prevents the aggregate command from completing.
+It MUST use the same registry, seeded policy fixtures, provider,
+acceptance binary, and assertions. A native build of the pinned ORAS
+version MAY seed the registry when its AMD64 binary fails under
+emulation. Record these accommodations and the actual command/result
+in `verification.md`; do not claim the Docker CI command ran.
+
 Rollback consists of reverting the acceptance-test change.
 
 During implementation, run the affected formatter tests and the
