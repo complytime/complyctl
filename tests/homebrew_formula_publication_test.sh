@@ -107,7 +107,7 @@ assert_unscoped_push_fails() {
         GIT_CREDENTIAL_HELPER="${fixture_directory}/credential-helper" \
         EXPECTED_GH_TOKEN="${SYNTHETIC_GH_TOKEN}" \
         HELPER_CALLED_PATH="${fixture_directory}/helper-called" \
-        git push origin formula/test; then
+        env -u GH_TOKEN git push origin formula/test; then
         printf 'FAIL: unscoped git push unexpectedly authenticated\n' >&2
         return 1
     fi
