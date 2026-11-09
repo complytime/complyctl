@@ -8,9 +8,9 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 readonly REPO_ROOT
 readonly WORKFLOW_PATH="${REPO_ROOT}/.github/workflows/release.yml"
 readonly SYNTHETIC_GH_TOKEN="synthetic-homebrew-token"
-readonly STEP_TOKEN='GH_TOKEN: ${{ steps.homebrew-token.outputs.token }}'
+readonly STEP_TOKEN="GH_TOKEN: \${{ steps.homebrew-token.outputs.token }}"
 readonly SETUP_GIT_COMMAND='gh auth setup-git'
-readonly PUSH_COMMAND='git push origin "${BRANCH}"'
+readonly PUSH_COMMAND="git push origin \"\${BRANCH}\""
 
 assert_workflow_uses_scoped_push_token() {
     local workflow
