@@ -23,7 +23,7 @@ require (
 	github.com/sigstore/sigstore v1.10.9
 	github.com/sigstore/sigstore-go v1.3.0
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
