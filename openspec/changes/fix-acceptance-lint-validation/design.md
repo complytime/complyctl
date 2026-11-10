@@ -16,6 +16,14 @@ CI runs. Those CI commands omit the acceptance build tag. Verify the
 toolchain and dependency context before drawing conclusions from a
 scanner result; record versions with the before/after lint output.
 
+The phase checkpoint also ran `yamllint .`, which scanned YAML in
+`vendor/` and an ignored generated behavioral report. MegaLinter
+already excludes `vendor/`, but standalone yamllint does not inherit
+that setting or `.gitignore`. The contributor manually added the two
+specific exclusions to `.yamllint.yml` and requested their inclusion
+in this change. This is an explicit input-scope adjustment, not a
+change to YAML formatting rules.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -23,12 +31,16 @@ scanner result; record versions with the before/after lint output.
 - Resolve exactly the two G704 and two G306 findings.
 - Preserve registry preflight behavior in both acceptance profiles.
 - Keep generated configuration readable by the test process and CLI.
+- Exclude vendored YAML and the generated evaluation report from
+  standalone style lint while retaining checks on maintained YAML.
 
 **Non-Goals:**
 
 - New validation profiles, Make targets, or tool-version enforcement.
-- YAML, pre-commit, vendor, or generated-report cleanup.
-- CI, scanner configuration, agent conventions, or workflow gates.
+- Reformatting vendor files or changing the report generator.
+- Broader YAML exclusions, pre-commit changes, or validation cleanup.
+- CI, security scanner configuration, agent conventions, or workflow
+  execution policy.
 - General-purpose URL validation or production security changes.
 
 ## Decisions
@@ -72,6 +84,31 @@ and verification acceptance targets already used by CI. Add focused
 permission assertions to the affected tests where needed; do not add
 validation-profile infrastructure or suppression-policy test machinery.
 
+### Bound standalone YAML exclusions to two inputs
+
+Retain the contributor's top-level `ignore` entries in
+`.yamllint.yml`: `vendor/` and the exact path
+`governance/reports/evaluation-log.yaml`. Preserve `extends: default`
+and every existing rule. Do not exclude the whole governance tree,
+all reports, all ignored files, or other first-party YAML.
+
+The report is reproducible output from `make test-behavioral` and is
+already Git-ignored. Its absence must not be necessary for lint to
+pass: recreating it must leave it outside yamllint's input set.
+Deleting a stale local report is workspace cleanup, not a tracked
+implementation change or a generator fix.
+
+Verify the exclusion boundaries using disposable YAML fixtures with
+the same relative paths and the repository configuration. Malformed
+vendored/report fixtures must be ignored; malformed maintained YAML
+and a sibling governance YAML file must still fail. Use temporary
+fixtures rather than introducing a new validation framework or
+committing intentionally invalid YAML.
+
+Reject reformatting vendored files: it adds upstream maintenance debt.
+Reject disabling indentation checks: maintained YAML still needs them.
+Security scanner and MegaLinter configuration stay unchanged.
+
 ## Risks / Trade-offs
 
 - [Scanner versions report different findings] -> Record versions and
@@ -81,10 +118,13 @@ validation-profile infrastructure or suppression-policy test machinery.
   runner-controlled inputs at each request site during code review.
 - [Owner-only files prevent CLI access] -> Run both acceptance profiles
   and check generated file permissions and readability.
+- [YAML exclusions hide maintained files] -> Verify the exact report
+  path boundary and that first-party YAML still produces lint errors.
 
 ## Migration Plan
 
-Apply the test-only fixes and verify the four reported findings and
-both acceptance profiles. No deployment or data migration is required.
-Any additional validation failures remain separate work, not reasons
-to expand this change or weaken a gate.
+Apply the test-only fixes and retain the contributor's two YAML
+exclusions. Verify the four reported findings, both acceptance
+profiles, and YAML exclusion boundaries. No deployment or data
+migration is required. Additional validation failures remain separate
+work, not reasons to expand the exclusions or disable lint rules.

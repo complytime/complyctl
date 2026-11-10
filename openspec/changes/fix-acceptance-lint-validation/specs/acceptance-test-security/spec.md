@@ -43,13 +43,14 @@ to the generated configuration.
 - **THEN** the file grants no group or other permissions and remains
   readable by the test process and its CLI child
 
-### Requirement: FR-003 Resolve only the four reported lint findings
+### Requirement: FR-003 Resolve the four acceptance lint findings
 
 The fix MUST resolve the two G704 preflight findings and two G306
 configuration-write findings with existing lint rules enabled. Any
 G704 exception MUST be specific to the reported request and explain
-its runner-controlled test inputs. No package-wide rule exclusion
-or validation-gate change is permitted.
+its runner-controlled test inputs. No package-wide Go lint exclusion
+or change to Go scanner configuration is permitted. The separate
+`yaml-lint-scope` capability defines the permitted YAML exclusions.
 
 #### Scenario: Repeat acceptance-tagged lint
 
@@ -57,4 +58,4 @@ or validation-gate change is permitted.
   acceptance-tagged lint runs
 - **WHEN** the fixed test sources are linted
 - **THEN** those four findings are resolved without changing
-  scanner configuration or suppressing unrelated findings
+  Go scanner configuration or suppressing unrelated Go findings
