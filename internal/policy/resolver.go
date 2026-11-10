@@ -4,12 +4,14 @@ package policy
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/log"
-
-	"github.com/complytime/complyctl/internal/complytime"
 	"github.com/gemaraproj/go-gemara"
 	"github.com/goccy/go-yaml"
+	"github.com/goccy/go-yaml/parser"
+
+	"github.com/complytime/complyctl/internal/complytime"
 )
 
 // DependencyGraph represents a resolved set of Controls, Guidelines, and Assessments
@@ -76,6 +78,7 @@ type PolicyMetadata struct {
 type PolicyLoader interface {
 	LoadLayerByMediaType(policyID, version, mediaType string) ([]byte, error)
 	LoadBundleFiles(policyID, version string) (map[string][]byte, error)
+	LoadBundleArtifacts(policyID, version string) (BundleArtifacts, error)
 	DetectManifestShape(policyID, version string) (isBundleShape bool, err error)
 	PolicyExists(policyID, version string) bool
 	ResolveVersion(policyID, configVersion string) (string, error)
@@ -139,26 +142,25 @@ func (r *Resolver) ExtractPolicyMetadata(
 func (r *Resolver) extractBundleMetadata(
 	policyID, version string,
 ) (PolicyMetadata, error) {
-	files, err := r.loader.LoadBundleFiles(policyID, version)
+	artifacts, err := r.loader.LoadBundleArtifacts(policyID, version)
 	if err != nil {
 		return PolicyMetadata{}, fmt.Errorf(
 			"bundle unpack failed for %s@%s: %w",
 			policyID, version, err)
 	}
 
-	policyData, ok := files["Policy"]
-	if !ok {
+	if artifacts.Source.Type != artifactTypePolicy {
 		return PolicyMetadata{}, fmt.Errorf(
-			"bundle for %s@%s: missing required Policy artifact",
-			policyID, version)
+			"bundle for %s@%s: missing required Policy artifact: bundle source is %q, expected Policy",
+			policyID, version, artifacts.Source.Type)
 	}
 
 	policyResult, parseErr := parsePolicyLayer(
-		policyID, policyData)
+		policyID, artifacts.Source.Data)
 	if parseErr != nil {
 		return PolicyMetadata{}, fmt.Errorf(
-			"failed to parse policy layer for %s: %w",
-			policyID, parseErr)
+			"failed to parse policy layer for %s (%q): %w",
+			policyID, artifacts.Source.Name, parseErr)
 	}
 
 	meta := PolicyMetadata{
@@ -167,14 +169,14 @@ func (r *Resolver) extractBundleMetadata(
 		AssessmentCount: len(policyResult.Assessments),
 	}
 
-	if catalogData, catalogOK := files["ControlCatalog"]; catalogOK {
-		catalog, catErr := parseControlCatalog(catalogData)
+	for _, file := range artifacts.FilesByType(artifactTypeControl) {
+		catalog, catErr := parseControlCatalog(file.Data)
 		if catErr != nil {
 			return PolicyMetadata{}, fmt.Errorf(
-				"policy %s: catalog layer is not valid Gemara: %w",
-				policyID, catErr)
+				"policy %s: catalog layer is not valid Gemara (%q): %w",
+				policyID, file.Name, catErr)
 		}
-		meta.ControlCount = len(catalog.Controls)
+		meta.ControlCount += len(catalog.Controls)
 	}
 
 	return meta, nil
@@ -260,59 +262,114 @@ func (r *Resolver) ResolvePolicyGraph(policyID, version string) (*DependencyGrap
 
 // resolveBundleGraph loads artifacts from a Gemara bundle using bundle.Unpack.
 func (r *Resolver) resolveBundleGraph(policyID, version string) (*DependencyGraph, error) {
-	files, err := r.loader.LoadBundleFiles(policyID, version)
+	artifacts, err := r.loader.LoadBundleArtifacts(policyID, version)
 	if err != nil {
 		return nil, fmt.Errorf("bundle unpack failed for %s@%s: %w", policyID, version, err)
 	}
+	if artifacts.Source.Type != artifactTypePolicy {
+		return nil, fmt.Errorf(
+			"bundle for %s@%s: missing required Policy artifact: bundle source is %q, expected Policy",
+			policyID, version, artifacts.Source.Type)
+	}
+	rootPolicy, err := parsePolicyLayer(policyID, artifacts.Source.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse policy layer for %s (%q): %w", policyID, artifacts.Source.Name, err)
+	}
 
 	graph := &DependencyGraph{
-		PolicyID:    policyID,
-		Controls:    []Control{},
-		Guidelines:  []Guideline{},
-		Assessments: []Assessment{},
+		PolicyID:          policyID,
+		Controls:          []Control{},
+		Guidelines:        []Guideline{},
+		Assessments:       append([]Assessment{}, rootPolicy.Assessments...),
+		EvaluatorID:       rootPolicy.EvaluatorID,
+		Timeline:          rootPolicy.Timeline,
+		MappingReferences: append([]gemara.MappingReference{}, rootPolicy.MappingReferences...),
 	}
-
-	if catalogData, ok := files["ControlCatalog"]; ok {
-		ctrl := Control{
-			ID:      policyID + "-catalog",
-			Content: catalogData,
-		}
-		parsed, parseErr := parseControlCatalog(catalogData)
-		if parseErr != nil {
-			return nil, fmt.Errorf("policy %s: catalog layer is not valid Gemara: %w", policyID, parseErr)
-		}
-		ctrl.Parsed = parsed
-		graph.Controls = append(graph.Controls, ctrl)
+	if err := appendBundleCatalogs(graph, artifacts); err != nil {
+		return nil, err
 	}
-
-	if guidanceData, ok := files["GuidanceCatalog"]; ok {
-		gl := Guideline{
-			ID:      policyID + "-guidance",
-			Content: guidanceData,
-		}
-		parsed, parseErr := parseGuidanceCatalog(guidanceData)
-		if parseErr != nil {
-			return nil, fmt.Errorf("policy %s: guidance layer is not valid Gemara: %w", policyID, parseErr)
-		}
-		gl.Parsed = parsed
-		graph.Guidelines = append(graph.Guidelines, gl)
+	if err := appendBundlePolicies(graph, artifacts); err != nil {
+		return nil, err
 	}
-
-	policyData, ok := files["Policy"]
-	if !ok {
-		return nil, fmt.Errorf("bundle for %s@%s: missing required Policy artifact", policyID, version)
-	}
-
-	policyLayer, parseErr := parsePolicyLayer(policyID, policyData)
-	if parseErr != nil {
-		return nil, fmt.Errorf("failed to parse policy layer for %s: %w", policyID, parseErr)
-	}
-	graph.EvaluatorID = policyLayer.EvaluatorID
-	graph.Assessments = append(graph.Assessments, policyLayer.Assessments...)
-	graph.Timeline = policyLayer.Timeline
-	graph.MappingReferences = policyLayer.MappingReferences
-
 	return graph, nil
+}
+
+func appendBundleCatalogs(graph *DependencyGraph, artifacts BundleArtifacts) error {
+	for index, file := range artifacts.FilesByType(artifactTypeControl) {
+		catalog, parseErr := parseControlCatalog(file.Data)
+		if parseErr != nil {
+			return fmt.Errorf("policy %s: catalog layer is not valid Gemara (%q): %w",
+				graph.PolicyID, file.Name, parseErr)
+		}
+		id := catalog.Metadata.Id
+		if id == "" {
+			id = fmt.Sprintf("%s-catalog-%d", graph.PolicyID, index)
+		}
+		graph.Controls = append(graph.Controls, Control{ID: id, Content: file.Data, Parsed: catalog})
+	}
+
+	for index, file := range artifacts.FilesByType(artifactTypeGuidance) {
+		guidance, parseErr := parseGuidanceCatalog(file.Data)
+		if parseErr != nil {
+			return fmt.Errorf("policy %s: guidance layer is not valid Gemara (%q): %w",
+				graph.PolicyID, file.Name, parseErr)
+		}
+		id := guidance.Metadata.Id
+		if id == "" {
+			id = fmt.Sprintf("%s-guidance-%d", graph.PolicyID, index)
+		}
+		graph.Guidelines = append(graph.Guidelines, Guideline{ID: id, Content: file.Data, Parsed: guidance})
+	}
+	return nil
+}
+
+func appendBundlePolicies(graph *DependencyGraph, artifacts BundleArtifacts) error {
+	declarations := make(map[string]assessmentPlanDeclaration)
+	if err := registerAssessmentPlans(declarations, graph.Assessments, artifacts.Source.Name); err != nil {
+		return err
+	}
+	for _, file := range artifacts.ImportsByType(artifactTypePolicy) {
+		imported, parseErr := parsePolicyLayer(graph.PolicyID, file.Data)
+		if parseErr != nil {
+			return fmt.Errorf("parse imported policy %q: %w", file.Name, parseErr)
+		}
+		if err := registerAssessmentPlans(declarations, imported.Assessments, file.Name); err != nil {
+			return err
+		}
+		graph.Assessments = append(graph.Assessments, imported.Assessments...)
+		graph.MappingReferences = append(graph.MappingReferences, imported.MappingReferences...)
+		// Only the importing/root Policy may set whole-graph evaluator routing.
+		// An imported default must not capture other imports or a mixed root.
+		if graph.Timeline == nil {
+			graph.Timeline = imported.Timeline
+		}
+	}
+
+	return nil
+}
+
+type assessmentPlanDeclaration struct {
+	artifact      string
+	requirementID string
+}
+
+// Plan IDs share one namespace in provider dispatch and scan result mapping.
+// Even equal requirement IDs cannot make duplicate configurations unambiguous.
+func registerAssessmentPlans(
+	declarations map[string]assessmentPlanDeclaration, assessments []Assessment, artifact string,
+) error {
+	for _, assessment := range assessments {
+		if previous, exists := declarations[assessment.ID]; exists {
+			return fmt.Errorf(
+				"duplicate assessment plan ID %q: %q (requirement %q) and %q (requirement %q)",
+				assessment.ID, previous.artifact, previous.requirementID,
+				artifact, assessment.RequirementID)
+		}
+		declarations[assessment.ID] = assessmentPlanDeclaration{
+			artifact: artifact, requirementID: assessment.RequirementID,
+		}
+	}
+	return nil
 }
 
 // resolveSplitGraph loads artifacts by matching distinct OCI layer media types.
@@ -361,6 +418,11 @@ func (r *Resolver) resolveSplitGraph(policyID, version string) (*DependencyGraph
 	if parseErr != nil {
 		return nil, fmt.Errorf("failed to parse policy layer for %s: %w", policyID, parseErr)
 	}
+	if err := registerAssessmentPlans(
+		make(map[string]assessmentPlanDeclaration), policyLayer.Assessments, policyID,
+	); err != nil {
+		return nil, err
+	}
 	graph.EvaluatorID = policyLayer.EvaluatorID
 	graph.Assessments = append(graph.Assessments, policyLayer.Assessments...)
 	graph.Timeline = policyLayer.Timeline
@@ -370,6 +432,9 @@ func (r *Resolver) resolveSplitGraph(policyID, version string) (*DependencyGraph
 }
 
 func parseControlCatalog(data []byte) (*gemara.ControlCatalog, error) {
+	if err := validateArtifactType(data, gemara.ControlCatalogArtifact); err != nil {
+		return nil, err
+	}
 	var catalog gemara.ControlCatalog
 	if err := yaml.Unmarshal(data, &catalog); err != nil {
 		return nil, fmt.Errorf("failed to parse control catalog YAML: %w", err)
@@ -378,6 +443,9 @@ func parseControlCatalog(data []byte) (*gemara.ControlCatalog, error) {
 }
 
 func parseGuidanceCatalog(data []byte) (*gemara.GuidanceCatalog, error) {
+	if err := validateArtifactType(data, gemara.GuidanceCatalogArtifact); err != nil {
+		return nil, err
+	}
 	var doc gemara.GuidanceCatalog
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return nil, fmt.Errorf("failed to parse guidance catalog YAML: %w", err)
@@ -393,19 +461,41 @@ type policyLayerResult struct {
 	MappingReferences []gemara.MappingReference
 }
 
-// parsePolicyLayer accepts only gemara.Policy with adherence.assessment-plans (R39).
-// Returns an error for invalid YAML or missing assessment plans — no fallback.
+// parsePolicyLayer decodes roots and imports through the same Gemara boundary.
+// A Policy may mandate only guidance; plan count does not establish validity.
 func parsePolicyLayer(policyID string, data []byte) (policyLayerResult, error) {
+	if err := validateArtifactType(data, gemara.PolicyArtifact); err != nil {
+		return policyLayerResult{}, fmt.Errorf(
+			"policy %s: layer is not valid Gemara Policy YAML: %w", policyID, err)
+	}
 	var gemaraPolicy gemara.Policy
 	if err := yaml.Unmarshal(data, &gemaraPolicy); err != nil {
 		return policyLayerResult{}, fmt.Errorf(
 			"policy %s: layer is not valid Gemara Policy YAML: %w", policyID, err)
 	}
-	if len(gemaraPolicy.Adherence.AssessmentPlans) == 0 {
+	if strings.TrimSpace(gemaraPolicy.Metadata.Id) == "" {
 		return policyLayerResult{}, fmt.Errorf(
-			"policy %s: Gemara Policy has no adherence.assessment-plans", policyID)
+			"policy %s: Gemara Policy metadata.id cannot be empty", policyID)
 	}
 	return extractFromGemaraPolicy(&gemaraPolicy), nil
+}
+
+func validateArtifactType(data []byte, expected gemara.ArtifactType) error {
+	file, err := parser.ParseBytes(data, 0)
+	if err != nil {
+		return err
+	}
+	if len(file.Docs) != 1 {
+		return fmt.Errorf("expected exactly one %s document, got %d", expected, len(file.Docs))
+	}
+	typ, err := gemara.DetectType(data)
+	if err != nil {
+		return err
+	}
+	if typ != expected {
+		return fmt.Errorf("metadata.type is %q, expected %s", typ, expected)
+	}
+	return nil
 }
 
 // extractFromGemaraPolicy converts a Gemara Policy into a policyLayerResult.

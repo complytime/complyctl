@@ -707,7 +707,7 @@ func needsRegeneration(baseDir string, genState *policy.GenerationState, digest 
 		return true
 	}
 	if !genState.IsFresh(digest, complypackDigests) {
-		fmt.Fprintf(os.Stderr, "Policy or complypack updated for %s since last generate — regenerating\n", eid)
+		fmt.Fprintf(os.Stderr, "Policy, complypack, or generation projection updated for %s — regenerating\n", eid)
 		return true
 	}
 	if !evaluatorArtifactsExist(baseDir, genState.EvaluatorIDs) {

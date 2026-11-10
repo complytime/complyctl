@@ -84,6 +84,29 @@
   existing-release recovery guidance in `docs/RELEASE_PROCESS.md`.
   Spec: `openspec/changes/fix-homebrew-publish-auth/specs/homebrew-publishing/spec.md`
 
+- Duplicate assessment plan IDs now fail graph resolution before generation
+  or scanning, with the plan ID and both declaring artifacts and requirements
+  in the error. This includes duplicates within a Policy and across imports,
+  even when requirement IDs match; unique authored IDs remain unchanged.
+- Generation state now records the assessment projection version. After
+  upgrading, the next scan automatically regenerates older, unversioned
+  state even if policy/complypack digests and evaluator directories are
+  unchanged, so imported plans enter provider-generated artifacts. Successful
+  generation persists the version; subsequent unchanged scans reuse artifacts.
+  The first scan after upgrade requires the configured providers, including
+  for single-Policy workspaces. Digest and missing-artifact checks still apply.
+- Policy streams now require exactly one document; supporting catalogs reject
+  mismatched artifact types. Root evaluator routing retains importing Policy
+  precedence without letting the first import override a mixed or unbound root.
+- Guidance-only Gemara Policies with zero assessment plans now load as
+  bundle roots, split-layer policies, and supporting imports. Metadata
+  and graphs retain catalogs, guidance, references, and timelines without
+  inventing assessments. Empty or incorrectly typed Policy inputs still
+  fail validation.
+- Gemara bundles now retain every supporting control and guidance catalog
+  and include assessments from imported Policies. Multi-artifact scans no
+  longer silently omit later artifacts; policy summaries count controls
+  across all bundled catalogs.
 - Scans where all controls are not-applicable now report
   `NotApplicable` aggregate result instead of `Passed`. This
   corrects a semantic error in upstream `go-gemara` result

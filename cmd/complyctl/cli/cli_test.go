@@ -1915,10 +1915,7 @@ func TestNeedsRegeneration_NilState(t *testing.T) {
 }
 
 func TestNeedsRegeneration_StaleDigest(t *testing.T) {
-	state := &policy.GenerationState{
-		PolicyDigest: cachetest.DigestA,
-		EvaluatorIDs: []string{"ampel"},
-	}
+	state := policy.NewGenerationState("test-policy", cachetest.DigestA, []string{"ampel"}, nil)
 	assert.True(t, needsRegeneration(".", state, cachetest.DigestB, nil, "test-policy"),
 		"mismatched digest should require regeneration")
 }
@@ -1929,10 +1926,7 @@ func TestNeedsRegeneration_FreshWithArtifacts(t *testing.T) {
 	require.NoError(t, os.MkdirAll(evalDir, 0750))
 	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "policy.rego"), []byte("package test"), 0600))
 
-	state := &policy.GenerationState{
-		PolicyDigest: cachetest.DigestA,
-		EvaluatorIDs: []string{"ampel"},
-	}
+	state := policy.NewGenerationState("test-policy", cachetest.DigestA, []string{"ampel"}, nil)
 	assert.False(t, needsRegeneration(baseDir, state, cachetest.DigestA, nil, "test-policy"),
 		"fresh digest with existing artifacts should not require regeneration")
 }
@@ -1940,10 +1934,7 @@ func TestNeedsRegeneration_FreshWithArtifacts(t *testing.T) {
 func TestNeedsRegeneration_FreshButArtifactsMissing(t *testing.T) {
 	baseDir := t.TempDir()
 	// Do not create the evaluator directory — simulates deleted artifacts.
-	state := &policy.GenerationState{
-		PolicyDigest: cachetest.DigestA,
-		EvaluatorIDs: []string{"ampel"},
-	}
+	state := policy.NewGenerationState("test-policy", cachetest.DigestA, []string{"ampel"}, nil)
 	assert.True(t, needsRegeneration(baseDir, state, cachetest.DigestA, nil, "test-policy"),
 		"fresh digest but missing artifacts should require regeneration")
 }
@@ -1954,11 +1945,8 @@ func TestNeedsRegeneration_ComplypackDigestChanged(t *testing.T) {
 	require.NoError(t, os.MkdirAll(evalDir, 0750))
 	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "policy.rego"), []byte("package test"), 0600))
 
-	state := &policy.GenerationState{
-		PolicyDigest:      cachetest.DigestA,
-		ComplypackDigests: map[string]string{"opa": cachetest.DigestB},
-		EvaluatorIDs:      []string{"ampel"},
-	}
+	state := policy.NewGenerationState("test-policy", cachetest.DigestA, []string{"ampel"},
+		map[string]string{"opa": cachetest.DigestB})
 	assert.True(t, needsRegeneration(baseDir, state, cachetest.DigestA,
 		map[string]string{"opa": cachetest.DigestC}, "test-policy"),
 		"changed complypack digest should require regeneration")

@@ -86,27 +86,28 @@ func TestLoadGenerationState_CorruptJSON(t *testing.T) {
 // --- T153: IsFresh tests ---
 
 func TestIsFresh_MatchingDigest(t *testing.T) {
-	s := &GenerationState{PolicyDigest: "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"}
+	s := NewGenerationState("test", "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", nil, nil)
 	assert.True(t, s.IsFresh("sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", nil))
 }
 
 func TestIsFresh_MismatchedDigest(t *testing.T) {
-	s := &GenerationState{PolicyDigest: "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"}
+	s := NewGenerationState("test", "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", nil, nil)
 	assert.False(t, s.IsFresh("sha256:d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5", nil))
 }
 
 func TestIsFresh_EmptyDigest(t *testing.T) {
-	s := &GenerationState{PolicyDigest: ""}
+	s := NewGenerationState("test", "", nil, nil)
 	assert.False(t, s.IsFresh("sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", nil))
 }
 
 func TestIsFresh_BothEmpty(t *testing.T) {
-	s := &GenerationState{PolicyDigest: ""}
+	s := NewGenerationState("test", "", nil, nil)
 	assert.True(t, s.IsFresh("", nil))
 }
 
 func TestIsFresh_ComplypackDigestChanged(t *testing.T) {
 	s := &GenerationState{
+		ProjectionVersion: currentGenerationProjectionVersion,
 		PolicyDigest:      "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
 		ComplypackDigests: map[string]string{"opa": "sha256:4444444444444444444444444444444444444444444444444444444444444444"},
 	}
@@ -114,18 +115,19 @@ func TestIsFresh_ComplypackDigestChanged(t *testing.T) {
 }
 
 func TestIsFresh_ComplypackDigestAdded(t *testing.T) {
-	s := &GenerationState{PolicyDigest: "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"}
+	s := NewGenerationState("test", "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", nil, nil)
 	assert.False(t, s.IsFresh("sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", map[string]string{"opa": "sha256:1111111111111111111111111111111111111111111111111111111111111111"}))
 }
 
 func TestIsFresh_NilVsEmptyComplypackDigests(t *testing.T) {
-	s := &GenerationState{PolicyDigest: "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"}
+	s := NewGenerationState("test", "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", nil, nil)
 	assert.True(t, s.IsFresh("sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2", map[string]string{}),
 		"nil and empty map both mean no complypacks")
 }
 
 func TestIsFresh_ComplypackDigestRemoved(t *testing.T) {
 	s := &GenerationState{
+		ProjectionVersion: currentGenerationProjectionVersion,
 		PolicyDigest:      "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
 		ComplypackDigests: map[string]string{"opa": "sha256:1111111111111111111111111111111111111111111111111111111111111111"},
 	}
@@ -136,6 +138,7 @@ func TestIsFresh_ComplypackDigestRemoved(t *testing.T) {
 func TestIsFresh_MatchingComplypackDigests(t *testing.T) {
 	cpDigests := map[string]string{"opa": "sha256:1111111111111111111111111111111111111111111111111111111111111111", "ampel": "sha256:2222222222222222222222222222222222222222222222222222222222222222"}
 	s := &GenerationState{
+		ProjectionVersion: currentGenerationProjectionVersion,
 		PolicyDigest:      "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
 		ComplypackDigests: cpDigests,
 	}

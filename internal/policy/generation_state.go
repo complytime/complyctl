@@ -21,6 +21,7 @@ import (
 // {workspace}/{WorkspaceDir}/generation/{policy-id}.json
 // See R37: specs/001-gemara-native-workflow/research.md
 type GenerationState struct {
+	ProjectionVersion int               `json:"projection_version"`
 	PolicyID          string            `json:"policy_id"`
 	PolicyDigest      string            `json:"policy_digest"`
 	ComplypackDigests map[string]string `json:"complypack_digests,omitempty"`
@@ -69,10 +70,10 @@ func LoadGenerationState(baseDir, policyID string) (*GenerationState, error) {
 	return &state, nil
 }
 
-// IsFresh returns true when the persisted policy digest and complypack digests
-// both match their current values from the cache.
+// IsFresh returns true when the persisted projection version, policy digest,
+// and complypack digests match their current values. Unversioned state is stale.
 func (s *GenerationState) IsFresh(currentDigest string, currentComplypackDigests map[string]string) bool {
-	if s.PolicyDigest != currentDigest {
+	if s.ProjectionVersion != currentGenerationProjectionVersion || s.PolicyDigest != currentDigest {
 		return false
 	}
 	return maps.Equal(normalizeNilMap(s.ComplypackDigests), normalizeNilMap(currentComplypackDigests))
@@ -85,9 +86,11 @@ func normalizeNilMap(m map[string]string) map[string]string {
 	return m
 }
 
-// NewGenerationState creates a GenerationState with the current timestamp.
+// NewGenerationState creates state for successful generation using the current
+// projection version and timestamp.
 func NewGenerationState(policyID, digest string, evaluatorIDs []string, complypackDigests map[string]string) *GenerationState {
 	return &GenerationState{
+		ProjectionVersion: currentGenerationProjectionVersion,
 		PolicyID:          policyID,
 		PolicyDigest:      digest,
 		ComplypackDigests: complypackDigests,

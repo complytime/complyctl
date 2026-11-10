@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gemaraproj/go-gemara"
+	"github.com/gemaraproj/go-gemara/bundle"
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,22 +15,24 @@ import (
 
 // mockPolicyLoader satisfies PolicyLoader for resolver unit tests.
 type mockPolicyLoader struct {
-	layers         map[string][]byte            // key: "policyID/version/mediaType"
-	exists         map[string]bool              // key: "policyID/version"
-	versions       map[string]string            // key: "policyID/configVersion" → resolved version
-	bundleFiles    map[string]map[string][]byte // key: "policyID/version" → type → data
-	bundleShape    map[string]bool              // key: "policyID/version" → true if bundle
-	bundleShapeErr map[string]error             // key: "policyID/version" → error for DetectManifestShape
+	layers          map[string][]byte            // key: "policyID/version/mediaType"
+	exists          map[string]bool              // key: "policyID/version"
+	versions        map[string]string            // key: "policyID/configVersion" → resolved version
+	bundleFiles     map[string]map[string][]byte // key: "policyID/version" → type → data
+	bundleArtifacts map[string]BundleArtifacts
+	bundleShape     map[string]bool  // key: "policyID/version" → true if bundle
+	bundleShapeErr  map[string]error // key: "policyID/version" → error for DetectManifestShape
 }
 
 func newMockLoader() *mockPolicyLoader {
 	return &mockPolicyLoader{
-		layers:         make(map[string][]byte),
-		exists:         make(map[string]bool),
-		versions:       make(map[string]string),
-		bundleFiles:    make(map[string]map[string][]byte),
-		bundleShape:    make(map[string]bool),
-		bundleShapeErr: make(map[string]error),
+		layers:          make(map[string][]byte),
+		exists:          make(map[string]bool),
+		versions:        make(map[string]string),
+		bundleFiles:     make(map[string]map[string][]byte),
+		bundleArtifacts: make(map[string]BundleArtifacts),
+		bundleShape:     make(map[string]bool),
+		bundleShapeErr:  make(map[string]error),
 	}
 }
 
@@ -47,6 +50,42 @@ func (m *mockPolicyLoader) LoadBundleFiles(policyID, version string) (map[string
 		return files, nil
 	}
 	return nil, fmt.Errorf("bundle files not found for %s", key)
+}
+
+func (m *mockPolicyLoader) LoadBundleArtifacts(policyID, version string) (BundleArtifacts, error) {
+	key := policyID + "/" + version
+	if artifacts, ok := m.bundleArtifacts[key]; ok {
+		return artifacts, nil
+	}
+	files, err := m.LoadBundleFiles(policyID, version)
+	if err != nil {
+		return BundleArtifacts{}, err
+	}
+	var artifacts BundleArtifacts
+	seen := make(map[string]bool)
+	for _, typ := range []string{"Policy", "ControlCatalog", "GuidanceCatalog"} {
+		if data, ok := files[typ]; ok {
+			file := bundle.File{Name: typ + ".yaml", Type: typ, Data: data}
+			if artifacts.Source.Name == "" {
+				artifacts.Source = file
+			} else {
+				artifacts.Imports = append(artifacts.Imports, file)
+			}
+			seen[typ] = true
+		}
+	}
+	for typ, data := range files {
+		if seen[typ] {
+			continue
+		}
+		file := bundle.File{Name: typ + ".yaml", Type: typ, Data: data}
+		if artifacts.Source.Name == "" {
+			artifacts.Source = file
+		} else {
+			artifacts.Imports = append(artifacts.Imports, file)
+		}
+	}
+	return artifacts, nil
 }
 
 func (m *mockPolicyLoader) DetectManifestShape(policyID, version string) (bool, error) {
@@ -99,6 +138,7 @@ func TestResolvePolicyGraph_AllThreeLayers(t *testing.T) {
 	ml.layers["test-policy/v1/application/vnd.gemara.catalog.v1+yaml"] = []byte(`
 title: Test Catalog
 metadata:
+  type: ControlCatalog
   id: cat-1
   version: "1.0"
 controls: []
@@ -107,6 +147,7 @@ controls: []
 	ml.layers["test-policy/v1/application/vnd.gemara.guidance.v1+yaml"] = []byte(`
 title: Test Guidance
 metadata:
+  type: GuidanceCatalog
   id: guide-1
   version: "1.0"
 guidelines: []
@@ -214,7 +255,9 @@ func TestParsePolicyLayer_InvalidYAML(t *testing.T) {
 	assert.Contains(t, err.Error(), "not valid Gemara Policy YAML")
 }
 
-func TestParsePolicyLayer_MissingAssessmentPlans(t *testing.T) {
+// Replaces the R39 rejection: the user clarified that roots may mandate
+// guidance without any assessment plans. Zero plans are not invalid input.
+func TestParsePolicyLayer_EmptyAdherence(t *testing.T) {
 	yamlData := []byte(`
 title: Empty Adherence
 metadata:
@@ -236,9 +279,11 @@ imports:
     - reference-id: cat-1
 adherence: {}
 `)
-	_, err := parsePolicyLayer("pol-empty", yamlData)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "no adherence.assessment-plans")
+	result, err := parsePolicyLayer("pol-empty", yamlData)
+	require.NoError(t, err)
+	assert.Equal(t, "Empty Adherence", result.Title)
+	assert.Empty(t, result.Assessments)
+	assert.Empty(t, result.EvaluatorID)
 }
 
 func TestParsePolicyLayer_SingleAssessmentPlan(t *testing.T) {
@@ -510,6 +555,7 @@ func TestResolvePolicyGraph_CatalogLoadError_PartialGraph(t *testing.T) {
 	ml.layers["partial/v1/application/vnd.gemara.guidance.v1+yaml"] = []byte(`
 title: Test Guidance
 metadata:
+  type: GuidanceCatalog
   id: guide-1
   version: "1.0"
 guidelines: []
@@ -532,6 +578,7 @@ func TestResolvePolicyGraph_PolicyLayerLoadError(t *testing.T) {
 	ml.layers["no-policy/v1/application/vnd.gemara.catalog.v1+yaml"] = []byte(`
 title: Test Catalog
 metadata:
+  type: ControlCatalog
   id: cat-1
   version: "1.0"
 controls: []
@@ -545,6 +592,164 @@ controls: []
 
 // --- Bundle-shape resolver tests (US1: 005-bundle-resolver-alignment) ---
 
+func testBundlePolicyYAML(id, evaluator, start string) string {
+	return fmt.Sprintf(`metadata:
+  id: %s
+  type: Policy
+  mapping-references:
+    - id: %s-mapping
+      title: %s mapping
+title: %s
+adherence:
+  evaluation-methods:
+    - executor:
+        id: %q
+  assessment-plans:
+    - id: %s-plan
+      requirement-id: %s-req
+implementation-plan:
+  evaluation-timeline:
+    start: %q
+`, id, id, id, id, evaluator, id, id, start)
+}
+
+func testGuidanceYAML(id string) string {
+	return fmt.Sprintf("metadata:\n  id: %s\n  type: GuidanceCatalog\nguidelines: []\n", id)
+}
+
+func TestResolveBundleGraphMultipleCatalogsAndParentPolicy(t *testing.T) {
+	files := []bundle.File{
+		{Name: "root.yaml", Type: "Policy", Data: []byte(testBundlePolicyYAML(
+			"root-policy", "root-evaluator", "2026-01-01T00:00:00Z"))},
+		{Name: "catalog-a.yaml", Type: "ControlCatalog", Data: []byte(testCatalogYAML("catalog-a"))},
+		{Name: "catalog-b.yaml", Type: "ControlCatalog", Data: []byte(testCatalogYAML("catalog-b") + "  - id: extra-control\n")},
+		{Name: "guidance-a.yaml", Type: "GuidanceCatalog", Data: []byte(testGuidanceYAML("guidance-a"))},
+		{Name: "parent.yaml", Type: "Policy", Data: []byte(testBundlePolicyYAML(
+			"parent-policy", "parent-evaluator", "2025-01-01T00:00:00Z"))},
+		{Name: "guidance-b.yaml", Type: "GuidanceCatalog", Data: []byte(testGuidanceYAML("guidance-b"))},
+		{Name: "grandparent.yaml", Type: "Policy", Data: []byte(testBundlePolicyYAML(
+			"grandparent-policy", "grandparent-evaluator", "2024-01-01T00:00:00Z"))},
+	}
+	r := NewResolver(seedBundlePolicy(t, "multi", "v1", files))
+	graph, err := r.ResolvePolicyGraph("multi", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, "multi", graph.PolicyID)
+	require.Len(t, graph.Controls, 2)
+	for i, tt := range []struct {
+		id   string
+		file bundle.File
+	}{{"catalog-a", files[1]}, {"catalog-b", files[2]}} {
+		assert.Equal(t, tt.id, graph.Controls[i].ID)
+		assert.Equal(t, tt.file.Data, graph.Controls[i].Content)
+		assert.Equal(t, tt.id, graph.Controls[i].Parsed.Metadata.Id)
+		require.Len(t, graph.Controls[i].Parsed.Controls, i+1)
+		assert.Equal(t, tt.id+"-control", graph.Controls[i].Parsed.Controls[0].Id)
+	}
+	require.Len(t, graph.Guidelines, 2)
+	assert.Equal(t, "guidance-a", graph.Guidelines[0].ID)
+	assert.Equal(t, "guidance-b", graph.Guidelines[1].ID)
+	assert.Equal(t, files[3].Data, graph.Guidelines[0].Content)
+	assert.Equal(t, files[5].Data, graph.Guidelines[1].Content)
+	assert.Equal(t, "guidance-b", graph.Guidelines[1].Parsed.Metadata.Id)
+	assert.Equal(t, []Assessment{
+		{ID: "root-policy-plan", RequirementID: "root-policy-req", EvaluatorID: "root-evaluator"},
+		{ID: "parent-policy-plan", RequirementID: "parent-policy-req", EvaluatorID: "parent-evaluator"},
+		{ID: "grandparent-policy-plan", RequirementID: "grandparent-policy-req",
+			EvaluatorID: "grandparent-evaluator"},
+	}, graph.Assessments)
+	assert.Equal(t, []gemara.MappingReference{
+		{Id: "root-policy-mapping", Title: "root-policy mapping"},
+		{Id: "parent-policy-mapping", Title: "parent-policy mapping"},
+		{Id: "grandparent-policy-mapping", Title: "grandparent-policy mapping"},
+	}, graph.MappingReferences)
+	assert.Equal(t, "root-evaluator", graph.EvaluatorID)
+	require.NotNil(t, graph.Timeline)
+	assert.Equal(t, "2026-01-01T00:00:00Z", graph.Timeline.EvaluationStart)
+	metadata, err := r.ExtractPolicyMetadata("multi", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, PolicyMetadata{
+		Title: "root-policy", EvaluatorID: "root-evaluator", ControlCount: 3, AssessmentCount: 1,
+	}, metadata)
+}
+
+func TestResolveBundleGraph_ImportedDefaultsAndMissingCatalogIDs(t *testing.T) {
+	loader := newMockLoader()
+	loader.exists["multi/v1"] = true
+	loader.bundleShape["multi/v1"] = true
+	loader.bundleArtifacts["multi/v1"] = BundleArtifacts{
+		Source: bundle.File{Name: "root.yaml", Type: "Policy", Data: []byte(testPolicyYAML("root"))},
+		Imports: []bundle.File{
+			{Name: "a.yaml", Type: "ControlCatalog", Data: []byte(testCatalogYAML(""))},
+			{Name: "b.yaml", Type: "ControlCatalog", Data: []byte(testCatalogYAML(""))},
+			{Name: "c.yaml", Type: "GuidanceCatalog", Data: []byte(testGuidanceYAML(""))},
+			{Name: "d.yaml", Type: "GuidanceCatalog", Data: []byte(testGuidanceYAML(""))},
+			{Name: "parent.yaml", Type: "Policy", Data: []byte(testBundlePolicyYAML(
+				"parent", "parent-evaluator", "2025-01-01T00:00:00Z"))},
+			{Name: "grandparent.yaml", Type: "Policy", Data: []byte(testBundlePolicyYAML(
+				"grandparent", "grandparent-evaluator", "2024-01-01T00:00:00Z"))},
+		},
+	}
+	graph, err := NewResolver(loader).ResolvePolicyGraph("multi", "v1")
+	require.NoError(t, err)
+	require.Len(t, graph.Controls, 2)
+	assert.Equal(t, "multi-catalog-0", graph.Controls[0].ID)
+	assert.Equal(t, "multi-catalog-1", graph.Controls[1].ID)
+	assert.Empty(t, graph.Controls[0].Parsed.Metadata.Id)
+	require.Len(t, graph.Guidelines, 2)
+	assert.Equal(t, "multi-guidance-0", graph.Guidelines[0].ID)
+	assert.Equal(t, "multi-guidance-1", graph.Guidelines[1].ID)
+	assert.Empty(t, graph.EvaluatorID, "imports must not set whole-graph routing")
+	require.NotNil(t, graph.Timeline)
+	assert.Equal(t, "2025-01-01T00:00:00Z", graph.Timeline.EvaluationStart)
+	require.Len(t, graph.Assessments, 3)
+	assert.Empty(t, graph.Assessments[0].EvaluatorID)
+	assert.Equal(t, "grandparent-plan", graph.Assessments[2].ID)
+}
+
+func TestExtractBundleMetadata_MultipleCatalogs(t *testing.T) {
+	r := NewResolver(seedBundlePolicy(t, "multi", "v1", []bundle.File{
+		{Name: "root.yaml", Type: "Policy", Data: []byte(testBundlePolicyYAML("root", "opa", ""))},
+		{Name: "a.yaml", Type: "ControlCatalog", Data: []byte(testCatalogYAML("a"))},
+		{Name: "b.yaml", Type: "ControlCatalog", Data: []byte(testCatalogYAML("b") + "  - id: b-extra\n  - id: b-third\n")},
+		{Name: "parent.yaml", Type: "Policy", Data: []byte(testPolicyYAML("parent"))},
+	}))
+	metadata, err := r.ExtractPolicyMetadata("multi", "v1")
+	require.NoError(t, err)
+	assert.Equal(t, PolicyMetadata{
+		Title: "root", EvaluatorID: "opa", ControlCount: 4, AssessmentCount: 1,
+	}, metadata)
+}
+
+func TestResolveBundleGraph_RejectsNonPolicySource(t *testing.T) {
+	loader := seedBundlePolicy(t, "wrong-root", "v1", []bundle.File{
+		{Name: "root.yaml", Type: "ControlCatalog", Data: []byte(testCatalogYAML("root"))},
+		{Name: "parent.yaml", Type: "Policy", Data: []byte(testPolicyYAML("parent"))},
+	})
+	r := NewResolver(loader)
+	_, err := r.ResolvePolicyGraph("wrong-root", "v1")
+	require.ErrorContains(t, err, `bundle source is "ControlCatalog", expected Policy`)
+	_, err = r.ExtractPolicyMetadata("wrong-root", "v1")
+	require.ErrorContains(t, err, `bundle source is "ControlCatalog", expected Policy`)
+}
+
+func TestResolveBundleGraph_MalformedSupportingArtifacts(t *testing.T) {
+	for _, typ := range []string{"ControlCatalog", "GuidanceCatalog", "Policy"} {
+		t.Run(typ, func(t *testing.T) {
+			r := NewResolver(seedBundlePolicy(t, "malformed", "v1", []bundle.File{
+				{Name: "root.yaml", Type: "Policy", Data: []byte(testPolicyYAML("root"))},
+				{Name: "valid.yaml", Type: "ControlCatalog", Data: []byte(testCatalogYAML("valid"))},
+				{Name: "invalid.yaml", Type: typ, Data: []byte("{invalid: yaml: [}")},
+			}))
+			_, err := r.ResolvePolicyGraph("malformed", "v1")
+			require.ErrorContains(t, err, "invalid.yaml")
+			if typ == "ControlCatalog" {
+				_, err = r.ExtractPolicyMetadata("malformed", "v1")
+				require.ErrorContains(t, err, "invalid.yaml")
+			}
+		})
+	}
+}
+
 func TestResolvePolicyGraph_BundleAllThreeArtifacts(t *testing.T) {
 	ml := newMockLoader()
 	ml.exists["bundle-policy/v1"] = true
@@ -553,6 +758,7 @@ func TestResolvePolicyGraph_BundleAllThreeArtifacts(t *testing.T) {
 		"ControlCatalog": []byte(`
 title: Test Catalog
 metadata:
+  type: ControlCatalog
   id: cat-1
   version: "1.0"
 controls: []
@@ -560,6 +766,7 @@ controls: []
 		"GuidanceCatalog": []byte(`
 title: Test Guidance
 metadata:
+  type: GuidanceCatalog
   id: guide-1
   version: "1.0"
 guidelines: []
@@ -602,6 +809,7 @@ func TestResolvePolicyGraph_BundleMissingPolicy(t *testing.T) {
 		"ControlCatalog": []byte(`
 title: Test Catalog
 metadata:
+  type: ControlCatalog
   id: cat-1
   version: "1.0"
 controls: []
@@ -690,6 +898,7 @@ func TestResolvePolicyGraph_BundleVerifyParsedFields(t *testing.T) {
 		"ControlCatalog": []byte(`
 title: Parsed Catalog
 metadata:
+  type: ControlCatalog
   id: cat-parsed
   version: "1.0"
 controls: []
@@ -697,6 +906,7 @@ controls: []
 		"GuidanceCatalog": []byte(`
 title: Parsed Guidance
 metadata:
+  type: GuidanceCatalog
   id: guide-parsed
   version: "1.0"
 guidelines: []
@@ -883,6 +1093,7 @@ func TestResolver_ExtractPolicyMetadata_MultiEvaluator(t *testing.T) {
 title: Multi Evaluator Policy
 metadata:
   id: pol-multi
+  type: Policy
   version: "1.0"
 contacts:
   responsible:
@@ -935,6 +1146,7 @@ func TestResolver_ExtractPolicyMetadata_EmptyTitle(t *testing.T) {
 title: ""
 metadata:
   id: pol-notitle
+  type: Policy
   version: "1.0"
 contacts:
   responsible:
@@ -992,6 +1204,7 @@ func validCatalogYAML() []byte {
 	return []byte(`
 title: Test Catalog
 metadata:
+  type: ControlCatalog
   id: cat-1
   version: "1.0"
 controls:

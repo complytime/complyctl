@@ -32,6 +32,8 @@ func ExtractAssessmentConfigs(graph *DependencyGraph) []provider.AssessmentConfi
 }
 
 // GroupByEvaluator groups assessment configs by EvaluatorID.
+// A resolved importing/root Policy evaluator takes precedence over imported
+// settings. With no root shortcut, each config retains its own evaluator.
 // See R32: specs/001-gemara-native-workflow/research.md
 func GroupByEvaluator(configs []provider.AssessmentConfiguration, graph *DependencyGraph) map[string]EvaluatorGroup {
 	groups := make(map[string]EvaluatorGroup)
