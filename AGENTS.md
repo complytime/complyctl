@@ -67,6 +67,10 @@ make test-homebrew
 make test-homebrew-publish
 # → bash ./tests/homebrew_publish_test.sh
 
+# Offline release notes preview regression tests (requires Python 3.9+ and PyYAML)
+make test-release-notes-preview
+# → python3 -m unittest discover -s tests -p 'release_notes_preview_test.py' -v
+
 # Verification acceptance tests (requires Sigstore infrastructure)
 make test-acceptance-verify
 # → compose up --profile verification (zot + Sigstore + sign-seed + verify-sut)
@@ -86,6 +90,12 @@ make test-api-compatibility   # compatibility regression suites only
 
 See [contributor guidance](docs/CONTRIBUTING.md#provider-api-compatibility)
 for tool versions, baseline selection, and analysis limits.
+
+### Release Notes Preview
+
+For a local release notes preview, run `make release-notes-preview`.
+See [release process](docs/RELEASE_PROCESS.md#previewing-release-notes)
+for prerequisites and committed-candidate limits.
 
 ### Lint & Format
 
@@ -157,7 +167,7 @@ pkg/
 ├── log/             # structured logging
 └── provider/        # provider discovery and gRPC lifecycle
 plans/               # feature planning artifacts
-scripts/             # maintenance scripts (SPDX checks, workflow setup)
+scripts/             # maintenance scripts (SPDX, workflow setup, release preview)
 specs/               # Speckit strategic specifications (NNN-*/  format)
 tests/
 ├── acceptance/      # Container-based acceptance tests (compose + zot)
@@ -169,7 +179,8 @@ tests/
 ├── schema-validation/  # CUE schema validation of EvaluationLog output (validate.sh)
 ├── homebrew_test.sh     # Homebrew formula smoke test (requires brew)
 ├── homebrew_publish_test.sh  # offline Homebrew publishing regression (no network)
-└── integration_test.sh  # shell-based integration test
+├── integration_test.sh  # shell-based integration test
+└── release_notes_preview_test.py # offline release preview regression tests
 vendor/              # vendored dependencies
 ```
 
@@ -337,6 +348,7 @@ packages organized by domain responsibility.
 
 ## Recent Changes
 - fix-homebrew-publish-auth: Homebrew publishing exports step-scoped `GH_TOKEN` for API and Git credential-helper authentication; `make test-homebrew-publish` exercises the actual workflow offline, including the legacy-token regression; release recovery remains PR-based without moving tags
+- release-notes-preview: `make release-notes-preview` uses `scripts/release-notes-preview.py` to preview the latest canonical release to committed HEAD without publishing; `make test-release-notes-preview` runs offline regression tests; prerequisites and usage are in `docs/RELEASE_PROCESS.md`
 - local-oci-layout-import: `complyctl get --from-oci-layout <path>` imports configured policies and complypacks from a validated local OCI image layout without registry or credential initialization; configured URLs select artifacts by digest only, while registry/repository remain cache and state identity; entries with effective verification fail closed before cache or state changes unless `--skip-verify` is explicitly supplied, and permitted local imports record `Verified: false`
 - provider-mapping-references: Proto `MappingReference` message with `id`, `title`, `version`, `description`, `url` fields and `mapping_references` repeated field on `ScanResponse` (field 3); `provider.MappingReference` struct and `ScanResponse.MappingReferences` field in `pkg/provider/client.go`; `internalMappingRefsToProto()` in `server.go` and `protoMappingRefsToInternal()` in `client.go` map references through gRPC boundary; `ScanResult.MappingReferences` in `pkg/provider/manager.go` with `RouteScanResult()` populating from proto response; `MergeMappingReferences()` in `internal/output/scan_summary.go` merges provider-sourced references into policy-sourced map with policy-wins collision semantics; `FormatMappingCollisions()` formats collision warnings; `scanSingleTarget()` gains 4th return value `[]provider.MappingReference`, sorted evaluator IDs for deterministic merge, `scanOutput.mappingReferences` field aggregates across targets; `reportMappingCollisions()` in `cmd/complyctl/cli/scan.go` emits three-channel warnings (stderr, debug log, Description annotation on retained MappingReference in EvaluationLog); backward-compatible (providers without mapping references unaffected)
 - evidence-source: Proto `Evidence` message gains `EvidenceMapping source` field (field 6) with `reference_id`, `coordinate`, `entry_id`, `digest`, `remarks` subfields mirroring go-gemara `EvidenceMapping`; `EvidenceSource` struct and `Source *EvidenceSource` field added to `pkg/provider/client.go`; `internalEvidenceSourceToProto()` in `server.go` and `protoEvidenceMappingToInternal()` in `client.go` map source through gRPC boundary; evaluator in `internal/output/evaluator.go` maps `provider.EvidenceSource` to `gemara.EvidenceMapping` when non-nil; `formatEvidenceMeta()` in `internal/output/markdown.go` renders source provenance as `source: <ref> @ <coord>`; stale ADR 0023 proto comment removed; backward-compatible (providers without source unaffected); fixes #841

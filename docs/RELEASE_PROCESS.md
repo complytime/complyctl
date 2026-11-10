@@ -86,6 +86,52 @@ bypass branch protection, or rerun the full release for this recovery. Offline
 regression tests do not prove server-side App authorization; live validation
 requires separate authorization. See [Tests](#tests) for the offline check.
 
+### Previewing Release Notes
+
+Before creating a release, preview the generated notes for committed HEAD:
+
+```bash
+make release-notes-preview
+```
+
+The command discovers the latest published stable release in
+`complytime/complyctl` and compares it with the checkout's committed HEAD.
+Push the candidate commit so GitHub can compare it. Uncommitted changes are
+not included. GitHub must be able to resolve that commit in the canonical
+comparison; a commit available only on a fork may be unavailable. The command
+uses the checkout's GoReleaser changelog settings;
+it does not select a new tag, build artifacts, execute release hooks, or
+publish a release. It requires a canonical Git remote (preferably named
+`upstream`) even when `origin` points to a fork. A detached checkout requires
+its effective default remote to point to the canonical repository.
+
+Install Git, GitHub CLI (`gh`), Python 3.9 or newer with PyYAML, and open-source
+GoReleaser v2.20.0 or newer within v2. Authenticate GitHub CLI for github.com
+with `gh auth login`. Run from the repository root and keep `TMPDIR` outside
+the checkout. The helper does not install dependencies or accept a baseline
+override. It writes the
+baseline, candidate, and diagnostics to standard error, and Markdown to
+standard output, which can be redirected:
+
+```bash
+make release-notes-preview > release-notes.md
+```
+
+If HEAD is already released, the command succeeds with a "No unreleased
+commits" diagnostic and no Markdown. Failed authentication, unavailable or
+diverged commits, missing tools, or renderer failures return a nonzero exit;
+fix the diagnostic and retry. No partial Markdown is emitted on failure.
+
+Run the offline coordinator regression suite with Git, Make, Python 3.9 or
+newer, and PyYAML:
+
+```bash
+make test-release-notes-preview
+```
+
+The tests do not require GitHub access or GoReleaser. They are local-only, not
+CI-gated; run them before submitting changes to the preview helper.
+
 ### Creating a Release
 
 To create a release, a project maintainer triggers the workflow manually:
