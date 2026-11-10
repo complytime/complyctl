@@ -2,31 +2,27 @@
 
 ## Why
 
-Local validation can report failures on an unchanged `main` checkout that
-the corresponding CI checks neither run nor scope the same way. Contributors
-cannot reliably distinguish baseline debt from regressions, and the four
-acceptance-tagged security-lint findings lack an explicit disposition.
+Four pre-existing acceptance-test gosec findings block `/uf.unleash`
+on another PR even though that PR did not introduce them. This change
+resolves those two G704 and two G306 findings in the test code.
 
 ## What Changes
 
-- Define supported local validation commands with documented tool versions,
-  build tags, and file selection that match their CI counterparts.
-- Add a CI-parity style and lint validation target that excludes vendored and
-  generated style inputs without weakening security scanners.
-- Add a separately named acceptance security-lint target that preserves gosec
-  coverage and requires narrow fixes or documented dispositions for its
-  baseline findings.
-- Document the distinction between CI-parity validation, broader pre-commit
-  checks, and acceptance-tagged security analysis.
-- Add regression coverage for validation target scope and exclusions.
+- Resolve the two G704 findings at the registry preflight requests in
+  `tests/acceptance/acceptance_test.go`, preserving private Compose
+  registry access and existing failure behavior.
+- Write test configuration with owner-only permissions at the two G306
+  sites in `helpers_test.go` and `verification_helpers_test.go`.
+- Verify the four findings with the existing acceptance-tagged lint
+  command and run the affected acceptance tests.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `ci-parity-local-validation`: Provides reproducible, documented local
-  validation profiles that align tool versions, flags, and style-input scope
-  with their intended CI checks while retaining separate security analysis.
+- `acceptance-test-security`: Keeps acceptance registry preflight
+  requests compatible with trusted test infrastructure and generated
+  configuration private to the test user.
 
 ### Modified Capabilities
 
@@ -34,8 +30,10 @@ acceptance-tagged security-lint findings lack an explicit disposition.
 
 ## Impact
 
-- Affected areas: `Makefile`, lint and pre-commit configuration, CI workflow
-  integration, acceptance test lint handling, and contributor documentation.
-- No public CLI API or runtime behavior changes.
-- Existing security checks, including gosec and broader MegaLinter security
-  scanners, remain in force; this change MUST NOT use blanket suppressions.
+- Relates to the four acceptance-lint findings in issue #965, not its
+  wider repository-validation work.
+- Implementation is limited to the three named acceptance test files
+  and regression assertions directly needed for these fixes.
+- No new validation targets, tool-version enforcement, CI changes,
+  vendor rewrites, YAML/pre-commit exclusions, or workflow changes.
+- Existing lint rules and `/uf.unleash` gates remain enabled.

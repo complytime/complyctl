@@ -1,24 +1,33 @@
 # Tasks
 
-## 1. Define Validation Profiles
+## 1. Resolve the Four Acceptance Lint Findings
 
-- [ ] 1.1 Inventory the CI lint, YAML, pre-commit, and acceptance security commands and record their tool versions, flags, build tags, and input scope; verify the inventory against `.github/workflows/` and current tool configuration.
-- [ ] 1.2 Add named Make targets for CI-parity style/lint validation and acceptance-tagged security lint; verify each target prints or executes its documented tool, flags, tags, and file scope.
-- [ ] 1.3 Add automated coverage for validation target scope, including vendored and generated style inputs; verify the tests fail when intended exclusions or acceptance security lint execution are removed.
-- [ ] 1.4 Document the validation profiles and their intended CI relationship in contributor documentation; verify every documented command runs as written in a clean checkout.
+- [ ] 1.1 Record Go and golangci-lint versions, compare them with
+  the project and CI context, and capture the existing acceptance-tagged
+  lint output; verify the two G704 and two G306 locations against the
+  unchanged source without treating version differences as regressions.
+- [ ] 1.2 Confirm that Compose supplies the registry and policy inputs,
+  then add finding-local G704 annotations with trust-boundary comments
+  at the two preflight requests; verify acceptance-tagged lint no longer
+  reports those two findings and request behavior is unchanged.
+- [ ] 1.3 Change only the two reported test configuration writes to
+  owner-only permissions and add focused permission/readability
+  assertions where needed; verify those assertions and confirm the
+  two G306 findings are resolved.
 
-## 2. Resolve Acceptance Security Baseline
+## 2. Verify the Scoped Fix
 
-- [ ] 2.1 Evaluate the two G704 acceptance registry requests against the Compose test-infrastructure trust model and implement narrow fixes or reviewed dispositions; verify acceptance-tagged gosec reports no unresolved G704 baseline finding.
-- [ ] 2.2 Resolve the two G306 acceptance test-configuration permission findings without weakening unrelated file handling; verify acceptance-tagged gosec reports no unresolved G306 baseline finding and the acceptance tests retain their required configuration access.
-- [ ] 2.3 Add or update acceptance tests for any changed registry request or test-configuration behavior; verify the affected acceptance test suite passes.
-- [ ] 2.4 Document any retained security disposition and its trust boundary; verify the documentation identifies the affected validation profile and does not introduce a blanket suppression.
-
-## 3. Verify Parity and Regression Protection
-
-- [ ] 3.1 Run the CI-parity validation profile on the baseline scope; verify it excludes only documented vendored and generated style inputs and reports no unexpected baseline failures.
-- [ ] 3.2 Run the acceptance security-lint profile and the affected acceptance tests; verify security analysis remains enabled and all resolved findings stay fixed.
-- [ ] 3.3 Run repository lint, formatting, and relevant CI-equivalent checks; verify the change introduces no lint, formatting, or validation regression.
+- [ ] 2.1 Run acceptance-tagged golangci-lint over
+  `./tests/acceptance/...` with the recorded tool context; verify the
+  four reported findings are resolved and report any other failures
+  separately without expanding the change.
+- [ ] 2.2 Run the lifecycle and verification acceptance commands
+  derived from `.github/workflows/`; verify private registry preflight,
+  seed checks, and CLI configuration access still work in both profiles.
+- [ ] 2.3 Run applicable existing lint and formatting checks and assess
+  CHANGELOG, AGENTS, and README impact; verify the diff is limited to
+  these fixes and directly required assertions or change entries, with
+  no scanner, CI, workflow-gate, or unrelated validation changes.
 
 ## Workflow follow-up
 

@@ -2,83 +2,89 @@
 
 ## Context
 
-See `proposal.md` for motivation. `make lint` currently runs the default
-Go lint scope, while acceptance-tagged Go security analysis, repository-wide
-YAML linting, and pre-commit checks use different scopes and are not a single
-CI-equivalent contract. MegaLinter exclusions do not apply to standalone
-tools.
+See `proposal.md` for motivation. The four reported findings are in
+acceptance-tagged test code:
+
+- G704: the registry reachability and seeded-policy requests in
+  `acceptance_test.go` use `REGISTRY_URL`.
+- G306: `writeWorkspaceConfig` in `helpers_test.go` and
+  `writeVerificationConfig` in `verification_helpers_test.go` write
+  configuration with `0o644` permissions.
+
+The issue reports golangci-lint 2.11.4 locally and 2.13.2 in inspected
+CI runs. Those CI commands omit the acceptance build tag. Verify the
+toolchain and dependency context before drawing conclusions from a
+scanner result; record versions with the before/after lint output.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Make each local validation profile explicit, reproducible, and documented.
-- Keep CI-equivalent style scope separate from broader local checks.
-- Keep acceptance security analysis enabled and separately actionable.
-- Protect the intended scope with automated regression checks.
+- Resolve exactly the two G704 and two G306 findings.
+- Preserve registry preflight behavior in both acceptance profiles.
+- Keep generated configuration readable by the test process and CLI.
 
 **Non-Goals:**
 
-- Changing public CLI behavior or provider interfaces.
-- Disabling gosec, MegaLinter security scanners, or pre-commit hooks.
-- Treating every local validation command as an exact replacement for CI.
+- New validation profiles, Make targets, or tool-version enforcement.
+- YAML, pre-commit, vendor, or generated-report cleanup.
+- CI, scanner configuration, agent conventions, or workflow gates.
+- General-purpose URL validation or production security changes.
 
 ## Decisions
 
-### Define named validation profiles
+### Limit G704 dispositions to the two test requests
 
-Add explicit Make targets for CI-parity style/lint validation and
-acceptance-tagged security lint. Document their version, flags, build tags,
-and input scope alongside the existing contributor guidance.
+The test runner supplies `REGISTRY_URL` and `TEST_POLICY_ID` through
+the acceptance environment. These values select test infrastructure;
+they do not come from a public service request. The runner already
+controls the test process and its network access.
 
-Rationale: named profiles make the intended comparison observable and avoid
-claiming that broader local commands reproduce CI.
+Confirm that boundary against the Compose configuration. If confirmed,
+use a finding-local G704 annotation at each of the two request sites
+with a comment explaining the trusted runner configuration and private
+test registry access. Keep timeouts, request paths, seed checks, and
+existing error behavior intact. Do not suppress G704 package-wide or
+change scanner configuration.
 
-Alternative considered: expand `make lint` to include every local check.
-Rejected because it would silently turn existing baseline findings into a
-new gate and conflate unrelated validation purposes.
+Reject a private-address ban: private Compose endpoints are intentional.
+Reject a new URL-validation subsystem: it would expand this test-only
+lint fix without addressing a demonstrated untrusted-input boundary.
+If the runner-controlled boundary is not confirmed, report that fact
+before choosing a different fix.
 
-### Scope style exclusions at the invoking profile
+### Use owner-only test configuration permissions
 
-Apply vendored and generated-file exclusions only to the standalone style
-commands that need CI-equivalent file selection. Keep the exclusions out of
-global security configuration.
+Change the two reported writes to `0o600`. Both helpers create files
+in test workspaces, and the test process launches the CLI to read them.
+Verify that both acceptance profiles can still read the configuration.
+Retain the existing contents, paths, and directory permissions.
 
-Rationale: tool-specific scope is explicit and does not weaken security
-coverage.
+Prefer this direct fix over suppressing G306 or changing repository
+file-permission conventions. Owner-only test files do not require a
+global convention amendment.
 
-Alternative considered: rely on MegaLinter exclusions. Rejected because
-standalone yamllint and pre-commit do not inherit them.
+### Verify with existing commands and focused assertions
 
-### Keep acceptance security findings actionable
-
-Run acceptance-tagged security lint under a dedicated target. Resolve its
-four baseline findings through code changes or narrow, reviewed
-dispositions backed by the test infrastructure trust model.
-
-Rationale: configured registry endpoints and test-file permissions need a
-deliberate security decision, not a broad exclusion.
-
-Alternative considered: add a global gosec exclusion. Rejected because it
-would hide future findings of the same class.
+Use the existing acceptance-tagged golangci-lint invocation to compare
+the same four locations before and after the fix. Run the lifecycle
+and verification acceptance targets already used by CI. Add focused
+permission assertions to the affected tests where needed; do not add
+validation-profile infrastructure or suppression-policy test machinery.
 
 ## Risks / Trade-offs
 
-- [CI tooling changes independently] -> Pin or document the intended version
-  source and update the profile with CI changes.
-- [Exclusions become too broad] -> Add regression tests that assert excluded
-  paths and preserve security-lint execution.
-- [Acceptance lint changes test behavior] -> Keep test execution and security
-  lint as separate targets with independently documented prerequisites.
+- [Scanner versions report different findings] -> Record versions and
+  compare like-for-like output; do not call a version difference a
+  code regression or introduce unrelated fixes.
+- [G704 annotations hide a changed trust boundary] -> Explain the
+  runner-controlled inputs at each request site during code review.
+- [Owner-only files prevent CLI access] -> Run both acceptance profiles
+  and check generated file permissions and readability.
 
 ## Migration Plan
 
-1. Add the validation profiles and their scope regression tests.
-2. Resolve or narrowly document the acceptance security baseline findings.
-3. Update contributor documentation and CI references.
-4. Run the supported profiles against the baseline and verify that broad
-   security scanning remains enabled.
-
-Rollback consists of restoring the prior Make targets and configuration if a
-new profile cannot reproduce its documented CI behavior. No persisted data or
-user-facing API migration is required.
+Apply the test-only fixes and verify the four reported findings and
+both acceptance profiles. No deployment or data migration is required.
+Any additional validation failures remain separate work, not reasons
+to expand this change or weaken a gate.
