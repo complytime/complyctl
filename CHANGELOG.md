@@ -80,6 +80,11 @@
 
 ### Fixed
 
+- Acceptance-test lint findings resolved with request-local trust
+  explanations for test registry access and owner-only configuration
+  files. Standalone yamllint excludes vendored files and the generated
+  behavioral evaluation log while retaining existing style rules. (#965)
+
 - Homebrew formula publishing now exports the App token as step-scoped
   `GH_TOKEN`, allowing Git's credential helper to authenticate the formula
   branch push as well as GitHub CLI API calls. The protected-branch PR flow

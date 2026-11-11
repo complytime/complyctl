@@ -15,6 +15,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/complytime/complyctl/internal/complytime"
 )
 
 const (
@@ -67,7 +69,25 @@ targets:
 	require.NoError(t, os.MkdirAll(configDir, 0o755))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(configDir, "complytime.yaml"),
-		[]byte(configYAML), 0o644))
+		[]byte(configYAML), 0o600))
+}
+
+func TestWriteWorkspaceConfig_OwnerOnlyReadable(t *testing.T) {
+	workDir := t.TempDir()
+	env := testEnv{RegistryURL: "http://localhost:5000", PolicyID: "test-policy", TargetID: "test-target"}
+	writeWorkspaceConfig(t, workDir, env)
+
+	configPath := filepath.Join(workDir, complytime.WorkspaceDir, complytime.WorkspaceConfigFile)
+	info, err := os.Stat(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "config must be owner-only read/write")
+
+	config, err := complytime.LoadFrom(configPath)
+	require.NoError(t, err, "generated config must remain readable by the application")
+	require.Len(t, config.Policies, 1)
+	assert.Equal(t, env.PolicyID, config.Policies[0].ID)
+	require.Len(t, config.Targets, 1)
+	assert.Equal(t, env.TargetID, config.Targets[0].ID)
 }
 
 // runComplyctl executes the complyctl binary with given args and returns

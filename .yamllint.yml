@@ -1,6 +1,10 @@
 ---
 extends: default
 
+ignore: |
+  vendor/
+  governance/reports/evaluation-log.yaml
+
 # https://yamllint.readthedocs.io/en/stable/rules.html
 rules:
   comments: disable

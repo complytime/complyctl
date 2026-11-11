@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/complytime/complyctl/internal/cache"
@@ -126,7 +127,30 @@ func writeVerificationConfig(t *testing.T, dir string, registryURL string, opts 
 	require.NoError(t, os.MkdirAll(configDir, 0o755))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(configDir, complytime.WorkspaceConfigFile),
-		data, 0o644))
+		data, 0o600))
+}
+
+func TestWriteVerificationConfig_OwnerOnlyReadable(t *testing.T) {
+	workDir := t.TempDir()
+	entry := policyEntryConfig{
+		URL: "http://localhost:5000/policies/test-policy", PolicyID: "test-policy",
+		TargetID: "test-target", SkipVerify: true,
+	}
+	writeVerificationConfig(t, workDir, "http://localhost:5000",
+		withPolicyEntries([]policyEntryConfig{entry}))
+
+	configPath := filepath.Join(workDir, complytime.WorkspaceDir, complytime.WorkspaceConfigFile)
+	info, err := os.Stat(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "config must be owner-only read/write")
+
+	config, err := complytime.LoadFrom(configPath)
+	require.NoError(t, err, "generated config must remain readable by the application")
+	require.Len(t, config.Policies, 1)
+	assert.Equal(t, entry.PolicyID, config.Policies[0].ID)
+	assert.True(t, config.Policies[0].SkipVerify)
+	require.Len(t, config.Targets, 1)
+	assert.Equal(t, entry.TargetID, config.Targets[0].ID)
 }
 
 // readPolicyState reads and unmarshals state.json from the XDG data

@@ -47,6 +47,7 @@ func TestMain(m *testing.M) {
 
 	// Verify registry is reachable
 	client := &http.Client{Timeout: 10 * time.Second}
+	// #nosec G704 -- The trusted runner sets REGISTRY_URL; private test registry access is intentional.
 	resp, err := client.Get(registryURL + "/v2/")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "FATAL: registry not reachable at %s: %v\n", registryURL, err)
@@ -59,6 +60,8 @@ func TestMain(m *testing.M) {
 	// is not set — verification tests have their own assertions.
 	policyID := os.Getenv("TEST_POLICY_ID")
 	if policyID != "" {
+		// #nosec G704 -- REGISTRY_URL and TEST_POLICY_ID are trusted runner configuration
+		// for private test registry access, not public service request inputs.
 		resp, err = client.Get(registryURL + "/v2/policies/" + policyID + "/tags/list")
 		if err != nil || resp.StatusCode != http.StatusOK {
 			fmt.Fprintf(os.Stderr, "FATAL: policy policies/%s not found in registry — seed container likely failed\n", policyID)

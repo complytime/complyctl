@@ -17,27 +17,27 @@
 
 ## 2. Verify the Contributor's YAML Scope Fix
 
-- [ ] 2.1 Verify the contributor-added `.yamllint.yml` change contains
+- [x] 2.1 Verify the contributor-added `.yamllint.yml` change contains
   only the `vendor/` and exact generated-report exclusions; confirm
   the base configuration, rules, security scanners, and CI are intact.
-- [ ] 2.2 Use disposable fixtures to verify malformed YAML under each
+- [x] 2.2 Use disposable fixtures to verify malformed YAML under each
   excluded path is ignored while malformed maintained YAML and a
   sibling governance YAML file still fail; do not add a new framework
   or commit intentionally invalid fixtures.
-- [ ] 2.3 Run `yamllint .`; verify excluded inputs no longer contribute
+- [x] 2.3 Run `yamllint .`; verify excluded inputs no longer contribute
   findings even when the generated report exists, and distinguish
   remaining first-party warnings from errors without disabling rules.
 
 ## 3. Verify the Scoped Fix
 
-- [ ] 3.1 Run acceptance-tagged golangci-lint over
+- [x] 3.1 Run acceptance-tagged golangci-lint over
   `./tests/acceptance/...` with the recorded tool context; verify the
   four reported findings are resolved and report any other failures
   separately without expanding the change.
-- [ ] 3.2 Run the lifecycle and verification acceptance commands
+- [x] 3.2 Run the lifecycle and verification acceptance commands
   derived from `.github/workflows/`; verify private registry preflight,
   seed checks, and CLI configuration access still work in both profiles.
-- [ ] 3.3 Run applicable existing lint and formatting checks and assess
+- [x] 3.3 Run applicable existing lint and formatting checks and assess
   CHANGELOG, AGENTS, and README impact; verify the diff is limited to
   the acceptance fixes, two YAML exclusions, and directly required
   assertions or change entries, with no security scanner, CI,
