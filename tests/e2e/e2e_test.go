@@ -29,9 +29,68 @@ import (
 
 	"github.com/complytime/complyctl/internal/cache"
 	"github.com/complytime/complyctl/internal/complytime"
+	"github.com/complytime/complyctl/internal/policy"
 )
 
 const testPolicyID = "nist-800-53-r5"
+
+func TestE2E_ResolvedTreeGenerationFreshness(t *testing.T) {
+	binary := locateBinary(t)
+	srv := startMockRegistry(t)
+	defer srv.Close()
+	homeDir, workDir := t.TempDir(), t.TempDir()
+	installTestPlugin(t, homeDir)
+	writeWorkspaceConfig(t, workDir, srv.URL, testPolicyID)
+	env := buildEnv(homeDir)
+	runComplytime(t, binary, workDir, env, "get")
+
+	// Automatic generation must persist the identifier after provider success.
+	out := runComplytime(t, binary, workDir, env, "scan", "--policy-id", testPolicyID)
+	assert.Contains(t, out, "No prior generation found")
+	state, err := policy.LoadGenerationState(workDir, testPolicyID)
+	require.NoError(t, err)
+	require.NotNil(t, state)
+	assert.Regexp(t, `^sha256:[a-f0-9]{64}$`, state.ResolvedTreeDigest)
+	// The test provider keeps generated configuration in memory rather than
+	// writing files. Supply its on-disk artifact fixture for the reuse check.
+	artifactDir := filepath.Join(workDir, complytime.WorkspaceDir, "test")
+	require.NoError(t, os.MkdirAll(artifactDir, 0750))
+	require.NoError(t, os.WriteFile(filepath.Join(artifactDir, "generated.json"), []byte("{}"), 0600))
+	assertReuse := func() {
+		t.Helper()
+		cmd := exec.Command(binary, "scan", "--policy-id", testPolicyID)
+		cmd.Dir, cmd.Env = workDir, env
+		output, err := cmd.CombinedOutput()
+		// A new test-provider process has no in-memory plans. Its empty scan
+		// is expected here; generation freshness is checked before scanning.
+		require.Error(t, err)
+		assert.Contains(t, string(output), "zero assessed requirements")
+		assert.Contains(t, string(output), "Reusing generated artifacts")
+		assert.NotContains(t, string(output), "Generating policy artifacts")
+	}
+	assertReuse()
+	reused, err := policy.LoadGenerationState(workDir, testPolicyID)
+	require.NoError(t, err)
+	assert.Equal(t, state, reused, "reuse must not rewrite successful generation state")
+
+	// Explicit generate shares the same resolved-tree identity.
+	runComplytime(t, binary, workDir, env, "generate", "--policy-id", testPolicyID)
+	explicit, err := policy.LoadGenerationState(workDir, testPolicyID)
+	require.NoError(t, err)
+	assert.Equal(t, state.ResolvedTreeDigest, explicit.ResolvedTreeDigest)
+
+	// Old projection-version state upgrades once despite existing artifacts.
+	legacy := fmt.Sprintf(`{"policy_id":%q,"policy_digest":%q,
+		"projection_version":1,"evaluator_ids":["test"]}`, testPolicyID, state.PolicyDigest)
+	statePath := filepath.Join(workDir, complytime.WorkspaceDir, "generation", testPolicyID+".json")
+	require.NoError(t, os.WriteFile(statePath, []byte(legacy), 0600))
+	out = runComplytime(t, binary, workDir, env, "scan", "--policy-id", testPolicyID)
+	assert.Contains(t, out, "regenerating")
+	upgraded, err := policy.LoadGenerationState(workDir, testPolicyID)
+	require.NoError(t, err)
+	assert.Equal(t, state.ResolvedTreeDigest, upgraded.ResolvedTreeDigest)
+	assertReuse()
+}
 
 // TestE2E_FullWorkflow exercises the entire Gemara workflow:
 //  1. complytime get    — fetch policies from mock OCI registry into cache

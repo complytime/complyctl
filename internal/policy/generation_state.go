@@ -16,17 +16,17 @@ import (
 	"github.com/complytime/complyctl/internal/complytime"
 )
 
-// GenerationState tracks the policy cache digest at generation time for
+// GenerationState tracks the resolved Gemara tree at generation time for
 // freshness detection. Persisted per policy at
 // {workspace}/{WorkspaceDir}/generation/{policy-id}.json
 // See R37: specs/001-gemara-native-workflow/research.md
 type GenerationState struct {
-	ProjectionVersion int               `json:"projection_version"`
-	PolicyID          string            `json:"policy_id"`
-	PolicyDigest      string            `json:"policy_digest"`
-	ComplypackDigests map[string]string `json:"complypack_digests,omitempty"`
-	GeneratedAt       string            `json:"generated_at"`
-	EvaluatorIDs      []string          `json:"evaluator_ids"`
+	ResolvedTreeDigest string            `json:"resolved_tree_digest,omitempty"`
+	PolicyID           string            `json:"policy_id"`
+	PolicyDigest       string            `json:"policy_digest"`
+	ComplypackDigests  map[string]string `json:"complypack_digests,omitempty"`
+	GeneratedAt        string            `json:"generated_at"`
+	EvaluatorIDs       []string          `json:"evaluator_ids"`
 }
 
 // SaveGenerationState persists a GenerationState to the generation directory.
@@ -70,10 +70,10 @@ func LoadGenerationState(baseDir, policyID string) (*GenerationState, error) {
 	return &state, nil
 }
 
-// IsFresh returns true when the persisted projection version, policy digest,
-// and complypack digests match their current values. Unversioned state is stale.
-func (s *GenerationState) IsFresh(currentDigest string, currentComplypackDigests map[string]string) bool {
-	if s.ProjectionVersion != currentGenerationProjectionVersion || s.PolicyDigest != currentDigest {
+// IsFresh compares resolved Gemara content and complypack digests. Legacy state
+// without a resolved tree identifier is stale; the OCI policy digest is provenance.
+func (s *GenerationState) IsFresh(currentTreeDigest string, currentComplypackDigests map[string]string) bool {
+	if s.ResolvedTreeDigest == "" || s.ResolvedTreeDigest != currentTreeDigest {
 		return false
 	}
 	return maps.Equal(normalizeNilMap(s.ComplypackDigests), normalizeNilMap(currentComplypackDigests))
@@ -86,16 +86,15 @@ func normalizeNilMap(m map[string]string) map[string]string {
 	return m
 }
 
-// NewGenerationState creates state for successful generation using the current
-// projection version and timestamp.
-func NewGenerationState(policyID, digest string, evaluatorIDs []string, complypackDigests map[string]string) *GenerationState {
+// NewGenerationState records the tree identifier and provenance after successful generation.
+func NewGenerationState(policyID, digest, treeDigest string, evaluatorIDs []string, complypackDigests map[string]string) *GenerationState {
 	return &GenerationState{
-		ProjectionVersion: currentGenerationProjectionVersion,
-		PolicyID:          policyID,
-		PolicyDigest:      digest,
-		ComplypackDigests: complypackDigests,
-		GeneratedAt:       time.Now().UTC().Format(time.RFC3339),
-		EvaluatorIDs:      evaluatorIDs,
+		ResolvedTreeDigest: treeDigest,
+		PolicyID:           policyID,
+		PolicyDigest:       digest,
+		ComplypackDigests:  complypackDigests,
+		GeneratedAt:        time.Now().UTC().Format(time.RFC3339),
+		EvaluatorIDs:       evaluatorIDs,
 	}
 }
 

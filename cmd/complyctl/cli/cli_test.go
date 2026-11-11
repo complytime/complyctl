@@ -1915,7 +1915,7 @@ func TestNeedsRegeneration_NilState(t *testing.T) {
 }
 
 func TestNeedsRegeneration_StaleDigest(t *testing.T) {
-	state := policy.NewGenerationState("test-policy", cachetest.DigestA, []string{"ampel"}, nil)
+	state := policy.NewGenerationState("test-policy", cachetest.DigestC, cachetest.DigestA, []string{"ampel"}, nil)
 	assert.True(t, needsRegeneration(".", state, cachetest.DigestB, nil, "test-policy"),
 		"mismatched digest should require regeneration")
 }
@@ -1926,7 +1926,7 @@ func TestNeedsRegeneration_FreshWithArtifacts(t *testing.T) {
 	require.NoError(t, os.MkdirAll(evalDir, 0750))
 	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "policy.rego"), []byte("package test"), 0600))
 
-	state := policy.NewGenerationState("test-policy", cachetest.DigestA, []string{"ampel"}, nil)
+	state := policy.NewGenerationState("test-policy", cachetest.DigestC, cachetest.DigestA, []string{"ampel"}, nil)
 	assert.False(t, needsRegeneration(baseDir, state, cachetest.DigestA, nil, "test-policy"),
 		"fresh digest with existing artifacts should not require regeneration")
 }
@@ -1934,7 +1934,7 @@ func TestNeedsRegeneration_FreshWithArtifacts(t *testing.T) {
 func TestNeedsRegeneration_FreshButArtifactsMissing(t *testing.T) {
 	baseDir := t.TempDir()
 	// Do not create the evaluator directory — simulates deleted artifacts.
-	state := policy.NewGenerationState("test-policy", cachetest.DigestA, []string{"ampel"}, nil)
+	state := policy.NewGenerationState("test-policy", cachetest.DigestC, cachetest.DigestA, []string{"ampel"}, nil)
 	assert.True(t, needsRegeneration(baseDir, state, cachetest.DigestA, nil, "test-policy"),
 		"fresh digest but missing artifacts should require regeneration")
 }
@@ -1945,7 +1945,7 @@ func TestNeedsRegeneration_ComplypackDigestChanged(t *testing.T) {
 	require.NoError(t, os.MkdirAll(evalDir, 0750))
 	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "policy.rego"), []byte("package test"), 0600))
 
-	state := policy.NewGenerationState("test-policy", cachetest.DigestA, []string{"ampel"},
+	state := policy.NewGenerationState("test-policy", cachetest.DigestC, cachetest.DigestA, []string{"ampel"},
 		map[string]string{"opa": cachetest.DigestB})
 	assert.True(t, needsRegeneration(baseDir, state, cachetest.DigestA,
 		map[string]string{"opa": cachetest.DigestC}, "test-policy"),
@@ -2061,7 +2061,7 @@ func TestSaveGenerationAndPrint_AllComplypacksAvailable(t *testing.T) {
 	require.NoError(t, cache.SaveState(state, cacheDir))
 
 	// Both evaluators had content available.
-	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid", cachetest.DigestC,
 		[]string{"io.complytime.opa", "io.complytime.ampel"},
 		[]string{"io.complytime.opa", "io.complytime.ampel"},
 		nil,
@@ -2072,6 +2072,7 @@ func TestSaveGenerationAndPrint_AllComplypacksAvailable(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, genState)
 	assert.Equal(t, cachetest.DigestA, genState.PolicyDigest)
+	assert.Equal(t, cachetest.DigestC, genState.ResolvedTreeDigest)
 	assert.Equal(t, map[string]string{
 		"io.complytime.opa":   cachetest.DigestB,
 		"io.complytime.ampel": cachetest.DigestC,
@@ -2094,7 +2095,7 @@ func TestSaveGenerationAndPrint_ComplypackUnavailable(t *testing.T) {
 	require.NoError(t, cache.SaveState(state, cacheDir))
 
 	// No evaluators had content available (cache deleted, etc).
-	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid", cachetest.DigestC,
 		[]string{"io.complytime.opa"},
 		nil, // no available evaluators
 		nil,
@@ -2124,7 +2125,7 @@ func TestSaveGenerationAndPrint_MixedAvailability(t *testing.T) {
 	require.NoError(t, cache.SaveState(state, cacheDir))
 
 	// Only opa had content available; ampel was missing.
-	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid", cachetest.DigestC,
 		[]string{"io.complytime.opa", "io.complytime.ampel"},
 		[]string{"io.complytime.opa"}, // only opa available
 		nil,
@@ -2153,7 +2154,7 @@ func TestSaveGenerationAndPrint_NoComplypacks(t *testing.T) {
 	}
 	require.NoError(t, cache.SaveState(state, cacheDir))
 
-	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid", cachetest.DigestC,
 		[]string{"io.complytime.opa"},
 		nil,
 		nil,

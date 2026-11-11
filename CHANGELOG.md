@@ -88,13 +88,14 @@
   or scanning, with the plan ID and both declaring artifacts and requirements
   in the error. This includes duplicates within a Policy and across imports,
   even when requirement IDs match; unique authored IDs remain unchanged.
-- Generation state now records the assessment projection version. After
-  upgrading, the next scan automatically regenerates older, unversioned
-  state even if policy/complypack digests and evaluator directories are
-  unchanged, so imported plans enter provider-generated artifacts. Successful
-  generation persists the version; subsequent unchanged scans reuse artifacts.
-  The first scan after upgrade requires the configured providers, including
-  for single-Policy workspaces. Digest and missing-artifact checks still apply.
+- Generation freshness now uses a deterministic SHA-256 identifier of the
+  resolved Gemara dependency tree, including imported assessment plans,
+  parameters, catalogs, evaluator routing, timelines, and mapping references.
+  Equivalent parsed trees reuse generated artifacts even when YAML formatting
+  or the root OCI digest changes. Complypack changes and missing artifacts
+  still trigger regeneration independently. Existing generation state without
+  a tree identifier regenerates once; only successful generation persists the
+  identifier. Workspace variables and targets are outside this identifier.
 - Policy streams now require exactly one document; supporting catalogs reject
   mismatched artifact types. Root evaluator routing retains importing Policy
   precedence without letting the first import override a mixed or unbound root.

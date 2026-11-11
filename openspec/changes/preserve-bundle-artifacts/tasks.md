@@ -18,13 +18,20 @@
 
 ## 4. Resolved tree freshness follow-up
 
-- [ ] 4.1 Review and commit/push the revised spec before implementation.
-- [ ] 4.2 Add failing canonical tree identifier regression tests.
-- [ ] 4.3 Implement deterministic resolved Gemara tree identification.
-- [ ] 4.4 Add failing freshness and legacy-state upgrade tests.
-- [ ] 4.5 Replace projection version and policy digest freshness checks.
-- [ ] 4.6 Share tree identification between explicit generate and scan.
-- [ ] 4.7 Verify complypack and missing-artifact invalidation still work.
-- [ ] 4.8 Verify failed generation never promotes freshness state.
-- [ ] 4.9 Update changelog and assess README/AGENTS documentation impact.
-- [ ] 4.10 Run CI-parity unit, E2E, integration, and applicable lint checks.
+- [x] 4.1 Review and commit/push the revised spec before implementation.
+- [x] 4.2 Add failing canonical tree identifier regression tests.
+- [x] 4.3 Implement deterministic resolved Gemara tree identification.
+- [x] 4.4 Add failing freshness and legacy-state upgrade tests.
+- [x] 4.5 Replace projection version and policy digest freshness checks.
+- [x] 4.6 Share tree identification between explicit generate and scan.
+- [x] 4.7 Verify complypack and missing-artifact invalidation still work.
+- [x] 4.8 Verify failed generation never promotes freshness state.
+- [x] 4.9 Update changelog and assess README/AGENTS documentation impact.
+- [x] 4.10 Run CI-parity unit, E2E, integration, and applicable lint checks.
+
+Verification: unit tests pass with `TZ=UTC` (the local timezone exposes
+an existing cache timestamp assertion); E2E and all 26 integration
+checks pass. Formatting, strict OpenSpec validation, and buf lint pass.
+Full lint remains blocked by existing G703 findings in
+`internal/cache/state.go`; API compatibility requires the missing
+`apidiff` tool. README and AGENTS need no structural or usage changes.

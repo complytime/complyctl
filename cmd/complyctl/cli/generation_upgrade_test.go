@@ -19,8 +19,14 @@ import (
 	"github.com/complytime/complyctl/pkg/provider"
 )
 
-func TestEnsureGenerated_UpgradesLegacyProjectionOnce(t *testing.T) {
+func TestEnsureGenerated_UpgradesLegacyTreeOnce(t *testing.T) {
 	baseDir, dataDir, cacheDir := t.TempDir(), t.TempDir(), t.TempDir()
+	graph := &policy.DependencyGraph{PolicyID: "multi", Assessments: []policy.Assessment{
+		{ID: "root-plan", RequirementID: "root-req", EvaluatorID: "opa"},
+		{ID: "imported-plan", RequirementID: "imported-req", EvaluatorID: "opa"},
+	}}
+	treeDigest, err := policy.ResolvedTreeDigest(graph)
+	require.NoError(t, err)
 	cpDigests := map[string]string{"opa": cachetest.DigestB}
 	require.NoError(t, cache.SaveState(&cache.State{
 		Policies: map[string]cache.PolicyState{"multi": {Digest: cachetest.DigestA}},
@@ -40,7 +46,7 @@ func TestEnsureGenerated_UpgradesLegacyProjectionOnce(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(genDir, "multi.json"), []byte(legacyJSON), 0600))
 	assert.True(t, evaluatorArtifactsExist(baseDir, []string{"opa"}))
 
-	needs, digest, gotCP, err := checkGenerationFreshness(dataDir, baseDir, "multi", "multi")
+	needs, digest, gotCP, err := checkGenerationFreshness(dataDir, baseDir, "multi", "multi", treeDigest)
 	require.NoError(t, err)
 	assert.Equal(t, cachetest.DigestA, digest)
 	assert.Equal(t, cpDigests, gotCP)
@@ -57,22 +63,43 @@ func TestEnsureGenerated_UpgradesLegacyProjectionOnce(t *testing.T) {
 		}}}
 	targets := []complytime.TargetConfig{{ID: "target"}}
 	err = ensureGenerated(context.Background(), cacheDir, dataDir, baseDir, mgr,
-		groups, targets, nil, "multi", "multi", []string{"opa"})
+		groups, targets, nil, "multi", "multi", []string{"opa"}, graph)
 	require.ErrorContains(t, err, `no provider registered for evaluator "opa"`)
 	legacy, err := policy.LoadGenerationState(baseDir, "multi")
 	require.NoError(t, err)
-	assert.False(t, legacy.IsFresh(cachetest.DigestA, cpDigests))
+	assert.False(t, legacy.IsFresh(treeDigest, cpDigests))
 
 	// Exercise the explicit-generate success persistence path, then the same
 	// scan freshness/skip path using the on-disk state, not an in-memory stub.
-	require.NoError(t, saveGenerationAndPrint(dataDir, baseDir, "multi", "multi",
+	require.NoError(t, saveGenerationAndPrint(dataDir, baseDir, "multi", "multi", treeDigest,
 		[]string{"opa"}, []string{"opa"}, nil))
 	current, err := policy.LoadGenerationState(baseDir, "multi")
 	require.NoError(t, err)
-	assert.True(t, current.IsFresh(cachetest.DigestA, cpDigests))
-	needs, _, _, err = checkGenerationFreshness(dataDir, baseDir, "multi", "multi")
+	assert.True(t, current.IsFresh(treeDigest, cpDigests))
+	needs, _, _, err = checkGenerationFreshness(dataDir, baseDir, "multi", "multi", treeDigest)
 	require.NoError(t, err)
-	assert.False(t, needs, "persisted current projection must remain fresh")
+	assert.False(t, needs, "persisted current tree must remain fresh")
 	require.NoError(t, ensureGenerated(context.Background(), cacheDir, dataDir, baseDir, mgr,
-		groups, targets, nil, "multi", "multi", []string{"opa"}))
+		groups, targets, nil, "multi", "multi", []string{"opa"}, graph))
+
+	// An imported plan change invalidates generation even with unchanged OCI digests.
+	graph.Assessments[1].Parameters = map[string]string{"mode": "strict"}
+	err = ensureGenerated(context.Background(), cacheDir, dataDir, baseDir, mgr,
+		groups, targets, nil, "multi", "multi", []string{"opa"}, graph)
+	require.ErrorContains(t, err, `no provider registered for evaluator "opa"`)
+	unchanged, err := policy.LoadGenerationState(baseDir, "multi")
+	require.NoError(t, err)
+	assert.Equal(t, current, unchanged, "failed regeneration must preserve previous state")
+}
+
+func TestEnsureGenerated_InvalidTreePreservesState(t *testing.T) {
+	baseDir := t.TempDir()
+	state := policy.NewGenerationState("multi", cachetest.DigestA, cachetest.DigestB, nil, nil)
+	require.NoError(t, policy.SaveGenerationState(baseDir, "multi", state))
+	err := ensureGenerated(context.Background(), t.TempDir(), t.TempDir(), baseDir, nil,
+		nil, nil, nil, "multi", "multi", nil, nil)
+	require.ErrorContains(t, err, "resolved policy tree")
+	unchanged, err := policy.LoadGenerationState(baseDir, "multi")
+	require.NoError(t, err)
+	assert.Equal(t, state, unchanged)
 }
