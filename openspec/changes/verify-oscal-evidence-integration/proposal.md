@@ -48,4 +48,4 @@ the earlier change records that contract in
   implementation; user-facing behavior and build commands do not
   change.
 
-Related work: https://github.com/complytime/complyctl/pull/956.
+Related work: [PR #956](https://github.com/complytime/complyctl/pull/956).

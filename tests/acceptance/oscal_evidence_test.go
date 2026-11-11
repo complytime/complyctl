@@ -143,6 +143,12 @@ func TestOSCALEvidence_RejectsLoss(t *testing.T) {
 				map[string]interface{}{"observation-uuid": "missing-observation"},
 			}
 		}, `unresolved observation UUID "missing-observation"`},
+		{"dangling_link_after_match", func(f oscalEvidenceFixture) {
+			f.finding["related-observations"] = []interface{}{
+				map[string]interface{}{"observation-uuid": f.observation["uuid"]},
+				map[string]interface{}{"observation-uuid": "missing-observation"},
+			}
+		}, `unresolved observation UUID "missing-observation"`},
 		{"missing_link_UUID", func(f oscalEvidenceFixture) {
 			f.finding["related-observations"] = []interface{}{map[string]interface{}{}}
 		}, `unresolved observation UUID ""`},

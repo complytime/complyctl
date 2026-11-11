@@ -29,7 +29,7 @@
 
 ## 2. Integration Verification
 
-- [ ] 2.1 Run `make lint` and
+- [x] 2.1 Run `make lint` and
   `golangci-lint run --build-tags=acceptance ./tests/acceptance/...`;
   verify both pass and `git diff --check` reports no whitespace errors.
 - [x] 2.2 Run `make test-unit` and
@@ -39,6 +39,20 @@
   existing CI targets; verify the scan workflows pass and the final
   diff contains only the planned acceptance coverage, artifacts, and
   any justified documentation updates.
+
+## 3. PR Review Follow-up
+
+- [x] 3.1 Reproduce the repeated-requirement link-order defect with
+  schema-valid permutations. Check all linked matches without
+  combining evidence or provenance across items or observations;
+  retain negative coverage and validate every finding link.
+- [x] 3.2 Document setup-helper network/fatal side effects and replace
+  the proposal's bare related-work URL with a Markdown link.
+- [x] 3.3 Verify the follow-up with focused race tests, default and
+  acceptance-tagged lint, unit/formatter tests, Markdown lint,
+  strict OpenSpec validation, whitespace checks, and a fresh
+  lifecycle acceptance run. Refresh `/uf.review-council` before
+  committing and pushing the reviewed follow-up.
 
 ## Workflow follow-up
 

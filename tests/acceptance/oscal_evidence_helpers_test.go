@@ -20,10 +20,21 @@ type oscalEvidenceExpectation struct {
 // checkOSCALEvidence inspects a decoded result, not schema validity. Optional
 // OSCAL evidence can disappear while the document remains schema-valid.
 func checkOSCALEvidence(result map[string]interface{}, expected oscalEvidenceExpectation) error {
-	observation, err := linkedOSCALObservation(result, expected.ControlID, expected.RequirementID)
+	observations, err := linkedOSCALObservations(result, expected.ControlID, expected.RequirementID)
 	if err != nil {
 		return err
 	}
+	var mismatch error
+	for _, observation := range observations {
+		mismatch = checkOSCALObservationEvidence(observation, expected)
+		if mismatch == nil {
+			return nil
+		}
+	}
+	return mismatch
+}
+
+func checkOSCALObservationEvidence(observation map[string]interface{}, expected oscalEvidenceExpectation) error {
 	evidence, err := oscalObjects(observation, "relevant-evidence")
 	if err != nil {
 		return fmt.Errorf("requirement %q: %w", expected.RequirementID, err)
@@ -44,7 +55,9 @@ func checkOSCALEvidence(result map[string]interface{}, expected oscalEvidenceExp
 		expected.RequirementID, mismatch)
 }
 
-func linkedOSCALObservation(result map[string]interface{}, controlID, requirementID string) (map[string]interface{}, error) {
+// Return matches only after checking every link, so finding valid evidence
+// cannot hide a dangling UUID later in the same finding.
+func linkedOSCALObservations(result map[string]interface{}, controlID, requirementID string) ([]map[string]interface{}, error) {
 	observations, err := oscalObjects(result, "observations")
 	if err != nil {
 		return nil, err
@@ -70,6 +83,7 @@ func linkedOSCALObservation(result map[string]interface{}, controlID, requiremen
 		if err != nil {
 			return nil, fmt.Errorf("control %q: %w", controlID, err)
 		}
+		var matches []map[string]interface{}
 		for _, link := range links {
 			uuid, _ := link["observation-uuid"].(string)
 			observation := byUUID[uuid]
@@ -77,8 +91,11 @@ func linkedOSCALObservation(result map[string]interface{}, controlID, requiremen
 				return nil, fmt.Errorf("control %q: unresolved observation UUID %q", controlID, uuid)
 			}
 			if hasOSCALProperty(observation, "requirement-id", requirementID) {
-				return observation, nil
+				matches = append(matches, observation)
 			}
+		}
+		if len(matches) > 0 {
+			return matches, nil
 		}
 		return nil, fmt.Errorf("control %q: no related observation for requirement %q",
 			controlID, requirementID)
