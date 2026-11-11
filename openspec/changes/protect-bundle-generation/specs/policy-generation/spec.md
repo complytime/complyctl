@@ -9,9 +9,9 @@ This MUST cover root/import, import/import, and internal duplicates in
 bundle and split-layer Policies, even with equal requirement IDs or
 different evaluators. Errors MUST name the conflicting plan ID and both
 declaring artifacts and requirements. No partial graph may escape.
-Unique authored IDs MUST remain unchanged. Existing root evaluator
-precedence, multi-artifact inventory, and valid zero-plan roots and
-imports MUST remain supported.
+Unique authored IDs MUST remain unchanged. Per-assessment effective
+evaluator bindings, multi-artifact inventory, and valid zero-plan roots
+and imports MUST remain supported.
 
 #### Scenario: Independently authored Policies reuse a plan ID
 
@@ -26,14 +26,17 @@ imports MUST remain supported.
 - **When** the resolver assembles its graph
 - **Then** the existing projection and evaluator routing MUST persist
 
-### Requirement: FR-002 Projection-aware generation freshness
+### Requirement: FR-002 Resolved-tree generation freshness
 
-Generation state MUST record the current projection version after
-successful generation. Missing or mismatched versions MUST be stale,
-even when policy and complypack digests match and artifacts exist.
-Persisted current-version state MUST remain fresh when digests match
-and required artifacts exist. Existing digest invalidation, missing
-artifact checks, and generation failure behavior MUST persist.
+Generation state MUST record the resolved tree identifier after
+successful generation. Missing or different identifiers MUST be stale.
+Equal identifiers and complypack digests MUST remain fresh when required
+artifacts exist. A policy OCI digest change alone MUST NOT invalidate
+generation. Missing-artifact and failure behavior MUST persist.
+
+The original projection-version requirement is superseded by FR-003
+and FR-004 in
+`preserve-bundle-artifacts/specs/bundle-artifact-inventory/spec.md`.
 
 #### Scenario: Upgrade from unversioned generation state
 
@@ -41,5 +44,5 @@ artifact checks, and generation failure behavior MUST persist.
   digests, and existing nonempty evaluator directories
 - **When** scan checks whether to generate
 - **Then** it MUST require generation with the current resolved plans
-- **And** successful generation MUST persist current-version state
+- **And** successful generation MUST persist the resolved tree identifier
 - **And** the next unchanged scan MUST reuse that generated state
