@@ -12,6 +12,11 @@ Task 9 adds a source/import inventory through `LoadBundleArtifacts`.
 The resolver consumes all catalogs, guidance, and imported Policies.
 `LoadBundleFiles` remains a first-per-type compatibility wrapper.
 
+Generation freshness will use a content-derived identifier of the
+resolved Gemara dependency tree instead of a manually incremented
+projection version or the root policy OCI digest. Complypack digest
+and missing-artifact checks remain separate freshness conditions.
+
 ## Capabilities
 
 ### Added Capabilities
@@ -20,9 +25,11 @@ The resolver consumes all catalogs, guidance, and imported Policies.
 
 ## Impact
 
-Only `internal/policy` loading and resolution change. The existing SDK
-unpacks standard OCI layouts; dependencies and formats stay unchanged.
-The changelog records the user-visible correction.
+Changes cover `internal/policy` loading, resolution, and generation
+state, plus CLI generate/scan freshness integration. The existing SDK
+unpacks standard OCI layouts; no new dependency is required. Existing
+generation state without a tree identifier regenerates once after
+upgrade. The changelog records the user-visible correction.
 
 ## Constitution Alignment
 
