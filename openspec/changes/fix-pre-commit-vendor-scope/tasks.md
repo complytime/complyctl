@@ -30,8 +30,11 @@ the agent can then review and verify them without changing gates.
 
 - [ ] 2.1 Build real-hook fixtures; verify isolated execution.
   Add normal Git fixture repositories in
-  `tests/pre_commit_scope_test.py` using the candidate configuration
-  and SPDX script; verify actual hook diagnostics and bounded
+  `tests/pre_commit_scope_test.py` using pytest test functions and
+  fixtures, the candidate configuration, and SPDX script; do not
+  introduce `unittest.TestCase` subclasses (Python pack TC-001).
+  Verify pytest is installed for the selected Python interpreter;
+  verify actual hook diagnostics and bounded
   failure reporting for missing prerequisites. Cover FR-007.
 - [ ] 2.2 Add scope tests; verify they reproduce the original bug.
   Cover vendor byte preservation for staged and all-files runs,
@@ -64,8 +67,10 @@ the agent can then review and verify them without changing gates.
   its existing failure remains and scanner settings, stages, hook
   revisions, and other hook definitions are unchanged. Cover FR-005.
 - [ ] 2.6 Add the test target and guidance; verify commands and lint.
-  Add `make test-pre-commit-scope` using unittest discovery;
-  document prerequisites, scope, and both stages in
+  Add `make test-pre-commit-scope` to invoke
+  `python3 -m pytest tests/pre_commit_scope_test.py`;
+  document pytest as a development/test prerequisite, not a runtime
+  dependency, along with existing prerequisites, scope, and stages in
   `docs/STYLE_GUIDE.md`. Enumerate the three formatter-only command
   exceptions, vendor-only SPDX exemption, and continued checks on
   other commands and archives. Verify the target and documented
