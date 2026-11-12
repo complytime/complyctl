@@ -34,7 +34,8 @@ the agent can then review and verify them without changing gates.
   fixtures, the candidate configuration, and SPDX script; do not
   introduce `unittest.TestCase` subclasses (Python pack TC-001).
   Verify pytest is installed for the selected Python interpreter;
-  verify actual hook diagnostics and bounded
+  verify `go` and `gofmt` match the toolchain declared in `go.mod`.
+  Verify actual hook diagnostics and bounded
   failure reporting for missing prerequisites. Cover FR-007.
 - [ ] 2.2 Add scope tests; verify they reproduce the original bug.
   Cover vendor byte preservation for staged and all-files runs,
@@ -43,38 +44,50 @@ the agent can then review and verify them without changing gates.
   paths, and second-run checks; verify failures reproduce before
   the exclusions and cover FR-001 through FR-003 and FR-007.
   For FR-008, cover all three exempt command paths for both
-  formatters under staged and all-files selection, asserting exact
-  bytes with eligible controls proving hook execution. Verify
+  whitespace/EOF hooks under staged/all-files selection. Assert
+  exact bytes with eligible controls proving hook execution. Verify
   neighboring commands, prefix/suffix lookalikes, nested copies,
   and archived specs remain selected. Independently remove only
   the command exemption or only the vendor exemption in disposable
   fixtures; verify the corresponding preservation cases fail.
+  For FR-009, execute pinned `go-fmt` on minimal valid Go fixtures
+  with staged/all-files vendor and first-party Go controls. Check
+  vendor bytes, non-Apache notices, defective/compliant maintained
+  inputs, vendor-like paths, repair exit status, and idempotence.
+  Remove only its vendor exclusion in a fresh disposable fixture;
+  verify vendor-preservation failures and audit actual changed paths.
 - [ ] 2.3 Test stage and file selection; verify hook execution.
   Add staged-versus-all-files fixtures and stage checks; verify an
   unstaged committed defect is found only by all-files
-  selection and intended hooks actually execute. Cover FR-004.
+  selection and intended hooks actually execute. Include `go-fmt`
+  at pre-push, preserving all existing stage assignments. Cover
+  FR-004 and FR-009.
 - [ ] 2.4 Hand off hook edits to a human; verify the manual changes.
-  A human contributor sets the two formatter exclusions to the
+  A human contributor sets the whitespace/EOF exclusions to the
   exact vendor-or-three-command expression in design decision 1.
-  `check-spdx` retains `exclude: ^vendor/`. No directory-wide
-  command or archive exclusion is permitted.
+  `go-fmt` and `check-spdx` each use `exclude: ^vendor/`.
+  No directory-wide command or archive exclusion is permitted.
   The agent MUST NOT apply or repair these protected hook edits.
   After the manual handoff, inspect the diff and verify regression
   tests pass and independent disposable mutations detect removal
-  of either exclusion branch. Cover FR-001 and FR-008.
+  of either exclusion branch and `go-fmt`'s exclusion. Cover FR-001,
+  FR-008, and FR-009.
 - [ ] 2.5 Test unrelated selection; verify other controls remain.
   Use an invalid vendored YAML fixture with `check-yaml`; verify
   its existing failure remains and scanner settings, stages, hook
-  revisions, and other hook definitions are unchanged. Cover FR-005.
+  revisions, `go-unit-tests`, and hooks outside the four affected
+  IDs are unchanged. Cover FR-005.
 - [ ] 2.6 Add the test target and guidance; verify commands and lint.
   Add `make test-pre-commit-scope` to invoke
   `python3 -m pytest tests/pre_commit_scope_test.py`;
   document pytest as a development/test prerequisite, not a runtime
   dependency, along with existing prerequisites, scope, and stages in
-  `docs/STYLE_GUIDE.md`. Enumerate the three formatter-only command
-  exceptions, vendor-only SPDX exemption, and continued checks on
-  other commands and archives. Verify the target and documented
-  commands in disposable fixtures; lint changed Python/YAML/Markdown.
+  `docs/STYLE_GUIDE.md`. Enumerate the three whitespace/EOF command
+  exceptions, vendor-only `go-fmt` and SPDX exclusions, and checks
+  on other commands and archives. Include `go-fmt` staged/all-files
+  pre-push commands and the Go version from `go.mod`. Verify the
+  target and documented commands in disposable fixtures; lint
+  changed Python/YAML/Markdown.
 - [ ] 2.7 Document the fix; verify documentation impact is covered.
   Add a `CHANGELOG.md` fix entry with this spec path;
   assess the new command's `AGENTS.md` documentation impact and
@@ -84,10 +97,12 @@ the agent can then review and verify them without changing gates.
 ## 3. Reconcile first-party baseline findings
 
 - [ ] 3.1 Compare baseline and candidate; verify vendor preservation.
-  Run the three affected hooks individually in disposable normal
+  Run the four affected hooks individually in disposable normal
   checkouts at their configured stages; verify vendor bytes remain
   unchanged in the candidate, along with all three exempt commands,
   and record per-path first-party findings with tool versions.
+  Attribute baseline/candidate `go-fmt` mutations separately under
+  the declared Go toolchain; record vendor exclusion, not repairs.
 - [ ] 3.2 Repair scoped first-party findings; verify or track each.
   Fix only approved whitespace/EOF findings and rerun the affected
   hooks to verify each repair. Record exact path,
@@ -98,9 +113,10 @@ the agent can then review and verify them without changing gates.
   whitespace repair without excluding other archived content.
 - [ ] 3.3 Deliver the inventory; verify all findings have dispositions.
   Provide a copy-ready verification handoff for manual publication;
-  distinguish verified repairs, the three explicit formatter
-  exclusions, and unresolved findings. Verify every finding has a
-  disposition and no historical count is used as a pass criterion.
+  distinguish verified repairs, vendor exclusions on four hooks,
+  the three whitespace/EOF command exceptions, and unresolved
+  findings. Verify every finding has a disposition and no historical
+  count is used as a pass criterion.
   Cover FR-006.
 
 ## 4. Verify repository integration

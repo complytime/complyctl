@@ -11,22 +11,28 @@ Baseline verification also found EOF defects in three commands
 scaffolded by uf. Preserve those managed files rather than apply
 project formatting changes that would diverge from their source.
 
+The full pre-push check also found `go-fmt` rewriting vendor files.
+Its selection needs the same root-vendor boundary while preserving
+checks on maintained Go sources.
+
 ## What Changes
 
 - Exclude the repository-root `vendor/` tree only from
-  `trailing-whitespace`, `end-of-file-fixer`, and `check-spdx`.
+  `trailing-whitespace`, `end-of-file-fixer`, `go-fmt`, and
+  `check-spdx`.
 - Also exclude exactly these scaffolded files from the two
-  formatting hooks, with no directory-wide command exemption:
+  whitespace/EOF hooks, with no directory-wide command exemption:
   - `.opencode/commands/uf.review-council.md`
   - `.opencode/commands/uf.review-pr.md`
   - `.opencode/commands/uf.address-feedback.md`
-  Keep the SPDX exclusion vendor-only.
+  Keep the `go-fmt` and SPDX exclusions vendor-only.
 - Preserve the existing rules, pinned hook revisions, file-type
   filters, and stage assignments for maintained first-party files.
 - Add regression checks using actual hook execution in temporary
   normal Git repositories, covering staged-file and all-files runs.
   Cover each command exception, neighboring paths, and independent
-  vendor and command-exception mutation cases.
+  vendor and command-exception mutation cases. Include actual
+  pinned `go-fmt` execution with defective and compliant Go inputs.
 - Inspect first-party baseline findings in a disposable checkout;
   fix ordinary formatting findings within scope or record exact
   paths and a disposition for protected or out-of-scope findings.
@@ -41,8 +47,8 @@ project formatting changes that would diverge from their source.
 ### New Capabilities
 
 - `project-hook-scope`: Ownership-aware selection for the project's
-  whitespace, EOF, and SPDX hooks, with continued first-party checks
-  across their configured Git stages.
+  whitespace, EOF, Go-formatting, and SPDX hooks, with continued
+  first-party checks across their configured Git stages.
 
 ### Modified Capabilities
 
@@ -52,7 +58,7 @@ covers standalone yamllint, not these hooks.
 
 ## Impact
 
-- Configuration: `.pre-commit-config.yaml`, limited to the three
+- Configuration: `.pre-commit-config.yaml`, limited to the four
   named hooks; agent edits are blocked by the gatekeeping rule.
 - Tests: a Python regression suite under `tests/`, invoking the
   real hooks and the repository SPDX script through pre-commit.
@@ -62,8 +68,8 @@ covers standalone yamllint, not these hooks.
 - Baseline cleanup: only individually verified first-party
   formatting changes; no vendored or protected template rewrites.
 - Dependencies: installed pytest as a development/test prerequisite,
-  pre-commit, and its pinned hook environments; no new runtime
-  dependency or provider API change.
+  pre-commit, its pinned hook environments, and the Go toolchain
+  declared by `go.mod`; no new runtime dependency or API change.
 - Ownership: local history and the sibling org-infra sync manifest
   indicate the target configuration and SPDX script are local.
   Recheck before implementation; shared policy changes require a
@@ -87,7 +93,7 @@ exception. Agents MUST stop and report the instruction conflict
 before editing hook policy. This change does not amend that rule
 or introduce an approval process.
 
-A human contributor MAY apply the three proposed hook exclusions
+A human contributor MAY apply the four proposed hook exclusions
 manually. The agent MAY then review the resulting diff and run
 verification without editing protected gates. This handoff does
 not waive the repository's ordinary PR review requirements.

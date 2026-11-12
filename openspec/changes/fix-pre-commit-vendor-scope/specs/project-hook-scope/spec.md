@@ -9,15 +9,15 @@ without rewriting third-party sources or hiding first-party defects.
 
 ### Requirement: FR-001 Preserve vendored content
 
-The `trailing-whitespace`, `end-of-file-fixer`, and `check-spdx`
-hooks MUST exclude the repository-root `vendor/` tree. Each MUST
+The `trailing-whitespace`, `end-of-file-fixer`, `go-fmt`, and
+`check-spdx` hooks MUST exclude the root `vendor/` tree. Each MUST
 leave vendored file bytes and license notices unchanged for both
 staged-file and repository-wide runs at its configured stage.
 
 #### Scenario: Staged vendored files violate project conventions
 
 - **GIVEN** staged vendored files contain trailing whitespace,
-  invalid EOF formatting, and non-Apache license notices
+  invalid EOF formatting, non-gofmt Go, or non-Apache license notices
 - **WHEN** each affected hook runs at its configured stage
 - **THEN** those files produce no findings from these hooks
 - **AND** their bytes and license notices remain unchanged
@@ -80,8 +80,10 @@ MUST NOT change the license-header policy for maintained sources.
 
 ### Requirement: FR-004 Preserve stages and file selection
 
-The affected hooks MUST retain their stage assignments: formatting
-at pre-push and SPDX at pre-commit. Staged-file runs MUST check
+The affected hooks MUST retain their existing stage assignments.
+Verification MUST cover whitespace, EOF, and `go-fmt` at pre-push
+and SPDX at pre-commit, preserving additional manifest stages.
+Staged-file runs MUST check
 eligible staged content; all-files runs MUST also check eligible
 tracked content outside the staged selection.
 
@@ -105,13 +107,15 @@ tracked content outside the staged selection.
 
 This change MUST NOT add a global vendor exclusion, disable hooks,
 alter hook revisions or rules, or change unrelated hook selection.
+The `go-fmt` change MUST be limited to its root-vendor exclusion;
+`go-unit-tests` and other unrelated Go hooks MUST remain unchanged.
 Applicable security scanning MUST retain its existing scope and
 configuration.
 
 #### Scenario: An unrelated check would select an input
 
 - **GIVEN** an input selected by an unrelated hook or scanner
-- **WHEN** the three hook-specific scope exclusions take effect
+- **WHEN** the four hook-specific scope exclusions take effect
 - **THEN** that unrelated control retains its existing selection
 
 ### Requirement: FR-006 Account for first-party baseline findings
@@ -143,13 +147,12 @@ Historical issue counts MUST NOT define the expected total.
 
 ### Requirement: FR-007 Provide repeatable contributor verification
 
-Contributor guidance MUST state affected hook scope, stage-specific
-execution, prerequisites, and how to run regression checks. The
-guidance MUST list the exact FR-008 formatter exceptions and
-distinguish them from the vendor-only SPDX exclusion. The
-regression checks MUST use isolated normal Git repositories, fail
-on missing prerequisites, and verify unchanged vendored bytes and
-continued first-party defect detection.
+Contributor guidance MUST document scope, stages, prerequisites,
+regression commands, the Go version from `go.mod`, FR-008 command
+exceptions, and vendor-only `go-fmt`/SPDX exclusions. Regression
+checks MUST use isolated normal Git repositories, fail on missing
+prerequisites, and verify unchanged vendor bytes and continued
+first-party defect detection.
 
 #### Scenario: A contributor runs the regression suite
 
@@ -176,11 +179,12 @@ hooks, or exclude an entire command or archive directory.
 
 - **GIVEN** any listed command contains trailing whitespace or an
   invalid EOF and an eligible control proves hook execution
-- **WHEN** either formatter runs at pre-push on staged or all files
+- **WHEN** either whitespace/EOF hook runs at pre-push on staged
+  or all files
 - **THEN** the listed command produces no formatter finding
 - **AND** its exact bytes remain unchanged
 - **AND** regression checks MUST exercise every listed command
-  with each formatter and each selection mode
+  with each whitespace/EOF hook and each selection mode
 
 #### Scenario: A neighboring or lookalike path has a defect
 
@@ -195,14 +199,63 @@ hooks, or exclude an entire command or archive directory.
 
 - **GIVEN** a disposable configuration retains the vendor exclusion
   but removes only the scaffolded-command exemption
-- **WHEN** the command-preservation cases run for each formatter
+- **WHEN** the command-preservation cases run for each
+  whitespace/EOF hook
 - **THEN** those cases fail because the defective commands change
 - **AND** the vendor-preservation cases still pass
 
 #### Scenario: The vendor exemption is removed independently
 
-- **GIVEN** a disposable formatter configuration retains the three
+- **GIVEN** a disposable whitespace/EOF hook retains the three
   command exceptions but removes only its vendor exclusion
 - **WHEN** the vendor and command preservation cases run
 - **THEN** vendor-preservation cases fail
 - **AND** command-preservation cases still pass
+
+### Requirement: FR-009 Retain first-party Go formatting
+
+The pinned `go-fmt` hook MUST preserve vendor bytes while retaining
+checks and corrections on maintained Go files at pre-push. Tests
+MUST exercise its actual invocation scope in isolated Git fixtures
+using the Go toolchain declared in `go.mod`. Its root-vendor
+exclusion MUST NOT hide vendor-like first-party paths.
+
+#### Scenario: Mixed Go inputs are selected
+
+- **GIVEN** valid Go fixtures contain non-gofmt vendor content with
+  an existing license notice and a non-gofmt maintained Go control
+- **WHEN** pinned `go-fmt` runs on staged or all files at pre-push
+- **THEN** vendor bytes and notices remain unchanged
+- **AND** the maintained file is corrected and the hook exits nonzero
+- **AND** changed-path evidence MUST show only eligible inputs changed
+
+#### Scenario: Maintained Go files comply after a repair
+
+- **GIVEN** maintained Go inputs already satisfy gofmt, including
+  compliant inputs and previously corrected files
+- **WHEN** `go-fmt` selects them at pre-push
+- **THEN** the hook passes without changing any bytes
+
+#### Scenario: Vendor-like maintained Go paths have defects
+
+- **GIVEN** `internal/vendor_helpers.go` and
+  `tests/vendor_cases/example.go` contain valid non-gofmt Go
+- **WHEN** `go-fmt` selects them at pre-push
+- **THEN** it corrects both files and reports failure
+
+#### Scenario: A Go defect is outside the staged selection
+
+- **GIVEN** a committed maintained Go file has a formatting defect
+  and only a separate compliant Go change is staged
+- **WHEN** `go-fmt` runs on staged files at pre-push
+- **THEN** it passes and leaves the unstaged file unchanged
+- **WHEN** it runs with all-files selection
+- **THEN** it corrects the defect and reports failure
+
+#### Scenario: Only the go-fmt vendor exemption is removed
+
+- **GIVEN** a fresh disposable configuration removes only
+  `go-fmt`'s vendor exclusion and retains all other exclusions
+- **WHEN** its vendor-preservation cases run at pre-push
+- **THEN** they fail because vendor bytes change
+- **AND** the regression checks MUST detect that mutation
