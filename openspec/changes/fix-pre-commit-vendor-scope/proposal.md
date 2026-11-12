@@ -17,7 +17,7 @@ while preserving upstream sources and first-party checks.
   normal Git repositories, covering staged-file and all-files runs.
 - Inspect first-party baseline findings in a disposable checkout;
   fix ordinary formatting findings within scope or record exact
-  paths and a disposition for findings needing separate approval.
+  paths and a disposition for protected or out-of-scope findings.
 - Document hook scope, stage-specific execution, prerequisites, and
   a Make target for the regression suite.
 - Leave unrelated hooks and security scanning policy intact.
@@ -39,12 +39,12 @@ covers standalone yamllint, not these hooks.
 ## Impact
 
 - Configuration: `.pre-commit-config.yaml`, limited to the three
-  named hooks after the required policy authorization.
+  named hooks; agent edits are blocked by the gatekeeping rule.
 - Tests: a Python regression suite under `tests/`, invoking the
   real hooks and the repository SPDX script through pre-commit.
 - Developer tooling: `Makefile`, `docs/STYLE_GUIDE.md`, and a
   contributor-facing changelog entry. Assess `AGENTS.md` for the
-  new test command through the repository's approval process.
+  new test command without changing protected agent settings.
 - Baseline cleanup: only individually verified first-party
   formatting changes; no vendored or protected template rewrites.
 - Dependencies: installed pre-commit and its pinned hook
@@ -53,8 +53,28 @@ covers standalone yamllint, not these hooks.
   indicate the target configuration and SPDX script are local.
   Recheck before implementation; shared policy changes require a
   separate upstream proposal rather than expanding this change.
-- Governance: this proposal does not authorize a protected gate
-  change. Implementation MUST stop before editing hook policy
-  unless the applicable maintainer authorization is established.
+- Agent constraint: `AGENTS.md` prohibits agents from modifying
+  quality/governance gates and requires them to stop and report.
+  Agent implementation of the proposed hook edits is blocked.
+
+## Implementation Status
+
+No process for authorizing agent edits to protected gates is
+documented in `AGENTS.md`, the constitution, or contributor guidance.
+The constitution and `docs/CONTRIBUTING.md` require ordinary PR
+review; the constitution's amendment procedure applies to changes
+to the constitution. Neither defines an exception to gatekeeping.
+
+These artifacts describe the proposed fix but MUST NOT be treated
+as permission to change protected gates. Spec review, PR approval,
+or a recorded maintainer decision does not establish a documented
+exception. Agents MUST stop and report the instruction conflict
+before editing hook policy. This change does not amend that rule
+or introduce an approval process.
+
+A human contributor MAY apply the three proposed hook exclusions
+manually. The agent MAY then review the resulting diff and run
+verification without editing protected gates. This handoff does
+not waive the repository's ordinary PR review requirements.
 
 Issue: https://github.com/complytime/complyctl/issues/972

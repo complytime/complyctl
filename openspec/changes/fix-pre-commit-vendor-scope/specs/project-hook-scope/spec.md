@@ -119,7 +119,7 @@ first-party finding MUST be fixed within the approved scope or
 tracked with its exact path, hook, reason, and follow-up disposition.
 Historical issue counts MUST NOT define the expected total.
 
-#### Scenario: A first-party finding requires separate approval
+#### Scenario: A first-party finding is outside the cleanup scope
 
 - **GIVEN** baseline verification identifies a protected template
   or other first-party file outside the approved cleanup scope
