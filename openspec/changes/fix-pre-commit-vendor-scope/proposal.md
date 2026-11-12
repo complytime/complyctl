@@ -7,17 +7,31 @@ unrelated changes and adding project license metadata to third-party
 code. Issue #972 needs a scoped fix so contributors can run the hooks
 while preserving upstream sources and first-party checks.
 
+Baseline verification also found EOF defects in three commands
+scaffolded by uf. Preserve those managed files rather than apply
+project formatting changes that would diverge from their source.
+
 ## What Changes
 
 - Exclude the repository-root `vendor/` tree only from
   `trailing-whitespace`, `end-of-file-fixer`, and `check-spdx`.
+- Also exclude exactly these scaffolded files from the two
+  formatting hooks, with no directory-wide command exemption:
+  - `.opencode/commands/uf.review-council.md`
+  - `.opencode/commands/uf.review-pr.md`
+  - `.opencode/commands/uf.address-feedback.md`
+  Keep the SPDX exclusion vendor-only.
 - Preserve the existing rules, pinned hook revisions, file-type
   filters, and stage assignments for maintained first-party files.
 - Add regression checks using actual hook execution in temporary
   normal Git repositories, covering staged-file and all-files runs.
+  Cover each command exception, neighboring paths, and independent
+  vendor and command-exception mutation cases.
 - Inspect first-party baseline findings in a disposable checkout;
   fix ordinary formatting findings within scope or record exact
   paths and a disposition for protected or out-of-scope findings.
+  Record excluded command defects as preserved scaffolded content,
+  not formatting repairs. Archived specs remain checked.
 - Document hook scope, stage-specific execution, prerequisites, and
   a Make target for the regression suite.
 - Leave unrelated hooks and security scanning policy intact.
