@@ -31,7 +31,10 @@ staged-file and repository-wide runs at its configured stage.
 ### Requirement: FR-002 Retain first-party formatting checks
 
 Whitespace and EOF hooks MUST retain their existing checks and
-failure behavior on applicable first-party files outside `vendor/`.
+failure behavior on applicable first-party files except `vendor/`
+and the three scaffolded-command exceptions in FR-008. No other
+first-party exemption is introduced. Other commands and
+archived specs MUST retain existing formatting checks.
 Scope exclusions MUST NOT hide files merely because another path
 component or filename contains the string `vendor`.
 
@@ -117,20 +120,33 @@ Verification MUST distinguish baseline findings from introduced
 defects using a recorded revision and tool versions. Each remaining
 first-party finding MUST be fixed within the approved scope or
 tracked with its exact path, hook, reason, and follow-up disposition.
+For the three command exceptions in FR-008, the inventory MUST
+distinguish exclusions from repairs and retain their dispositions.
 Historical issue counts MUST NOT define the expected total.
 
 #### Scenario: A first-party finding is outside the cleanup scope
 
 - **GIVEN** baseline verification identifies a protected template
-  or other first-party file outside the approved cleanup scope
+  outside the FR-008 exceptions or another out-of-scope file
 - **WHEN** verification results are recorded
 - **THEN** the finding remains explicitly tracked under #972
 - **AND** no broader exclusion or unauthorized edit hides it
+
+#### Scenario: A scaffolded command has a baseline defect
+
+- **GIVEN** an FR-008 command has a baseline formatter defect
+- **WHEN** candidate verification excludes that path
+- **THEN** the inventory retains the path, hook, and original defect
+- **AND** its disposition MUST state "excluded from formatters;
+  preserved uf-scaffolded bytes" with a source-template follow-up
+- **AND** the inventory MUST NOT count the exclusion as a repair
 
 ### Requirement: FR-007 Provide repeatable contributor verification
 
 Contributor guidance MUST state affected hook scope, stage-specific
 execution, prerequisites, and how to run regression checks. The
+guidance MUST list the exact FR-008 formatter exceptions and
+distinguish them from the vendor-only SPDX exclusion. The
 regression checks MUST use isolated normal Git repositories, fail
 on missing prerequisites, and verify unchanged vendored bytes and
 continued first-party defect detection.
@@ -142,3 +158,51 @@ continued first-party defect detection.
 - **THEN** the checks exercise actual hook behavior
 - **AND** a missing tool or unavailable hook environment fails visibly
 - **AND** a second run on corrected inputs passes unchanged
+
+### Requirement: FR-008 Preserve three scaffolded commands
+
+The whitespace and EOF hooks MUST exclude exactly these additional
+repository-root paths, preserving their bytes under staged-file
+and all-files selection at pre-push:
+
+- `.opencode/commands/uf.review-council.md`
+- `.opencode/commands/uf.review-pr.md`
+- `.opencode/commands/uf.address-feedback.md`
+
+This exception MUST NOT broaden the SPDX exclusion, affect other
+hooks, or exclude an entire command or archive directory.
+
+#### Scenario: An exempt scaffolded command has formatting defects
+
+- **GIVEN** any listed command contains trailing whitespace or an
+  invalid EOF and an eligible control proves hook execution
+- **WHEN** either formatter runs at pre-push on staged or all files
+- **THEN** the listed command produces no formatter finding
+- **AND** its exact bytes remain unchanged
+- **AND** regression checks MUST exercise every listed command
+  with each formatter and each selection mode
+
+#### Scenario: A neighboring or lookalike path has a defect
+
+- **GIVEN** a different command, prefix/suffix lookalike, nested
+  copy, or archived spec contains an applicable formatting defect
+- **WHEN** the whitespace or EOF hook selects it at pre-push
+- **THEN** the hook reports failure and applies its usual correction
+- **AND** regression checks MUST cover neighboring commands,
+  prefix/suffix lookalikes, nested copies, and archived specs
+
+#### Scenario: The command exemption is removed independently
+
+- **GIVEN** a disposable configuration retains the vendor exclusion
+  but removes only the scaffolded-command exemption
+- **WHEN** the command-preservation cases run for each formatter
+- **THEN** those cases fail because the defective commands change
+- **AND** the vendor-preservation cases still pass
+
+#### Scenario: The vendor exemption is removed independently
+
+- **GIVEN** a disposable formatter configuration retains the three
+  command exceptions but removes only its vendor exclusion
+- **WHEN** the vendor and command preservation cases run
+- **THEN** vendor-preservation cases fail
+- **AND** command-preservation cases still pass

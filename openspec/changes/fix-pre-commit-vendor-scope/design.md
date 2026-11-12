@@ -3,12 +3,13 @@
 ## Context
 
 See `proposal.md` for motivation and the `project-hook-scope` delta
-for FR-001 through FR-007. This design changes hook selection,
+for FR-001 through FR-008. This design changes hook selection,
 not formatter rules or first-party licensing policy.
 
 `.pre-commit-config.yaml` defaults hooks to `pre-push`; the local
 SPDX hook explicitly uses `pre-commit` and selects `.py`, `.go`,
-and `.sh` files. None of the three reported hooks excludes vendor.
+and `.sh` files. The original configuration excludes neither vendor
+nor the three scaffolded commands identified below.
 The SPDX script prepends Apache-2.0 when its first-three-line check
 fails. Yamllint and MegaLinter exclusions are independent.
 
@@ -51,11 +52,23 @@ be committed and pushed before implementation.
 
 ### 1. Put root-anchored exclusions on three hooks
 
-The proposed fix adds `exclude: ^vendor/` separately to
-`trailing-whitespace`, `end-of-file-fixer`, and `check-spdx`.
-Retain pinned revisions, existing rules, type filters, and stages.
-The pattern excludes only the repository-root vendor tree and
-keeps vendor-like first-party paths eligible.
+The proposed fix uses this hook-level exclusion on both
+`trailing-whitespace` and `end-of-file-fixer`:
+
+```yaml
+exclude: '^(vendor/|\.opencode/commands/uf\.(review-council|review-pr|address-feedback)\.md$)'
+```
+
+It preserves the root `vendor/` tree and exactly three uf-scaffolded
+files under `.opencode/commands/`: `uf.review-council.md`,
+`uf.review-pr.md`, and `uf.address-feedback.md`. The command branch
+is anchored to each complete path. Other commands, name lookalikes,
+and nested copies remain eligible for the formatting hooks.
+
+The SPDX hook retains `exclude: ^vendor/`; Markdown commands do
+not match its existing extension filter. Retain pinned revisions,
+rules, type filters, and stages for all hooks. Do not exclude
+`.opencode/` or `openspec/changes/archive/` as whole directories.
 
 This is a proposed configuration change, not an executable agent
 instruction under the current gatekeeping rule. Agents MUST stop
@@ -101,6 +114,15 @@ The fixture matrix MUST cover:
 
 - Vendor Go, Python, shell, and text files with formatting defects
   and existing non-Apache license notices; assert exact bytes.
+- All three exempt commands with trailing whitespace and invalid
+  EOFs, separately for each formatter and staged/all-files runs;
+  assert exact bytes and no findings on those paths. Include an
+  eligible first-party control proving that the hook executes.
+- Maintained command neighbors and path lookalikes with defects:
+  `uf.other.md`, `uf.review-pr.md.bak`, `xuf.review-pr.md`, and a
+  nested copy of `.opencode/commands/uf.review-pr.md`. Each MUST
+  remain selected and corrected by both formatters. Archived spec
+  fixtures MUST also remain selected.
 - Matching first-party failures for each formatter and each SPDX
   file extension; verify the correction and nonzero exit status.
 - Clean first-party inputs and second-run idempotence.
@@ -109,14 +131,18 @@ The fixture matrix MUST cover:
 - Stage assignments and unchanged unrelated controls.
 
 Require evidence that each intended hook actually ran; a
-wrong-stage skip is not a passing behavioral check. Vendor-only
+wrong-stage skip is not a passing behavioral check. Excluded-only
 selection may legitimately report no eligible files. Include
 eligible first-party controls in mixed fixtures to distinguish
 valid exclusion from disabled execution.
 
-Removing the candidate exclusions in a disposable fixture MUST
-make vendor-preservation cases fail. This checks that the suite
-would detect the original bug without touching the real config.
+Mutation checks MUST independently remove each exclusion branch
+in disposable fixtures. Removing only the command branch, while
+keeping vendor excluded, MUST make command-preservation cases
+fail for each formatter. Removing only the vendor branch MUST
+make vendor-preservation cases fail while keeping the command
+exceptions intact. For SPDX, remove its vendor-only exclusion.
+These checks MUST NOT edit the developer's hook configuration.
 
 ### 3. Make prerequisites and stage coverage explicit
 
@@ -134,6 +160,9 @@ they MUST NOT become skipped tests or implicit success.
 
 Document separate execution of SPDX at pre-commit and the two
 formatters at pre-push. Show both staged and all-files forms.
+List the three command paths as formatter-only exceptions and
+explain that the SPDX exemption remains vendor-only. Do not
+describe excluded template defects as fixed formatting issues.
 An unqualified all-files run alone does not cover both stages.
 Full-stage runs remain a separate repository verification step.
 
@@ -147,10 +176,19 @@ hook ID, exit status, and changed paths. Compare vendor bytes
 before and after candidate hook runs.
 
 Run the three hooks individually to attribute their mutations.
+For each of the three exempt commands, record its exact path,
+the baseline hook finding, and the disposition "excluded from
+formatters; preserved uf-scaffolded bytes". Verify its candidate
+bytes are unchanged; do not count its disappearance from formatter
+output as a repair. Retain a source-template follow-up under #972
+in the copy-ready handoff, without posting to GitHub.
+
 Apply only verified first-party whitespace/EOF repairs within the
-approved scope. Do not mass-copy hook output back to the working
-tree. For protected command templates or out-of-scope findings,
-record exact path, hook, reason, and follow-up disposition under
+approved scope, including ordinary archived spec content. The
+known archived design whitespace finding is a repair candidate,
+not a reason to exclude archives. Do not mass-copy hook output
+back to the working tree. For other protected or out-of-scope
+findings, record exact path, hook, reason, and follow-up under
 #972 in the verification handoff for the user to publish manually.
 Do not create a broad exclusion to turn those findings green.
 
@@ -185,6 +223,9 @@ change because runtime behavior is unaffected.
   disposable checkouts and retain byte comparisons.
 - Protected first-party findings remain → track each explicitly
   and report an incomplete full-run result without weakening gates.
+- Exact command exceptions preserve known formatting defects →
+  report their exclusion disposition and source-template follow-up;
+  regression controls MUST prevent a directory-wide exemption.
 - Direct SPDX script callers can still pass vendor paths → document
   the hook boundary; script-wide hardening is outside this fix.
 

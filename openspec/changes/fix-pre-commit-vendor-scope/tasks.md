@@ -9,17 +9,19 @@ the agent can then review and verify them without changing gates.
 
 ## 1. Establish implementation prerequisites
 
-- [ ] 1.1 Verify reviewed specs are committed and pushed.
+- [x] 1.1 Verify reviewed specs are committed and pushed.
   Before source edits, record the spec commit and remote evidence.
-- [ ] 1.2 Check the gatekeeping rule and report the blocker.
+  After a scope amendment, repeat this verification for the revised
+  artifacts and obtain a fresh spec review before implementation.
+- [x] 1.2 Check the gatekeeping rule and report the blocker.
   Record the prohibition on agent edits to quality/governance
   gates and the absence of a documented exception process.
   Stop agent execution before protected hook edits; do not treat
   spec review or maintainer approval as an exception to the rule.
-- [ ] 1.3 Verify local hook ownership and record the evidence.
+- [x] 1.3 Verify local hook ownership and record the evidence.
   Check local history and the org-infra sync manifest; stop for
   separate upstream planning if the policy is shared infrastructure.
-- [ ] 1.4 Verify hook prerequisites and record baseline versions.
+- [x] 1.4 Verify hook prerequisites and record baseline versions.
   Record the revision and Git, Python, pre-commit, and Go versions;
   verify required hook environments can initialize
   in disposable state without modifying the user's checkout.
@@ -37,17 +39,26 @@ the agent can then review and verify them without changing gates.
   formatter and all SPDX extensions. Include shebang, vendor-like
   paths, and second-run checks; verify failures reproduce before
   the exclusions and cover FR-001 through FR-003 and FR-007.
+  For FR-008, cover all three exempt command paths for both
+  formatters under staged and all-files selection, asserting exact
+  bytes with eligible controls proving hook execution. Verify
+  neighboring commands, prefix/suffix lookalikes, nested copies,
+  and archived specs remain selected. Independently remove only
+  the command exemption or only the vendor exemption in disposable
+  fixtures; verify the corresponding preservation cases fail.
 - [ ] 2.3 Test stage and file selection; verify hook execution.
   Add staged-versus-all-files fixtures and stage checks; verify an
   unstaged committed defect is found only by all-files
   selection and intended hooks actually execute. Cover FR-004.
 - [ ] 2.4 Hand off hook edits to a human; verify the manual changes.
-  A human contributor adds only `exclude: ^vendor/` to
-  `trailing-whitespace`, `end-of-file-fixer`, and `check-spdx`.
+  A human contributor sets the two formatter exclusions to the
+  exact vendor-or-three-command expression in design decision 1.
+  `check-spdx` retains `exclude: ^vendor/`. No directory-wide
+  command or archive exclusion is permitted.
   The agent MUST NOT apply or repair these protected hook edits.
   After the manual handoff, inspect the diff and verify regression
-  tests now pass and a disposable copy
-  with the exclusions removed fails vendor-preservation cases.
+  tests pass and independent disposable mutations detect removal
+  of either exclusion branch. Cover FR-001 and FR-008.
 - [ ] 2.5 Test unrelated selection; verify other controls remain.
   Use an invalid vendored YAML fixture with `check-yaml`; verify
   its existing failure remains and scanner settings, stages, hook
@@ -55,8 +66,10 @@ the agent can then review and verify them without changing gates.
 - [ ] 2.6 Add the test target and guidance; verify commands and lint.
   Add `make test-pre-commit-scope` using unittest discovery;
   document prerequisites, scope, and both stages in
-  `docs/STYLE_GUIDE.md`. Verify the target and documented commands
-  in disposable fixtures and lint the changed Python/YAML/Markdown.
+  `docs/STYLE_GUIDE.md`. Enumerate the three formatter-only command
+  exceptions, vendor-only SPDX exemption, and continued checks on
+  other commands and archives. Verify the target and documented
+  commands in disposable fixtures; lint changed Python/YAML/Markdown.
 - [ ] 2.7 Document the fix; verify documentation impact is covered.
   Add a `CHANGELOG.md` fix entry with this spec path;
   assess the new command's `AGENTS.md` documentation impact and
@@ -68,18 +81,22 @@ the agent can then review and verify them without changing gates.
 - [ ] 3.1 Compare baseline and candidate; verify vendor preservation.
   Run the three affected hooks individually in disposable normal
   checkouts at their configured stages; verify vendor bytes remain
-  unchanged in the candidate
+  unchanged in the candidate, along with all three exempt commands,
   and record per-path first-party findings with tool versions.
 - [ ] 3.2 Repair scoped first-party findings; verify or track each.
   Fix only approved whitespace/EOF findings and rerun the affected
   hooks to verify each repair. Record exact path,
   hook, reason, and follow-up disposition under #972 for every
-  remaining finding, including protected command templates.
+  remaining finding. Record each exempt command's baseline defect
+  as preserved scaffolded content with a source-template follow-up;
+  exclusion is not a repair. Verify the archived design's scoped
+  whitespace repair without excluding other archived content.
 - [ ] 3.3 Deliver the inventory; verify all findings have dispositions.
   Provide a copy-ready verification handoff for manual publication;
-  verify every finding is resolved or explicitly tracked and no
-  historical count is used
-  as a pass criterion. Cover FR-006.
+  distinguish verified repairs, the three explicit formatter
+  exclusions, and unresolved findings. Verify every finding has a
+  disposition and no historical count is used as a pass criterion.
+  Cover FR-006.
 
 ## 4. Verify repository integration
 
@@ -90,8 +107,9 @@ the agent can then review and verify them without changing gates.
 - [ ] 4.2 Verify full-stage and staged runs against the inventory.
   In a disposable candidate checkout, run full all-files
   checks separately at pre-commit and pre-push, then exercise staged
-  checks; verify exit statuses, vendor preservation, and first-party
-  findings agree with the recorded inventory. Report tracked
+  checks. Verify vendor and scaffolded-command byte preservation.
+  Verify exit statuses, exclusions, and first-party findings agree
+  with the recorded inventory. Report tracked
   baseline failures explicitly rather than claiming a clean run.
 - [ ] 4.3 Run applicable local CI checks; verify and classify results.
   Derive the checks from
