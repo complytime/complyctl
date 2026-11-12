@@ -20,11 +20,14 @@ import (
 // environment variables are not set. Verification tests require
 // COSIGN_KEY_PATH to be configured, which is only available in the
 // verify-sut container profile — not in the lifecycle sut container.
+// When enabled, it performs registry HTTP preflight and fails the calling test
+// if the registry configuration or reachability checks fail.
 func skipIfNoVerificationEnv(t *testing.T) {
 	t.Helper()
 	if os.Getenv("COSIGN_KEY_PATH") == "" {
 		t.Skip("verification env vars not set")
 	}
+	requireRegistry(t)
 }
 
 // TestVerification_Keyed_HappyPath verifies that complyctl get with a

@@ -17,7 +17,6 @@
 package acceptance
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -30,30 +29,25 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-// TestMain runs a preflight check to verify the registry is reachable and
-// seeded before executing any tests. This gives a clear error message when
-// the seed container failed silently.
+// requireRegistry verifies the registry is reachable and seeded before a live
+// acceptance test runs. Per-test setup keeps report inspection tests isolated
+// (constitution II) without a flag that could bypass live-test preflights.
 //
 // The preflight seed check only runs when TEST_POLICY_ID is set (lifecycle
 // profile). Verification tests use their own env vars (COSIGN_KEY_PATH,
 // VERIFY_*_POLICY_ID) and skip via skipIfNoVerificationEnv when the
 // verification profile is not active.
-func TestMain(m *testing.M) {
+func requireRegistry(t *testing.T) {
+	t.Helper()
 	registryURL := os.Getenv("REGISTRY_URL")
-	if registryURL == "" {
-		fmt.Fprintln(os.Stderr, "FATAL: REGISTRY_URL must be set")
-		os.Exit(1)
-	}
+	require.NotEmpty(t, registryURL, "REGISTRY_URL must be set")
 
 	// Verify registry is reachable
 	client := &http.Client{Timeout: 10 * time.Second}
 	// #nosec G704 -- The trusted runner sets REGISTRY_URL; private test registry access is intentional.
 	resp, err := client.Get(registryURL + "/v2/")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "FATAL: registry not reachable at %s: %v\n", registryURL, err)
-		os.Exit(1)
-	}
-	resp.Body.Close()
+	require.NoError(t, err, "registry not reachable at %s", registryURL)
+	require.NoError(t, resp.Body.Close())
 
 	// Lifecycle profile preflight: verify the seeded policy exists.
 	// Skip this check in the verification profile where TEST_POLICY_ID
@@ -63,17 +57,11 @@ func TestMain(m *testing.M) {
 		// #nosec G704 -- REGISTRY_URL and TEST_POLICY_ID are trusted runner configuration
 		// for private test registry access, not public service request inputs.
 		resp, err = client.Get(registryURL + "/v2/policies/" + policyID + "/tags/list")
-		if err != nil || resp.StatusCode != http.StatusOK {
-			fmt.Fprintf(os.Stderr, "FATAL: policy policies/%s not found in registry — seed container likely failed\n", policyID)
-			if err == nil {
-				resp.Body.Close()
-			}
-			os.Exit(1)
-		}
-		resp.Body.Close()
+		require.NoError(t, err, "fetch seeded policy policies/%s", policyID)
+		require.NoError(t, resp.Body.Close())
+		require.Equal(t, http.StatusOK, resp.StatusCode,
+			"policy policies/%s not found in registry — seed container likely failed", policyID)
 	}
-
-	os.Exit(m.Run())
 }
 
 // TestAcceptance_OCILifecycle exercises the full happy-path lifecycle against a
@@ -161,7 +149,8 @@ func TestAcceptance_OCILifecycle(t *testing.T) {
 // TestAcceptance_FormatInterop validates that artifacts pushed by the oras CLI
 // are correctly consumed by complyctl's oras-go client. Verifies the OSCAL
 // assessment-results output contains the control-level finding and its
-// assessment observations from the seeded policy.
+// evidence-bearing assessment observations from the seeded policy, and that
+// the complete document conforms to OSCAL 1.1.3.
 func TestAcceptance_FormatInterop(t *testing.T) {
 	env := loadTestEnv(t)
 	workDir := t.TempDir()
@@ -181,8 +170,22 @@ func TestAcceptance_FormatInterop(t *testing.T) {
 	scanDir := filepath.Join(workDir, ".complytime", "scan")
 	assertOutputFile(t, scanDir, "evaluation-log-", ".yaml")
 	oscalFile := assertOutputFile(t, scanDir, "assessment-results-", ".json")
+	assert.NoError(t, checkOSCALSchema(oscalFile),
+		"complete scan output must conform to OSCAL 1.1.3")
 
 	result := parseOSCALResult(t, oscalFile)
+	// testdata/policy.yaml selects plan block-force-push. The test provider
+	// uses that plan's MatchID for the description and source coordinate;
+	// its source reference and digest are fixed in cmd/test-provider/main.go.
+	assert.NoError(t, checkOSCALEvidence(result, oscalEvidenceExpectation{
+		ControlID:     "force-push-protection",
+		RequirementID: "block-force-push",
+		Description:   "test evidence for block-force-push",
+		ReferenceID:   "test-policy",
+		Coordinate:    "/checks/block-force-push",
+		Digest:        "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+	}), "control finding must link to the expected assessment and its provider evidence")
+
 	findings, ok := result["findings"].([]interface{})
 	require.True(t, ok, "OSCAL result must contain findings")
 	require.NotEmpty(t, findings, "OSCAL output must contain findings")

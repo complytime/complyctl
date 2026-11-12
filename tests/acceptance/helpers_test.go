@@ -31,10 +31,12 @@ type testEnv struct {
 	TargetID    string
 }
 
-// loadTestEnv reads required environment variables. Fails the test if
-// any required variable is missing.
+// loadTestEnv reads required environment variables and performs registry HTTP
+// preflight. It requires a reachable registry with the configured policy seeded
+// and fails the calling test if configuration or preflight checks fail.
 func loadTestEnv(t *testing.T) testEnv {
 	t.Helper()
+	requireRegistry(t)
 	registryURL := os.Getenv("REGISTRY_URL")
 	require.NotEmpty(t, registryURL, "REGISTRY_URL must be set")
 	policyID := os.Getenv("TEST_POLICY_ID")
