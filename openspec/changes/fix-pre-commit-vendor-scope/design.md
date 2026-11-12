@@ -3,7 +3,7 @@
 ## Context
 
 See `proposal.md` for motivation and the `project-hook-scope` delta
-for FR-001 through FR-008. This design changes hook selection,
+for FR-001 through FR-009. This design changes hook selection,
 not formatter rules or first-party licensing policy.
 
 `.pre-commit-config.yaml` defaults hooks to `pre-push`; the local
@@ -44,13 +44,14 @@ be committed and pushed before implementation.
 - Reimplement formatters or introduce an SPDX license parser.
 - Change direct invocation behavior of the SPDX script; the
   repository hook configuration owns this selection boundary.
-- Change hook stages, Go hooks, security scanners, CI policy,
-  shared org-infra templates, or agent/workflow definitions.
+- Change hook stages, Go hooks other than `go-fmt` selection,
+  security scanners, CI policy, shared org-infra templates, or
+  agent/workflow definitions. `go-unit-tests` remains unchanged.
 - Normalize the vendor tree or repair every historical document.
 
 ## Decisions
 
-### 1. Put root-anchored exclusions on three hooks
+### 1. Put root-anchored exclusions on four hooks
 
 The proposed fix uses this hook-level exclusion on both
 `trailing-whitespace` and `end-of-file-fixer`:
@@ -65,17 +66,27 @@ files under `.opencode/commands/`: `uf.review-council.md`,
 is anchored to each complete path. Other commands, name lookalikes,
 and nested copies remain eligible for the formatting hooks.
 
-The SPDX hook retains `exclude: ^vendor/`; Markdown commands do
-not match its existing extension filter. Retain pinned revisions,
-rules, type filters, and stages for all hooks. Do not exclude
+The `go-fmt` and SPDX hooks each use `exclude: ^vendor/`.
+The command exceptions apply only to whitespace/EOF hooks, not
+Go formatting or SPDX. Retain pinned revisions, rules, type
+filters, and stages for all hooks. Do not exclude
 `.opencode/` or `openspec/changes/archive/` as whole directories.
+
+The pinned `pre-commit-golang` revision
+`fb24a639f7c938759fe56eeebbb7713b69d60494` declares `go-fmt` with
+`files: '\.go$'`, `language: script`, and `entry: run-go-fmt.sh`.
+Its script invokes `gofmt -l -w "$@"` and fails if files changed.
+It formats the filenames supplied by pre-commit, not a recursive
+module or package selection. Verify this actual pinned behavior;
+do not substitute a stub or assume an exclusion prevents traversal.
+Neither the script nor the `go-unit-tests` hook changes here.
 
 This is a proposed configuration change, not an executable agent
 instruction under the current gatekeeping rule. Agents MUST stop
 and report before applying it; a recorded approval does not supply
 an exception absent from the governing instructions.
 
-A human contributor can apply the three exclusions manually.
+A human contributor can apply the four exclusions manually.
 After that handoff, the agent can inspect the actual diff, verify
 that only the proposed hook scope changed, and run the regression
 and integration checks. Any further protected hook edit remains
@@ -116,15 +127,27 @@ The fixture matrix MUST cover:
 
 - Vendor Go, Python, shell, and text files with formatting defects
   and existing non-Apache license notices; assert exact bytes.
+- Real `go-fmt` execution at pre-push using minimal valid Go module
+  fixtures with tracked maintained and vendor Go files. Cover
+  staged and all-files runs, syntactically valid non-gofmt vendor
+  input with a non-Apache notice, and a maintained input proving
+  execution. Assert exact vendor bytes and corrected maintained
+  bytes, nonzero exit on repairs, and unchanged second-run success.
+- Defective and compliant first-party Go controls, including
+  `internal/vendor_helpers.go` and `tests/vendor_cases/example.go`.
+  Verify those inputs remain eligible. For staged selection, a
+  committed unstaged Go defect MUST stay unchanged until an
+  all-files run selects it. Audit actual changed paths to rule out
+  unexpected traversal; never invoke the unrelated Go test hook.
 - All three exempt commands with trailing whitespace and invalid
-  EOFs, separately for each formatter and staged/all-files runs;
+  EOFs, separately for each whitespace/EOF hook and selection mode;
   assert exact bytes and no findings on those paths. Include an
   eligible first-party control proving that the hook executes.
 - Maintained command neighbors and path lookalikes with defects:
   `uf.other.md`, `uf.review-pr.md.bak`, `xuf.review-pr.md`, and a
   nested copy of `.opencode/commands/uf.review-pr.md`. Each MUST
-  remain selected and corrected by both formatters. Archived spec
-  fixtures MUST also remain selected.
+  remain selected and corrected by both whitespace/EOF hooks.
+  Archived spec fixtures MUST also remain selected.
 - Matching first-party failures for each formatter and each SPDX
   file extension; verify the correction and nonzero exit status.
 - Clean first-party inputs and second-run idempotence.
@@ -141,9 +164,13 @@ valid exclusion from disabled execution.
 Mutation checks MUST independently remove each exclusion branch
 in disposable fixtures. Removing only the command branch, while
 keeping vendor excluded, MUST make command-preservation cases
-fail for each formatter. Removing only the vendor branch MUST
-make vendor-preservation cases fail while keeping the command
+fail for each whitespace/EOF hook. Removing only the vendor branch
+MUST make vendor-preservation cases fail while keeping the command
 exceptions intact. For SPDX, remove its vendor-only exclusion.
+Independently remove only `go-fmt`'s vendor exclusion: its vendor
+preservation cases MUST fail, while other hook exclusions remain
+unchanged. Run each mutation against a fresh fixture so prior
+formatter corrections cannot mask it.
 These checks MUST NOT edit the developer's hook configuration.
 
 ### 3. Make prerequisites and stage coverage explicit
@@ -155,6 +182,8 @@ Python 3.10 or newer
 the configured stage names, pytest installed for that Python
 interpreter, and installed hook environments. Document pytest as
 a development/test prerequisite, not a runtime dependency.
+Require `go` and `gofmt` from the toolchain declared in `go.mod`;
+record the resolved versions rather than rely on stale agent prose.
 
 Initial environment setup may need network access for the pinned
 pre-commit-hooks revision. Use an isolated `PRE_COMMIT_HOME` for
@@ -162,10 +191,11 @@ test-created state, reusable within the suite. Missing tools,
 download failures, and timeouts MUST fail with actionable output;
 they MUST NOT become skipped tests or implicit success.
 
-Document separate execution of SPDX at pre-commit and the two
-formatters at pre-push. Show both staged and all-files forms.
-List the three command paths as formatter-only exceptions and
-explain that the SPDX exemption remains vendor-only. Do not
+Document separate execution of SPDX at pre-commit and whitespace,
+EOF, and `go-fmt` at pre-push. Show staged and all-files forms.
+Preserve any additional stages from the pinned hook manifests.
+List the three command paths as whitespace/EOF-only exceptions;
+explain that `go-fmt` and SPDX remain vendor-only. Do not
 describe excluded template defects as fixed formatting issues.
 An unqualified all-files run alone does not cover both stages.
 Full-stage runs remain a separate repository verification step.
@@ -179,7 +209,10 @@ revision, candidate diff, Python/pre-commit/Go versions, stage,
 hook ID, exit status, and changed paths. Compare vendor bytes
 before and after candidate hook runs.
 
-Run the three hooks individually to attribute their mutations.
+Run all four affected hooks individually to attribute mutations,
+including `go-fmt` at pre-push under the recorded Go toolchain.
+Compare its baseline/candidate changed paths and vendor bytes;
+vendor preservation is an exclusion result, not a vendor repair.
 For each of the three exempt commands, record its exact path,
 the baseline hook finding, and the disposition "excluded from
 formatters; preserved uf-scaffolded bytes". Verify its candidate
@@ -203,8 +236,8 @@ historical observations, not test expectations.
 ### 5. Keep security and contributor guidance aligned
 
 Compare the candidate configuration with baseline to show only
-three hook-level exclusions. Verify unrelated hook definitions,
-pinned revisions, and scanner configuration are unchanged.
+four hook-level exclusions. Verify `go-unit-tests`, other unrelated
+hooks, pinned revisions, and scanner configuration are unchanged.
 Run an existing unrelated validation hook against an invalid
 fixture that it previously selected to catch a global exclusion.
 
@@ -239,13 +272,13 @@ change because runtime behavior is unaffected.
    workflow. Record that agent hook edits are blocked by
    `AGENTS.md`; no gate-change authorization process is documented.
 2. Add regression coverage without editing protected hook policy.
-3. Hand off the three hook exclusions to a human contributor for
+3. Hand off the four hook exclusions to a human contributor for
    manual editing. Stop agent work that depends on those edits
    until they are present; inspect the diff before verification.
 4. Verify baseline/candidate behavior, perform scoped cleanup, and
    update contributor guidance.
 5. Run relevant local CI checks and the pre-PR review council.
 
-No runtime migration is required. Rollback restores the three
+No runtime migration is required. Rollback restores the four
 hook definitions through an ordinary reviewed change; it does not
 rewrite vendor content or remove existing security checks.
