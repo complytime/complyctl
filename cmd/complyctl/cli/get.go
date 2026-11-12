@@ -556,29 +556,26 @@ func syncSinglePolicy(
 	}
 
 	// Extract and cache metadata after sync (D7 ordering).
-	// Needed for fresh fetches or upgrade backfill (D8).
-	// hasMetadata() (not just PolicyEvaluator=="") avoids redundant
-	// re-extraction for multi-evaluator policies where PolicyEvaluator
-	// is intentionally empty.
+	// Revisit cache hits as resolver upgrades can correct populated metadata.
 	ps, _ := state.GetPolicyState(ref.Repository)
-	extractMetadata := fetched || !hasMetadata(ps)
-
-	if extractMetadata {
-		// Use the concrete version SyncPolicy persisted, not the config
-		// tag: a ":latest" pin is stored under the resolved version, so
-		// extracting by "latest" would fail store.Resolve() and silently
-		// drop all metadata.
-		meta, metaErr := resolver.ExtractPolicyMetadata(
-			ref.Repository, ps.Version,
+	// Use the concrete version SyncPolicy persisted, not the config
+	// tag: a ":latest" pin is stored under the resolved version, so
+	// extracting by "latest" would fail store.Resolve() and silently
+	// drop all metadata.
+	meta, metaErr := resolver.ExtractPolicyMetadata(
+		ref.Repository, ps.Version,
+	)
+	if metaErr != nil {
+		// D5: metadata extraction failure is non-fatal.
+		logger.Warn(
+			"Failed to extract policy metadata",
+			"policy", entry.EffectiveID(),
+			"error", metaErr,
 		)
-		if metaErr != nil {
-			// D5: metadata extraction failure is non-fatal.
-			logger.Warn(
-				"Failed to extract policy metadata",
-				"policy", entry.EffectiveID(),
-				"error", metaErr,
-			)
-		} else {
+	} else {
+		changed := ps.PolicyTitle != meta.Title || ps.PolicyEvaluator != meta.EvaluatorID ||
+			ps.ControlCount != meta.ControlCount || ps.AssessmentCount != meta.AssessmentCount
+		if changed {
 			state.SetPolicyMetadata(
 				ref.Repository,
 				meta.Title,
@@ -586,10 +583,10 @@ func syncSinglePolicy(
 				meta.ControlCount,
 				meta.AssessmentCount,
 			)
-			summary := formatPolicySummary(meta)
-			if summary != "" {
-				fmt.Fprint(os.Stderr, summary)
-			}
+		}
+		summary := formatPolicySummary(meta)
+		if summary != "" && (fetched || changed) {
+			fmt.Fprint(os.Stderr, summary)
 		}
 	}
 

@@ -45,9 +45,10 @@ type Assessment struct {
 	// RequirementID is the requirement ID from the Gemara assessment plan's
 	// requirement-id field. Used post-scan to resolve plan IDs in provider
 	// results to actual requirement IDs for report output.
-	RequirementID string
-	EvaluatorID   string
-	Parameters    map[string]string
+	RequirementID      string
+	EvaluatorID        string
+	Parameters         map[string]string
+	AuthoredParameters []gemara.Parameter
 }
 
 // PolicyTimeline captures the evaluation and enforcement periods from a
@@ -137,8 +138,7 @@ func (r *Resolver) ExtractPolicyMetadata(
 }
 
 // extractBundleMetadata extracts metadata from a Gemara bundle-format
-// policy. Parses only the Policy and ControlCatalog artifacts —
-// guidance is not needed for display metadata.
+// policy using the same validated inventory as execution.
 func (r *Resolver) extractBundleMetadata(
 	policyID, version string,
 ) (PolicyMetadata, error) {
@@ -149,10 +149,9 @@ func (r *Resolver) extractBundleMetadata(
 			policyID, version, err)
 	}
 
-	if artifacts.Source.Type != artifactTypePolicy {
-		return PolicyMetadata{}, fmt.Errorf(
-			"bundle for %s@%s: missing required Policy artifact: bundle source is %q, expected Policy",
-			policyID, version, artifacts.Source.Type)
+	graph, err := resolveBundleArtifacts(policyID, version, artifacts)
+	if err != nil {
+		return PolicyMetadata{}, err
 	}
 
 	policyResult, parseErr := parsePolicyLayer(
@@ -166,17 +165,11 @@ func (r *Resolver) extractBundleMetadata(
 	meta := PolicyMetadata{
 		Title:           policyResult.Title,
 		EvaluatorID:     policyResult.EvaluatorID,
-		AssessmentCount: len(policyResult.Assessments),
+		AssessmentCount: len(graph.Assessments),
 	}
 
-	for _, file := range artifacts.FilesByType(artifactTypeControl) {
-		catalog, catErr := parseControlCatalog(file.Data)
-		if catErr != nil {
-			return PolicyMetadata{}, fmt.Errorf(
-				"policy %s: catalog layer is not valid Gemara (%q): %w",
-				policyID, file.Name, catErr)
-		}
-		meta.ControlCount += len(catalog.Controls)
+	for _, catalog := range graph.Controls {
+		meta.ControlCount += len(catalog.Parsed.Controls)
 	}
 
 	return meta, nil
@@ -266,6 +259,10 @@ func (r *Resolver) resolveBundleGraph(policyID, version string) (*DependencyGrap
 	if err != nil {
 		return nil, fmt.Errorf("bundle unpack failed for %s@%s: %w", policyID, version, err)
 	}
+	return resolveBundleArtifacts(policyID, version, artifacts)
+}
+
+func resolveBundleArtifacts(policyID, version string, artifacts BundleArtifacts) (*DependencyGraph, error) {
 	if artifacts.Source.Type != artifactTypePolicy {
 		return nil, fmt.Errorf(
 			"bundle for %s@%s: missing required Policy artifact: bundle source is %q, expected Policy",
@@ -295,6 +292,7 @@ func (r *Resolver) resolveBundleGraph(policyID, version string) (*DependencyGrap
 }
 
 func appendBundleCatalogs(graph *DependencyGraph, artifacts BundleArtifacts) error {
+	identities := newCatalogIdentities()
 	for index, file := range artifacts.FilesByType(artifactTypeControl) {
 		catalog, parseErr := parseControlCatalog(file.Data)
 		if parseErr != nil {
@@ -304,6 +302,9 @@ func appendBundleCatalogs(graph *DependencyGraph, artifacts BundleArtifacts) err
 		id := catalog.Metadata.Id
 		if id == "" {
 			id = fmt.Sprintf("%s-catalog-%d", graph.PolicyID, index)
+		}
+		if err := identities.registerControlCatalog(id, catalog, file.Name); err != nil {
+			return err
 		}
 		graph.Controls = append(graph.Controls, Control{ID: id, Content: file.Data, Parsed: catalog})
 	}
@@ -318,6 +319,9 @@ func appendBundleCatalogs(graph *DependencyGraph, artifacts BundleArtifacts) err
 		if id == "" {
 			id = fmt.Sprintf("%s-guidance-%d", graph.PolicyID, index)
 		}
+		if err := registerBundleIdentity(identities.catalogs, "catalog", id, file.Name); err != nil {
+			return err
+		}
 		graph.Guidelines = append(graph.Guidelines, Guideline{ID: id, Content: file.Data, Parsed: guidance})
 	}
 	return nil
@@ -325,6 +329,12 @@ func appendBundleCatalogs(graph *DependencyGraph, artifacts BundleArtifacts) err
 
 func appendBundlePolicies(graph *DependencyGraph, artifacts BundleArtifacts) error {
 	declarations := make(map[string]assessmentPlanDeclaration)
+	references := make(map[string]mappingReferenceDeclaration)
+	rootRefs := graph.MappingReferences
+	graph.MappingReferences = nil
+	if err := appendMappingReferences(graph, references, rootRefs, artifacts.Source.Name); err != nil {
+		return err
+	}
 	if err := registerAssessmentPlans(declarations, graph.Assessments, artifacts.Source.Name); err != nil {
 		return err
 	}
@@ -337,9 +347,9 @@ func appendBundlePolicies(graph *DependencyGraph, artifacts BundleArtifacts) err
 			return err
 		}
 		graph.Assessments = append(graph.Assessments, imported.Assessments...)
-		graph.MappingReferences = append(graph.MappingReferences, imported.MappingReferences...)
-		// Only the importing/root Policy may set whole-graph evaluator routing.
-		// An imported default must not capture other imports or a mixed root.
+		if err := appendMappingReferences(graph, references, imported.MappingReferences, file.Name); err != nil {
+			return err
+		}
 		if graph.Timeline == nil {
 			graph.Timeline = imported.Timeline
 		}
@@ -374,6 +384,7 @@ func registerAssessmentPlans(
 
 // resolveSplitGraph loads artifacts by matching distinct OCI layer media types.
 func (r *Resolver) resolveSplitGraph(policyID, version string) (*DependencyGraph, error) {
+	identities := newCatalogIdentities()
 	graph := &DependencyGraph{
 		PolicyID:    policyID,
 		Controls:    []Control{},
@@ -392,6 +403,13 @@ func (r *Resolver) resolveSplitGraph(policyID, version string) (*DependencyGraph
 			return nil, fmt.Errorf("policy %s: catalog layer is not valid Gemara: %w", policyID, parseErr)
 		}
 		ctrl.Parsed = parsed
+		id := parsed.Metadata.Id
+		if id == "" {
+			id = ctrl.ID
+		}
+		if err := identities.registerControlCatalog(id, parsed, complytime.MediaTypeCatalog); err != nil {
+			return nil, err
+		}
 		graph.Controls = append(graph.Controls, ctrl)
 	}
 
@@ -406,6 +424,13 @@ func (r *Resolver) resolveSplitGraph(policyID, version string) (*DependencyGraph
 			return nil, fmt.Errorf("policy %s: guidance layer is not valid Gemara: %w", policyID, parseErr)
 		}
 		gl.Parsed = parsed
+		id := parsed.Metadata.Id
+		if id == "" {
+			id = gl.ID
+		}
+		if err := registerBundleIdentity(identities.catalogs, "catalog", id, complytime.MediaTypeGuidance); err != nil {
+			return nil, err
+		}
 		graph.Guidelines = append(graph.Guidelines, gl)
 	}
 
@@ -426,7 +451,10 @@ func (r *Resolver) resolveSplitGraph(policyID, version string) (*DependencyGraph
 	graph.EvaluatorID = policyLayer.EvaluatorID
 	graph.Assessments = append(graph.Assessments, policyLayer.Assessments...)
 	graph.Timeline = policyLayer.Timeline
-	graph.MappingReferences = policyLayer.MappingReferences
+	if err := appendMappingReferences(graph, make(map[string]mappingReferenceDeclaration),
+		policyLayer.MappingReferences, complytime.MediaTypePolicy); err != nil {
+		return nil, err
+	}
 
 	return graph, nil
 }
@@ -519,9 +547,10 @@ func extractFromGemaraPolicy(p *gemara.Policy) policyLayerResult {
 		evalIDSet[evalID] = true
 
 		assessments = append(assessments, Assessment{
-			ID:            plan.Id,
-			RequirementID: plan.RequirementId,
-			EvaluatorID:   evalID,
+			ID:                 plan.Id,
+			RequirementID:      plan.RequirementId,
+			EvaluatorID:        evalID,
+			AuthoredParameters: plan.Parameters,
 		})
 	}
 

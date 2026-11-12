@@ -24,19 +24,21 @@ before typed projection. Missing catalog IDs MUST retain existing fallback.
 - **THEN** graph resolution MUST reject it contextually
 - **AND** control metadata extraction MUST reject the wrong catalog
 
-### Requirement: Importing evaluator precedence
+### Requirement: Declaring-policy evaluator bindings
 
-The root Policy's resolved evaluator setting MUST take precedence over
-imported settings. Without a root whole-graph evaluator, imported plans
-MUST retain their individual routing without promoting an imported
-evaluator into a whole-graph shortcut. Existing per-plan extraction and
-timeline precedence MUST remain unchanged.
+Each assessment MUST retain its declaring Policy's effective evaluator.
+The root evaluator MUST NOT replace an imported assessment's binding.
+Existing per-plan extraction and timeline precedence remain unchanged.
+
+Superseded: the former root-evaluator override requirement and scenario
+are replaced by FR-002 in
+`../../../preserve-bundle-artifacts/specs/bundle-artifact-inventory/spec.md`.
 
 #### Scenario: Root and imported evaluators disagree
 
 - **GIVEN** a root with one resolved evaluator and an import with another
 - **WHEN** the resolved graph is extracted and grouped for providers
-- **THEN** the root evaluator MUST receive both plans
+- **THEN** each evaluator MUST receive its declaring Policy's plan
 
 #### Scenario: Root has no whole-graph evaluator
 

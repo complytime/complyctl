@@ -993,30 +993,46 @@ func extractPlanToReqMap(graph *policy.DependencyGraph) map[string]string {
 // graph. Providers return plan IDs for plan-scoped assessments, while global
 // evaluators can return requirement IDs directly.
 func resolveAssessmentIDs(assessments []provider.AssessmentLog, planToReq map[string]string) {
+	requirements := make(map[string]bool, len(planToReq))
+	for _, reqID := range planToReq {
+		requirements[reqID] = true
+	}
 	for i := range assessments {
 		matchID := assessments[i].PlanID
 		if matchID == "" {
 			matchID = assessments[i].RequirementID
 		}
 		if reqID, ok := planToReq[matchID]; ok {
+			assessments[i].PlanID = matchID
 			assessments[i].RequirementID = reqID
-		} else if assessments[i].RequirementID == "" {
-			logger.Warn("unresolved assessment ID",
-				"matchID", matchID,
-				"hint", "provider returned an ID not found in the policy graph")
-			assessments[i].RequirementID = matchID
+		} else {
+			// The wire field is a match ID, not necessarily an assessment plan.
+			assessments[i].PlanID = ""
+			if assessments[i].RequirementID == "" {
+				if !requirements[matchID] {
+					logger.Warn("unresolved assessment ID",
+						"matchID", matchID,
+						"hint", "provider returned an ID not found in the policy graph")
+				}
+				assessments[i].RequirementID = matchID
+			}
 		}
 	}
 }
 
 // reverseMap inverts a string-to-string map. If multiple keys map to the same
-// value, only one mapping is preserved (last-write-wins) and a warning is logged.
+// value, omit that ambiguous fallback rather than selecting an arbitrary key.
 func reverseMap(m map[string]string) map[string]string {
 	r := make(map[string]string, len(m))
+	ambiguous := make(map[string]bool)
 	for k, v := range m {
-		if existing, ok := r[v]; ok {
-			logger.Warn("multiple keys map to same value in reverse map",
-				"value", v, "kept", k, "dropped", existing)
+		if ambiguous[v] {
+			continue
+		}
+		if _, ok := r[v]; ok {
+			delete(r, v)
+			ambiguous[v] = true
+			continue
 		}
 		r[v] = k
 	}

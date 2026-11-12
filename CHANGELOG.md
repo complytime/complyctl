@@ -97,8 +97,8 @@
   a tree identifier regenerates once; only successful generation persists the
   identifier. Workspace variables and targets are outside this identifier.
 - Policy streams now require exactly one document; supporting catalogs reject
-  mismatched artifact types. Root evaluator routing retains importing Policy
-  precedence without letting the first import override a mixed or unbound root.
+  mismatched artifact types. Each assessment retains its declaring Policy's
+  evaluator binding instead of being routed through the root's evaluator.
 - Guidance-only Gemara Policies with zero assessment plans now load as
   bundle roots, split-layer policies, and supporting imports. Metadata
   and graphs retain catalogs, guidance, references, and timelines without
@@ -107,7 +107,15 @@
 - Gemara bundles now retain every supporting control and guidance catalog
   and include assessments from imported Policies. Multi-artifact scans no
   longer silently omit later artifacts; policy summaries count controls
-  across all bundled catalogs.
+  across all bundled catalogs and assessments across all Policies. Cached
+  summaries are refreshed during `get`, including previously populated counts.
+- Reports preserve provider-returned plan IDs when multiple plans assess one
+  requirement; requirement-only results use plan fallback only when unique.
+  Typed authored parameter declarations now participate in tree freshness
+  without being converted into runtime parameter overrides. Bundles reject
+  ambiguous catalog, control, and requirement IDs and conflicting policy
+  mapping references with both declaring artifacts in the error; identical
+  mapping references are coalesced.
 - Scans where all controls are not-applicable now report
   `NotApplicable` aggregate result instead of `Passed`. This
   corrects a semantic error in upstream `go-gemara` result

@@ -179,7 +179,7 @@ func TestResolveBundleGraph_ZeroPlanRootImportedDefaults(t *testing.T) {
 	assert.Equal(t, "2025-01-01T00:00:00Z", graph.Timeline.EvaluationStart)
 	meta, err := r.ExtractPolicyMetadata("governance", "v1")
 	require.NoError(t, err)
-	assert.Equal(t, PolicyMetadata{Title: "Guidance governance"}, meta)
+	assert.Equal(t, PolicyMetadata{Title: "Guidance governance", AssessmentCount: 1}, meta)
 }
 
 func TestParsePolicyLayer_InvalidPolicyRoles(t *testing.T) {

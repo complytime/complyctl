@@ -38,19 +38,37 @@ Full lint remains blocked by existing G703 findings in
 
 ## 5. Bounded PR feedback corrections
 
-- [ ] 5.1 Review and commit/push this narrow spec amendment before code.
-- [ ] 5.2 Add failing report identity tests; preserve returned plan IDs
+- [x] 5.1 Review and commit/push this narrow spec amendment before code.
+- [x] 5.2 Add failing report identity tests; preserve returned plan IDs
   and allow requirement fallback only for unique plan mappings.
-- [ ] 5.3 Add failing SDK-bundle parameter tests; preserve typed authored
+- [x] 5.3 Add failing SDK-bundle parameter tests; preserve typed authored
   declarations and include them in the resolved tree digest.
-- [ ] 5.4 Add failing imported evaluator routing tests; preserve each
+- [x] 5.4 Add failing imported evaluator routing tests; preserve each
   assessment's effective binding during grouping.
-- [ ] 5.5 Add failing order-independent collision tests; reject ambiguous
+- [x] 5.5 Add failing order-independent collision tests; reject ambiguous
   catalog/control/requirement IDs and conflicting mapping references,
   coalescing equal references while keeping duplicate-plan rejection.
-- [ ] 5.6 Add failing complete-count and populated-cache refresh tests;
+- [x] 5.6 Add failing complete-count and populated-cache refresh tests;
   update extraction and cache-hit metadata refresh.
-- [ ] 5.7 Align earlier freshness specifications and quick-start guidance;
+- [x] 5.7 Align earlier freshness specifications and quick-start guidance;
   update the changelog and assess README/AGENTS impact.
-- [ ] 5.8 Run focused regression tests and applicable CI-parity checks;
+- [x] 5.8 Run focused regression tests and applicable CI-parity checks;
   self-review the bounded diff and record verification evidence.
+
+Bounded-fix verification: `TZ=UTC make test-unit`, `TZ=UTC make test-e2e`,
+and `TZ=UTC make test-integration` pass (26 integration checks).
+`make api-compatibility` passes after installing the pinned `apidiff` tool.
+Strict validation of both amended OpenSpec changes, `buf lint`,
+`go vet -mod=vendor ./...`, formatting, and `git diff --check` pass.
+`make lint` still reports only the existing G703 findings at
+`internal/cache/state.go:153`, `:158`, and `:162`; gates remain unchanged.
+README and AGENTS require no structural or command updates.
+Fresh-context review identified requirement-only wire result normalization
+and split-layer identity validation gaps; both have failing-then-passing
+regressions and are included in the final passing suite.
+The older evaluator-override requirement and scenario in
+`final-bundle-review/specs/bundle-consumption/spec.md` are explicitly
+superseded by the amended per-assessment binding in FR-002.
+The requested Fedora CIS Level 1 plus additional NIST composition example
+is tracked separately in
+https://github.com/complytime/complyctl/issues/974 and linked from PR #967.

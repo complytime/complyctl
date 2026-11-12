@@ -257,8 +257,12 @@ func (e *Evaluator) providerToGemaraAssessment(a *provider.AssessmentLog) (*gema
 		gemaraLog.Evidence = gemaraEvidence
 	}
 
-	// Populate the Plan field when a plan ID mapping exists for this requirement.
-	if planID, ok := e.reqToPlan[a.RequirementID]; ok {
+	// Preserve provider identity; legacy requirement-only results use a unique fallback.
+	planID := a.PlanID
+	if planID == "" {
+		planID = e.reqToPlan[a.RequirementID]
+	}
+	if planID != "" {
 		gemaraLog.Plan = &gemara.EntryMapping{
 			ReferenceId: e.policyID,
 			EntryId:     planID,

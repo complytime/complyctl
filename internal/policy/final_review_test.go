@@ -13,7 +13,7 @@ import (
 	"github.com/complytime/complyctl/internal/complytime"
 )
 
-func TestResolvePolicyGraph_ImportingEvaluatorPrecedence(t *testing.T) {
+func TestResolvePolicyGraph_DeclaringPolicyEvaluators(t *testing.T) {
 	zero := "metadata: {id: root, type: Policy}\ntitle: Governance\n"
 	multi := zero + `adherence:
   assessment-plans:
@@ -27,8 +27,8 @@ func TestResolvePolicyGraph_ImportingEvaluatorPrecedence(t *testing.T) {
 		root string
 		want map[string][]string
 	}{
-		{"root override", testBundlePolicyYAML("root", "opa", ""),
-			map[string][]string{"opa": {"root-plan", "parent-plan", "other-plan"}}},
+		{"root preserves imports", testBundlePolicyYAML("root", "opa", ""),
+			map[string][]string{"opa": {"root-plan"}, "ampel": {"parent-plan"}, "other": {"other-plan"}}},
 		{"multi root no shortcut", multi,
 			map[string][]string{"opa": {"root-opa"}, "ampel": {"root-ampel", "parent-plan"}, "other": {"other-plan"}}},
 		{"zero root no default", zero,

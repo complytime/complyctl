@@ -4,6 +4,7 @@ package policy
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/gemaraproj/go-gemara"
@@ -668,7 +669,7 @@ func TestResolveBundleGraphMultipleCatalogsAndParentPolicy(t *testing.T) {
 	metadata, err := r.ExtractPolicyMetadata("multi", "v1")
 	require.NoError(t, err)
 	assert.Equal(t, PolicyMetadata{
-		Title: "root-policy", EvaluatorID: "root-evaluator", ControlCount: 3, AssessmentCount: 1,
+		Title: "root-policy", EvaluatorID: "root-evaluator", ControlCount: 3, AssessmentCount: 3,
 	}, metadata)
 }
 
@@ -680,7 +681,7 @@ func TestResolveBundleGraph_ImportedDefaultsAndMissingCatalogIDs(t *testing.T) {
 		Source: bundle.File{Name: "root.yaml", Type: "Policy", Data: []byte(testPolicyYAML("root"))},
 		Imports: []bundle.File{
 			{Name: "a.yaml", Type: "ControlCatalog", Data: []byte(testCatalogYAML(""))},
-			{Name: "b.yaml", Type: "ControlCatalog", Data: []byte(testCatalogYAML(""))},
+			{Name: "b.yaml", Type: "ControlCatalog", Data: []byte(strings.ReplaceAll(testCatalogYAML(""), "-control", "b-control"))},
 			{Name: "c.yaml", Type: "GuidanceCatalog", Data: []byte(testGuidanceYAML(""))},
 			{Name: "d.yaml", Type: "GuidanceCatalog", Data: []byte(testGuidanceYAML(""))},
 			{Name: "parent.yaml", Type: "Policy", Data: []byte(testBundlePolicyYAML(
@@ -716,7 +717,7 @@ func TestExtractBundleMetadata_MultipleCatalogs(t *testing.T) {
 	metadata, err := r.ExtractPolicyMetadata("multi", "v1")
 	require.NoError(t, err)
 	assert.Equal(t, PolicyMetadata{
-		Title: "root", EvaluatorID: "opa", ControlCount: 4, AssessmentCount: 1,
+		Title: "root", EvaluatorID: "opa", ControlCount: 4, AssessmentCount: 2,
 	}, metadata)
 }
 

@@ -1722,6 +1722,31 @@ func TestExtractPlanToReqMap_EmptyAssessments(t *testing.T) {
 
 // --- resolveAssessmentIDs tests ---
 
+func TestResolveAssessmentIDs_RequirementMatchDoesNotInventPlan(t *testing.T) {
+	for _, ambiguous := range []bool{false, true} {
+		t.Run(map[bool]string{false: "unique", true: "ambiguous"}[ambiguous], func(t *testing.T) {
+			plans := map[string]string{"plan-a": "shared"}
+			if ambiguous {
+				plans["plan-b"] = "shared"
+			}
+			// The gRPC client puts the wire requirement_id (a match ID) in PlanID.
+			assessments := []provider.AssessmentLog{{PlanID: "shared"}}
+			resolveAssessmentIDs(assessments, plans)
+			assert.Empty(t, assessments[0].PlanID)
+			assert.Equal(t, "shared", assessments[0].RequirementID)
+			evaluator := output.NewEvaluator("policy", "target", nil, reverseMap(plans), nil, nil)
+			evaluator.AddTarget(assessments)
+			log := evaluator.GemaraLog().Evaluations[0].AssessmentLogs[0]
+			if ambiguous {
+				assert.Nil(t, log.Plan)
+			} else {
+				require.NotNil(t, log.Plan)
+				assert.Equal(t, "plan-a", log.Plan.EntryId)
+			}
+		})
+	}
+}
+
 func TestResolveAssessmentIDs_ReplacesMatchingIDs(t *testing.T) {
 	assessments := []provider.AssessmentLog{
 		{PlanID: "ap-1"},
@@ -2634,6 +2659,18 @@ func TestReverseMap_Empty(t *testing.T) {
 func TestReverseMap_Nil(t *testing.T) {
 	r := reverseMap(nil)
 	assert.Empty(t, r)
+}
+
+func TestReverseMap_OmitsAmbiguousPlanFallbacks(t *testing.T) {
+	fallback := reverseMap(map[string]string{
+		"plan-a": "shared", "plan-b": "shared", "plan-c": "shared", "unique": "req-2",
+	})
+	assert.Equal(t, map[string]string{"req-2": "unique"}, fallback)
+	eval := output.NewEvaluator("policy", "target", nil, fallback, nil, nil)
+	eval.AddTarget([]provider.AssessmentLog{{RequirementID: "shared"}})
+	logs := eval.GemaraLog().Evaluations[0].AssessmentLogs
+	require.Len(t, logs, 1)
+	assert.Nil(t, logs[0].Plan, "a requirement-only result cannot select among three plans")
 }
 
 // --- buildReqToComplypackRef tests ---

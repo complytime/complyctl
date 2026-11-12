@@ -31,10 +31,11 @@ type resolvedCatalog struct {
 }
 
 type resolvedAssessment struct {
-	ID            string            `json:"id"`
-	RequirementID string            `json:"requirement_id"`
-	EvaluatorID   string            `json:"evaluator_id"`
-	Parameters    map[string]string `json:"parameters,omitempty"`
+	ID                 string             `json:"id"`
+	RequirementID      string             `json:"requirement_id"`
+	EvaluatorID        string             `json:"evaluator_id"`
+	Parameters         map[string]string  `json:"parameters,omitempty"`
+	AuthoredParameters []gemara.Parameter `json:"authored_parameters,omitempty"`
 }
 
 // ResolvedTreeDigest identifies resolved Gemara content independently of OCI
