@@ -15,6 +15,38 @@ import (
 	"github.com/complytime/complyctl/internal/cache"
 )
 
+const (
+	artifactTypePolicy   = "Policy"
+	artifactTypeControl  = "ControlCatalog"
+	artifactTypeGuidance = "GuidanceCatalog"
+)
+
+// BundleArtifacts preserves every source and import in a Gemara bundle.
+type BundleArtifacts struct {
+	Source  bundle.File
+	Imports []bundle.File
+}
+
+// FilesByType returns the source followed by imports matching typ, in bundle order.
+func (a BundleArtifacts) FilesByType(typ string) []bundle.File {
+	var files []bundle.File
+	if a.Source.Type == typ {
+		files = append(files, a.Source)
+	}
+	return append(files, a.ImportsByType(typ)...)
+}
+
+// ImportsByType returns only imports matching typ, in bundle order.
+func (a BundleArtifacts) ImportsByType(typ string) []bundle.File {
+	var files []bundle.File
+	for _, file := range a.Imports {
+		if file.Type == typ {
+			files = append(files, file)
+		}
+	}
+	return files
+}
+
 // Loader reads policy artifacts from OCI Layout cache stores.
 type Loader struct {
 	cacheMgr *cache.Cache
@@ -107,10 +139,32 @@ func isBundleManifest(manifest ocispec.Manifest) bool {
 	return manifest.Config.MediaType == bundle.MediaTypeManifest
 }
 
-// LoadBundleFiles unpacks a Gemara bundle from the local OCI store and returns
-// the file list keyed by artifact type (e.g. "Policy", "ControlCatalog").
-// This is the bundle-path counterpart to LoadLayerByMediaType.
-func (l *Loader) LoadBundleFiles(policyID, version string) (map[string][]byte, error) {
+// LoadBundleArtifacts loads every source and import for a cached policy version,
+// recovering missing file types from the bundle manifest without changing raw data.
+// It returns an error for empty inputs, inaccessible stores, or invalid bundles.
+func (l *Loader) LoadBundleArtifacts(policyID, version string) (BundleArtifacts, error) {
+	b, err := l.unpackBundle(policyID, version)
+	if err != nil {
+		return BundleArtifacts{}, err
+	}
+	artTypes := make(map[string]string, len(b.Manifest.Artifacts))
+	for _, artifact := range b.Manifest.Artifacts {
+		artTypes[artifact.Name] = artifact.Type
+	}
+	normalize := func(file bundle.File) bundle.File {
+		if file.Type == "" {
+			file.Type = artTypes[file.Name]
+		}
+		return file
+	}
+	artifacts := BundleArtifacts{Source: normalize(b.Source)}
+	for _, file := range b.Imports {
+		artifacts.Imports = append(artifacts.Imports, normalize(file))
+	}
+	return artifacts, nil
+}
+
+func (l *Loader) unpackBundle(policyID, version string) (*bundle.Bundle, error) {
 	if policyID == "" {
 		return nil, fmt.Errorf("policy ID cannot be empty")
 	}
@@ -128,28 +182,26 @@ func (l *Loader) LoadBundleFiles(policyID, version string) (map[string][]byte, e
 	if err != nil {
 		return nil, fmt.Errorf("failed to unpack bundle for %s@%s: %w", policyID, version, err)
 	}
+	return b, nil
+}
 
-	artTypes := make(map[string]string, len(b.Manifest.Artifacts))
-	for _, a := range b.Manifest.Artifacts {
-		artTypes[a.Name] = a.Type
+// LoadBundleFiles returns the first file of each artifact type, source first.
+// It is a compatibility wrapper around LoadBundleArtifacts and returns the same errors.
+func (l *Loader) LoadBundleFiles(policyID, version string) (map[string][]byte, error) {
+	artifacts, err := l.LoadBundleArtifacts(policyID, version)
+	if err != nil {
+		return nil, err
 	}
-
-	fileType := func(f bundle.File) string {
-		if f.Type != "" {
-			return f.Type
+	files := make(map[string][]byte, 1+len(artifacts.Imports))
+	if artifacts.Source.Type != "" {
+		files[artifacts.Source.Type] = artifacts.Source.Data
+	}
+	for _, file := range artifacts.Imports {
+		if file.Type == "" {
+			continue
 		}
-		return artTypes[f.Name]
-	}
-
-	files := make(map[string][]byte, 1+len(b.Imports))
-	if t := fileType(b.Source); t != "" {
-		files[t] = b.Source.Data
-	}
-	for _, f := range b.Imports {
-		if t := fileType(f); t != "" {
-			if _, exists := files[t]; !exists {
-				files[t] = f.Data
-			}
+		if _, exists := files[file.Type]; !exists {
+			files[file.Type] = file.Data
 		}
 	}
 	return files, nil

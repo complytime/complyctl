@@ -365,7 +365,11 @@ Or scan a single target (policy is inferred when the target has exactly one):
 complyctl scan my-repo
 ```
 
-`complyctl scan` automatically calls `generate` if artifacts are missing or the policy digest has changed.
+`complyctl scan` automatically calls `generate` if generated artifacts are
+missing, the resolved Gemara content changes, or a referenced complypack
+digest changes. An OCI policy digest change alone does not trigger
+regeneration when the resolved content is unchanged. Existing generation
+state without a resolved-tree identifier is regenerated once on upgrade.
 
 Output written to `./.complytime/scan/`.
 

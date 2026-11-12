@@ -77,3 +77,10 @@ func TestGroupByEvaluator_EmptyConfigs(t *testing.T) {
 	groups := GroupByEvaluator(nil, graph)
 	assert.Empty(t, groups)
 }
+
+func TestGroupByEvaluator_EmptyConfigsRetainsDeclaredEvaluator(t *testing.T) {
+	groups := GroupByEvaluator(nil, &DependencyGraph{EvaluatorID: "openscap"})
+	require.Contains(t, groups, "openscap")
+	assert.Equal(t, "openscap", groups["openscap"].EvaluatorID)
+	assert.Empty(t, groups["openscap"].Configs)
+}

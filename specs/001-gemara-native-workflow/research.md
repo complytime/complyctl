@@ -571,6 +571,13 @@ Target Scope:
 
 ## R39: parsePolicyLayer — Gemara-Only Format (Session 2026-02-23c)
 
+**Correction (2026-11-06)**: The user confirmed that root Policies may
+have zero plans and only mandate guidance. The tactical
+[Policy decoding correction](../../openspec/changes/accept-zero-plan-policies/specs/policy-decoding/spec.md)
+supersedes the nonempty-plan assumption below for roots and imports
+alike. Gemara-only decoding and invalid-input rejection still apply;
+the following decision text records the historical rationale.
+
 **Decision**: `parsePolicyLayer` accepts only `gemara.Policy` with `adherence.assessment-plans`. Remove the structured format (`evaluator_id` + `requirements` list) and legacy format (flat list with per-entry `evaluator_id`). Change function signature from `parsePolicyLayer(policyID string, data []byte) policyLayerResult` to `parsePolicyLayer(policyID string, data []byte) (policyLayerResult, error)`. Return an error when YAML does not parse as a valid `gemara.Policy` or when `adherence.assessment-plans` is empty.
 
 **Rationale**: The structured and legacy formats were transitional scaffolding for pre-Gemara development. With Gemara as the only workflow (Session 2026-02-14), all policy layers MUST be valid Gemara Policy YAML. Silent fallback to non-Gemara formats masks data issues and makes debugging hard. Failing fast aligns with the spec's edge case handling pattern and Constitution II (Simplicity & Isolation) — fewer code paths, fewer states.

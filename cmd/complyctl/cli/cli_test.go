@@ -1722,6 +1722,31 @@ func TestExtractPlanToReqMap_EmptyAssessments(t *testing.T) {
 
 // --- resolveAssessmentIDs tests ---
 
+func TestResolveAssessmentIDs_RequirementMatchDoesNotInventPlan(t *testing.T) {
+	for _, ambiguous := range []bool{false, true} {
+		t.Run(map[bool]string{false: "unique", true: "ambiguous"}[ambiguous], func(t *testing.T) {
+			plans := map[string]string{"plan-a": "shared"}
+			if ambiguous {
+				plans["plan-b"] = "shared"
+			}
+			// The gRPC client puts the wire requirement_id (a match ID) in PlanID.
+			assessments := []provider.AssessmentLog{{PlanID: "shared"}}
+			resolveAssessmentIDs(assessments, plans)
+			assert.Empty(t, assessments[0].PlanID)
+			assert.Equal(t, "shared", assessments[0].RequirementID)
+			evaluator := output.NewEvaluator("policy", "target", nil, reverseMap(plans), nil, nil)
+			evaluator.AddTarget(assessments)
+			log := evaluator.GemaraLog().Evaluations[0].AssessmentLogs[0]
+			if ambiguous {
+				assert.Nil(t, log.Plan)
+			} else {
+				require.NotNil(t, log.Plan)
+				assert.Equal(t, "plan-a", log.Plan.EntryId)
+			}
+		})
+	}
+}
+
 func TestResolveAssessmentIDs_ReplacesMatchingIDs(t *testing.T) {
 	assessments := []provider.AssessmentLog{
 		{PlanID: "ap-1"},
@@ -1915,10 +1940,7 @@ func TestNeedsRegeneration_NilState(t *testing.T) {
 }
 
 func TestNeedsRegeneration_StaleDigest(t *testing.T) {
-	state := &policy.GenerationState{
-		PolicyDigest: cachetest.DigestA,
-		EvaluatorIDs: []string{"ampel"},
-	}
+	state := policy.NewGenerationState("test-policy", cachetest.DigestC, cachetest.DigestA, []string{"ampel"}, nil)
 	assert.True(t, needsRegeneration(".", state, cachetest.DigestB, nil, "test-policy"),
 		"mismatched digest should require regeneration")
 }
@@ -1929,10 +1951,7 @@ func TestNeedsRegeneration_FreshWithArtifacts(t *testing.T) {
 	require.NoError(t, os.MkdirAll(evalDir, 0750))
 	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "policy.rego"), []byte("package test"), 0600))
 
-	state := &policy.GenerationState{
-		PolicyDigest: cachetest.DigestA,
-		EvaluatorIDs: []string{"ampel"},
-	}
+	state := policy.NewGenerationState("test-policy", cachetest.DigestC, cachetest.DigestA, []string{"ampel"}, nil)
 	assert.False(t, needsRegeneration(baseDir, state, cachetest.DigestA, nil, "test-policy"),
 		"fresh digest with existing artifacts should not require regeneration")
 }
@@ -1940,10 +1959,7 @@ func TestNeedsRegeneration_FreshWithArtifacts(t *testing.T) {
 func TestNeedsRegeneration_FreshButArtifactsMissing(t *testing.T) {
 	baseDir := t.TempDir()
 	// Do not create the evaluator directory — simulates deleted artifacts.
-	state := &policy.GenerationState{
-		PolicyDigest: cachetest.DigestA,
-		EvaluatorIDs: []string{"ampel"},
-	}
+	state := policy.NewGenerationState("test-policy", cachetest.DigestC, cachetest.DigestA, []string{"ampel"}, nil)
 	assert.True(t, needsRegeneration(baseDir, state, cachetest.DigestA, nil, "test-policy"),
 		"fresh digest but missing artifacts should require regeneration")
 }
@@ -1954,11 +1970,8 @@ func TestNeedsRegeneration_ComplypackDigestChanged(t *testing.T) {
 	require.NoError(t, os.MkdirAll(evalDir, 0750))
 	require.NoError(t, os.WriteFile(filepath.Join(evalDir, "policy.rego"), []byte("package test"), 0600))
 
-	state := &policy.GenerationState{
-		PolicyDigest:      cachetest.DigestA,
-		ComplypackDigests: map[string]string{"opa": cachetest.DigestB},
-		EvaluatorIDs:      []string{"ampel"},
-	}
+	state := policy.NewGenerationState("test-policy", cachetest.DigestC, cachetest.DigestA, []string{"ampel"},
+		map[string]string{"opa": cachetest.DigestB})
 	assert.True(t, needsRegeneration(baseDir, state, cachetest.DigestA,
 		map[string]string{"opa": cachetest.DigestC}, "test-policy"),
 		"changed complypack digest should require regeneration")
@@ -2073,7 +2086,7 @@ func TestSaveGenerationAndPrint_AllComplypacksAvailable(t *testing.T) {
 	require.NoError(t, cache.SaveState(state, cacheDir))
 
 	// Both evaluators had content available.
-	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid", cachetest.DigestC,
 		[]string{"io.complytime.opa", "io.complytime.ampel"},
 		[]string{"io.complytime.opa", "io.complytime.ampel"},
 		nil,
@@ -2084,6 +2097,7 @@ func TestSaveGenerationAndPrint_AllComplypacksAvailable(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, genState)
 	assert.Equal(t, cachetest.DigestA, genState.PolicyDigest)
+	assert.Equal(t, cachetest.DigestC, genState.ResolvedTreeDigest)
 	assert.Equal(t, map[string]string{
 		"io.complytime.opa":   cachetest.DigestB,
 		"io.complytime.ampel": cachetest.DigestC,
@@ -2106,7 +2120,7 @@ func TestSaveGenerationAndPrint_ComplypackUnavailable(t *testing.T) {
 	require.NoError(t, cache.SaveState(state, cacheDir))
 
 	// No evaluators had content available (cache deleted, etc).
-	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid", cachetest.DigestC,
 		[]string{"io.complytime.opa"},
 		nil, // no available evaluators
 		nil,
@@ -2136,7 +2150,7 @@ func TestSaveGenerationAndPrint_MixedAvailability(t *testing.T) {
 	require.NoError(t, cache.SaveState(state, cacheDir))
 
 	// Only opa had content available; ampel was missing.
-	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid", cachetest.DigestC,
 		[]string{"io.complytime.opa", "io.complytime.ampel"},
 		[]string{"io.complytime.opa"}, // only opa available
 		nil,
@@ -2165,7 +2179,7 @@ func TestSaveGenerationAndPrint_NoComplypacks(t *testing.T) {
 	}
 	require.NoError(t, cache.SaveState(state, cacheDir))
 
-	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid",
+	err := saveGenerationAndPrint(cacheDir, baseDir, "test-repo", "test-eid", cachetest.DigestC,
 		[]string{"io.complytime.opa"},
 		nil,
 		nil,
@@ -2645,6 +2659,18 @@ func TestReverseMap_Empty(t *testing.T) {
 func TestReverseMap_Nil(t *testing.T) {
 	r := reverseMap(nil)
 	assert.Empty(t, r)
+}
+
+func TestReverseMap_OmitsAmbiguousPlanFallbacks(t *testing.T) {
+	fallback := reverseMap(map[string]string{
+		"plan-a": "shared", "plan-b": "shared", "plan-c": "shared", "unique": "req-2",
+	})
+	assert.Equal(t, map[string]string{"req-2": "unique"}, fallback)
+	eval := output.NewEvaluator("policy", "target", nil, fallback, nil, nil)
+	eval.AddTarget([]provider.AssessmentLog{{RequirementID: "shared"}})
+	logs := eval.GemaraLog().Evaluations[0].AssessmentLogs
+	require.Len(t, logs, 1)
+	assert.Nil(t, logs[0].Plan, "a requirement-only result cannot select among three plans")
 }
 
 // --- buildReqToComplypackRef tests ---

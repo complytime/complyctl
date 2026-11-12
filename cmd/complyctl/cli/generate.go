@@ -109,6 +109,10 @@ func (o *generateOptions) generatePolicy(ctx context.Context, cfg *complytime.Wo
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "Resolved %s version: %s\n", ref.Repository, version)
+	treeDigest, err := policy.ResolvedTreeDigest(graph)
+	if err != nil {
+		return fmt.Errorf("failed to identify resolved policy tree: %w", err)
+	}
 
 	mgr, err := loadProviders(o.providerDir)
 	if err != nil {
@@ -125,7 +129,7 @@ func (o *generateOptions) generatePolicy(ctx context.Context, cfg *complytime.Wo
 		return err
 	}
 
-	return saveGenerationAndPrint(o.dataDir, baseDir, ref.Repository, eid, evaluatorIDs, availableEvaluators, planRows)
+	return saveGenerationAndPrint(o.dataDir, baseDir, ref.Repository, eid, treeDigest, evaluatorIDs, availableEvaluators, planRows)
 }
 
 func invokeGenerate(ctx context.Context, cacheDir, dataDir, baseDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, configVars map[string]string) ([]string, []string, []output.ExecutionPlanRow, error) {
@@ -173,7 +177,7 @@ func providerStatus(mgr *provider.Manager, evalID string) string {
 // complypack content actually resolved during generation. Only digests for
 // these evaluators are recorded — evaluators without content get no digest
 // entry, which forces regeneration when the complypack becomes available.
-func saveGenerationAndPrint(dataDir, baseDir, repository, eid string, evaluatorIDs, availableEvaluators []string, planRows []output.ExecutionPlanRow) error {
+func saveGenerationAndPrint(dataDir, baseDir, repository, eid, treeDigest string, evaluatorIDs, availableEvaluators []string, planRows []output.ExecutionPlanRow) error {
 	cacheState, err := cache.LoadState(dataDir)
 	if err != nil {
 		return fmt.Errorf("failed to load cache state: %w", err)
@@ -183,7 +187,7 @@ func saveGenerationAndPrint(dataDir, baseDir, repository, eid string, evaluatorI
 		complypackDigestsByEvaluator(cacheState),
 		availableEvaluators,
 	)
-	genState := policy.NewGenerationState(repository, policyState.Digest, evaluatorIDs, cpDigests)
+	genState := policy.NewGenerationState(repository, policyState.Digest, treeDigest, evaluatorIDs, cpDigests)
 	if err := policy.SaveGenerationState(baseDir, repository, genState); err != nil {
 		return fmt.Errorf("failed to save generation state: %w", err)
 	}

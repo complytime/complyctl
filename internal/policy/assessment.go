@@ -32,20 +32,21 @@ func ExtractAssessmentConfigs(graph *DependencyGraph) []provider.AssessmentConfi
 }
 
 // GroupByEvaluator groups assessment configs by EvaluatorID.
+// Each config retains its declaring Policy's binding. The graph evaluator is
+// a fallback only for configs without an explicit binding.
 // See R32: specs/001-gemara-native-workflow/research.md
 func GroupByEvaluator(configs []provider.AssessmentConfiguration, graph *DependencyGraph) map[string]EvaluatorGroup {
 	groups := make(map[string]EvaluatorGroup)
-
-	if graph.EvaluatorID != "" {
-		groups[graph.EvaluatorID] = EvaluatorGroup{
-			EvaluatorID: graph.EvaluatorID,
-			Configs:     configs,
-		}
-		return groups
+	// Diagnostics still need the declared evaluator when a policy has no plans.
+	if len(configs) == 0 && graph.EvaluatorID != "" {
+		groups[graph.EvaluatorID] = EvaluatorGroup{EvaluatorID: graph.EvaluatorID}
 	}
 
 	for _, cfg := range configs {
 		evalID := cfg.EvaluatorID
+		if evalID == "" {
+			evalID = graph.EvaluatorID
+		}
 		g := groups[evalID]
 		g.EvaluatorID = evalID
 		g.Configs = append(g.Configs, cfg)

@@ -395,7 +395,7 @@ func (o *scanOptions) scanPolicy(ctx context.Context, cfg *complytime.WorkspaceC
 	// Generation runs for ALL targets referencing the policy (per D7:
 	// generation freshness is policy-scoped, not target-scoped). Narrowing
 	// before generation would silently skip targets that were never generated.
-	if err := ensureGenerated(ctx, o.cacheDir, o.dataDir, baseDir, mgr, groups, policyTargets, cfg.Variables, ref.Repository, eid, evaluatorIDs); err != nil {
+	if err := ensureGenerated(ctx, o.cacheDir, o.dataDir, baseDir, mgr, groups, policyTargets, cfg.Variables, ref.Repository, eid, evaluatorIDs, graph); err != nil {
 		return err
 	}
 
@@ -460,8 +460,12 @@ func targetIDList(targets []complytime.TargetConfig) []string {
 	return ids
 }
 
-func ensureGenerated(ctx context.Context, cacheDir, dataDir, baseDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, configVars map[string]string, repository, eid string, evaluatorIDs []string) error {
-	needsGenerate, policyDigest, cpDigests, err := checkGenerationFreshness(dataDir, baseDir, repository, eid)
+func ensureGenerated(ctx context.Context, cacheDir, dataDir, baseDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, configVars map[string]string, repository, eid string, evaluatorIDs []string, graph *policy.DependencyGraph) error {
+	treeDigest, err := policy.ResolvedTreeDigest(graph)
+	if err != nil {
+		return fmt.Errorf("failed to identify resolved policy tree: %w", err)
+	}
+	needsGenerate, policyDigest, cpDigests, err := checkGenerationFreshness(dataDir, baseDir, repository, eid, treeDigest)
 	if err != nil {
 		return err
 	}
@@ -469,7 +473,7 @@ func ensureGenerated(ctx context.Context, cacheDir, dataDir, baseDir string, mgr
 		return nil
 	}
 	globalVars := complytime.WithWorkspaceVar(configVars, baseDir)
-	return runGeneration(ctx, cacheDir, dataDir, baseDir, mgr, groups, policyTargets, globalVars, repository, policyDigest, evaluatorIDs, cpDigests)
+	return runGeneration(ctx, cacheDir, dataDir, baseDir, mgr, groups, policyTargets, globalVars, repository, policyDigest, treeDigest, evaluatorIDs, cpDigests)
 }
 
 // runScanAndReport executes the scan across all targets and processes the
@@ -662,7 +666,7 @@ func filterTargetsForPolicy(targets []complytime.TargetConfig, policyID string) 
 	return result
 }
 
-func checkGenerationFreshness(dataDir, baseDir, repository, eid string) (needsGenerate bool, digest string, complypackDigests map[string]string, err error) {
+func checkGenerationFreshness(dataDir, baseDir, repository, eid, treeDigest string) (needsGenerate bool, digest string, complypackDigests map[string]string, err error) {
 	cacheState, err := cache.LoadState(dataDir)
 	if err != nil {
 		return false, "", nil, fmt.Errorf("failed to load cache state: %w", err)
@@ -675,7 +679,7 @@ func checkGenerationFreshness(dataDir, baseDir, repository, eid string) (needsGe
 		return false, "", nil, fmt.Errorf("failed to load generation state: %w", err)
 	}
 
-	return needsRegeneration(baseDir, genState, policyState.Digest, cpDigests, eid), policyState.Digest, cpDigests, nil
+	return needsRegeneration(baseDir, genState, treeDigest, cpDigests, eid), policyState.Digest, cpDigests, nil
 }
 
 func complypackDigestsByEvaluator(cacheState *cache.State) map[string]string {
@@ -701,13 +705,13 @@ func filterComplypackDigests(allDigests map[string]string, availableEvaluators [
 	return filtered
 }
 
-func needsRegeneration(baseDir string, genState *policy.GenerationState, digest string, complypackDigests map[string]string, eid string) bool {
+func needsRegeneration(baseDir string, genState *policy.GenerationState, treeDigest string, complypackDigests map[string]string, eid string) bool {
 	if genState == nil {
 		fmt.Fprintf(os.Stderr, "No prior generation found — generating artifacts for %s\n", eid)
 		return true
 	}
-	if !genState.IsFresh(digest, complypackDigests) {
-		fmt.Fprintf(os.Stderr, "Policy or complypack updated for %s since last generate — regenerating\n", eid)
+	if !genState.IsFresh(treeDigest, complypackDigests) {
+		fmt.Fprintf(os.Stderr, "Resolved policy tree or complypack updated for %s — regenerating\n", eid)
 		return true
 	}
 	if !evaluatorArtifactsExist(baseDir, genState.EvaluatorIDs) {
@@ -733,7 +737,7 @@ func evaluatorArtifactsExist(baseDir string, evaluatorIDs []string) bool {
 	return true
 }
 
-func runGeneration(ctx context.Context, cacheDir, dataDir, baseDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string, repository, policyDigest string, evaluatorIDs []string, complypackDigests map[string]string) error {
+func runGeneration(ctx context.Context, cacheDir, dataDir, baseDir string, mgr *provider.Manager, groups map[string]policy.EvaluatorGroup, policyTargets []complytime.TargetConfig, globalVars map[string]string, repository, policyDigest, treeDigest string, evaluatorIDs []string, complypackDigests map[string]string) error {
 	genSpin := terminal.NewSpinner("Generating policy artifacts...")
 	genSpin.Start()
 	defer genSpin.Stop()
@@ -744,7 +748,7 @@ func runGeneration(ctx context.Context, cacheDir, dataDir, baseDir string, mgr *
 	}
 
 	filteredDigests := filterComplypackDigests(complypackDigests, availableEvaluators)
-	newGenState := policy.NewGenerationState(repository, policyDigest, evaluatorIDs, filteredDigests)
+	newGenState := policy.NewGenerationState(repository, policyDigest, treeDigest, evaluatorIDs, filteredDigests)
 	if err := policy.SaveGenerationState(baseDir, repository, newGenState); err != nil {
 		return fmt.Errorf("failed to save generation state: %w", err)
 	}
@@ -989,30 +993,46 @@ func extractPlanToReqMap(graph *policy.DependencyGraph) map[string]string {
 // graph. Providers return plan IDs for plan-scoped assessments, while global
 // evaluators can return requirement IDs directly.
 func resolveAssessmentIDs(assessments []provider.AssessmentLog, planToReq map[string]string) {
+	requirements := make(map[string]bool, len(planToReq))
+	for _, reqID := range planToReq {
+		requirements[reqID] = true
+	}
 	for i := range assessments {
 		matchID := assessments[i].PlanID
 		if matchID == "" {
 			matchID = assessments[i].RequirementID
 		}
 		if reqID, ok := planToReq[matchID]; ok {
+			assessments[i].PlanID = matchID
 			assessments[i].RequirementID = reqID
-		} else if assessments[i].RequirementID == "" {
-			logger.Warn("unresolved assessment ID",
-				"matchID", matchID,
-				"hint", "provider returned an ID not found in the policy graph")
-			assessments[i].RequirementID = matchID
+		} else {
+			// The wire field is a match ID, not necessarily an assessment plan.
+			assessments[i].PlanID = ""
+			if assessments[i].RequirementID == "" {
+				if !requirements[matchID] {
+					logger.Warn("unresolved assessment ID",
+						"matchID", matchID,
+						"hint", "provider returned an ID not found in the policy graph")
+				}
+				assessments[i].RequirementID = matchID
+			}
 		}
 	}
 }
 
 // reverseMap inverts a string-to-string map. If multiple keys map to the same
-// value, only one mapping is preserved (last-write-wins) and a warning is logged.
+// value, omit that ambiguous fallback rather than selecting an arbitrary key.
 func reverseMap(m map[string]string) map[string]string {
 	r := make(map[string]string, len(m))
+	ambiguous := make(map[string]bool)
 	for k, v := range m {
-		if existing, ok := r[v]; ok {
-			logger.Warn("multiple keys map to same value in reverse map",
-				"value", v, "kept", k, "dropped", existing)
+		if ambiguous[v] {
+			continue
+		}
+		if _, ok := r[v]; ok {
+			delete(r, v)
+			ambiguous[v] = true
+			continue
 		}
 		r[v] = k
 	}

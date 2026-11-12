@@ -63,6 +63,7 @@ func buildDummyTarGz(name string, content []byte) []byte {
 var testPolicyYAML = []byte(`title: Test Policy
 metadata:
   id: test-policy
+  type: Policy
   version: "1.0.0"
 contacts:
   responsible:
@@ -252,7 +253,9 @@ func startMockRegistry(t *testing.T) *httptest.Server {
 	}{
 		{
 			mt: "application/vnd.gemara.catalog.v1+yaml",
-			data: []byte(`id: nist-800-53-r5
+			data: []byte(`metadata:
+  id: nist-800-53-r5
+  type: ControlCatalog
 title: NIST SP 800-53 Rev 5
 controls:
   - id: AC-1
@@ -275,7 +278,9 @@ controls:
 	}{
 		{
 			mt: "application/vnd.gemara.catalog.v1+yaml",
-			data: []byte(`id: nist-800-53-r5
+			data: []byte(`metadata:
+  id: nist-800-53-r5
+  type: ControlCatalog
 title: NIST SP 800-53 Rev 5
 controls:
   - id: AC-1
@@ -297,7 +302,9 @@ controls:
 	}{
 		{
 			mt: "application/vnd.gemara.catalog.v1+yaml",
-			data: []byte(`id: cis-benchmark
+			data: []byte(`metadata:
+  id: cis-benchmark
+  type: ControlCatalog
 title: CIS Benchmark
 controls:
   - id: CIS-1.1
@@ -515,7 +522,9 @@ func createLocalOCIImportLayout(t *testing.T) (string, string, string) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	catalog := []byte(`id: local-policy
+	catalog := []byte(`metadata:
+  id: local-policy
+  type: ControlCatalog
 title: Local Policy Catalog
 controls:
   - id: AC-1

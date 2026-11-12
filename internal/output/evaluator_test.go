@@ -202,6 +202,25 @@ func TestGemaraLog_PlanFieldPopulated(t *testing.T) {
 	assert.Equal(t, "plan-1", al.Plan.EntryId)
 }
 
+func TestGemaraLog_PreservesReturnedPlanIdentity(t *testing.T) {
+	for _, fallback := range []map[string]string{nil, {"req-1": "other-plan"}} {
+		eval := output.NewEvaluator("pol", "tgt", nil, fallback, nil, nil)
+		eval.AddTarget([]provider.AssessmentLog{
+			{PlanID: "plan-a", RequirementID: "req-1"},
+			{PlanID: "plan-b", RequirementID: "req-1"},
+		})
+		log := eval.GemaraLog()
+		require.Len(t, log.Evaluations, 1)
+		logs := log.Evaluations[0].AssessmentLogs
+		require.Len(t, logs, 2)
+		for i, want := range []string{"plan-a", "plan-b"} {
+			require.NotNil(t, logs[i].Plan)
+			assert.Equal(t, want, logs[i].Plan.EntryId)
+			assert.Equal(t, "req-1", logs[i].Requirement.EntryId)
+		}
+	}
+}
+
 func TestGemaraLog_PlanFieldOmittedWhenNoMapping(t *testing.T) {
 	eval := output.NewEvaluator("pol", "tgt", nil, nil, nil, nil)
 	eval.AddTarget([]provider.AssessmentLog{
