@@ -88,8 +88,10 @@ unresolved and create a second selection boundary. None is needed.
 
 ### 2. Exercise the actual configuration in disposable repositories
 
-Add `tests/pre_commit_scope_test.py` using stdlib `unittest`,
-type annotations, and `tempfile.TemporaryDirectory`. Copy the
+Add `tests/pre_commit_scope_test.py` using pytest test functions
+and fixtures, type annotations, and isolated temporary directories.
+Python pack TC-001 requires pytest for new tests; do not introduce
+`unittest.TestCase` subclasses. Copy the
 candidate hook configuration and SPDX script into each fixture's
 normal Git repository. Use argument-list subprocess calls with
 explicit working directories, captured diagnostics, and bounded
@@ -146,11 +148,13 @@ These checks MUST NOT edit the developer's hook configuration.
 
 ### 3. Make prerequisites and stage coverage explicit
 
-Add `make test-pre-commit-scope`, following the existing Python
-unittest discovery pattern. Require Git, Python 3.10 or newer
+Add `make test-pre-commit-scope` to invoke
+`python3 -m pytest tests/pre_commit_scope_test.py`. Require Git,
+Python 3.10 or newer
 (matching the existing script syntax), pre-commit with support for
-the configured stage names, and installed hook environments.
-Do not add a test runner dependency.
+the configured stage names, pytest installed for that Python
+interpreter, and installed hook environments. Document pytest as
+a development/test prerequisite, not a runtime dependency.
 
 Initial environment setup may need network access for the pinned
 pre-commit-hooks revision. Use an isolated `PRE_COMMIT_HOME` for

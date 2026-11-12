@@ -61,8 +61,9 @@ covers standalone yamllint, not these hooks.
   new test command without changing protected agent settings.
 - Baseline cleanup: only individually verified first-party
   formatting changes; no vendored or protected template rewrites.
-- Dependencies: installed pre-commit and its pinned hook
-  environments; no new runtime dependency or provider API change.
+- Dependencies: installed pytest as a development/test prerequisite,
+  pre-commit, and its pinned hook environments; no new runtime
+  dependency or provider API change.
 - Ownership: local history and the sibling org-infra sync manifest
   indicate the target configuration and SPDX script are local.
   Recheck before implementation; shared policy changes require a
