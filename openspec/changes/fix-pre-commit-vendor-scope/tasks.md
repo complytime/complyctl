@@ -1,12 +1,21 @@
 # Tasks
 
+Agent implementation of protected hook edits is blocked by the
+gatekeeping rule in `AGENTS.md`. No exception or authorization
+process is documented. The unchecked tasks retain the proposed
+implementation scope; they do not grant permission to edit gates.
+A human contributor can perform task 2.4's protected edits manually;
+the agent can then review and verify them without changing gates.
+
 ## 1. Establish implementation prerequisites
 
 - [ ] 1.1 Verify reviewed specs are committed and pushed.
   Before source edits, record the spec commit and remote evidence.
-- [ ] 1.2 Verify authorization before editing protected hook scope.
-  Verify the recorded decision permits only the three
-  proposed exclusions, or stop before changing protected policy.
+- [ ] 1.2 Check the gatekeeping rule and report the blocker.
+  Record the prohibition on agent edits to quality/governance
+  gates and the absence of a documented exception process.
+  Stop agent execution before protected hook edits; do not treat
+  spec review or maintainer approval as an exception to the rule.
 - [ ] 1.3 Verify local hook ownership and record the evidence.
   Check local history and the org-infra sync manifest; stop for
   separate upstream planning if the policy is shared infrastructure.
@@ -32,9 +41,12 @@
   Add staged-versus-all-files fixtures and stage checks; verify an
   unstaged committed defect is found only by all-files
   selection and intended hooks actually execute. Cover FR-004.
-- [ ] 2.4 Apply approved hook exclusions; verify regression tests.
-  Add only `exclude: ^vendor/` to the three authorized hooks;
-  verify regression tests now pass and a disposable copy
+- [ ] 2.4 Hand off hook edits to a human; verify the manual changes.
+  A human contributor adds only `exclude: ^vendor/` to
+  `trailing-whitespace`, `end-of-file-fixer`, and `check-spdx`.
+  The agent MUST NOT apply or repair these protected hook edits.
+  After the manual handoff, inspect the diff and verify regression
+  tests now pass and a disposable copy
   with the exclusions removed fails vendor-preservation cases.
 - [ ] 2.5 Test unrelated selection; verify other controls remain.
   Use an invalid vendored YAML fixture with `check-yaml`; verify
@@ -47,9 +59,9 @@
   in disposable fixtures and lint the changed Python/YAML/Markdown.
 - [ ] 2.7 Document the fix; verify documentation impact is covered.
   Add a `CHANGELOG.md` fix entry with this spec path;
-  assess the new command's `AGENTS.md` documentation impact through
-  applicable authorization and verify README needs no description
-  update. Confirm no protected agent-setting edits were introduced.
+  assess the new command's `AGENTS.md` documentation impact and
+  record any protected agent-setting edit as blocked. Verify README
+  needs no description update and no protected settings changed.
 
 ## 3. Reconcile first-party baseline findings
 

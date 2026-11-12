@@ -19,10 +19,14 @@ This supports repository-local ownership; implementation MUST
 recheck that evidence rather than assume a shared template change.
 
 `AGENTS.md` protects quality/governance gates. These artifacts
-propose the scope correction but do not grant an exception to that
-rule. Implementation MUST stop for the required maintainer
-authorization before any protected policy edit. Reviewed spec
-artifacts MUST also be committed and pushed before implementation.
+propose the scope correction but do not grant an exception.
+The rule prohibits agent edits and requires stopping and reporting;
+it defines no maintainer-authorization exception. Neither the
+constitution nor contributor guidance documents such a process.
+Ordinary PR review and constitution amendments are separate from
+this prohibition. Agent implementation of the hook edits is blocked
+under the current instructions. Reviewed spec artifacts MUST also
+be committed and pushed before implementation.
 
 ## Goals / Non-Goals
 
@@ -47,11 +51,22 @@ artifacts MUST also be committed and pushed before implementation.
 
 ### 1. Put root-anchored exclusions on three hooks
 
-After policy authorization, add `exclude: ^vendor/` separately to
+The proposed fix adds `exclude: ^vendor/` separately to
 `trailing-whitespace`, `end-of-file-fixer`, and `check-spdx`.
 Retain pinned revisions, existing rules, type filters, and stages.
 The pattern excludes only the repository-root vendor tree and
 keeps vendor-like first-party paths eligible.
+
+This is a proposed configuration change, not an executable agent
+instruction under the current gatekeeping rule. Agents MUST stop
+and report before applying it; a recorded approval does not supply
+an exception absent from the governing instructions.
+
+A human contributor can apply the three exclusions manually.
+After that handoff, the agent can inspect the actual diff, verify
+that only the proposed hook scope changed, and run the regression
+and integration checks. Any further protected hook edit remains
+manual. Ordinary PR review still applies.
 
 A global exclusion would change unrelated hook selection. A broad
 `vendor` substring would hide maintained files. Duplicating path
@@ -154,14 +169,14 @@ fixture that it previously selected to catch a global exclusion.
 Extend `docs/STYLE_GUIDE.md` with scope, stages, prerequisites,
 disposable-checkout guidance, and the regression target. Add a
 `CHANGELOG.md` entry referencing this change. Assess `AGENTS.md`
-for the new test command; protected agent-setting edits require
-their own applicable authorization. README needs no description
+for the new test command; record any needed protected agent-setting
+edit as blocked under the existing rule. README needs no description
 change because runtime behavior is unaffected.
 
 ## Risks / Trade-offs
 
-- Hook exclusions affect a protected gate → stop for the applicable
-  authorization; no agent may infer it from artifact creation.
+- Hook exclusions affect a protected gate → agent implementation
+  is blocked; stop and report rather than invent an approval path.
 - Cached environments or stage skips hide failures → use isolated
   state, real hook execution, and positive first-party controls.
 - Network setup fails → report an environment failure with
@@ -176,11 +191,15 @@ change because runtime behavior is unaffected.
 ## Migration Plan
 
 1. Review and commit/push these spec artifacts using the normal
-   workflow, and establish protected-policy authorization.
-2. Add regression coverage, then apply the approved exclusions.
-3. Verify baseline/candidate behavior, perform scoped cleanup, and
+   workflow. Record that agent hook edits are blocked by
+   `AGENTS.md`; no gate-change authorization process is documented.
+2. Add regression coverage without editing protected hook policy.
+3. Hand off the three hook exclusions to a human contributor for
+   manual editing. Stop agent work that depends on those edits
+   until they are present; inspect the diff before verification.
+4. Verify baseline/candidate behavior, perform scoped cleanup, and
    update contributor guidance.
-4. Run relevant local CI checks and the pre-PR review council.
+5. Run relevant local CI checks and the pre-PR review council.
 
 No runtime migration is required. Rollback restores the three
 hook definitions through an ordinary reviewed change; it does not
