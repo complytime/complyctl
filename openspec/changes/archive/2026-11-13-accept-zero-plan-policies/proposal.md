@@ -27,3 +27,12 @@ One shared decoder follows I and II; the bounded correction follows III
 and IV. Existing Gemara types/type detection follow V. Retaining raw
 inventories and configuration follows VI and VII. The user authorizes
 local signed specification commits before implementation without push.
+
+## Archive clarification
+
+The original delta used `MODIFIED` to correct Speckit research R39,
+but no canonical `policy-decoding` OpenSpec existed. Archival records
+these requirements as `ADDED` to establish that canonical capability.
+The supporting-Policy scenario also follows the later declaring-policy
+evaluator correction merged in PR #967; root-first timeline precedence
+is unchanged. This clarification introduces no implementation changes.
