@@ -15,7 +15,7 @@
   Consumers MUST NOT treat every `not-satisfied` finding as a failed
   assessment. The report `metadata.version` is now `2.0.0` so automated
   consumers can select the control-level format.
-  Spec: `openspec/changes/delegate-oscal-conversion/specs/oscal-assessment-results/spec.md`
+  Spec: `openspec/specs/oscal-assessment-results/spec.md`
 
 ### Added
 
@@ -23,10 +23,10 @@
   evidence instead of filename globs, supports explicit prebuilt hosts via
   `COMPLYCTL_BIN_DIR`, and exports/schema-validates JSON and YAML logs.
   `make test-cross-repo-evidence` exercises evidence and host selection
-  offline. Spec: `openspec/changes/resolve-cross-repo-evidence-mappings/`.
+  offline. Spec: `openspec/specs/cross-repo-integration-test/spec.md`.
 - Maintainers can preview generated release notes for committed HEAD with
   `make release-notes-preview` before selecting a tag or publishing. Spec:
-  `openspec/changes/release-notes-preview/`.
+  `openspec/specs/release-notes-preview/spec.md`.
 - Provider API compatibility guardrail: `api-compatibility` compares the
   protobuf and exported Go contracts with the latest stable release in the
   current major version, failing closed on analysis errors. Default baseline
@@ -95,7 +95,7 @@
   branch push as well as GitHub CLI API calls. The protected-branch PR flow
   and App scope are unchanged. Added offline regression coverage and
   existing-release recovery guidance in `docs/RELEASE_PROCESS.md`.
-  Spec: `openspec/changes/fix-homebrew-publish-auth/specs/homebrew-publishing/spec.md`
+  Spec: `openspec/specs/homebrew-publishing/spec.md`
 
 - Duplicate assessment plan IDs now fail graph resolution before generation
   or scanning, with the plan ID and both declaring artifacts and requirements

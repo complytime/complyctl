@@ -1,17 +1,19 @@
-# Policy generation requirements
+# Policy Generation Specification
 
-## ADDED Requirements
+## Purpose
+
+Prevent ambiguous assessment plan identities and stale generated
+artifacts when the resolved Gemara dependency tree changes.
+
+## Requirements
 
 ### Requirement: FR-001 Unambiguous assessment plan IDs
 
-The resolver MUST reject duplicate plan IDs before returning a graph.
-This MUST cover root/import, import/import, and internal duplicates in
-bundle and split-layer Policies, even with equal requirement IDs or
-different evaluators. Errors MUST name the conflicting plan ID and both
-declaring artifacts and requirements. No partial graph may escape.
-Unique authored IDs MUST remain unchanged. Per-assessment effective
-evaluator bindings, multi-artifact inventory, and valid zero-plan roots
-and imports MUST remain supported.
+The resolver MUST reject duplicate plan IDs before returning a graph,
+with no partial graph escaping. Errors MUST name the conflicting plan
+ID and both declaring artifacts and requirements. Unique authored IDs,
+per-assessment effective evaluator bindings, multi-artifact inventory,
+and valid zero-plan roots and imports MUST remain supported.
 
 #### Scenario: Independently authored Policies reuse a plan ID
 
@@ -19,6 +21,9 @@ and imports MUST remain supported.
 - **When** the resolver assembles the Policy graph
 - **Then** resolution MUST fail with both declaration contexts
 - **And** generation and result mapping MUST NOT receive that graph
+- **And** this MUST cover root/import, import/import, and internal
+  duplicates in bundle and split-layer Policies, even with equal
+  requirement IDs or different evaluators
 
 #### Scenario: A single valid Policy has unique plan IDs
 
@@ -36,7 +41,7 @@ generation. Missing-artifact and failure behavior MUST persist.
 
 The original projection-version requirement is superseded by FR-003
 and FR-004 in
-`preserve-bundle-artifacts/specs/bundle-artifact-inventory/spec.md`.
+`openspec/specs/bundle-artifact-inventory/spec.md`.
 
 #### Scenario: Upgrade from unversioned generation state
 

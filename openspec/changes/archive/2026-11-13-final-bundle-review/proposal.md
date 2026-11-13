@@ -25,3 +25,11 @@ Dependencies, authored content, and assessment execution contracts stay
 unchanged. The approved local-only workflow supersedes the repository's
 push requirement. No PR or independent reviewer dispatch is part of this
 fix wave.
+
+## Archive clarification
+
+The evaluator precedence proposal above is historical. The subsequent
+bounded fixes merged in PR #967 supersede it: each assessment retains
+its declaring Policy's effective evaluator binding. The amended
+`bundle-consumption` delta and FR-002 of
+`openspec/specs/bundle-artifact-inventory/spec.md` record that contract.

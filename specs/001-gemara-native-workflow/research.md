@@ -573,7 +573,7 @@ Target Scope:
 
 **Correction (2026-11-06)**: The user confirmed that root Policies may
 have zero plans and only mandate guidance. The tactical
-[Policy decoding correction](../../openspec/changes/accept-zero-plan-policies/specs/policy-decoding/spec.md)
+[Policy decoding correction](../../openspec/specs/policy-decoding/spec.md)
 supersedes the nonempty-plan assumption below for roots and imports
 alike. Gemara-only decoding and invalid-input rejection still apply;
 the following decision text records the historical rationale.
