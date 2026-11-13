@@ -246,6 +246,10 @@ clean:
 
 ##@ Testing
 
+test-pre-commit-scope: ## test hook scope (requires pytest, pre-commit, Go)
+	@python3 -m pytest tests/pre_commit_scope_test.py
+.PHONY: test-pre-commit-scope
+
 test-release-notes-preview: ## run offline release notes preview tests
 	@python3 -m unittest discover -s tests -p 'release_notes_preview_test.py' -v
 .PHONY: test-release-notes-preview
