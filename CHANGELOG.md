@@ -19,6 +19,11 @@
 
 ### Added
 
+- Cross-repository validation follows the scan's mapped Ampel/Snappy
+  evidence instead of filename globs, supports explicit prebuilt hosts via
+  `COMPLYCTL_BIN_DIR`, and exports/schema-validates JSON and YAML logs.
+  `make test-cross-repo-evidence` exercises evidence and host selection
+  offline. Spec: `openspec/changes/resolve-cross-repo-evidence-mappings/`.
 - Maintainers can preview generated release notes for committed HEAD with
   `make release-notes-preview` before selecting a tag or publishing. Spec:
   `openspec/changes/release-notes-preview/`.

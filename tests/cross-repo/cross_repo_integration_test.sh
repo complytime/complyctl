@@ -11,8 +11,12 @@
 #   GITHUB_TOKEN        GitHub token with read access to public repositories
 #
 # Optional environment variables:
-#   SCAN_OUTPUT_DIR     Directory to export evaluation-log-*.yaml files for downstream
+#   COMPLYCTL_BIN_DIR   Absolute directory containing both prebuilt host binaries;
+#                       defaults to this harness checkout's bin/ directory
+#   SCAN_OUTPUT_DIR     Directory to export evaluation-log-*.json and *.yaml for downstream
 #                       schema validation (set by CI, not required for local runs)
+#   COMPLYCTL_CROSS_REPO_INDEX_FIXTURE_TEST
+#                       Test-only: 1 runs index fixtures and skips the live pipeline
 #
 # Run locally:  make test-cross-repo PROVIDERS_BIN_DIR=/path/to/providers/bin
 # Run directly: PROVIDERS_BIN_DIR=... GITHUB_TOKEN=... ./tests/cross-repo/cross_repo_integration_test.sh
@@ -20,13 +24,19 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-BINARY="${REPO_ROOT}/bin/complyctl"
-MOCK_REGISTRY="${REPO_ROOT}/bin/mock-oci-registry"
-TESTDATA_DIR="${REPO_ROOT}/tests/cross-repo/testdata"
+# shellcheck source=tests/cross-repo/evidence_helpers.sh
+source "${REPO_ROOT}/tests/cross-repo/evidence_helpers.sh"
+# shellcheck source=tests/cross-repo/evidence_assertions.sh
+source "${REPO_ROOT}/tests/cross-repo/evidence_assertions.sh"
+# shellcheck source=tests/cross-repo/harness_helpers.sh
+source "${REPO_ROOT}/tests/cross-repo/harness_helpers.sh"
 
 REGISTRY_PORT="${GEMARA_SERVICE_PORT:-8765}"
 REGISTRY_URL="http://localhost:${REGISTRY_PORT}"
 POLICY_ID="test-ampel-bp"
+AMPEL_REPOSITORY="policies/test-branch-protection"
+AMPEL_TARGET="complyctl-repo"
+AMPEL_REQUIREMENT="block-force-push"
 OPA_POLICY_ID="test-opa-k8s"
 AMPEL_TARGET_URL="https://github.com/complytime/complyctl"
 
@@ -44,7 +54,7 @@ FOUND_FILE=""
 # Capture and unset GITHUB_TOKEN so only run_complyctl inherits it.
 # This follows least-privilege for environment inheritance.
 # shellcheck disable=SC2153 # GITHUB_TOKEN is set externally, not a misspelling of _GITHUB_TOKEN
-_GITHUB_TOKEN="${GITHUB_TOKEN}"
+_GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 unset GITHUB_TOKEN
 
 cleanup() {
@@ -52,22 +62,16 @@ cleanup() {
         kill "${REGISTRY_PID}" 2>/dev/null || true
         wait "${REGISTRY_PID}" 2>/dev/null || true
     fi
-    [[ -n "${WORK_DIR}" ]] && rm -rf "${WORK_DIR}"
-    [[ -n "${TEST_HOME}" ]] && rm -rf "${TEST_HOME}"
+    if [[ -n "${WORK_DIR}" ]]; then
+        rm -rf "${WORK_DIR}"
+    fi
+    if [[ -n "${TEST_HOME}" ]]; then
+        rm -rf "${TEST_HOME}"
+    fi
 }
 trap cleanup EXIT
 
 # --- Assertion helpers ---
-
-pass() {
-    PASSED=$((PASSED + 1))
-    echo "  PASS: $1" >&2
-}
-
-fail() {
-    FAILED=$((FAILED + 1))
-    echo "  FAIL: $1" >&2
-}
 
 assert_contains() {
     local label="$1" haystack="$2" needle="$3"
@@ -223,6 +227,7 @@ sanitize_output() {
 }
 
 if [[ "${COMPLYCTL_CROSS_REPO_INDEX_FIXTURE_TEST:-}" == "1" ]]; then
+    echo 'FIXTURE MODE: generation-index fixtures only; live pipeline is not executed.'
     test_indexed_ampel_bundle_failures
     [[ "${FAILED}" -eq 0 ]]
     exit
@@ -231,6 +236,8 @@ fi
 # --- Prerequisites ---
 
 echo "=== Prerequisites ==="
+
+select_host_binaries "${REPO_ROOT}"
 
 # Validate required environment variables
 if [[ -z "${PROVIDERS_BIN_DIR:-}" ]]; then
@@ -262,17 +269,7 @@ if ! command -v conftest >/dev/null 2>&1; then
     exit 1
 fi
 
-if [[ ! -x "${BINARY}" ]]; then
-    echo "FATAL: complyctl binary not found at ${BINARY}. Run 'make build' first."
-    exit 1
-fi
-
-if [[ ! -x "${MOCK_REGISTRY}" ]]; then
-    echo "FATAL: mock-oci-registry binary not found at ${MOCK_REGISTRY}. Run 'make build' first."
-    exit 1
-fi
-
-for cmd in jq curl; do
+for cmd in jq curl realpath sha256sum; do
     if ! command -v "${cmd}" >/dev/null 2>&1; then
         echo "FATAL: '${cmd}' is required but not installed."
         exit 1
@@ -390,7 +387,7 @@ test_scan() {
     local out rc=0
     # complyctl scan exits 0 on tool-level success (even if policy controls FAIL).
     # A non-zero exit indicates a tool-level error (gRPC failure, binary not found, etc.).
-    out="$(run_complyctl scan --policy-id "${POLICY_ID}")" || rc=$?
+    out="$(run_complyctl scan --policy-id "${POLICY_ID}" --log-format json)" || rc=$?
     if [[ "${rc}" -ne 0 ]]; then
         fail "scan: unexpected exit code ${rc}"
         echo "${out}" | sanitize_output >&2
@@ -399,17 +396,8 @@ test_scan() {
     echo "${out}" | sanitize_output
     assert_contains "scan: completed" "${out}" "requirements:"
 
-    assert_file_exists "scan: snappy attestation exists" \
-        "${WORK_DIR}/.complytime/ampel/results/*-snappy.intoto.json"
-
-    assert_file_exists "scan: ampel attestation exists" \
-        "${WORK_DIR}/.complytime/ampel/results/*-ampel.intoto.json"
-    local ampel_file="${FOUND_FILE}"
-
-    if [[ -n "${ampel_file}" ]]; then
-        assert_json_contains "scan: ampel result contains block-force-push requirement ID" \
-            "${ampel_file}" '.predicate.results[].policy.id' "block-force-push"
-    fi
+    # The assertion records FAILED; keep running unrelated live checks and export.
+    assert_mapped_ampel_evidence "${out}" || return 0
 }
 
 # --- test_generate_bad_policy (negative test) ---
@@ -542,16 +530,7 @@ echo "==============================="
 # --- Export scan output for schema validation (CI only) ---
 
 if [[ -n "${SCAN_OUTPUT_DIR:-}" ]]; then
-    mkdir -p "${SCAN_OUTPUT_DIR}"
-    SCAN_DIR="${WORK_DIR}/.complytime/scan"
-    if [[ -d "${SCAN_DIR}" ]]; then
-        cp "${SCAN_DIR}"/evaluation-log-*.yaml "${SCAN_OUTPUT_DIR}/" 2>/dev/null || true
-    fi
-    EXPORTED=$(find "${SCAN_OUTPUT_DIR}" -name 'evaluation-log-*.yaml' 2>/dev/null | wc -l)
-    echo "  Exported ${EXPORTED} EvaluationLog file(s) to ${SCAN_OUTPUT_DIR}"
-    if [[ "${EXPORTED}" -eq 0 ]]; then
-        echo "  WARNING: No EvaluationLog files found to export. Scan may not have produced output."
-    fi
+    export_evaluation_logs "${WORK_DIR}/${EVIDENCE_SCAN_SUBDIR}" "${SCAN_OUTPUT_DIR}"
 fi
 
 if [[ "${FAILED}" -gt 0 ]]; then

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# Validate EvaluationLog YAML files against the Gemara CUE schema.
+# Validate EvaluationLog JSON and YAML files against the Gemara CUE schema.
 # Fetches the schema directly from the CUE Central Registry — no local
 # module files to maintain.
 #
@@ -75,13 +75,14 @@ for dir in "$@"; do
     while IFS= read -r -d '' file; do
         FILES_FOUND=$((FILES_FOUND + 1))
         validate_file "${file}"
-    done < <(find "${dir}" -name 'evaluation-log-*.yaml' -print0 2>/dev/null)
+    done < <(find "${dir}" -type f \
+        \( -name 'evaluation-log-*.json' -o -name 'evaluation-log-*.yaml' \) -print0 2>/dev/null)
 done
 
 echo ""
 
 if [[ ${FILES_FOUND} -eq 0 ]]; then
-    echo "ERROR: No evaluation-log-*.yaml files found in: $*"
+    echo "ERROR: No evaluation-log-*.json or evaluation-log-*.yaml files found in: $*"
     echo "       Ensure complyctl scan completed successfully before validation."
     exit 2
 fi

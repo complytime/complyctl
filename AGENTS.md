@@ -44,6 +44,10 @@ make test-integration
 make test-cross-repo PROVIDERS_BIN_DIR=/path/to/providers/bin
 # → timeout 120 ./tests/cross-repo/cross_repo_integration_test.sh
 
+# Offline mapped-evidence, host-selection, and generation-index regressions
+make test-cross-repo-evidence
+# → Bash/jq/GNU coreutils/cmp fixtures; no token, providers, or network required
+
 # Behavioral assessment (EvaluationLog + SARIF reports)
 make test-behavioral
 
@@ -51,9 +55,12 @@ make test-behavioral
 make test-devcontainer
 # → podman build -t complyctl-devcontainer-test .devcontainer/
 
-# Schema validation (validates EvaluationLog YAML against Gemara CUE schema, requires cue)
+# Schema validation (EvaluationLog JSON/YAML against Gemara CUE schema, requires cue)
 make test-schema-validation
 # → ./tests/schema-validation/validate.sh .complytime/scan
+
+# Schema discovery/failure regressions (requires cue, jq, and schema access/cache)
+make test-schema-validation-regression
 
 # Acceptance tests (container-based, requires podman-compose or docker compose)
 make test-acceptance
@@ -347,6 +354,7 @@ packages organized by domain responsibility.
 <!-- MANUAL ADDITIONS END -->
 
 ## Recent Changes
+- resolve-cross-repo-evidence-mappings: Cross-repo harness follows invocation-specific JSON logs and mapped Ampel/Snappy evidence; `COMPLYCTL_BIN_DIR` selects both prebuilt hosts with harness-owned fixtures; `make test-cross-repo-evidence` runs offline regressions; export and CUE validation include JSON/YAML; live retained acceptance remains required before merge
 - fix-homebrew-publish-auth: Homebrew publishing exports step-scoped `GH_TOKEN` for API and Git credential-helper authentication; `make test-homebrew-publish` exercises the actual workflow offline, including the legacy-token regression; release recovery remains PR-based without moving tags
 - release-notes-preview: `make release-notes-preview` uses `scripts/release-notes-preview.py` to preview the latest canonical release to committed HEAD without publishing; `make test-release-notes-preview` runs offline regression tests; prerequisites and usage are in `docs/RELEASE_PROCESS.md`
 - local-oci-layout-import: `complyctl get --from-oci-layout <path>` imports configured policies and complypacks from a validated local OCI image layout without registry or credential initialization; configured URLs select artifacts by digest only, while registry/repository remain cache and state identity; entries with effective verification fail closed before cache or state changes unless `--skip-verify` is explicitly supplied, and permitted local imports record `Verified: false`

@@ -70,9 +70,22 @@ endif
 	timeout 120 ./tests/cross-repo/cross_repo_integration_test.sh
 .PHONY: test-cross-repo
 
-test-schema-validation: ## validate EvaluationLog YAML against Gemara CUE schema (requires cue + scan output)
+test-cross-repo-evidence-mappings: ## run evidence-only fixtures (requires bash, jq, GNU coreutils)
+	bash ./tests/cross-repo/evidence_test.sh
+.PHONY: test-cross-repo-evidence-mappings
+
+test-cross-repo-evidence: test-cross-repo-evidence-mappings ## run offline evidence/host regressions (requires bash, jq, GNU coreutils, cmp)
+	bash ./tests/cross-repo/harness_test.sh
+	COMPLYCTL_CROSS_REPO_INDEX_FIXTURE_TEST=1 bash ./tests/cross-repo/cross_repo_integration_test.sh
+.PHONY: test-cross-repo-evidence
+
+test-schema-validation: ## validate EvaluationLog JSON/YAML against Gemara CUE schema (requires cue + scan output)
 	./tests/schema-validation/validate.sh $(or $(SCAN_OUTPUT_DIR),.complytime/scan)
 .PHONY: test-schema-validation
+
+test-schema-validation-regression: ## test JSON/YAML schema discovery and failures (requires cue + jq)
+	bash ./tests/schema-validation/validate_test.sh
+.PHONY: test-schema-validation-regression
 
 test-devcontainer: ## verify devcontainer Containerfile builds
 	podman build -t complyctl-devcontainer-test .devcontainer/
