@@ -85,6 +85,17 @@
 
 ### Fixed
 
+- Project hooks preserve upstream bytes and license notices by excluding
+  root `vendor/` from `trailing-whitespace`, `end-of-file-fixer`, `go-fmt`,
+  and `check-spdx`. Only the whitespace/EOF hooks additionally preserve
+  these exact scaffolded paths: `.opencode/commands/uf.review-council.md`,
+  `.opencode/commands/uf.review-pr.md`, and
+  `.opencode/commands/uf.address-feedback.md`. These exceptions are not
+  repairs; other commands and archived specs remain checked. Added
+  `make test-pre-commit-scope` for isolated real-hook regression coverage.
+  Spec: `openspec/changes/fix-pre-commit-vendor-scope/specs/project-hook-scope/spec.md`
+  (#972)
+
 - Acceptance-test lint findings resolved with request-local trust
   explanations for test registry access and owner-only configuration
   files. Standalone yamllint excludes vendored files and the generated
