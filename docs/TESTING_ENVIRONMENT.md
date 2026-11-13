@@ -523,6 +523,103 @@ completes in well under this budget; the margin absorbs cold
 runners with no build-layer cache. Superseded runs on the same
 ref are cancelled automatically.
 
+## Cross-Repository Evidence Tests
+
+The canonical harness in `tests/cross-repo/` checks the real Ampel/OPA
+Get → Generate → Scan pipeline. It selects Ampel's JSON EvaluationLog
+from that scan's reported path and verifies the expected repository,
+target, and `block-force-push` assessment. It follows the returned
+Ampel/Snappy evidence mappings, not filenames or nearby metadata.
+Provider evidence IDs use `ampel_` and `snappy_` prefixes to identify
+roles; each matching assessment must contain both roles. Log metadata
+and requirement references identify the resolved policy repository,
+not its workspace alias. Live verification must confirm these producer
+contracts and distinct per-instance mapping-reference IDs.
+
+Run deterministic regressions before configuring live providers:
+
+```bash
+make test-cross-repo-evidence
+```
+
+Prerequisites are Bash, jq, GNU core utilities (`realpath`, `sha256sum`,
+`mktemp`, and standard file utilities), and Make. No GitHub token,
+provider executables, or network access is required. The aggregate target
+runs the evidence-only `test-cross-repo-evidence-mappings` dependency,
+host/export fixtures, and generation-index fixtures. The host/export
+suite uses GNU `timeout` to bound its injected-failure subprocess; `cmp`
+checks exported bytes.
+Fixtures cover
+legacy and retained layouts, equal-content instances, historical
+overwrites/removals, and parent-shell assertion counters. These fixtures
+test the checker, not actual provider retention.
+The unreadable-file fixture reports an explicit skip (not a pass) if
+the current user can read mode-000 files, as root commonly can.
+
+Helpers in `tests/cross-repo/evidence_helpers.sh` return nonzero and
+write `evidence:` diagnostics on stderr for missing/ambiguous logs,
+wrong policy or target, malformed/missing sources, missing/unreadable
+files, workspace escapes, unsupported or mismatched SHA-256 digests,
+missing/duplicate references, invalid file URLs, locator disagreement,
+and missing Ampel requirement content. Coordinates resolve from the
+workspace; absolute legacy paths must remain inside it. Local file URLs
+must identify the same canonical file, including percent-escaped spaces,
+percent signs, and Unicode. Helpers do not try alternative files.
+
+For the normal live invocation, build the providers and install `snappy`,
+`ampel`, `conftest`, jq, curl, and the core utilities. Supply a
+`GITHUB_TOKEN` with read access to the repository's branch protection:
+
+```bash
+make test-cross-repo PROVIDERS_BIN_DIR=/path/to/complytime-providers/bin
+```
+
+This Make target builds this checkout's host binaries and keeps the
+existing 120-second timeout. Get, generation-index checks, bad-policy
+rejection, and both OPA failing/passing fixtures still run.
+
+To test an unchanged released host with this checkout's assertions,
+prebuild **both** `complyctl` and `mock-oci-registry` in the selected host
+checkout. Set `COMPLYCTL_BIN_DIR` to their absolute directory and invoke
+the script directly (not the building Make target):
+
+```bash
+COMPLYCTL_BIN_DIR="/absolute/path/to/released host/bin" \
+PROVIDERS_BIN_DIR="/absolute/path/to/complytime-providers/bin" \
+timeout 120 bash ./tests/cross-repo/cross_repo_integration_test.sh
+```
+
+Without the override, both host binaries come from the harness checkout's
+`bin/`. Explicit empty, relative, missing, or incomplete selections fail
+without building or falling back. Assertions and `testdata/` always come
+from the harness checkout, even with external hosts and paths containing
+spaces. The script gives the token only to complyctl subprocesses.
+
+Set `SCAN_OUTPUT_DIR` to export the actual JSON and YAML EvaluationLogs.
+Validate both serializations with the existing Gemara CUE schema:
+
+```bash
+make test-schema-validation SCAN_OUTPUT_DIR=/path/to/exported-logs
+make test-schema-validation-regression
+```
+
+These commands require CUE (`v0.17.1` in CI); the regression target also
+requires jq. Schema access requires the CUE registry or a populated local
+cache. The configured Gemara module, `#EvaluationLog` definition, and
+completeness check are unchanged. JSON-only logs are validated directly;
+invalid logs fail with exit 1 and absent logs with exit 2. No additional
+YAML parser or credentialed scan is involved.
+
+Before claiming live retention acceptance, perform two real evaluations
+with the retained provider build in one workspace. Copy each invocation's
+reported JSON log immediately into separate snapshot files, because report
+filenames can collide within one second. Source `evidence_helpers.sh` and
+call `validate_evidence_history` with the workspace, both snapshots,
+resolved policy repository, target ID, and requirement ID. It revalidates
+both logs' files and recorded digests, and rejects collapsed instance IDs,
+references, or coordinates even when bytes match. Record exact host and
+provider revisions and actual results separately from offline fixtures.
+
 ## See Also
 
 - [Quick Start](./QUICK_START.md)

@@ -1,9 +1,10 @@
 # Cross-repo integration test workflow.
 # Builds complyctl from the PR branch, checks out complytime-providers@main,
 # builds provider binaries (ampel + opa), installs snappy, ampel, and conftest,
+# runs offline evidence regressions before credentialed execution,
 # runs the cross-repo integration test script to validate the full
 # complyctl + provider pipeline end-to-end, then validates the resulting
-# EvaluationLog YAML files against the Gemara CUE schema with cue vet.
+# EvaluationLog JSON and YAML files against the Gemara CUE schema with cue vet.
 name: Cross-Repo Integration Test
 
 on:
@@ -34,6 +35,9 @@ jobs:
 
             - name: Build complyctl
               run: make build
+
+            - name: Run offline cross-repo evidence regressions
+              run: make test-cross-repo-evidence
 
             # Intentionally tracks main for HEAD-to-HEAD cross-repo integration.
             # This is a same-org repo under the same maintainer trust boundary.
@@ -97,4 +101,6 @@ jobs:
               run: go install cuelang.org/go/cmd/cue@v0.17.1
 
             - name: Validate EvaluationLog schema
-              run: ./tests/schema-validation/validate.sh .ci-scan-output
+              run: |
+                  make test-schema-validation-regression
+                  ./tests/schema-validation/validate.sh .ci-scan-output
