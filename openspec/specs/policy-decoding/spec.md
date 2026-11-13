@@ -1,4 +1,11 @@
-## MODIFIED Requirements
+# Policy Decoding Specification
+
+## Purpose
+
+Accept guidance-only Gemara Policies without weakening typed input
+validation or inventing assessments for Policies with no plans.
+
+## Requirements
 
 ### Requirement: FR-001 Decode Policies independently of plan count
 
@@ -23,7 +30,8 @@ test; Gemara-only decoding without legacy fallback remains required.
 - **When** the consumer resolves the bundle
 - **Then** it MUST retain the root's assessments and display metadata
 - **And** append supporting references in inventory order
-- **And** retain root-first evaluator and timeline precedence
+- **And** retain declaring-policy evaluator bindings and root-first
+  timeline precedence
 - **And** imports MUST still supply absent graph defaults
 
 ### Requirement: FR-002 Retain minimal input validity checks

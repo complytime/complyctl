@@ -1,3 +1,8 @@
+## Purpose
+
+Preserve complete Gemara bundle inventories and assessment semantics,
+and reuse generated artifacts only for equivalent resolved content.
+
 ## ADDED Requirements
 
 ### Requirement: FR-001 Preserve the bundle inventory
@@ -17,17 +22,12 @@ validation.
 
 ### Requirement: FR-002 Resolve the complete inventory
 
-The resolver MUST require a Policy source and emit a separate graph
-entry per control or guidance catalog, preserving raw bytes and IDs.
-Missing catalog IDs MUST use deterministic indexed fallback IDs.
-Imported Policies MUST contribute assessments and mapping references.
-Each assessment MUST retain its declaring Policy's effective evaluator
-binding. A root evaluator MUST NOT replace an imported assessment's
-binding. The root timeline MUST take precedence; imports MUST supply
-it only when absent. Metadata MUST sum controls across all catalogs
-and assessments across the root and imported Policies while retaining
-root Policy display metadata. Cached display metadata MUST be refreshed
-when it no longer matches the resolved inventory.
+The resolver MUST require a Policy source and preserve every supporting
+catalog, imported assessment, and mapping reference. Each assessment
+MUST retain its declaring Policy's effective evaluator binding, without
+root override. Root timeline and display metadata MUST take precedence.
+Metadata totals MUST cover the complete inventory, and stale cached
+display metadata MUST be refreshed.
 
 #### Scenario: Resolve supporting artifacts
 
@@ -35,6 +35,14 @@ when it no longer matches the resolved inventory.
 - **When** the resolver builds the dependency graph
 - **Then** it MUST retain each catalog and imported assessment
 - **And** it MUST report malformed supporting documents with context
+- **And** each control or guidance catalog MUST have a separate graph
+  entry preserving raw bytes and IDs
+- **And** missing catalog IDs MUST use deterministic indexed fallback IDs
+- **And** imports MUST contribute their mapping references
+- **And** imports MUST supply the timeline only when the root lacks it
+- **And** metadata MUST sum controls across all catalogs and assessments
+  across the root and imported Policies
+- **And** metadata MUST retain the root Policy's display metadata
 
 #### Scenario: Reject a non-Policy source
 
@@ -44,14 +52,11 @@ when it no longer matches the resolved inventory.
 
 ### Requirement: FR-003 Identify the resolved Gemara dependency tree
 
-The system MUST derive a deterministic content identifier from the
-resolved Gemara dependency tree, including imported assessments,
-catalogs, effective evaluator bindings, parameters, timeline, and
-mapping references. It MUST exclude workspace variables, targets,
-complypack content, and executable versions from this identifier.
-Equivalent resolved content MUST retain its identifier despite map
-iteration order, unordered inventory order, or YAML formatting.
-Ordering that affects effective behavior MUST remain significant.
+The system MUST derive a deterministic identifier from the resolved
+Gemara dependency tree, including imported assessments, catalogs,
+effective evaluator bindings, parameters, timeline, and mapping
+references. Equivalent resolved content MUST retain its identifier;
+ordering that affects effective behavior MUST remain significant.
 
 #### Scenario: Imported assessment changes without an OCI update
 
@@ -68,6 +73,15 @@ Ordering that affects effective behavior MUST remain significant.
 - **When** the resolved tree remains equivalent
 - **Then** the next scan MUST reuse generated artifacts
 - **And** a different root OCI digest alone MUST NOT force generation
+
+#### Scenario: Non-semantic inputs change
+
+- **Given** equivalent resolved Gemara content
+- **When** map iteration order, unordered inventory order, YAML
+  formatting, workspace variables, targets, complypack content, or
+  executable versions change
+- **Then** the resolved tree identifier MUST remain unchanged
+- **And** independent complypack freshness checks MUST still apply
 
 ### Requirement: FR-004 Persist successful tree-based freshness
 
@@ -100,22 +114,13 @@ Existing state without a tree identifier MUST require regeneration.
 
 ### Requirement: FR-005 Preserve unambiguous downstream meaning
 
-Reported assessments MUST preserve provider-returned plan IDs. A
-requirement-only result MAY recover a plan ID only when the requirement
-identifies exactly one plan. Resolution MUST preserve authored Gemara
-parameter declarations in their SDK types and include them in the
-resolved tree identifier, separately from workspace parameter overrides.
-
-Before returning a graph, resolution MUST reject catalog identities,
-control IDs, or requirement IDs that collide in the current unqualified
-downstream mappings. Errors MUST identify the conflicting ID and both
-declarations. Equal mapping-reference declarations MAY be coalesced;
-conflicting declarations with the same reference ID MUST be rejected
-with both declaring Policy contexts.
-
-Existing duplicate-plan rejection MUST remain in effect. These checks
-MUST NOT introduce policy inheritance, plan replacement, tailoring, or
-a new namespaced provider identity model.
+Reported assessments MUST preserve provider-returned plan IDs and use
+requirement fallback only for unique plan mappings. Resolution MUST
+preserve typed authored parameters in the tree identifier, separately
+from workspace overrides. It MUST reject ambiguous downstream IDs and
+conflicting mapping references before returning a graph, with the
+conflicting ID and both declaration contexts. Duplicate-plan rejection
+MUST remain in effect.
 
 #### Scenario: Distinct plans assess one requirement
 
@@ -140,6 +145,24 @@ a new namespaced provider identity model.
 - **When** resolution runs
 - **Then** resolution MUST fail with both declaration contexts
 - **And** no partial graph MUST reach generation or reporting
+- **And** collisions MUST cover catalog identities, control IDs, and
+  requirement IDs in the current unqualified downstream mappings
+- **And** errors MUST identify the conflicting ID
+
+#### Scenario: Mapping reference declarations agree
+
+- **Given** equal mapping-reference declarations with the same ID
+- **When** resolution assembles the graph
+- **Then** it MAY coalesce the equal declarations
+- **And** conflicting declarations MUST instead fail with both declaring
+  Policy contexts
+
+#### Scenario: Existing identity model remains unchanged
+
+- **Given** valid authored Policies with unique plan IDs
+- **When** resolution applies downstream ambiguity checks
+- **Then** it MUST NOT introduce policy inheritance, plan replacement,
+  tailoring, or a new namespaced provider identity model
 
 #### Scenario: Refresh previously populated metadata
 
