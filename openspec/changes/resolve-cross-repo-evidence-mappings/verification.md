@@ -85,23 +85,41 @@ modified to hide the failure. Task 6.1's workflow-derived checks
 and result recording are complete. This does not classify the
 ordinary local-time run as passed or waive any quality gate.
 
-## Outstanding acceptance and review
+## Live acceptance and review
 
-- Task 6.2: not run. `GITHUB_TOKEN` and `PROVIDERS_BIN_DIR` are
-  unset, `conftest` is not on PATH, and a retained-provider build
-  has not been selected. Neither current-host nor unchanged
-  v1.2.0 live interoperability is claimed.
-- Task 6.3: not run. Two actual retained-provider evaluations,
-  their snapshots, revisions, and historical validation are
-  still required; generated fixtures do not substitute for them.
+The initial agent session lacked live prerequisites. After
+installing conftest, the maintainer reported all local tests
+successful and explicitly confirmed both unchanged v1.2.0 and
+the two-evaluation `validate_evidence_history` check. These are
+maintainer-reported results, not agent-executed acceptance runs.
+Raw logs and snapshot paths were not supplied to the agent.
+
+- Provider revision supplied by the maintainer:
+  `f8dec3f9af9b6a5b23e2878e5f94e44e0c0ea965`.
+- Current host/harness branch revision:
+  `ef860cc8c2a7b1ba5e4ea87149c5d04560e21db5`.
+- Unchanged released host: v1.2.0,
+  `f10c1426f3674bbcb967a8aad8ca529b32e21212`.
+- Task 6.2: passed, per maintainer confirmation of the canonical
+  harness against both hosts with the selected provider build.
+- Task 6.3: passed, per maintainer confirmation of two actual
+  evaluations in one workspace, log snapshots, and successful
+  `validate_evidence_history` revalidation. Offline fixtures are
+  not the evidence for this task.
+- Task 5.2: passed. In addition to the maintainer's local results,
+  PR #975's Cross-Repo Integration Test job completed the real
+  integration step and schema validation successfully:
+  https://github.com/complytime/complyctl/actions/runs/43411704074/job/131839452255
 - Task 6.4: strict OpenSpec validation passed. An initial audit
   identified recursive failure-injection risk; the injected child
   now runs only the evidence dependency under a 120-second timeout,
   with a recursion guard and distinct timeout diagnostic.
-  Independent council review is pending. No PR has been submitted.
-- Task 5.2 was reopened after review: pipeline call sites were
-  inspected and offline index fixtures ran, but actual live
-  Get/bad-policy/OPA execution still depends on task 6.2.
+  Independent council review approved candidate `8f0b4943` for
+  draft submission (details below). No implementation code changed
+  after approval; only this record and task bookkeeping changed.
+Task 5.2 had been reopened because inspection alone was not live
+execution evidence. It is now closed on the actual CI execution
+and maintainer-confirmed local results, not on that inspection.
 
 ## Council fixes and evidence
 
@@ -118,13 +136,28 @@ The suggested v1.2.0 API incompatibility was disproved by
 v1.2.0 -- api/plugin`: `plugin.proto:117` already contains
 `mapping_references = 3`, and `plugin.proto:214` contains
 `EvidenceMapping source = 6`. This source evidence is not a
-substitute for the still-required real v1.2.0 integration run.
+substitute for the maintainer-reported v1.2.0 integration run.
 
 Council pre-flight passed, including `make lint` (zero issues).
 The full aggregate pre-commit run modified 2223 unrelated files;
 identical formatter drift reproduced in a detached main worktree.
 Only those verified, agent-generated formatter edits were restored.
 They are not included in this branch. No quality gate was changed.
+
+All nine discovered Divisor personas ran as independent reviewer
+sessions, reviewing the full branch diff: Adversary, Architect,
+Guard, Tester, SRE, Curator, Envoy, Herald, and Scribe. An earlier
+supervisor-only audit lacked independent contexts and was not
+counted as the required council. After one fix loop, all nine
+returned APPROVE in the second independent round, specifically
+for draft submission. No blocking code findings remain.
+
+Council approval alone did not establish live acceptance; the
+subsequent maintainer confirmation above closes tasks 5.2, 6.2,
+and 6.3. Remaining non-blocking advisories
+include existing token-redaction hardening, reused export
+destinations, schema-infrastructure diagnostics, and some test
+diagnostic polish; no specified requirement was waived.
 
 ## Documentation impact
 
@@ -146,3 +179,10 @@ They are not included in this branch. No quality gate was changed.
   `github.com/gemaraproj/gemara@v1.6.0` module.
 - ShellCheck 0.11.0; actionlint 1.7.12; yamllint 1.38.0.
 - Go `go1.26.10-X:nodwarf5 linux/amd64`.
+
+Live tools observed in the local environment after the maintainer
+confirmation: Snappy v0.2.6, Ampel v1.4.2, and Conftest built from
+`github.com/open-policy-agent/conftest@v0.68.2` with OPA 1.15.2.
+Conftest prints `dev` as its version; its Go build metadata
+identifies the module version. These observations are not a
+reconstruction of unsupplied test logs.

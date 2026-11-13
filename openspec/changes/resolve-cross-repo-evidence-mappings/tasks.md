@@ -69,7 +69,7 @@ committed, and pushed. All tasks below remain implementation work.
   existing cross-repository workflow; verify shellcheck, actionlint,
   and configured YAML lint pass without changing job identities,
   timeouts, token scopes, or quality/governance gates.
-- [ ] 5.2 Verify Get, generation-index checks, bad-policy rejection,
+- [x] 5.2 Verify Get, generation-index checks, bad-policy rejection,
   and both OPA fixture checks still execute (FR-006); run the
   existing indexed-generation fixture mode and offline evidence target.
 - [x] 5.3 Assess `CHANGELOG.md`, `AGENTS.md`, and `README.md` with
@@ -82,15 +82,15 @@ committed, and pushed. All tasks below remain implementation work.
   including offline regressions, lint, and affected schema validation;
   record commands and actual results without marking skipped checks
   successful or altering any quality/governance gate.
-- [ ] 6.2 Run the canonical harness against current complyctl and
+- [x] 6.2 Run the canonical harness against current complyctl and
   unchanged v1.2.0 with the selected retained-provider build; record
   exact host/provider revisions, tool versions, and real credentialed
   results, leaving this task incomplete if prerequisites are absent.
-- [ ] 6.3 Exercise two actual retained-provider evaluations in one
+- [x] 6.3 Exercise two actual retained-provider evaluations in one
   workspace, snapshot both actual JSON logs, and apply the same history
   and identity checks; verify earlier digests remain valid, separating
   these results from offline fixtures and schema-only validation.
-- [ ] 6.4 Validate this change strictly and complete required pre-PR
+- [x] 6.4 Validate this change strictly and complete required pre-PR
   review; verify all blocking findings are resolved before submission
   and no code changes follow final approval.
 
