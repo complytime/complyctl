@@ -31,7 +31,7 @@ the provider-to-OSCAL pipeline against that regression.
 None. The production report contract remains the one implemented by
 PR #956. No canonical specifications exist under `openspec/specs/`;
 the earlier change records that contract in
-`openspec/changes/delegate-oscal-conversion/`.
+`openspec/specs/oscal-assessment-results/spec.md`.
 
 ## Impact
 

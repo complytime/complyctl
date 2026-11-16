@@ -1,4 +1,11 @@
-## ADDED Requirements
+# Bundle Consumption Specification
+
+## Purpose
+
+Reject ambiguous Policy streams and mislabeled supporting artifacts
+while retaining each assessment's declaring-policy evaluator binding.
+
+## Requirements
 
 ### Requirement: Single-artifact parsing
 
@@ -32,7 +39,7 @@ Existing per-plan extraction and timeline precedence remain unchanged.
 
 Superseded: the former root-evaluator override requirement and scenario
 are replaced by FR-002 in
-`../../../preserve-bundle-artifacts/specs/bundle-artifact-inventory/spec.md`.
+`openspec/specs/bundle-artifact-inventory/spec.md`.
 
 #### Scenario: Root and imported evaluators disagree
 
