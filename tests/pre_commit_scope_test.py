@@ -25,6 +25,8 @@ COMMAND_TIMEOUT_SECONDS = 30
 HOOK_TIMEOUT_SECONDS = 180
 MINIMUM_PYTHON_VERSION = (3, 10)
 REQUIRED_EXECUTABLES = ("git", "python", "pre-commit", "go", "gofmt")
+# Fedora records this build setting without changing the underlying Go release.
+GO_BUILD_SUFFIX = "-X:nodwarf5"
 HOOK_STAGES = {
     "trailing-whitespace": "pre-push",
     "end-of-file-fixer": "pre-push",
@@ -235,7 +237,10 @@ def _verify_prerequisites(cwd: Path, env: dict[str, str]) -> dict[str, str]:
     gofmt = Path(goroot) / "bin" / "gofmt"
     env["PATH"] = os.pathsep.join((str(gofmt.parent), env["PATH"]))
     versions["go"] = _checked_command(["go", "version"], cwd=cwd, env=env)
-    if versions["go"].split()[2] != f"go{versions['go.mod']}":
+    if (
+        versions["go"].split()[2].removesuffix(GO_BUILD_SUFFIX)
+        != f"go{versions['go.mod']}"
+    ):
         raise RuntimeError(
             f"Go toolchain mismatch: go.mod requires {versions['go.mod']}; "
             f"found {versions['go']}. Select the declared installed toolchain."
@@ -243,7 +248,10 @@ def _verify_prerequisites(cwd: Path, env: dict[str, str]) -> dict[str, str]:
     versions["gofmt"] = _checked_command(
         ["go", "version", str(gofmt)], cwd=cwd, env=env
     )
-    if versions["gofmt"].split()[-1] != f"go{versions['go.mod']}":
+    if (
+        versions["gofmt"].split()[-1].removesuffix(GO_BUILD_SUFFIX)
+        != f"go{versions['go.mod']}"
+    ):
         raise RuntimeError(
             f"gofmt toolchain mismatch: {versions['gofmt']}. "
             "Select the gofmt bundled with the Go version in go.mod."
@@ -708,6 +716,108 @@ def test_unrelated_check_yaml_still_validates_vendor_inputs(
     _assert_hook_result(valid, hook_id, failed=False)
     assert _tracked_bytes(repository) == {**before, invalid_path: corrected}
     assert repository.git("diff", "--name-only") == ""
+
+
+@pytest.fixture
+def prerequisite_probes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[dict[str, str], dict[tuple[str, ...], str]]:
+    """Isolate tool reports so version cases need no installed tools or hook setup."""
+    (tmp_path / "go.mod").write_text("module example.com/probe\n\ngo 1.26.10\n")
+    goroot = tmp_path / "go"
+    outputs = {
+        ("git", "--version"): "git version 2.50.0",
+        (sys.executable, "-m", "pytest", "--version"): "pytest 9.0.0",
+        ("pre-commit", "--version"): "pre-commit 4.0.0",
+        ("python", "-c", "import sys; print(*sys.version_info[:3], sep='.')"): "3.11.0",
+        ("go", "env", "GOROOT"): str(goroot),
+        ("go", "version"): "go version go1.26.10 linux/arm64",
+        ("go", "version", str(goroot / "bin" / "gofmt")): "gofmt: go1.26.10",
+    }
+
+    def available_tool(executable: str, *, path: str) -> str:
+        return f"/tools/{executable}"
+
+    def probe(
+        arguments: list[str], *, cwd: Path, env: dict[str, str]
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(arguments, 0, outputs[tuple(arguments)], "")
+
+    monkeypatch.setattr(sys.modules[__name__], "SOURCE_ROOT", tmp_path)
+    monkeypatch.setattr(sys.modules[__name__], "_run_command", probe)
+    monkeypatch.setattr(shutil, "which", available_tool)
+    return {"PATH": "/tools"}, outputs
+
+
+@pytest.mark.parametrize("go_suffix", ("", "-X:nodwarf5"))
+@pytest.mark.parametrize("gofmt_suffix", ("", "-X:nodwarf5"))
+def test_prerequisites_matching_go_build_suffixes_preserve_reports(
+    tmp_path: Path,
+    prerequisite_probes: tuple[dict[str, str], dict[tuple[str, ...], str]],
+    go_suffix: str,
+    gofmt_suffix: str,
+) -> None:
+    """The same release passes with Fedora build metadata on either tool report."""
+    env, outputs = prerequisite_probes
+    gofmt = str(tmp_path / "go" / "bin" / "gofmt")
+    go_report = f"go version go1.26.10{go_suffix} linux/arm64"
+    gofmt_report = f"{gofmt}: go1.26.10{gofmt_suffix}"
+    outputs[("go", "version")] = go_report
+    outputs[("go", "version", gofmt)] = gofmt_report
+
+    versions = _verify_prerequisites(tmp_path, env)
+
+    assert versions["go.mod"] == "1.26.10"
+    assert versions["go"] == go_report
+    assert versions["gofmt"] == gofmt_report
+    assert env["PATH"].split(os.pathsep)[0] == str(Path(gofmt).parent)
+
+
+@pytest.mark.parametrize("tool", ("go", "gofmt"))
+@pytest.mark.parametrize(
+    "version",
+    (
+        "go1.26.9",
+        "go1.26.11",
+        "go1.27.10",
+        "go1.26.9-X:nodwarf5",
+        "go1.26.11-X:nodwarf5",
+        "go1.27.10-X:nodwarf5",
+        "go1.26.10-unknown",
+        "go1.26.10-X:",
+        "go1.26.10-X:nodwarf5-extra",
+        "go1.26.10-X:nodwarf5-X:nodwarf5",
+        "go1.26rc1",
+        "devel",
+    ),
+)
+def test_prerequisites_mismatched_go_versions_fail_actionably(
+    tmp_path: Path,
+    prerequisite_probes: tuple[dict[str, str], dict[tuple[str, ...], str]],
+    tool: str,
+    version: str,
+) -> None:
+    """Recognizing build metadata must not admit other releases or arbitrary suffixes."""
+    env, outputs = prerequisite_probes
+    gofmt = str(tmp_path / "go" / "bin" / "gofmt")
+    command = ("go", "version") if tool == "go" else ("go", "version", gofmt)
+    report = (
+        f"go version {version} linux/arm64" if tool == "go" else f"{gofmt}: {version}"
+    )
+    outputs[command] = report
+
+    tool_label = "Go" if tool == "go" else "gofmt"
+    with pytest.raises(
+        RuntimeError, match=f"{tool_label} toolchain mismatch"
+    ) as caught:
+        _verify_prerequisites(tmp_path, env)
+
+    assert report in str(caught.value)
+    assert "Select the" in str(caught.value)
+    if tool == "go":
+        assert "go.mod requires 1.26.10" in str(caught.value)
+    else:
+        assert "bundled with the Go version in go.mod" in str(caught.value)
 
 
 @pytest.mark.parametrize("missing", REQUIRED_EXECUTABLES)
