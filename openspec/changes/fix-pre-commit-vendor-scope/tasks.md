@@ -118,6 +118,7 @@ the agent can then review and verify them without changing gates.
   findings. Verify every finding has a disposition and no historical
   count is used as a pass criterion.
   Cover FR-006.
+  See the [baseline inventory and verification](verification.md).
 
 ## 4. Verify repository integration
 
