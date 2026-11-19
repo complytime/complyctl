@@ -148,13 +148,13 @@ func ResolveWorkspaceDir(flagValue string) (string, error) {
     } else {
         raw = "."
     }
-    
+
     expanded := ExpandPath(raw) // Handle ~/
     absPath, err := filepath.Abs(expanded)
     if err != nil {
         return "", fmt.Errorf("failed to resolve workspace path: %w", err)
     }
-    
+
     stat, err := os.Stat(absPath)
     if err != nil {
         return "", fmt.Errorf("workspace directory does not exist: %s", absPath)
@@ -162,7 +162,7 @@ func ResolveWorkspaceDir(flagValue string) (string, error) {
     if !stat.IsDir() {
         return "", fmt.Errorf("workspace path is not a directory: %s", absPath)
     }
-    
+
     return absPath, nil
 }
 ```
@@ -177,13 +177,13 @@ func DetectConfigPath(baseDir string) (configPath string, isLegacy bool, err err
     if _, err := os.Stat(newPath); err == nil {
         return newPath, false, nil
     }
-    
+
     // Fall back to legacy location
     legacyPath := filepath.Join(baseDir, WorkspaceConfigFile)
     if _, err := os.Stat(legacyPath); err == nil {
         return legacyPath, true, nil
     }
-    
+
     // Neither exists
     return "", false, fmt.Errorf("config file not found in %s (checked %s and %s)",
         baseDir, newPath, legacyPath)
@@ -206,11 +206,11 @@ func NewWorkspace(baseDir string) *Workspace {
         // Detection error — let Load() handle it
         configPath = filepath.Join(baseDir, WorkspaceDir, WorkspaceConfigFile)
     }
-    
+
     if isLegacy {
         printDeprecationWarning()
     }
-    
+
     return &Workspace{
         baseDir:    baseDir,
         configPath: configPath,
@@ -239,12 +239,12 @@ func (o *scanOptions) run(ctx context.Context) error {
     if err != nil {
         return err
     }
-    
+
     ws := complytime.NewWorkspace(baseDir)
     if err := ws.LoadAndValidate(); err != nil {
         return fmt.Errorf("failed to load workspace config: %w", err)
     }
-    
+
     // Use baseDir for all workspace-relative paths
     outDir := filepath.Join(baseDir, complytime.WorkspaceDir, complytime.ScanOutputDir)
     // ...
