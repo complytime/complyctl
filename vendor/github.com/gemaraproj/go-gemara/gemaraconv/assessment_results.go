@@ -4,6 +4,7 @@ package gemaraconv
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -18,20 +19,75 @@ import (
 //
 // Use WithImportApHref to set the assessment plan reference (defaults to "#").
 // Use WithCatalog to enrich findings with control titles and requirement text.
+//
+// Returns an error when the log's metadata id or target id is empty, when two
+// control evaluations share the same control mapping (reference id and entry
+// id), or when mapping references conflict on title or URL for the same ID:
+// each would break the deterministic UUID scheme or the back-matter it
+// generates.
 func EvaluationLogToOSCALAssessmentResults(log gemara.EvaluationLog, opts ...EvalOption) (oscal.AssessmentResults, error) {
 	options := defaultEvalOpts()
 	for _, opt := range opts {
 		opt(&options)
 	}
 
-	authorPartyUUID := uuid.NewUUID()
-	metadata := createAssessmentResultsMetadata(log, authorPartyUUID)
+	// The metadata id and target id key identity-bearing assembly UUIDs;
+	// logs that omit them would silently share finding and inventory-item
+	// UUIDs across unrelated documents, the same authoring-mistake class
+	// as a duplicate control evaluation.
+	if log.Metadata.Id == "" {
+		return oscal.AssessmentResults{}, fmt.Errorf("evaluation log for target %s: metadata id is required", log.Target.Id)
+	}
+	if log.Target.Id == "" {
+		return oscal.AssessmentResults{}, fmt.Errorf("evaluation log %s: target id is required", log.Metadata.Id)
+	}
 
-	backMatter, mappingResourceUUIDs := mappingToBackMatterWithUUIDs(log.Metadata.MappingReferences)
-	result := evaluationLogToResult(log, options.catalog, authorPartyUUID, mappingResourceUUIDs)
+	seenControls := make(map[controlIdentity]struct{}, len(log.Evaluations))
+	for _, eval := range log.Evaluations {
+		if eval == nil {
+			continue
+		}
+		id := controlIdentity{referenceId: eval.Control.ReferenceId, entryId: eval.Control.EntryId}
+		if _, exists := seenControls[id]; exists {
+			name := eval.Control.EntryId
+			if eval.Control.ReferenceId != "" {
+				name = eval.Control.ReferenceId + "/" + eval.Control.EntryId
+			}
+			return oscal.AssessmentResults{}, fmt.Errorf("evaluation log %s: duplicate control evaluation for control %s", log.Metadata.Id, name)
+		}
+		seenControls[id] = struct{}{}
+	}
+
+	// The metadata party, the origin actors on findings and observations,
+	// and the logged-by entry all gate on a non-empty author name — the
+	// same gate createAssessmentResultsMetadata and createMetadata use to
+	// emit the party. An author with no name (with or without an id) has no
+	// party in the document, so no reference is generated either: deriving
+	// a UUID anyway would leave origins and logged-by entries pointing at
+	// a party that does not exist, and for anonymous authors it would
+	// collapse every actor of the same entity type onto one shared party.
+	authorPartyUUID := ""
+	if log.Metadata.Author.Name != "" {
+		authorPartyUUID = uuid.NewUUIDWithSource(partyUUIDSource(log.Metadata.Author))
+	}
+	version := defaultVersion(log.Metadata.Version)
+	// A single now feeds the date segment, the Result start, and
+	// last-modified, so a conversion that straddles UTC midnight cannot
+	// emit a document whose UUIDs and timestamps disagree. nowFunc (not
+	// time.Now directly) lets tests pin the clock: determinism tests
+	// convert the same log twice and must agree on the date segment.
+	now := nowFunc()
+	metadata := createAssessmentResultsMetadata(log, authorPartyUUID, version, now)
+
+	backMatter, mappingResourceUUIDs, err := mappingToBackMatterWithUUIDs(log.Metadata.MappingReferences)
+	if err != nil {
+		return oscal.AssessmentResults{}, fmt.Errorf("evaluation log %s: %w", log.Metadata.Id, err)
+	}
+	dateSegment := assessmentDateSegment(string(log.Metadata.Date), now)
+	result := evaluationLogToResult(log, options.catalog, authorPartyUUID, mappingResourceUUIDs, log.Metadata.Id, dateSegment, now)
 
 	return oscal.AssessmentResults{
-		UUID:       uuid.NewUUID(),
+		UUID:       uuid.NewUUIDWithSource(fmt.Sprintf("gemara:%s/%s/%s/assessment-results", url.PathEscape(log.Metadata.Id), url.PathEscape(version), url.PathEscape(dateSegment))),
 		Metadata:   metadata,
 		ImportAp:   oscal.ImportAp{Href: options.importApHref},
 		Results:    []oscal.Result{result},
@@ -39,11 +95,68 @@ func EvaluationLogToOSCALAssessmentResults(log gemara.EvaluationLog, opts ...Eva
 	}, nil
 }
 
-func evaluationLogToResult(log gemara.EvaluationLog, catalog *gemara.ControlCatalog, authorPartyUUID string, mappingResourceUUIDs map[string]string) oscal.Result {
-	now := time.Now()
+// controlIdentity identifies a control evaluation the way the schema does:
+// by its mapping's reference id and entry id together. Two catalogs can map
+// the same entry id, so the entry id alone is not unique.
+type controlIdentity struct {
+	referenceId string
+	entryId     string
+}
+
+// nowFunc is the conversion clock, kept as a variable so tests can pin it
+// without changing the exported API: determinism tests convert the same log
+// twice and must see the same date segment even if the run straddles UTC
+// midnight.
+var nowFunc = time.Now
+
+// mappingSource renders a mapping's identity with a fixed marker per field.
+// The ref= and entry= markers are always emitted, empty when unset, so an
+// optional field can never shift the segment boundaries of a UUID source
+// string: a control with no reference and a control whose reference holds
+// what the first one's entry holds cannot render alike. Values are escaped,
+// so a "/" inside an id cannot be read as a separator either.
+func mappingSource(c gemara.EntryMapping) string {
+	return "ref=" + url.PathEscape(c.ReferenceId) + "/entry=" + url.PathEscape(c.EntryId)
+}
+
+// planSource renders an assessment log's plan mapping for its UUID source
+// segment and occurrence key: empty when no plan is recorded, the mapping's
+// marked identity otherwise. A recorded plan distinguishes logs that
+// evaluate the same requirement under different plans, leaving the
+// occurrence counter to break only the remaining ties.
+func planSource(p *gemara.EntryMapping) string {
+	if p == nil {
+		return ""
+	}
+	return mappingSource(*p)
+}
+
+// assessmentKey identifies what an assessment log evaluates: the control
+// (mapping reference plus entry id), the requirement, and, when recorded,
+// the plan it executed. Assessment logs that share a key are distinguished
+// by an occurrence counter rather than identity fields alone.
+type assessmentKey struct {
+	controlId     string
+	requirementId string
+	plan          string
+}
+
+// assessmentDateSegment returns the date component of the AssessmentResults
+// root and Result UUID sources. An explicit metadata.Date is used verbatim;
+// an empty one falls back to the conversion date so the per-run tier still
+// rotates across days instead of freezing every empty-date log onto the same
+// shared root and Result UUIDs.
+func assessmentDateSegment(date string, now time.Time) string {
+	if date != "" {
+		return date
+	}
+	return now.UTC().Format("2006-01-02")
+}
+
+func evaluationLogToResult(log gemara.EvaluationLog, catalog *gemara.ControlCatalog, authorPartyUUID string, mappingResourceUUIDs map[string]string, logId string, dateSegment string, now time.Time) oscal.Result {
 	start := oscalUtils.GetTimeWithFallback(string(log.Metadata.Date), now)
 
-	origin := buildOrigin(log.Metadata.Author, authorPartyUUID)
+	origins := buildOrigins(log.Metadata.Author, authorPartyUUID)
 
 	controlIds := collectControlIds(log)
 	reviewedControls := buildReviewedControls(controlIds)
@@ -52,12 +165,17 @@ func evaluationLogToResult(log gemara.EvaluationLog, catalog *gemara.ControlCata
 	var findings []oscal.Finding
 	var logEntries []oscal.AssessmentLogEntry
 
+	// Occurrence counter for assessment logs sharing the same
+	// (control, requirement, plan) key. OSCAL requires per-document UUID
+	// uniqueness, and a requirement can be evaluated in more than one way.
+	occurrences := make(map[assessmentKey]int)
+
 	for _, eval := range log.Evaluations {
 		if eval == nil {
 			continue
 		}
 
-		finding := buildFinding(eval, catalog, origin)
+		finding := buildFinding(eval, catalog, origins, logId)
 		var relatedObs []oscal.RelatedObservation
 
 		for _, alog := range eval.AssessmentLogs {
@@ -65,11 +183,14 @@ func evaluationLogToResult(log gemara.EvaluationLog, catalog *gemara.ControlCata
 				continue
 			}
 
-			obs := buildObservation(alog, eval, origin, start, mappingResourceUUIDs)
+			key := assessmentKey{controlId: mappingSource(eval.Control), requirementId: alog.Requirement.EntryId, plan: planSource(alog.Plan)}
+			occurrences[key]++
+
+			obs := buildObservation(alog, eval, origins, start, mappingResourceUUIDs, logId, occurrences[key])
 			observations = append(observations, obs)
 			relatedObs = append(relatedObs, oscal.RelatedObservation{ObservationUuid: obs.UUID})
 
-			entry := buildLogEntry(alog, eval, authorPartyUUID, start)
+			entry := buildLogEntry(alog, eval, authorPartyUUID, start, logId, occurrences[key])
 			logEntries = append(logEntries, entry)
 		}
 
@@ -87,7 +208,7 @@ func evaluationLogToResult(log gemara.EvaluationLog, catalog *gemara.ControlCata
 	}
 
 	result := oscal.Result{
-		UUID:             uuid.NewUUID(),
+		UUID:             uuid.NewUUIDWithSource(fmt.Sprintf("gemara:%s/%s/result", url.PathEscape(logId), url.PathEscape(dateSegment))),
 		Title:            title,
 		Description:      fmt.Sprintf("Results from Gemara EvaluationLog %s", log.Metadata.Id),
 		Start:            start,
@@ -111,13 +232,7 @@ func evaluationLogToResult(log gemara.EvaluationLog, catalog *gemara.ControlCata
 	return result
 }
 
-func createAssessmentResultsMetadata(log gemara.EvaluationLog, authorPartyUUID string) oscal.Metadata {
-	version := log.Metadata.Version
-	if version == "" {
-		version = oscalUtils.DefaultOSCALVersion
-	}
-
-	now := time.Now()
+func createAssessmentResultsMetadata(log gemara.EvaluationLog, authorPartyUUID string, version string, now time.Time) oscal.Metadata {
 	published := oscalUtils.GetTime(string(log.Metadata.Date))
 
 	metadata := oscal.Metadata{
@@ -148,13 +263,22 @@ func createAssessmentResultsMetadata(log gemara.EvaluationLog, authorPartyUUID s
 	return metadata
 }
 
-func buildOrigin(author gemara.Actor, partyUUID string) oscal.Origin {
-	return oscal.Origin{
-		Actors: []oscal.OriginActor{
-			{
-				ActorUuid: partyUUID,
-				Type:      mapActorType(author.Type),
-				RoleId:    "assessor",
+// buildOrigins returns the origin list for the log's author, or nil when the
+// author has no name: the party is emitted only for named authors, and OSCAL
+// requires an origin to carry at least one actor referencing a party UUID,
+// so a name-less author (with or without an id) has no party to reference.
+func buildOrigins(author gemara.Actor, partyUUID string) *[]oscal.Origin {
+	if partyUUID == "" {
+		return nil
+	}
+	return &[]oscal.Origin{
+		{
+			Actors: []oscal.OriginActor{
+				{
+					ActorUuid: partyUUID,
+					Type:      mapActorType(author.Type),
+					RoleId:    "assessor",
+				},
 			},
 		},
 	}
@@ -167,12 +291,12 @@ func buildReviewedControls(controlIds []string) oscal.ReviewedControls {
 	}
 	return oscal.ReviewedControls{
 		ControlSelections: []oscal.AssessedControls{
-			{IncludeControls: &selectors},
+			{IncludeControls: oscalUtils.NilIfEmpty(selectors)},
 		},
 	}
 }
 
-func buildFinding(eval *gemara.ControlEvaluation, catalog *gemara.ControlCatalog, origin oscal.Origin) oscal.Finding {
+func buildFinding(eval *gemara.ControlEvaluation, catalog *gemara.ControlCatalog, origins *[]oscal.Origin, logId string) oscal.Finding {
 	controlId := eval.Control.EntryId
 	status := mapResultToObjectiveStatus(eval.Result)
 
@@ -194,10 +318,10 @@ func buildFinding(eval *gemara.ControlEvaluation, catalog *gemara.ControlCatalog
 	title = sanitizeTitle(title)
 
 	return oscal.Finding{
-		UUID:        uuid.NewUUID(),
+		UUID:        uuid.NewUUIDWithSource(fmt.Sprintf("gemara:%s/%s/finding", url.PathEscape(logId), mappingSource(eval.Control))),
 		Title:       title,
 		Description: description,
-		Origins:     &[]oscal.Origin{origin},
+		Origins:     origins,
 		Target: oscal.FindingTarget{
 			Type:     "objective-id",
 			TargetId: controlId,
@@ -206,7 +330,7 @@ func buildFinding(eval *gemara.ControlEvaluation, catalog *gemara.ControlCatalog
 	}
 }
 
-func buildObservation(alog *gemara.AssessmentLog, eval *gemara.ControlEvaluation, origin oscal.Origin, fallback time.Time, mappingResourceUUIDs map[string]string) oscal.Observation {
+func buildObservation(alog *gemara.AssessmentLog, eval *gemara.ControlEvaluation, origins *[]oscal.Origin, fallback time.Time, mappingResourceUUIDs map[string]string, logId string, occurrence int) oscal.Observation {
 	collected := oscalUtils.GetTimeWithFallback(string(alog.Start), fallback)
 
 	description := alog.Description
@@ -223,11 +347,11 @@ func buildObservation(alog *gemara.AssessmentLog, eval *gemara.ControlEvaluation
 	}
 
 	obs := oscal.Observation{
-		UUID:        uuid.NewUUID(),
+		UUID:        uuid.NewUUIDWithSource(assessmentSource(logId, eval, alog, occurrence) + "/observation"),
 		Description: description,
 		Collected:   collected,
 		Methods:     methods,
-		Origins:     &[]oscal.Origin{origin},
+		Origins:     origins,
 		Props: &[]oscal.Property{
 			{
 				Name:  "result",
@@ -299,19 +423,40 @@ func buildRelevantEvidence(evidence []gemara.Evidence, mappingResourceUUIDs map[
 	return relevantEvidence
 }
 
-func buildLogEntry(alog *gemara.AssessmentLog, eval *gemara.ControlEvaluation, partyUUID string, fallback time.Time) oscal.AssessmentLogEntry {
+// assessmentSource builds the shared identity segment of the observation and
+// log-entry UUID sources: log id, control mapping, requirement, recorded
+// plan, and occurrence counter. Every field carries a fixed marker (see
+// mappingSource) and the plan= slot is always emitted, so segment boundaries
+// cannot shift when a field is empty: a control with no reference cannot
+// render like a control whose reference holds what the first one's entry
+// holds. A recorded plan distinguishes logs that evaluate the same
+// requirement under different plans without spending counter values on them;
+// the counter breaks only ties among logs sharing the same control,
+// requirement, and plan.
+func assessmentSource(logId string, eval *gemara.ControlEvaluation, alog *gemara.AssessmentLog, occurrence int) string {
+	return fmt.Sprintf("gemara:%s/%s/req=%s/plan=%s/%d",
+		url.PathEscape(logId), mappingSource(eval.Control), url.PathEscape(alog.Requirement.EntryId), planSource(alog.Plan), occurrence)
+}
+
+func buildLogEntry(alog *gemara.AssessmentLog, eval *gemara.ControlEvaluation, partyUUID string, fallback time.Time, logId string, occurrence int) oscal.AssessmentLogEntry {
 	start := oscalUtils.GetTimeWithFallback(string(alog.Start), fallback)
 
 	title := fmt.Sprintf("%s / %s", eval.Control.EntryId, alog.Requirement.EntryId)
 
 	entry := oscal.AssessmentLogEntry{
-		UUID:        uuid.NewUUID(),
+		UUID:        uuid.NewUUIDWithSource(assessmentSource(logId, eval, alog, occurrence) + "/log-entry"),
 		Title:       title,
 		Start:       start,
 		Description: alog.Description,
-		LoggedBy: &[]oscal.LoggedBy{
+	}
+
+	// LoggedBy must reference a party UUID, and the party is emitted only
+	// for named authors; an author with no name (with or without an id) has
+	// none, so the entry is logged by no one rather than by a phantom party.
+	if partyUUID != "" {
+		entry.LoggedBy = &[]oscal.LoggedBy{
 			{PartyUuid: partyUUID, RoleId: "assessor"},
-		},
+		}
 	}
 
 	if end := oscalUtils.GetTime(string(alog.End)); end != nil {
@@ -328,7 +473,7 @@ func buildTargetInventoryItem(target gemara.Resource) oscal.InventoryItem {
 	}
 
 	return oscal.InventoryItem{
-		UUID:        uuid.NewUUID(),
+		UUID:        uuid.NewUUIDWithSource(fmt.Sprintf("gemara:%s/inventory-item", url.PathEscape(target.Id))),
 		Description: description,
 		Props: &[]oscal.Property{
 			{

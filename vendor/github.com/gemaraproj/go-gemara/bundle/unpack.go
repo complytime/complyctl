@@ -67,7 +67,7 @@ func Unpack(ctx context.Context, target oras.ReadOnlyTarget, ref string) (*Bundl
 			b.Imports = append(b.Imports, f)
 		default:
 			if b.Source.Name != "" {
-				return nil, fmt.Errorf("bundle contains multiple source artifacts; expected exactly one")
+				return nil, fmt.Errorf("bundle contains multiple source artifacts; expected exactly one — re-assemble the bundle from its original sources with a single source file and repack it")
 			}
 			b.Source = f
 		}

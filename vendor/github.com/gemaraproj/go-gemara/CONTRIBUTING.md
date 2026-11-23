@@ -17,7 +17,7 @@ This project follows the [OpenSSF Code of Conduct](https://openssf.org/community
 
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.26+ (matching go.mod)
 - [golangci-lint](https://golangci-lint.run/)
 - [CUE CLI](https://cuelang.org/) (for type generation)
 
