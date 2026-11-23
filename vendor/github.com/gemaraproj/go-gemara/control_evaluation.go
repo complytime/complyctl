@@ -28,6 +28,12 @@ func (c *ControlEvaluation) AddAssessment(requirementId string, description stri
 // The targetData is the data that the assessment will be run against. The userApplicability is a slice
 // of strings that determine when the assessment is applicable.
 func (c *ControlEvaluation) Evaluate(targetData interface{}, userApplicability []string) {
+	// Reset everything Evaluate accumulates, so a second evaluation does not
+	// compound its results with the first: Failed is sticky in
+	// UpdateAggregateResult, and a first-run message would otherwise persist.
+	c.Result = NotRun
+	c.Message = ""
+
 	if len(c.AssessmentLogs) == 0 {
 		c.Result = NeedsReview
 		return

@@ -35,6 +35,11 @@ type URI struct {
 	// BasePath is the directory used to resolve relative file:// URIs and
 	// bare relative paths. When empty, paths resolve against the process
 	// working directory (the default, backward-compatible behavior).
+	//
+	// BasePath is a convenience anchor, not a security boundary: relative
+	// paths containing ".." and absolute paths both resolve outside it.
+	// Applications resolving references from untrusted artifacts must
+	// validate paths before fetching.
 	BasePath string
 }
 

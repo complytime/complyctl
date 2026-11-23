@@ -2,6 +2,7 @@ package gemaraconv
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/defenseunicorns/go-oscal/src/pkg/uuid"
@@ -10,13 +11,21 @@ import (
 	oscalUtils "github.com/gemaraproj/go-gemara/internal/oscal"
 )
 
-// createMetadata creates OSCAL metadata with common fields and optional author information
-func createMetadata(title string, version string, published *time.Time, canonicalHref string, authorName string) oscal.Metadata {
-	now := time.Now()
-	// Ensure version is never empty by using default if not provided
-	if version == "" {
-		version = oscalUtils.DefaultOSCALVersion
+// partyUUIDSource returns the deterministic UUID source for an author.
+// Actor.Id is the identity key: a renamed actor keeps its UUID, and two
+// actors sharing a name do not collide. Documents that omit the id (the
+// schema requires it, but nothing enforces it) fall back to name and type.
+func partyUUIDSource(author gemara.Actor) string {
+	if author.Id != "" {
+		return fmt.Sprintf("gemara:%s/party", url.PathEscape(author.Id))
 	}
+	return fmt.Sprintf("gemara:%s/%s/party", url.PathEscape(author.Name), url.PathEscape(author.Type.String()))
+}
+
+// createMetadata creates OSCAL metadata with common fields and optional author information
+func createMetadata(title string, version string, published *time.Time, canonicalHref string, author gemara.Actor) oscal.Metadata {
+	now := time.Now()
+	version = defaultVersion(version)
 	metadata := oscal.Metadata{
 		Title:        title,
 		OscalVersion: oscal.Version,
@@ -34,25 +43,25 @@ func createMetadata(title string, version string, published *time.Time, canonica
 		}
 	}
 
-	if authorName != "" {
+	if author.Name != "" {
 		authorRole := oscal.Role{
 			ID:          "author",
 			Description: "Author and owner of the document",
 			Title:       "Author",
 		}
 
-		author := oscal.Party{
-			UUID: uuid.NewUUID(),
-			Type: "person",
-			Name: authorName,
+		party := oscal.Party{
+			UUID: uuid.NewUUIDWithSource(partyUUIDSource(author)),
+			Type: mapPartyType(author.Type),
+			Name: author.Name,
 		}
 
 		responsibleParty := oscal.ResponsibleParty{
-			PartyUuids: []string{author.UUID},
+			PartyUuids: []string{party.UUID},
 			RoleId:     authorRole.ID,
 		}
 
-		metadata.Parties = &[]oscal.Party{author}
+		metadata.Parties = &[]oscal.Party{party}
 		metadata.Roles = &[]oscal.Role{authorRole}
 		metadata.ResponsibleParties = &[]oscal.ResponsibleParty{responsibleParty}
 	}
@@ -73,7 +82,7 @@ func createMetadataFromGuidance(guidance gemara.GuidanceCatalog, opts generateOp
 		opts.version,
 		published,
 		canonicalHref,
-		guidance.Metadata.Author.Name,
+		guidance.Metadata.Author,
 	)
 
 	return metadata, nil
@@ -97,7 +106,7 @@ func createMetadataFromCatalog(catalog gemara.ControlCatalog, opts generateOpts)
 		opts.version,
 		published,
 		canonicalHref,
-		catalog.Metadata.Author.Name,
+		catalog.Metadata.Author,
 	)
 
 	return metadata, nil

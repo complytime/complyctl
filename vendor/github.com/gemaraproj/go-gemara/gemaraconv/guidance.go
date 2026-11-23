@@ -2,6 +2,7 @@ package gemaraconv
 
 import (
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -14,6 +15,9 @@ import (
 // GuidanceToOSCAL converts a Gemara GuidanceCatalog to both an OSCAL Catalog and Profile.
 // The catalog includes only the locally defined guidelines (categories), not imported ones.
 // The profile includes imports for both external guidelines and the local catalog.
+//
+// Returns an error when guidanceDocHref is empty, when the catalog defines no
+// families, or when mapping references conflict on title or URL for the same ID.
 func GuidanceToOSCAL(g gemara.GuidanceCatalog, guidanceDocHref string, opts ...GenerateOption) (oscal.Catalog, oscal.Profile, error) {
 	// The guidanceDocHref parameter specifies the location where the OSCAL Catalog
 	// will be saved, used to create the import reference in the Profile. This must
@@ -40,16 +44,9 @@ func GuidanceToOSCAL(g gemara.GuidanceCatalog, guidanceDocHref string, opts ...G
 	}
 
 	// Create a resource map for control linking
-	resourcesMap := make(map[string]string)
-	backmatter := mappingToBackMatter(g.Metadata.MappingReferences)
-	if backmatter != nil && backmatter.Resources != nil {
-		for _, resource := range *backmatter.Resources {
-			if resource.Props != nil && len(*resource.Props) > 0 {
-				props := *resource.Props
-				id := props[0].Value
-				resourcesMap[id] = resource.UUID
-			}
-		}
+	backmatter, resourcesMap, err := mappingToBackMatterWithUUIDs(g.Metadata.MappingReferences)
+	if err != nil {
+		return oscal.Catalog{}, oscal.Profile{}, fmt.Errorf("guidance document %s: %w", g.Metadata.Id, err)
 	}
 
 	// Group guidelines by family
@@ -71,7 +68,7 @@ func GuidanceToOSCAL(g gemara.GuidanceCatalog, guidanceDocHref string, opts ...G
 	}
 
 	catalog := oscal.Catalog{
-		UUID:       uuid.NewUUID(),
+		UUID:       uuid.NewUUIDWithSource(fmt.Sprintf("gemara:%s/%s/guidance-catalog", url.PathEscape(g.Metadata.Id), url.PathEscape(options.version))),
 		Metadata:   catalogMetadata,
 		Groups:     oscalUtils.NilIfEmpty(groups),
 		BackMatter: backmatter,
@@ -107,7 +104,7 @@ func GuidanceToOSCAL(g gemara.GuidanceCatalog, guidanceDocHref string, opts ...G
 	modify := buildModifySection(alterationMap)
 
 	profile := oscal.Profile{
-		UUID:     uuid.NewUUID(),
+		UUID:     uuid.NewUUIDWithSource(fmt.Sprintf("gemara:%s/%s/guidance-profile", url.PathEscape(g.Metadata.Id), url.PathEscape(options.version))),
 		Imports:  imports,
 		Metadata: profileMetadata,
 		Modify:   modify,
@@ -493,19 +490,26 @@ func mappingToLinks(mappings []gemara.MultiEntryMapping, resourcesMap map[string
 	return links
 }
 
-func mappingToBackMatter(resourceRefs []gemara.MappingReference) *oscal.BackMatter {
-	backMatter, _ := mappingToBackMatterWithUUIDs(resourceRefs)
-	return backMatter
-}
-
-func mappingToBackMatterWithUUIDs(resourceRefs []gemara.MappingReference) (*oscal.BackMatter, map[string]string) {
+func mappingToBackMatterWithUUIDs(resourceRefs []gemara.MappingReference) (*oscal.BackMatter, map[string]string, error) {
 	var resources []oscal.Resource
 	resourceUUIDs := make(map[string]string, len(resourceRefs))
+	kept := make(map[string]gemara.MappingReference, len(resourceRefs))
 	for _, ref := range resourceRefs {
 		if ref.Id == "" {
 			continue
 		}
-		resourceUUID := uuid.NewUUID()
+		if first, exists := kept[ref.Id]; exists {
+			// A repeated id with the same title and URL is a plain
+			// duplicate and is skipped. A differing title or URL means
+			// two distinct resources claim one id, which would make the
+			// back-matter entry ambiguous.
+			if ref.Title != first.Title || ref.Url != first.Url {
+				return nil, nil, fmt.Errorf("mapping reference %s is duplicated with a different title or url", ref.Id)
+			}
+			continue
+		}
+		kept[ref.Id] = ref
+		resourceUUID := uuid.NewUUIDWithSource(fmt.Sprintf("gemara:%s/resource", url.PathEscape(ref.Id)))
 		resourceUUIDs[ref.Id] = resourceUUID
 		resource := oscal.Resource{
 			UUID:        resourceUUID,
@@ -530,11 +534,11 @@ func mappingToBackMatterWithUUIDs(resourceRefs []gemara.MappingReference) (*osca
 	}
 
 	if len(resources) == 0 {
-		return nil, resourceUUIDs
+		return nil, resourceUUIDs, nil
 	}
 
 	backmatter := oscal.BackMatter{
 		Resources: &resources,
 	}
-	return &backmatter, resourceUUIDs
+	return &backmatter, resourceUUIDs, nil
 }

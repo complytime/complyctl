@@ -78,6 +78,11 @@ func parseFile(f File) (*parsedFile, error) {
 // its extends and imports via mapping-references URLs, then recursively
 // parses fetched artifacts for their own references until the full
 // dependency tree is resolved.
+//
+// It returns an error when a URL-less mapping-reference matches no artifact
+// metadata.id in the assembled set, unless WithContinueOnError() is passed.
+// An empty Manifest.BundleVersion is defaulted from the source artifact's
+// metadata.version.
 func (a *Assembler) Assemble(ctx context.Context, m Manifest, source File, opts ...AssembleOption) (*Bundle, error) {
 	var aopts assembleOptions
 	for _, o := range opts {

@@ -2,7 +2,10 @@
 
 package gemaraconv
 
-import "github.com/gemaraproj/go-gemara"
+import (
+	"github.com/gemaraproj/go-gemara"
+	oscalUtils "github.com/gemaraproj/go-gemara/internal/oscal"
+)
 
 type generateOpts struct {
 	version       string
@@ -11,10 +14,23 @@ type generateOpts struct {
 	controlHREF   string
 }
 
+// defaultVersion returns the OSCAL version to stamp into metadata and hash
+// into root UUID sources when the source document and the options both omit
+// one. Every conversion path must resolve its version through this helper:
+// the fallback was once re-derived per site, and one path hashed an empty
+// version while another stamped "0.0.0" into metadata.
+func defaultVersion(version string) string {
+	if version == "" {
+		return oscalUtils.DefaultOSCALVersion
+	}
+	return version
+}
+
 func (g *generateOpts) completeFromGuidance(doc gemara.GuidanceCatalog) {
 	if g.version == "" {
 		g.version = doc.Metadata.Version
 	}
+	g.version = defaultVersion(g.version)
 	if g.imports == nil {
 		g.imports = make(map[string]string)
 		for _, mappingRef := range doc.Metadata.MappingReferences {
@@ -27,6 +43,7 @@ func (g *generateOpts) completeFromCatalog(catalog gemara.ControlCatalog) {
 	if g.version == "" {
 		g.version = catalog.Metadata.Version
 	}
+	g.version = defaultVersion(g.version)
 }
 
 // GenerateOption defines an option to tune the behavior of the OSCAL
@@ -126,7 +143,7 @@ func WithApplicabilityMatrix(enabled bool) MarkdownOption {
 // (via mapping-references or remarks URL), term autolinking in prose, and a
 // trailing glossary. The provided [gemara.Fetcher] is used to load the lexicon
 // document. When enabled and metadata.lexicon is set, this takes precedence
-// over [WithInlineLexicon].
+// over [WithInlineLexicon]. It panics if f is nil.
 //
 // See [fetcher.ExampleURI_ssrfSafe] for an example that blocks requests to
 // private network addresses.
