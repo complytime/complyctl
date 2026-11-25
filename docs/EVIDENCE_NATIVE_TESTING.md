@@ -18,11 +18,29 @@ needed; lifecycle tests use their own provider fixtures.
 | Matching-architecture Docker/Podman container | Linux coverage on its actual test filesystem and kernel |
 | amd64 container emulated on an arm64 machine | Supplemental emulated Linux coverage, not native amd64 evidence |
 
-For the full matrix, record Linux amd64 and arm64 on ext4, XFS, Btrfs,
-and tmpfs, plus macOS amd64 and arm64 on local APFS. Keep separate
-results for every combination. Existing results can be reused when the
-tested code is unchanged; a new run is not evidence for a different
-architecture or filesystem.
+The release configuration builds four targets: Linux amd64, Linux
+arm64, macOS amd64, and macOS arm64, all with `CGO_ENABLED=0`.
+Task 5.4 requires runtime coverage of those targets and the baseline
+filesystems. It does not prescribe every Linux filesystem on every
+architecture. Cover ext4, XFS, Btrfs, and tmpfs across the available
+native Linux machines; record the architecture for each result.
+Race-enabled tests are a verification mode, not another release target.
+
+Use this bounded plan. A completed row does not need another full run
+when the affected code is unchanged:
+
+| Coverage | Where to run | Instructions | Recorded status |
+| --- | --- | --- | --- |
+| Linux arm64/tmpfs | Existing arm64 devcontainer terminal | Sections 1 and 2 | Four race suites and CGO-disabled cleanup passed |
+| macOS arm64/APFS | Apple Silicon Mac terminal, outside the devcontainer | Sections 1 and 3 | Native suites passed; captured-errno fix passed 20 race-enabled and 20 CGO-disabled focused repetitions |
+| Linux amd64 | x86_64 Linux PC terminal; matching-architecture VM/container also works | Sections 1 and 4 for tmpfs, or section 2 on an existing tmpfs mount | Remaining |
+| macOS amd64/APFS | Intel Mac terminal, outside containers | Sections 1 and 3 | Remaining |
+| Linux ext4, XFS, and Btrfs | A native Linux host/VM with these filesystems and loop-mount support | Sections 1, 4, and 5 | Remaining; one recorded native architecture per filesystem is sufficient for this plan |
+
+Keep separate logs for each run. Missing hardware or kernel facilities
+remain missing verification. A new run is not evidence for a different
+architecture or filesystem. This plan does not add Windows, additional
+Linux distributions, or an exhaustive OS-version matrix.
 
 A container image supplies userspace tools, not a different kernel or
 filesystem. Selecting a Fedora or Debian image does not select XFS or
@@ -35,13 +53,38 @@ not prove that execution is native.
 
 ## 1. Create the common test runner
 
+**Run on:** every machine where you will execute tests. For container
+tests, create the runner on the engine's host machine, then bind-mount it
+using section 4. This section creates a file; it does not run the suites.
+
 Run all shell examples in **Bash**, from the root of this checkout.
 On macOS, enter `bash` first if your terminal uses zsh. Go 1.26.10,
 a C compiler, and the platform's C development libraries are required
-for the race detector. On macOS, install Xcode Command Line Tools with
+where the tests execute for the race detector. The container recipe
+installs these inside the image; its host only needs the container
+engine, Git, and Bash. On macOS, install Xcode Command Line Tools with
 `xcode-select --install` if they are absent. In the Fedora devcontainer,
 install missing compiler packages with `sudo dnf install gcc glibc-devel`
 (omit `sudo` if already root).
+
+On a separate testing PC, clone the feature branch first:
+
+```bash
+git clone --branch opsx/evidence-cleanup --single-branch \
+    https://github.com/yvonnedevlinrh/complyctl.git &&
+cd complyctl &&
+git rev-parse HEAD &&
+git status --short &&
+uname -s -m
+```
+
+The clone contains only pushed commits. Before comparing results,
+confirm with the change author that the branch contains the candidate
+being tested, including follow-up fixes. An existing checkout can use
+`git pull --ff-only` when its working tree is clean. Do not discard local
+changes to update it. On the Mac with the bind-mounted development
+checkout, keep the current working files instead of replacing them with
+an older clone.
 
 Create this temporary runner once per machine. The container examples
 also use this file. It writes logs and compiled test binaries outside
@@ -49,8 +92,9 @@ the filesystem under test, so a `noexec` tmpfs mount remains usable.
 Tests create and clean their own synthetic workspaces beneath `TMPDIR`.
 
 ```bash
+if (
 set -euo pipefail
-cat > /tmp/complyctl-native-tests.sh <<'BASH'
+cat > /tmp/complyctl-native-tests.sh <<'BASH' || exit
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -106,7 +150,17 @@ TMPDIR="$TEST_ROOT" GOTMPDIR="$TEST_ROOT" "$RUN_DIR/evidencecleanup-nocgo.test" 
 printf '\nCompleted. Keep results from: %s\n' "$RUN_DIR"
 BASH
 bash -n /tmp/complyctl-native-tests.sh
+); then
+    printf 'Runner created and syntax checked.\n'
+else
+    printf 'Runner setup failed; inspect the error above.\n' >&2
+fi
 ```
+
+The subshell keeps setup options out of your interactive shell. The `if`
+also handles setup failure when that shell already has `errexit` enabled.
+This block only creates and syntax-checks the runner; section 2 or 3 runs
+the tests.
 
 `set -o pipefail` preserves a failing test's exit status through `tee`.
 The runner stops at the first failed build or suite; missing later logs
@@ -118,7 +172,12 @@ Setting only `TMPDIR` while leaving `GOTMPDIR` on overlay is insufficient.
 
 ## 2. Current Linux devcontainer: tmpfs
 
-Run inside the devcontainer, from this checkout. Confirm that `/dev/shm`
+**Run on:** the Linux devcontainer terminal, or a native Linux terminal
+with writable `/dev/shm`. This does not run macOS tests, even when the
+devcontainer's physical host is a Mac. No container image download is
+needed for the already running devcontainer.
+
+Run from this checkout in the selected Linux terminal. Confirm that `/dev/shm`
 has enough free space for the test fixtures; compilation happens in
 `RUN_DIR`, not `/dev/shm`.
 
@@ -127,7 +186,12 @@ df -h /dev/shm
 TEST_ROOT="$(mktemp -d /dev/shm/complyctl-native.XXXXXX)"
 export TEST_ROOT
 unset RUN_DIR
-bash /tmp/complyctl-native-tests.sh
+if bash /tmp/complyctl-native-tests.sh; then
+    printf 'Native tests completed.\n'
+else
+    status=$?
+    printf 'Native tests failed (exit %s); keep the results directory printed above.\n' "$status" >&2
+fi
 ```
 
 The environment log should report `tmpfs`, and
@@ -146,6 +210,9 @@ unchanged.
 
 ## 3. Native macOS: APFS
 
+**Run on:** the macOS host terminal. Use an Apple Silicon Mac for arm64
+or an Intel Mac for amd64. No Docker/Podman image is used here.
+
 Run in the Mac terminal, **outside** the devcontainer, using the same
 checkout with its uncommitted files. Run as your normal user, not root.
 
@@ -155,7 +222,12 @@ export TEST_ROOT
 unset RUN_DIR
 df -h "$TEST_ROOT"
 diskutil info /System/Volumes/Data
-bash /tmp/complyctl-native-tests.sh
+if bash /tmp/complyctl-native-tests.sh; then
+    printf 'Native Mac tests completed.\n'
+else
+    status=$?
+    printf 'Native Mac tests failed (exit %s); keep the results directory printed above.\n' "$status" >&2
+fi
 ```
 
 The `diskutil` command describes the standard macOS Data volume. If
@@ -167,6 +239,11 @@ arm64 Mac or an Intel amd64 Mac. Run the same procedure on an Intel Mac
 to supply the missing Darwin amd64 evidence.
 
 ## 4. Docker or Podman: Linux tmpfs
+
+**Run on:** the host terminal where Docker or Podman runs, from the
+checkout root. For the remaining Linux amd64 result, use the x86_64 PC
+or a native amd64 VM. Do not paste these commands into the Mac-native
+test section or an unconfigured nested devcontainer.
 
 The official `docker.io/library/golang:1.26.10-bookworm` image has Linux
 amd64 and arm64 variants. The following local derivative adds filesystem
@@ -186,6 +263,8 @@ Linux, use a running Docker service or an available Podman engine.
 export ENGINE=docker
 # For Podman instead: export ENGINE=podman
 "$ENGINE" info
+# Explicitly download the base image for the engine's native architecture.
+"$ENGINE" pull docker.io/library/golang:1.26.10-bookworm
 REPO="$(pwd -P)"
 export REPO
 test -f "$REPO/go.mod"
@@ -215,7 +294,7 @@ export CONTAINER_RESULTS
 # This fresh scratch directory must be writable by container UID 1000.
 chmod 0777 "$CONTAINER_RESULTS"
 
-"$ENGINE" run --rm --privileged \
+if "$ENGINE" run --rm --privileged \
     --user 1000:1000 --security-opt label=disable \
     --mount "type=bind,src=$REPO,dst=/src,readonly" \
     --mount "type=bind,src=$CONTAINER_FILES/native-tests.sh,dst=/run-native-tests.sh,readonly" \
@@ -224,6 +303,12 @@ chmod 0777 "$CONTAINER_RESULTS"
     -e TEST_ROOT=/testfs -e RUN_DIR=/results/tmpfs \
     complyctl-native-test:go1.26.10 \
     bash -c 'git config --global --add safe.directory /src; bash /run-native-tests.sh'
+then
+    printf 'Container tmpfs tests completed.\n'
+else
+    status=$?
+    printf 'Container tests failed (exit %s); inspect %s.\n' "$status" "$CONTAINER_RESULTS" >&2
+fi
 
 printf 'Host results directory: %s\n' "$CONTAINER_RESULTS"
 ```
@@ -258,6 +343,11 @@ Other host restrictions, including AppArmor user-namespace policy,
 can still prevent these tests. Do not change CI gates to hide them.
 
 ## 5. Docker or Podman: ext4, XFS and Btrfs
+
+**Run on:** the same engine host terminal as section 4. Prefer the
+x86_64 Linux PC/VM if it provides the required kernel filesystems.
+Running this once on a supported native architecture supplies the
+filesystem coverage; it need not be repeated on both Linux architectures.
 
 Reuse the image, runner, `ENGINE`, `REPO`, and `CONTAINER_RESULTS` from
 section 4. This procedure creates fresh **regular image files**, formats
@@ -315,6 +405,8 @@ BASH
 bash -n /tmp/complyctl-filesystem-matrix.sh
 install -m 0644 /tmp/complyctl-filesystem-matrix.sh "$CONTAINER_FILES/filesystem-matrix.sh"
 
+if (
+set -o pipefail
 "$ENGINE" run --rm --privileged --security-opt label=disable \
     --mount "type=bind,src=$REPO,dst=/src,readonly" \
     --mount "type=bind,src=$CONTAINER_FILES/native-tests.sh,dst=/run-native-tests.sh,readonly" \
@@ -323,16 +415,39 @@ install -m 0644 /tmp/complyctl-filesystem-matrix.sh "$CONTAINER_FILES/filesystem
     complyctl-native-test:go1.26.10 \
     bash -c 'runuser -u runner -- git config --global --add safe.directory /src; bash /run-matrix.sh' \
     2>&1 | tee "$CONTAINER_RESULTS/filesystem-matrix.log"
+); then
+    printf 'Filesystem tests completed.\n'
+else
+    status=$?
+    printf 'Filesystem tests failed (exit %s); inspect %s.\n' "$status" "$CONTAINER_RESULTS" >&2
+fi
 ```
 
-Run with `set -o pipefail` in the calling Bash shell, as well as inside
-the scripts. If a filesystem fails, the script stops before subsequent
-filesystems. Keep `filesystem-matrix.log` and the completed per-filesystem
+The subshell's `pipefail` preserves the container's exit status without
+changing interactive-shell options. If a filesystem fails, the script
+stops before subsequent filesystems. Keep `filesystem-matrix.log` and the completed per-filesystem
 directories. Do not interpret absent directories as successful runs.
-Run the procedure on both native Linux architectures to fill both rows
-of filesystem evidence. To use already-mounted ext4/XFS/Btrfs on a
-Linux host instead, set `TEST_ROOT` to a fresh writable directory there
-and run section 1's common runner directly.
+To use an already-mounted filesystem instead, run the following in the
+**native Linux host terminal**, after creating section 1's runner. The
+interactive prompt asks for the existing mount path; it never formats it:
+
+```bash
+read -r -p 'Existing writable ext4/XFS/Btrfs mount directory: ' TEST_MOUNT
+if TEST_ROOT="$(mktemp -d "$TEST_MOUNT/complyctl-native.XXXXXX")"; then
+    export TEST_ROOT
+    unset RUN_DIR
+    if bash /tmp/complyctl-native-tests.sh; then
+        printf 'Tests completed on the selected mount.\n'
+    else
+        status=$?
+        printf 'Tests failed (exit %s); retain the printed results directory.\n' "$status" >&2
+    fi
+else
+    printf 'Could not create a test directory on that mount.\n' >&2
+fi
+```
+
+Repeat only for baseline filesystems whose results are still missing.
 
 ## 6. Decide whether a matrix entry is complete
 
@@ -366,7 +481,8 @@ Expected Linux native filesystem identifiers in the coordination log:
 | Btrfs | `0x9123683e` |
 | tmpfs | `0x1021994` |
 
-Only mark task 5.4 complete when all required matrix entries have actual
+Only mark task 5.4 complete when the four native OS/architecture targets
+and the baseline filesystem coverage in the opening table have actual
 runtime evidence. Missing hardware, kernel support, permissions, or
 filesystem mounts remain missing verification, not failed product
 behavior and not a passing test result. No container image supplies a
@@ -378,9 +494,11 @@ The common runner completed all four race suites and the CGO-disabled
 cleanup suite on Linux arm64/tmpfs on 2026-11-25. The coordination test
 reported `0x1021994`; the only skips were the two case-equivalent-path
 subcases on case-sensitive tmpfs, in each cleanup run. All Bash examples
-and embedded scripts passed Bash syntax checks and ShellCheck. The
-container and native macOS procedures still require execution in their
-respective environments; syntax validation is not runtime evidence.
+and embedded scripts passed Bash syntax checks and ShellCheck. Native
+macOS arm64 results were supplied separately, including the focused
+captured-errno regression in race-enabled and CGO-disabled builds. The
+container procedures still require execution in their respective
+environments; syntax validation is not runtime evidence.
 
 Related: [cleanup scope and recovery](EVIDENCE.md),
 [development test environment](TESTING_ENVIRONMENT.md), and
