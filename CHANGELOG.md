@@ -159,6 +159,32 @@
 
 ### Security
 
+- Bumped transitive `github.com/klauspost/compress` from v1.19.2 to
+  v1.20.5, fixing
+  [GO-2026-6865](https://pkg.go.dev/vuln/GO-2026-6865)
+  (CVE-2026-116591, panic on two-block frames in `fse`/`huff0`).
+  Unlike earlier module-level-only advisories, `govulncheck` reported
+  the vulnerable symbols as reachable: go-containerregistry's zstd
+  layer codec is linked in on `complyctl get`'s fetch and signature
+  verification path, so crafted zstd layers could panic the CLI.
+  This is a live fix, not dependency hygiene; the panic is remediated
+  in the upstream decoder and has no local reproduction test.
+- Bumped transitive `golang.org/x/crypto` from v0.58.0 to v0.59.0
+  (with the transitively required `x/mod` v0.42.0, `x/sync` v0.25.0,
+  `x/sys` v0.50.0, `x/term` v0.48.0, and `x/text` v0.44.0 floors),
+  moving the module past the
+  [GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932) fixed version
+  (`v0.58.1-0.20261009181718-2f1f834330b2`; the split `openpgp`
+  module itself has no fixed version). The advisory's `openpgp`
+  packages no longer ship in `x/crypto`; `go mod tidy` now records
+  the standalone `golang.org/x/crypto/openpgp v0.1.0-deprecated`
+  module because dependency test closures import `rekor` v1.5.3 PGP
+  helper packages (`pkg/pki/pgp`, `pkg/util/e2eutil`) that complyctl
+  never imports. No `openpgp` package is vendored or in the build
+  graph and `govulncheck` reports no findings; the residual
+  module-level flag clears fully once the sigstore stack moves to
+  Go 1.27 (rekor >= v1.5.5, sigstore-go >= v1.4.0, already in
+  flight as #952).
 - Bumped transitive `golang.org/x/net` from v0.61.0 to v0.62.0,
   clearing two advisories in `golang.org/x/net/html`:
   [GO-2026-6866](https://pkg.go.dev/vuln/GO-2026-6866) (missed
@@ -169,11 +195,7 @@
   the build graph); this is dependency hygiene, not a live exploit
   path. v0.62.0 requires the same `x/crypto`, `x/sys`, `x/term`,
   and `x/text` pins already in place, so there is no transitive
-  drift. `golang.org/x/crypto/openpgp`
-  ([GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932), unmaintained
-  by design, no fixed version) remains flagged at the module level
-  only; its packages are absent from the build graph and `govulncheck`
-  reports 0 reachable symbols, so no action is required.
+  drift.
 - Transitive `oras-go` bump via `go-gemara` v0.9.1 addresses
   CVE-2026-50163. (#813)
 
