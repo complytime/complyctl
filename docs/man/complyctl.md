@@ -1,6 +1,6 @@
 % COMPLYCTL(1) Complyctl Manual
 % Marcus Burghardt <maburgha@redhat.com>
-% September 2026
+% November 2026
 
 # NAME
 
@@ -157,6 +157,136 @@ complyctl scan --policy-id my-policy --log-format json
 : EvaluationLog serialization format: **yaml**, **json**
   (default: **yaml**). Can also be set via **COMPLYTIME_LOG_FORMAT**.
 
+## clean
+
+Expire managed report/evaluation groups beneath **.complytime/** in the
+selected workspace. Successful expiry permanently removes both the
+reports and their supporting evaluation directories, including all
+contained outputs. Save anything needed for audit elsewhere and preview
+before deleting:
+
+```bash
+complyctl clean --older-than 30d --dry-run
+complyctl clean --older-than 30d
+```
+
+**--older-than** *days*d
+: Required positive whole days, each exactly 24 hours; no default.
+  Accepts **1d** through **106751d**, without leading zeroes. Rejects
+  zero, negative, fractional, whitespace-padded, unsupported-unit, and
+  overflowing values.
+
+**--dry-run**
+: Preview complete groups without changing workspace files (default:
+  **false**). Does not create configuration, lock files, activity records,
+  reports, evidence, or debug logs. Preview releases access when done;
+  later cleanup independently repeats discovery and preflight.
+
+No positional arguments are accepted. Workspace precedence is
+**--workspace** (or **-w**), then **COMPLYTIME_WORKSPACE**, then the
+current directory. Select the existing project root containing
+**.complytime/**. Cleanup does not initialize a missing workspace or
+require configuration, registry credentials, policy resolution, or
+provider installation. Results use stdout; diagnostics use stderr even
+with **--debug**, without creating or modifying the workspace log file.
+
+### Scope and expiry
+
+Cleanup recognizes retained-layout evaluation directories beneath only
+**.complytime/ampel/results/**, **.complytime/opa/results/**, and
+**.complytime/openscap/results/**. Valid intermediate labels contain
+1–80 ASCII letters, digits, underscores, or hyphens. Evaluation names use
+**evaluation-**, a UTC collection-start timestamp in **20060102T150405Z**
+format, a hyphen, and exactly 32 lowercase hexadecimal characters.
+Flat legacy files and unrecognized layouts remain untouched.
+
+Managed reports live directly under **.complytime/scan/**: YAML/JSON
+EvaluationLogs, Markdown with an embedded EvaluationLog, OSCAL, and
+SARIF variants. Validated content establishes relationships; filenames
+alone never prove ownership. Reports sharing any evaluation join one
+group transitively, even when they cite different files within it.
+An unreferenced or incomplete evaluation can qualify only after a
+complete managed-report inventory establishes no report references it.
+
+Every evaluation in a group must start strictly before one captured UTC
+cutoff. Age uses collection start, not modification times, report
+filenames, or optional metadata. A newer, exact-cutoff, future, or
+invalid start retains the whole group. Reports follow their connected
+evaluations' ages. Reports without an establishable evaluation age stay.
+
+Cleanup preserves CLI logs, configuration, scan inputs, working clones,
+generation state, caches, unrelated files, and other workspaces. It does
+not prune labels or managed roots, fetch remote evidence, or expand its
+scope through evidence references. External or renamed report copies
+are outside managed scope; cleanup cannot guarantee their references
+remain valid. Renaming is not an override: unknown report-like files
+inside the report root can block cleanup.
+
+Current SARIF output lacks originating-log and evidence provenance.
+Cleanup therefore refuses workspace planning when a managed SARIF
+report is present, including an empty all-passing report. It never
+guesses associations from a matching filename or silently skips SARIF.
+Unbounded report ambiguity
+likewise refuses the workspace before deletion.
+
+### Safety, support, and failures
+
+Whole-group preflight retains every member unchanged if any member has
+a detectable safety or access failure. Confined traversal refuses
+symlinks, special files, replaced candidates, and mount crossings.
+Eligible groups lose all evidence before report removal begins.
+Unexpected removal failures stop the affected group, retain what
+remains, print exact progress, and return nonzero; independent safe
+groups can continue. An evidence failure leaves all group reports,
+possibly referencing already removed evidence. A report failure can
+leave some reports after all evidence is gone. There is no rollback.
+
+Cleanup and preview require exclusive workspace access. Updated hosts
+coordinate scan/generation, relevant **get** artifact removal, and
+**init**; conflicting access fails promptly. Scan protection extends
+through report publication and normal provider teardown. Normal RPC
+completion and teardown allow removal of the invocation's own activity
+record, including handled application errors. Host interruption, forced
+or abnormal termination, transport failure, or uncertain cancellation
+leaves unresolved activity that blocks cleanup even after lock release.
+Normal completion is not proof that arbitrary descendant tools exited.
+
+Cleanup targets Linux and macOS on amd64 and arm64. Allowed local
+filesystems are ext4, XFS, Btrfs, and tmpfs on Linux, and APFS on macOS.
+Other filesystems, including network, FUSE, overlay, and HFS+, are
+refused. OS support and filesystem support are separate; unavailable
+locking/confinement or unsafe mount layouts also cause refusal. These
+targets do not imply completed native runtime verification on every
+platform. Windows is outside the cleanup support boundary.
+
+Stop older hosts, direct provider callers, and independent writers before
+cleanup: host locks do not stop them. Keep directory and mount layouts
+stable. Unchanged provider binaries work under updated hosts, but
+provider availability does not limit cleanup of existing evidence.
+
+Unresolved activity errors identify exact record paths under
+**.complytime/coordination/operations/**. Pause new scans and stop all
+writers, including provider-launched tools. If shutdown is uncertain,
+restart the complete writer machine/VM or stop its complete isolated
+container environment, prevent job restarts, and stop writers in other
+environments too. Restarting a terminal or complyctl alone is
+insufficient. Only then manually remove the exact identified records,
+not the coordination directory or unrelated files. Records and PIDs are
+diagnostic hints, not authority to kill processes. There is no force or
+automatic stale-record override. Rerun preview; record removal never
+bypasses a live host lock. See the evidence guide's
+[Interrupted-Scan Recovery](https://github.com/complytime/complyctl/blob/main/docs/EVIDENCE.md#interrupted-scan-recovery)
+for the full procedure.
+
+Output includes workspace, UTC cutoff, consequences, stable group
+membership, blockers, reasons, exclusions, and totals. Preview uses
+**would-delete** or **retained**; execution uses **deleted**,
+**partially-deleted**, or **retained** and prints successful removals.
+No matches, normal age exclusions, and repeated successful cleanup exit
+zero. Invalid arguments, missing workspaces, coordination/inventory
+refusal, safety/access failures, removal errors, and output errors exit
+nonzero, even when independent groups succeeded.
+
 ## doctor
 
 Run pre-flight diagnostics on the workspace. Checks provider
@@ -212,11 +342,12 @@ complyctl completion fish
 These options apply to all commands.
 
 **-d**, **--debug**
-: Output debug logs to stderr and the workspace log file.
+: Output debug logs to stderr and the workspace log file. Exception:
+  **clean**, including preview, uses stderr only and leaves logs unchanged.
 
 **-w**, **--workspace** *directory*
-: Workspace directory. Defaults to the current directory. Can also be
-  set via **COMPLYTIME_WORKSPACE**.
+: Workspace directory. Takes precedence over **COMPLYTIME_WORKSPACE**;
+  otherwise defaults to the current directory.
 
 **-h**, **--help**
 : Show help for complyctl or any subcommand.
@@ -451,6 +582,11 @@ invalid configuration, or zero requirements assessed. Reports and
 summaries are written before the non-zero exit so partial results
 remain available.
 
+For **clean**, normal age exclusions, no matches, and repeated successful
+cleanup return **0**. Validation, coordination, discovery, preflight,
+removal, or output errors return **1**. Returned cleanup results are
+printed even on failure; workspace-wide refusal can provide no plan.
+
 To gate a pipeline on compliance results, parse the scan output
 (SARIF, OSCAL) with your policy engine rather than relying on the exit
 code.
@@ -537,7 +673,16 @@ Filenames follow the pattern
 (e.g., **evaluation-log-pol-v1-web-20260729-143012.yaml**).
 
 **.complytime/complyctl.log**
-: Debug log file (created when **--debug** is used).
+: Debug log file (created when **--debug** is used, except by **clean**).
+
+**.complytime/{ampel,opa,openscap}/results/**
+: Provider results roots. Recognized evaluation directories and all their
+contents are indivisible evidence members for **clean**.
+
+**.complytime/coordination/operations/**
+: Host activity records persisted before provider startup. Unresolved
+records block cleanup and require the stopped-writer recovery procedure
+above; they are not age-based cleanup candidates.
 
 # SEE ALSO
 

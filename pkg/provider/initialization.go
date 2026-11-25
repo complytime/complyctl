@@ -12,13 +12,14 @@ import (
 )
 
 func NewClient(executablePath string, logger hclog.Logger) (*Client, error) {
+	cmd := exec.Command(executablePath) /* #nosec G204 — path validated by discovery */
 	config := &goplugin.ClientConfig{
 		HandshakeConfig:  Handshake,
 		Logger:           logger.Named(executablePath),
 		Managed:          true,
 		AutoMTLS:         true,
 		AllowedProtocols: []goplugin.Protocol{goplugin.ProtocolGRPC},
-		Cmd:              exec.Command(executablePath), /* #nosec G204 — path validated by discovery */
+		Cmd:              cmd,
 		Plugins:          SupportedProviders,
 	}
 
@@ -43,6 +44,7 @@ func NewClient(executablePath string, logger hclog.Logger) (*Client, error) {
 	}
 
 	return &Client{
+		cmd:            cmd,
 		executablePath: executablePath,
 		gopluginClient: client,
 		grpcClient:     grpcClient,

@@ -356,6 +356,426 @@ Not all providers support evidence source provenance. Check your
 provider's documentation for details on which evidence types include
 source information and which fields are populated.
 
+## Cleanup Grouping and Preview
+
+Use `complyctl clean` to expire managed reports and their supporting
+evaluations in one workspace. Preview first, then omit `--dry-run`
+only after reviewing the groups and saving anything needed for audit:
+
+```bash
+complyctl clean --older-than 30d --dry-run
+complyctl clean --older-than 30d
+```
+
+`--older-than` is required; there is no default age and no positional
+argument. Workspace selection follows `--workspace` (or `-w`), then
+`COMPLYTIME_WORKSPACE`, then the current directory. Select the project
+root containing `.complytime/`, not `.complytime/` itself. The workspace
+must already exist; cleanup does not initialize it or require policy
+configuration, credentials, a registry connection, or providers.
+
+The CLI calls `internal/evidencecleanup.Preview` for `--dry-run` and
+`internal/evidencecleanup.Run` otherwise. Both share age, inventory,
+grouping, coordination, and whole-group preflight rules. Cleanup sends
+results to stdout and diagnostics to stderr, including with `--debug`;
+neither mode creates or changes the workspace log file. The inherited
+global debug help describes other commands' file logging, not cleanup.
+
+### Managed Scope and Group Membership
+
+The inventory considers recognized evaluation directories beneath
+only these roots in the selected workspace:
+
+- `.complytime/ampel/results/`
+- `.complytime/opa/results/`
+- `.complytime/openscap/results/`
+
+An evaluation name contains `evaluation-`, a UTC collection-start
+timestamp in `20060102T150405Z` format, a hyphen, and exactly 32
+lowercase hexadecimal characters. Intermediate labels may be nested;
+each label contains 1–80 ASCII letters, digits, underscores, or
+hyphens. For example, the inventory fixtures use
+`.complytime/opa/results/policy/target/evaluation-20261001T120000Z-0123456789abcdef0123456789abcdef`.
+The evaluation directory and **all** its supporting outputs form one
+indivisible evidence member, not separate file-level candidates.
+
+Managed host reports live directly under `.complytime/scan/`. The
+inventory selects format adapters using these naming conventions:
+
+- `evaluation-log-` with a `.yaml` or `.json` suffix: EvaluationLog.
+- `report-` with a `.md` suffix: Markdown with an embedded EvaluationLog.
+- `assessment-results-` with a `.json` suffix: OSCAL assessment-results.
+- `scan-` with a `.sarif.json` suffix: SARIF, subject to the provenance
+  refusal described below.
+
+Names select an adapter; they never prove a report's relationship to
+evidence. The adapters read validated EvaluationLog content, the log
+embedded in Markdown, or typed OSCAL evidence properties and mapping
+references. No new sidecar or provider marker is required. Reports
+with links to the same evaluation join one group, even when they cite
+different files inside it. Sharing merges groups transitively across
+reports and providers.
+
+External or renamed report copies are outside the managed inventory
+contract. Cleanup does not search for every copy or guarantee
+protection of its references. Renaming is not a cleanup override:
+report-like unknown files inside `.complytime/scan/` can instead block
+the entire inventory. A changed filename that still follows a managed
+convention still selects its adapter; its content determines its
+relationships, not its apparent policy, target, or timestamp.
+
+Evidence coordinates resolve relative to the selected workspace, or
+as validated absolute local paths, including local `file://` URIs.
+They can link only to already recognized evaluation units. They do
+not authorize extra roots, access to another workspace, or remote
+fetches. Mapping-reference URLs remain metadata, not fetch requests;
+inline payloads without a source mapping are not filesystem targets.
+CLI logs, configuration, scan inputs, OPA working clones, generation
+state, caches, unrelated files, and unrecognized layouts remain
+outside the managed groups. The flat evidence paths in the provenance
+walkthrough above are not recognized retained-layout evaluations.
+
+### Collection-Start Age and Shared Evidence
+
+Age means elapsed time since the evaluation directory's encoded
+collection start, not since report publication or the last filesystem
+write. `--older-than` accepts canonical positive whole-day thresholds
+such as `1d` and `30d`, with each day exactly 24 hours. It rejects
+missing values, `0d`, `-1d`, `1.5d`, `01d`, whitespace padding,
+unsupported units such as `30h`, and overflow. The maximum supported
+threshold is `106751d`.
+
+One captured UTC invocation time supplies the cutoff for every group.
+With the fixed-clock fixture time `2026-11-18T12:00:00Z` and `30d`,
+the cutoff is `2026-10-19T12:00:00Z`:
+
+| Encoded collection start | Age decision                     |
+| ------------------------ | -------------------------------- |
+| `20261019T115959Z`       | Older; subject to preflight.     |
+| `20261019T120000Z`       | Retain group: exact cutoff.      |
+| `20261019T120001Z`       | Retain group: newer.             |
+| `20261119T120000Z`       | Retain group: future start.      |
+| `20260230T120000Z`       | Retain group: invalid date.      |
+
+Every evaluation in a group must start **strictly before** the
+cutoff. Reports follow all connected evaluation ages; neither report
+filename timestamps nor modification times establish age. Optional
+metadata does not establish age, completion, or inactivity.
+
+For example, the shared-evidence fixtures have report A cite an old
+Ampel evaluation and `first.json` in a shared OPA evaluation. Report B
+cites `nested/second.json` in that same OPA evaluation and an old
+OpenSCAP evaluation. Both reports and all three evaluations form one
+group. If the shared OPA evaluation starts exactly at the cutoff,
+every member is retained, including both older evaluations. A
+detectable access failure, unsafe member, missing required evidence
+file, or unresolved mapping reference likewise blocks the whole
+connected group. Preflight leaves every member byte-for-byte unchanged
+and identifies the blocking member; it does not rewrite references.
+
+### Reportless Evaluations and Conservative Refusal
+
+A reportless (orphan) evaluation is not automatically disposable.
+Only a complete managed-report inventory can establish that no
+managed report references it. An incomplete evaluation, including one
+without metadata or a completion marker, can then form a standalone
+group if its age, activity, access, and safety checks pass. A report
+with no establishable evaluation age is retained rather than aged
+from its filename. Labels and results/report roots are not expiry
+members and are not candidates for pruning.
+
+When a problem has a known scope, cleanup retains the affected
+group while keeping independent groups' decisions. A missing file
+inside a known evaluation, for example, keeps that evaluation linked
+to every referring report. When possible relationships cannot be
+bounded, it refuses workspace planning with no partial plan, rather
+than treating apparently unreferenced evidence as orphaned. Malformed
+reports, unsupported report-like variants, ambiguous coordinates,
+and Markdown without an unambiguous embedded log can cause this
+workspace-wide refusal.
+
+Case-variant duplicate report fields are ambiguous and block planning
+before typed decoding can overwrite evidence references. An evidence
+coordinate rejected for unsafe or inaccessible traversal also blocks
+workspace planning: cleanup does not follow a symlink to discover its
+target or assume that target is an unreferenced evaluation.
+An unmatched local evidence coordinate also blocks planning, even if
+its final file is missing. Successful file access alone cannot
+prove independence: case-insensitive filesystems can resolve different
+spellings to the same evidence. Cleanup neither lowercases paths nor
+assumes unmatched evidence is unrelated.
+Absolute paths and file URIs outside the established workspace boundary
+also block planning. An external alias can point directly into a managed
+evaluation without passing through the workspace root; cleanup does not
+treat that spelling as proof that the evaluation is unreferenced.
+
+Current SARIF output lacks originating EvaluationLog and evidence
+provenance. The adapter therefore refuses workspace planning whenever
+a managed SARIF report is present, including an empty all-passing
+report. Even a single apparently matching log, policy/target-like
+filename, matching alert, or timestamp cannot prove ownership.
+Formatters can publish across second boundaries, and names can
+collide. Cleanup does not infer SARIF relationships from filenames
+or silently omit SARIF to make other groups eligible.
+
+### Read-Only Preview Decisions
+
+`complyctl clean --older-than 30d --dry-run` calls the `Preview`
+library API, which takes an existing workspace,
+an explicit `OlderThan` threshold, and an injected clock. It captures
+one age window, acquires exclusive workspace access, checks filesystem
+support and unresolved activity, then inventories and preflights
+complete groups. It needs no policy configuration, provider
+installation, credentials, or registry connection. It does not create
+or modify configuration, lock files, activity records, debug logs,
+reports, or evidence.
+
+For each otherwise eligible group, preview also prepares the same
+descriptor-relative removal handles and platform checks as execution,
+then closes them without unlinking anything. Insufficient file
+descriptors or unavailable confinement facilities retain the group
+rather than reporting `would-delete`.
+
+The CLI prints the snapshot's canonical workspace and UTC cutoff,
+expiry consequences, and a preview-only warning. It lists every group
+member with a workspace-relative path,
+kind (`evaluation` or `report`), status (`would-delete` or `retained`),
+and reasons. Members and blockers have stable path ordering; groups
+sort by their first member path. Totals count groups and indivisible
+members, not every file inside an evaluation. Exclusions have their
+own paths and reasons; their count is not a census of all unrelated
+workspace files.
+
+In the preview fixture with the fixed clock above:
+
+- An old reportless Ampel evaluation is one `would-delete` member.
+- An old OPA evaluation plus YAML/JSON EvaluationLogs, embedded-log
+  Markdown, and OSCAL variants form another group: five
+  `would-delete` members.
+- An exact-cutoff OpenSCAP evaluation and its report form a retained
+  group: two members, with the evaluation named as the age blocker.
+
+The totals are two would-delete groups (six members) and one retained
+group (two members); no member is actually deleted. Normal age
+exclusions and no matches return no error. Bounded safety/access
+failures return the full snapshot plus `ErrPreflightBlocked`, with
+every member of each blocked group retained. Busy access, unresolved
+activity, unsupported filesystems, or incomplete inventory return an
+error without a partial plan. The CLI prints a returned snapshot even
+when preflight reports blocked groups, then exits nonzero. No matches
+and normal age exclusions exit zero.
+
+Preview releases access when it returns. It does not reserve groups
+or authorize later removal; a later execution must reacquire access
+and repeat discovery and preflight. Passing preflight is not a
+guarantee of future I/O success or transactional deletion. See
+[Workspace Coordination and Cleanup Limitations](#workspace-coordination-and-cleanup-limitations)
+for activity refusal, recovery, and the supported operating boundary.
+
+### Irreversible Expiry and Partial Failures
+
+Review `--dry-run` before running explicit cleanup, and retain
+any reports and evidence needed for audit or recovery elsewhere.
+Successful expiry permanently removes **both** the group's managed
+reports and every supporting evaluation directory with its contents.
+Cleanup provides no undo or transactional rollback. Preview is a
+read-only snapshot, not a reservation of future groups; `Run` takes
+fresh options, reacquires exclusive access, and repeats inventory and
+whole-group preflight rather than accepting a saved preview.
+
+Whole-group preflight checks every member before the first deletion,
+including preparing access to every report and evaluation. A failed
+check leaves the entire affected group unchanged and identifies the
+blocking member. This zero-change guarantee for blocked preflight
+does **not** guarantee future I/O success once removal begins.
+
+`Run` finishes removing all group evidence before it starts removing
+reports. An unexpected removal error stops that group immediately:
+
+- If evidence removal fails, all group reports remain unchanged.
+  Earlier evaluations may already be gone, and the failing evaluation
+  may have lost some files or directories. Remaining reports can
+  therefore reference evidence that no longer exists; cleanup does
+  not rewrite those references or restore deleted evidence.
+- If report removal fails, all group evidence is already gone.
+  Earlier reports may also be gone; the failing and unattempted
+  reports remain. The group is not reported as fully deleted.
+
+Inspect cleanup's text output even when it exits nonzero. The CLI
+prints the library's returned `Result` even when `Run` returns an error. It
+identifies the workspace, cutoff, stable group membership, reasons,
+blockers, failures, and totals. Each member has an actual status:
+`deleted` means the entire member including its root was removed;
+`partially-deleted` means some contained entries were removed but the
+member remains; `retained` means this invocation removed nothing from
+that member, even if removal failed before its first successful unlink.
+`RemovedPaths` records exact successful removals, including directories,
+in execution order per member. An unattempted member has no `Failure`.
+Group `PartialLoss` records successful removals in a failed group;
+totals distinguish complete deletions from partial members. These
+results describe this invocation, not later external changes.
+
+Independent safe groups continue after a bounded preflight or removal
+failure, but the invocation still returns an error. Workspace-wide
+refusals such as busy access, unresolved activity, or unbounded report
+relationships stop execution before any deletion; a later workspace
+revalidation failure stops further groups without undoing progress.
+No matches, normal age exclusions, and repeated successful cleanup
+return no error and exit zero. Invalid arguments, missing workspaces,
+coordination or inventory refusal, safety/access failures, removal
+errors, and result-output failures exit nonzero. Execution prints
+per-member successful removals and failures, partial-deletion warnings,
+and totals for deleted, retained, failed, and partially deleted work.
+
+## Workspace Coordination and Cleanup Limitations
+
+Use updated complyctl hosts for operations that share a workspace.
+Host-side coordination protects provider work and report publication
+from conflicting participating operations. This coordination is in
+place for scan, generation, relevant `get` artifact removal, `init`,
+and `clean`, including cleanup preview.
+
+### Coordinated Operations
+
+On Linux and macOS, scan and generation acquire shared access to the
+existing workspace directory. Relevant `get` artifact removal and
+`init` acquire exclusive access; cleanup also requires
+exclusive access. Conflicting access fails promptly rather than
+waiting or starting conflicting work. Workspace aliases contend on
+the same directory, while separate workspaces remain independent.
+Acquiring access does not create a lock file.
+
+Before starting providers, the host persists a uniquely owned activity
+record under `.complytime/coordination/operations/`. If locking or
+record persistence fails, provider startup stops. Generation nested
+inside a scan reuses the scan's access and activity record.
+
+The scan holds access through report publication and normal provider
+shutdown, not merely until a scan response arrives. After provider
+RPCs complete normally and report writes finish, the host completes
+normal provider teardown, removes only its own unchanged activity
+record, and releases access. Handled application errors returned in a
+successful provider response do not imply uncertain completion. A
+handled scan or report-writing error can also release protection
+without a leftover record after normal provider shutdown; this does
+not mean that the scan succeeded or every report was published.
+
+### Interrupted Activity and Cleanup Refusal
+
+Treat a remaining activity record as unresolved activity, not as an
+expired lock. A killed host can lose its kernel lock while a provider
+or provider-launched tool still runs. Host interruption, abnormal or
+forced provider termination, transport failure, or cancellation with
+uncertain completion leaves the record in place. Closing workspace
+access alone does not remove it.
+
+The coordination checks reject unresolved activity even after the
+kernel lock becomes available. Cleanup uses these checks before
+deletion and refuses malformed, unreadable, or unsafe
+coordination state as well. Elapsed time, a missing PID, and provider
+metadata do not establish inactivity or automatically clear records.
+Process identifiers in a record are diagnostic hints, not authority
+to kill processes. There is no automatic stale-record or force-clean
+override; unresolved records block cleanup until manual recovery.
+
+Normal provider completion is the supported host-operation boundary,
+not proof that every arbitrary descendant process has exited. Do not
+clear records merely to bypass refusal: manual recovery requires
+stopping all writers and preventing new scans. Absence of a record
+does not establish that independent writers are absent.
+
+### Interrupted-Scan Recovery
+
+Use this procedure when an unresolved activity error blocks workspace
+access. The error identifies the canonical workspace and exact
+filesystem-discovered paths; the check leaves records intact and
+deletes no reports or evidence. Cleanup preview uses this same
+coordination check and cannot bypass unresolved activity.
+
+1. Pause scheduled jobs and prevent new scans against this workspace.
+   Keep them paused throughout recovery and the subsequent preview.
+2. Stop all writers: affected complyctl hosts, providers, and
+   provider-launched child tools, as well as independent callers.
+   Record contents, elapsed time, and missing or reused PIDs cannot
+   establish that all writers have stopped. Do not kill processes
+   based on recorded PIDs or execute commands from record contents.
+3. If you cannot confidently establish writer shutdown, restart the
+   machine or VM that owns the writers, or stop the complete isolated
+   container environment containing them. Restarting a terminal,
+   complyctl alone, or an unrelated container is insufficient.
+   Prevent automatic job restarts. If other machines or environments
+   can write the workspace, stop those writers too or do not proceed.
+4. Only after all writers have stopped and new scans remain paused,
+   manually remove **only the exact unresolved activity records**
+   identified by the error. This is your assertion of exclusive
+   control, not proof supplied by complyctl. Do not use wildcards or
+   remove the coordination directory, reports, evidence, configuration,
+   or unrelated files. Recover each operation separately; other
+   unresolved records continue blocking access.
+5. Rerun `complyctl clean --older-than 30d --dry-run` with your chosen
+   workspace and age, and review it before explicit cleanup. Removing a
+   record never overrides a live updated host's kernel lock. Preview must
+   still pass all other safety checks; recovery does not authorize deletion.
+
+Malformed and unreadable records require the same precautions. Paths
+come from filesystem discovery, not fields inside the records, and
+diagnostics quote them to escape control characters. Quoted diagnostic
+paths are not shell commands or shell-escaped arguments. Do not
+construct executable shell commands from untrusted record contents.
+
+An error may instead identify an unsafe or inaccessible coordination
+directory. Inspect and repair that specific problem under the same
+stopped-writer conditions; do not recursively delete the directory or
+follow a symlink to clear the error. There is no automatic stale-record
+expiry, PID-killing recovery, or force-clean override. See
+[Interrupted Activity and Cleanup Refusal](#interrupted-activity-and-cleanup-refusal)
+for the normal-completion boundary and why interruption retains records.
+
+### Operating Systems and Filesystems
+
+For exact devcontainer, native macOS, and Docker/Podman verification steps,
+see [Cleanup native-platform testing](EVIDENCE_NATIVE_TESTING.md). The runbook
+separates native matrix evidence from emulated runs and container filesystem
+refusal checks.
+
+The host release matrix targets Linux and macOS (`darwin`), each on
+amd64 and arm64. Cleanup has Linux and Darwin backends for these
+targets; macOS is not an excluded cleanup platform. This support
+boundary is not a claim that all native runtime matrix checks or live
+cross-repository checks are complete. Cross-compilation alone does
+not verify runtime behavior. Operating system support does not imply
+support for every filesystem:
+
+- Linux cleanup requires a local ext4, XFS, Btrfs, or tmpfs workspace.
+- macOS cleanup requires a local APFS workspace.
+- The cleanup support check refuses unknown, network, FUSE, overlay,
+  and HFS+ filesystems. This includes container workspaces on overlay
+  filesystems, even when the host runs Linux.
+
+macOS preflight inspects ACL metadata on the opened file descriptor through
+libSystem, using the vendored PureGo binding on amd64 and arm64. Builds still
+support `CGO_ENABLED=0`; no additional library installation is needed. An ACL,
+unavailable binding, or failed metadata query blocks the affected group rather
+than falling back to a pathname check or assuming that no ACL exists.
+
+The cleanup filesystem allowlist does not apply to ordinary scan or
+generation coordination. Those operations still require working
+locking and activity-record persistence on Linux and macOS; they do
+not silently proceed unprotected on failure. Passing the workspace
+filesystem check alone does not validate descendant mounts or
+authorize deletion. Cleanup also refuses unavailable
+confinement facilities and unsafe or ambiguous mount layouts.
+
+Coordination works with unchanged provider binaries launched by an
+updated host; it requires no new provider RPC or provider-side marker.
+Older hosts, direct provider calls, and independent external writers
+do not participate in these host locks. Running them against the same
+workspace during cleanup is unsupported. Keep the workspace namespace
+stable: external directory moves and administrative mount changes are
+outside the supported operating mode. Windows is not a host release
+target or part of the cleanup support boundary; existing non-cleanup
+commands retain their platform behavior outside Linux and macOS.
+
 ## See Also
 
 - [Quick Start](QUICK_START.md) -- getting started with complyctl

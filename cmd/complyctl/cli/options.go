@@ -22,7 +22,8 @@ type Output struct {
 }
 
 func (o *Common) BindFlags(fs *pflag.FlagSet) {
-	fs.BoolVarP(&o.Debug, "debug", "d", false, "output debug logs to stderr and log file")
+	fs.BoolVarP(&o.Debug, "debug", "d", false,
+		"output debug logs to stderr and log file (clean uses stderr only)")
 	fs.StringVarP(&o.Workspace, "workspace", "w", "", "workspace directory (env: COMPLYTIME_WORKSPACE, default: current directory)")
 }
 

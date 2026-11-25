@@ -20,6 +20,7 @@ import (
 	"github.com/complytime/complyctl/internal/output"
 	"github.com/complytime/complyctl/internal/policy"
 	"github.com/complytime/complyctl/internal/terminal"
+	"github.com/complytime/complyctl/internal/workspacecoord"
 	"github.com/complytime/complyctl/pkg/provider"
 )
 
@@ -368,6 +369,12 @@ func loadWorkspaceConfig(baseDir string) (*complytime.WorkspaceConfig, error) {
 }
 
 func (o *scanOptions) scanPolicy(ctx context.Context, cfg *complytime.WorkspaceConfig, entry complytime.PolicyEntry, targetID, baseDir string) error {
+	return withProviderOperation(baseDir, workspacecoord.OperationScan, func(op *providerOperation) error {
+		return o.scanProtected(ctx, cfg, entry, targetID, baseDir, op)
+	})
+}
+
+func (o *scanOptions) scanProtected(ctx context.Context, cfg *complytime.WorkspaceConfig, entry complytime.PolicyEntry, targetID, baseDir string, op *providerOperation) error {
 	ref, err := complytime.ParsePolicyRef(entry.URL)
 	if err != nil {
 		return fmt.Errorf("invalid policy reference %q: %w", entry.URL, err)
@@ -383,11 +390,10 @@ func (o *scanOptions) scanPolicy(ctx context.Context, cfg *complytime.WorkspaceC
 	assessmentConfigs := policy.ExtractAssessmentConfigs(graph)
 	groups := policy.GroupByEvaluator(assessmentConfigs, graph)
 
-	mgr, err := loadProviders(o.providerDir)
+	mgr, err := op.loadProviders(o.providerDir)
 	if err != nil {
 		return err
 	}
-	defer mgr.Cleanup()
 
 	policyTargets := filterTargetsForPolicy(cfg.Targets, eid)
 	evaluatorIDs := evaluatorIDList(groups)
@@ -426,22 +432,6 @@ func resolveVersionAndGraph(cacheDir string, ref complytime.PolicyRef) (string, 
 		return "", nil, fmt.Errorf("failed to resolve policy graph: %w", err)
 	}
 	return version, graph, nil
-}
-
-func loadProviders(providerDir string) (*provider.Manager, error) {
-	mgr, err := provider.NewManager(providerDir, logger)
-	if err != nil {
-		return nil, fmt.Errorf("provider manager init failed: %w", err)
-	}
-	if err := mgr.LoadProviders(); err != nil {
-		mgr.Cleanup()
-		return nil, fmt.Errorf("provider discovery failed: %w", err)
-	}
-	if len(mgr.ListProviders()) == 0 {
-		mgr.Cleanup()
-		return nil, fmt.Errorf("no providers found in %s (Describe may have failed)", providerDir)
-	}
-	return mgr, nil
 }
 
 func evaluatorIDList(groups map[string]policy.EvaluatorGroup) []string {
