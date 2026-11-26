@@ -22,7 +22,7 @@ func TestLoadDarwinSecurity_InitializationFailures(t *testing.T) {
 	openFailure := errors.New("open failure")
 	lookupFailure := errors.New("lookup failure")
 	closeFailure := errors.New("close failure")
-	for _, failure := range []string{"open", "fgetattrlist", "__error", "null symbol"} {
+	for _, failure := range []string{"open", "fgetattrlist", "null symbol"} {
 		t.Run(failure, func(t *testing.T) {
 			var closed bool
 			var symbols []string
@@ -51,7 +51,6 @@ func TestLoadDarwinSecurity_InitializationFailures(t *testing.T) {
 				})
 			require.Error(t, err)
 			assert.Nil(t, api.read)
-			assert.Nil(t, api.errno)
 			if failure == "open" {
 				assert.ErrorIs(t, err, openFailure)
 				assert.False(t, closed)
@@ -103,6 +102,25 @@ func TestDarwinSecurityAPI_OpenedDescriptorAndErrno(t *testing.T) {
 	buffer, err := api.readSecurity(replacementFD)
 	require.NoError(t, err)
 	require.ErrorContains(t, checkDarwinSecurityBuffer(buffer), "ACL requires retention")
+}
+
+func TestDarwinSecurityAPI_CapturedErrnoSurvivesLaterForeignCall(t *testing.T) {
+	api, err := darwinPreflightSecurity()
+	require.NoError(t, err)
+	read := api.read
+	api.read = func(fd int32, buffer *[darwinSecurityBufferSize]byte) (int32, int32) {
+		result, errno := read(fd, buffer)
+		// Another foreign call on the same thread must not affect the errno
+		// already returned by the binding. This deterministically exercises
+		// the boundary that the concurrent GC stress test also covers.
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		_, laterErr := unix.Open("", unix.O_RDONLY, 0)
+		require.ErrorIs(t, laterErr, unix.ENOENT)
+		return result, errno
+	}
+	_, err = api.readSecurity(math.MaxInt32)
+	require.ErrorIs(t, err, unix.EBADF)
 }
 
 func TestLoadDarwinSecurity_RetainsLibraryForBoundCalls(t *testing.T) {

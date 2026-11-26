@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"unsafe"
 
 	"github.com/ebitengine/purego"
 	"golang.org/x/sys/unix"
@@ -44,38 +45,37 @@ func bindDarwinSecurity(
 	if err != nil {
 		return darwinSecurityAPI{}, fmt.Errorf("resolve fgetattrlist: %w", err)
 	}
-	getErrno, err := lookup(handle, "__error")
-	if err != nil {
-		return darwinSecurityAPI{}, fmt.Errorf("resolve __error: %w", err)
-	}
-	return registerDarwinSecurity(getattr, getErrno)
+	return registerDarwinSecurity(getattr)
 }
 
-func registerDarwinSecurity(getattr, getErrno uintptr) (darwinSecurityAPI, error) {
-	if getattr == 0 || getErrno == 0 {
+func registerDarwinSecurity(getattr uintptr) (darwinSecurityAPI, error) {
+	if getattr == 0 {
 		return darwinSecurityAPI{}, fmt.Errorf("resolve libSystem ACL API: null symbol")
 	}
 	// Public ABI: xnu/bsd/sys/attr.h and bsd/man/man2/getattrlist.2 declare
 	// int fgetattrlist(int, struct attrlist *, void *, size_t, unsigned long).
-	// xnu/bsd/sys/errno.h declares int *__error(void). Both Darwin targets use
-	// 32-bit C int and 64-bit size_t/unsigned long; x/sys supplies attrlist.
+	// Both Darwin targets use 32-bit C int and 64-bit size_t/unsigned long;
+	// x/sys supplies attrlist. SyscallN captures errno in PureGo's Darwin
+	// trampoline before Go runtime bookkeeping can overwrite thread-local errno.
 	// Use the maintained FFI per Constitution V, not private runtime/assembly
 	// stubs or unsupported direct Darwin syscalls. No struct is passed by value.
-	var fgetattrlist func(int32, *unix.Attrlist, *[darwinSecurityBufferSize]byte, uintptr, uint64) int32
-	var errno func() *int32
-	purego.RegisterFunc(&fgetattrlist, getattr)
-	purego.RegisterFunc(&errno, getErrno)
 	return darwinSecurityAPI{
-		read: func(fd int32, buffer *[darwinSecurityBufferSize]byte) int32 {
+		read: func(fd int32, buffer *[darwinSecurityBufferSize]byte) (int32, int32) {
+			if fd < 0 {
+				return -1, int32(unix.EBADF)
+			}
 			attrs := unix.Attrlist{Bitmapcount: unix.ATTR_BIT_MAP_COUNT,
 				Commonattr: unix.ATTR_CMN_EXTENDED_SECURITY}
-			result := fgetattrlist(fd, &attrs, buffer, uintptr(len(buffer)), 0)
+			// Convert pointers only in the SyscallN argument list, as required
+			// by unsafe.Pointer rule 4. Both objects are pointer-free and the
+			// synchronous libSystem call does not retain either pointer.
+			result, _, errno := purego.SyscallN(getattr, uintptr(fd),
+				uintptr(unsafe.Pointer(&attrs)), uintptr(unsafe.Pointer(buffer)), uintptr(len(buffer)), 0)
 			// fgetattrlist is synchronous and retains neither pointer. Keep the
 			// pointer-free Go storage alive until libSystem has finished with it.
 			runtime.KeepAlive(&attrs)
 			runtime.KeepAlive(buffer)
-			return result
+			return darwinSecurityCallResult(result, errno)
 		},
-		errno: errno,
 	}, nil
 }

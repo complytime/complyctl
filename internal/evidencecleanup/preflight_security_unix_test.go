@@ -20,7 +20,6 @@ func TestDarwinSecurityAPI_ReadSecurity(t *testing.T) {
 		fd     int
 		result int32
 		errno  int32
-		nilErr bool
 		want   error
 		reason string
 	}{
@@ -31,29 +30,20 @@ func TestDarwinSecurityAPI_ReadSecurity(t *testing.T) {
 		{name: "unsupported", fd: 42, result: -1, errno: int32(unix.ENOTSUP), want: unix.ENOTSUP},
 		{name: "bad descriptor", fd: math.MaxInt32, result: -1,
 			errno: int32(unix.EBADF), want: unix.EBADF},
-		{name: "missing errno storage", fd: 42, nilErr: true, reason: "unavailable errno storage"},
 		{name: "missing error code", fd: 42, result: -1, reason: "invalid libSystem result"},
 		{name: "negative error code", fd: 42, result: -1, errno: -1, reason: "invalid libSystem result"},
 		{name: "invalid result", fd: 42, result: 1, errno: int32(unix.EACCES),
 			reason: "invalid libSystem result"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			var calls, errnoCalls int
+			var calls int
 			api := darwinSecurityAPI{
-				errno: func() *int32 {
-					errnoCalls++
-					if test.nilErr {
-						return nil
-					}
-					return &test.errno
-				},
-				read: func(fd int32, buffer *[darwinSecurityBufferSize]byte) int32 {
+				read: func(fd int32, buffer *[darwinSecurityBufferSize]byte) (int32, int32) {
 					calls++
 					assert.EqualValues(t, test.fd, fd)
-					assert.Equal(t, 1, errnoCalls, "errno address must be fetched before the call")
 					assert.Equal(t, [darwinSecurityBufferSize]byte{}, *buffer)
 					binary.LittleEndian.PutUint32(buffer[:4], 12)
-					return test.result
+					return test.result, test.errno
 				},
 			}
 			buffer, err := api.readSecurity(test.fd)
@@ -67,14 +57,34 @@ func TestDarwinSecurityAPI_ReadSecurity(t *testing.T) {
 				require.NoError(t, checkDarwinSecurityBuffer(buffer))
 			}
 			if test.fd < 0 || test.fd > math.MaxInt32 {
-				assert.Zero(t, errnoCalls)
-				assert.Zero(t, calls)
-			} else if test.nilErr {
-				assert.Equal(t, 1, errnoCalls)
 				assert.Zero(t, calls)
 			} else {
 				assert.Equal(t, 1, calls)
 			}
+		})
+	}
+}
+
+func TestDarwinSecurityCallResult_CIntValues(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		result, errno uintptr
+		wantResult    int32
+		wantErrno     int32
+	}{
+		{name: "success"},
+		{name: "bad descriptor", result: math.MaxUint32, errno: uintptr(unix.EBADF),
+			wantResult: -1, wantErrno: int32(unix.EBADF)},
+		{name: "upper register bits", result: ^uintptr(0), errno: (uintptr(7) << 32) | uintptr(unix.EBADF),
+			wantResult: -1, wantErrno: int32(unix.EBADF)},
+		{name: "invalid errno", result: math.MaxUint32, errno: math.MaxUint32, wantResult: 1},
+		{name: "invalid negative result", result: math.MaxUint32 - 1, wantResult: 1},
+		{name: "invalid positive result", result: 42, wantResult: 42},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			result, errno := darwinSecurityCallResult(test.result, test.errno)
+			assert.Equal(t, test.wantResult, result)
+			assert.Equal(t, test.wantErrno, errno)
 		})
 	}
 }
