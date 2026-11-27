@@ -155,6 +155,84 @@ authorize committing, pushing, or starting implementation.
   `/uf.review-council` before PR submission; resolve blocking findings
   and verify no code changes occur after the approving review.
 
+## 6. PR #991 accepted feedback: specification only
+
+These tasks track accepted items 2 (duration) and 3 (output). Item 1
+(mount tests, Testing Farm, and gates) remains HELD and MUST NOT be
+changed by this follow-up. Prior completion states, including 5.4,
+MUST remain intact. New tasks MUST stay unchecked in this spec phase.
+
+- [x] 6.1 Review proposal, design, and requirements for strict `d/h/m`
+  parsing, unit bounds, exact durations, one UTC capture, and the
+  unchanged exclusive cutoff (FR-001 through FR-003).
+- [x] 6.2 Review concise/verbose text and versioned JSON contracts,
+  early-error token handling, null unknowns, service-owned outcomes,
+  failure visibility, and stdout-failure recovery. Confirm FR-006,
+  FR-007, FR-013, FR-017, and FR-018 agree; no behavioral or gate
+  changes are authorized beyond the accepted duration/output fixes.
+- [ ] 6.3 Validate, commit, and push the spec update before source work
+  begins, using the user's explicit execution authorization.
+
+## 7. PR #991 accepted feedback: source and reference updates
+
+Source work MUST wait for 6.1 through 6.3. It MUST NOT alter existing
+grouping, eligibility checks, deletion order, coordination, or exit
+semantics. Presentation MUST preserve underlying service failures.
+
+- [ ] 7.1 Extend the duration parser with strict single-unit `d/h/m`
+  grammar and pre-multiplication unit bounds. Preserve one UTC clock
+  capture and the exclusive cutoff (FR-002, FR-003).
+- [ ] 7.2 Add service-owned structured statuses, reason codes,
+  exclusions, and exact removed-path progress, including contained
+  removals before failure. Keep rendering separate from service policy
+  and do not derive structured outcomes from English text (FR-017).
+- [ ] 7.3 Add concise default and verbose text renderers, report and
+  evaluation outcome totals, plain age reasons, and unhidden safety,
+  access, discovery, and partial errors (FR-006, FR-007, FR-013).
+- [ ] 7.4 Add `--format text|json`, the complete versioned envelope,
+  nullable unknowns, one-document stdout, and clean-local early-error
+  handling including format tokens after invalid arguments/flags.
+  Keep verbose JSON unfiltered and diagnostics on stderr (FR-017,
+  FR-018).
+- [ ] 7.5 Preserve write errors together with service errors and emit
+  available exact progress/recovery details to writable stderr without
+  deletion retries or duplicate JSON output (FR-018).
+- [ ] 7.6 Update clean help, evidence guidance, command reference/man
+  page, and changelog for accepted duration/output changes. Retain
+  irreversible/non-transactional warnings and move routine reference
+  text out of successful output. Assess README and AGENTS impact;
+  leave user-owned untracked documents alone (FR-006, FR-007, FR-013).
+
+## 8. PR #991 accepted feedback: verification
+
+- [ ] 8.1 Add table-driven duration tests for all units, rejected
+  grammar, minimums, exact per-unit maxima and maxima plus one,
+  integer parse overflow, equivalent durations, daylight saving,
+  and before/at/after cutoff decisions (FR-002, FR-003).
+- [ ] 8.2 Test concise execution/preview summaries, unique member
+  counts, ordinary age reasons without `Blocker`, verbose detail,
+  exclusions, mixed age/safety findings, and partial/failed member
+  totals with exact progress (FR-006, FR-007, FR-013, FR-016).
+- [ ] 8.3 Test one JSON document through EOF for preview, execution,
+  failure, verbose, and debug; assert schema, null unknowns, partial
+  inventories, typed reasons, exclusions, exact removed paths, and
+  structured errors without parsing English (FR-017).
+- [ ] 8.4 Test missing required age, bad positional arguments, invalid
+  values, unknown/malformed flags, both format spellings/orderings,
+  repeated formats, unreadable final format, and `--` boundaries.
+  Assert early JSON errors start no service/hooks/logs and preserve
+  null unknowns and known-empty removal progress (FR-018).
+- [ ] 8.5 Inject stdout failures in text and JSON, with and without
+  service failure/partial progress; assert nonzero, preserved causes,
+  stderr recovery/progress, and no deletion retry. Verify preview is
+  read-only in default, verbose, JSON, and debug modes (FR-007,
+  FR-018).
+- [ ] 8.6 Run applicable existing CI-parity checks and spec validation
+  for these fixes; record unavailable checks separately. Reassess
+  documentation consistency and run the existing required review.
+  MUST NOT change mount tests, Testing Farm, task 5.4, workflows, or
+  quality gates as part of this feedback scope.
+
 ## Workflow follow-up
 
 - Preserve the user's report of team-lead confirmation of grouped
