@@ -28,6 +28,12 @@ transactional rollback after an unexpected filesystem failure. This
 replaces the earlier report-preserving policy and the issue's proposed
 exclusion of host reports; see proposal provenance.
 
+PR #991 items 2 and 3 amend only duration input and output contracts.
+Item 1 (mount tests, Testing Farm, and gates) remains HELD. Existing
+platform obligations remain unchanged; this follow-up MUST NOT alter
+their tests, task states, or gates. Implementation MUST wait for the
+parent to commit and push this specification update.
+
 Sources inspected during specification:
 
 - Provider `internal/evidence/storage_linux.go`: allocation, `Close`,
@@ -68,9 +74,9 @@ Sources inspected during specification:
 ### 1. Keep the CLI thin
 
 Add `cmd/complyctl/cli/clean.go` for argument validation, workspace
-resolution, service invocation, and text output. Put candidate policy
-and deletion orchestration in `internal/evidencecleanup/`. Put shared
-workspace protection in `internal/workspacecoord/` for reuse by scan,
+resolution, service invocation, and text/JSON output. Put candidate
+policy and deletion orchestration in `internal/evidencecleanup/`.
+Put shared workspace protection in `internal/workspacecoord/` for scan,
 generate, get, and init where their lifetimes overlap managed storage.
 The names describe responsibilities rather than provider types.
 
@@ -84,10 +90,17 @@ Do not assume `os.Root` alone rejects symlinks or mount crossings.
 
 ### 2. Build complete groups before applying collection-start age
 
-Accept canonical `[1-9][0-9]*d` input, rejecting leading zeroes and
-arithmetic overflow. Bound the parsed count before converting days
-to the duration representation. Capture invocation time once and
-subtract exact 24-hour periods, not calendar days.
+Accept only `[1-9][0-9]*[dhm]`: one positive decimal integer and one
+lowercase unit. Reject leading zeroes, fractions, signs, compounds,
+whitespace, missing units, and other units. Before multiplication,
+bound the count by `floor(MaxInt64 / unitNanoseconds)` and reject
+integer parse overflow. The inclusive maxima are `106751d`,
+`2562047h`, and `153722867m`; each maximum plus one MUST fail.
+Capture invocation time once in UTC and subtract the duration once.
+Days mean exactly 24 hours, hours 60 minutes, and minutes 60 seconds;
+calendar boundaries and daylight saving MUST NOT alter the cutoff.
+The exclusive cutoff and all collection-start selection rules remain
+unchanged. Equivalent durations MUST give identical fixed-clock plans.
 
 Traverse the three approved provider results roots and the managed
 report directory, `.complytime/scan/`. Provider intermediate labels
@@ -293,12 +306,122 @@ debug diagnostics go to stderr. Cleanup does not load providers,
 resolve policies, contact registries, or require a valid policy config
 to remove otherwise recognized accumulated evidence.
 
-Print workspace, invocation cutoff in UTC, expiry consequences, and
-stable group membership and relative paths with status and reasons.
-Name the blocking member and explain that the entire group is retained.
-Preview uses
-`would-delete`; execution uses `deleted`. Every invocation discovers
-its own candidates under its own exclusive access.
+Default text MUST show the workspace and concise report/evaluation
+totals: deleted and kept for execution, would-delete and kept for
+preview. Preview MUST clearly say no deletion occurred. Ordinary age
+retention MUST use a plain age reason, never a `Blocker` label. Full
+paths, stable group/member detail, exclusion detail, and removal
+progress belong in `--verbose` text. Exact UTC cutoff and capture time
+MUST remain available in verbose text and JSON. Generic safety and
+platform reference text belongs in help and evidence documentation,
+not repeated on successful runs. Help MUST retain irreversible
+report/evidence deletion and non-transactional failure warnings.
+Every invocation discovers its own candidates under exclusive access.
+
+Concise execution example for a single too-new evaluation and report:
+
+```text
+Workspace: /home/analyst/workspace
+Nothing to clean: no report/evaluation groups qualify for deletion.
+Kept: 1 report and 1 evaluation (evaluation newer than the 30-day cutoff).
+```
+
+The displayed reason MUST distinguish newer, equal-cutoff, and future
+timestamps. Summary counts MUST count unique report files and
+evaluation units, not groups or contained evidence files. Partial
+evaluations MUST NOT count as fully deleted or wholly kept; summaries
+MUST identify partial/failed members separately. Preview MUST NOT
+count planned removals as actual deletions.
+
+Safety, access, discovery, and partial-removal failures MUST remain
+actionable in default text and JSON, even alongside ordinary age
+retention. Rendering MUST NOT stop after the first age reason and
+hide an already-known safety failure. Name affected paths/members,
+retained groups, actual partial loss, and recovery steps where needed.
+This is presentation of service findings, not a new preflight policy.
+
+### 5a. Versioned output and command-local validation errors
+
+`--format` MUST accept only `text` and `json`, defaulting to `text`.
+`--verbose` MUST affect text detail only; it MUST NOT filter JSON
+fields or change the schema or outcomes. The service MUST own typed
+statuses, reason codes, exclusions, and removal progress. Renderers
+MUST NOT infer outcomes by parsing English errors or reason strings.
+This follows separation of concerns; presentation changes MUST NOT
+change service selection, deletion ordering, or exit decisions.
+
+JSON schema version 1 MUST contain these top-level fields on success
+and failure, with UTC timestamps serialized as RFC 3339 strings:
+
+- `schema_version`: integer `1`.
+- `mode`: `preview` or `execution`, null only if intent is unreadable.
+- `workspace`: resolved absolute path, or null if unresolved.
+- `captured_time` and `cutoff`: exact service times, null if unknown.
+- `totals`: null before inventory, otherwise an object with `reports`
+  and `evaluations` objects, each containing `deleted`, `kept`,
+  `would_delete`, `partial`, and `failed` counts. Unknown counts MUST
+  be null, not fabricated zeroes. Partial/failed counts MAY overlap;
+  deleted and kept MUST count only complete member outcomes.
+- `groups`: stable ordered group objects with `id`, `status`,
+  `reasons`, `members`, `removed_paths`, and `error`.
+- `exclusions`: ordered objects with `path`, `status`, and `reasons`.
+- `removed_paths`: exact workspace-relative paths actually removed,
+  in removal order, including contained paths removed before failure.
+- `error`: null or an object with `code`, `message`, `paths`,
+  `recovery_steps`, and `causes` for combined underlying errors.
+
+Members MUST have `path`, `kind` (`report` or `evaluation`), `status`,
+`reasons`, `removed_paths`, and `error`. Group/member errors MUST use
+the top-level error shape, or null when no error applies.
+Group/member status values MUST be
+`would_delete`, `deleted`, `kept`, `blocked`, `partial`, or `failed`;
+exclusions MUST use `excluded`. Each reason MUST carry a stable
+`code`, human `message`, and affected `paths`. Centralized codes MUST
+distinguish ordinary age outcomes from safety, access, discovery,
+coordination, and removal failures. A group MAY have multiple reasons.
+Messages MAY evolve without changing code meaning. Group membership
+MUST remain available after partial execution. Group and top-level
+errors MUST expose known failures without requiring English parsing.
+
+Unknown inventory arrays MUST be null; known-empty arrays MUST be
+empty arrays. Known partial inventories MUST retain discovered
+entries, with unknown totals null and a discovery error explaining
+incompleteness. Known no-removal progress MUST be an empty array even
+on validation failure. Unknown workspace, times, or totals MUST NOT
+be fabricated by reading workspace state merely to render an error.
+
+JSON MUST be exactly one stdout document, followed by a newline,
+without banners, progress lines, usage text, or debug diagnostics.
+Diagnostics MUST use stderr only, without creating files. Buffering
+the final result before encoding avoids progress document streams.
+`--verbose --format json` MUST retain the same complete schema.
+
+Missing required age, bad arguments, invalid age/format, and flag
+parse errors MUST use this envelope when JSON intent is readable.
+Use clean-local argument validation and a clean-local flag-error
+handler, plus narrowly scoped error-output suppression if required.
+A broad root-command rewrite or changes to other commands are out
+of scope. Normal Cobra parsing MUST remain authoritative for errors.
+
+For error rendering only, inspect clean's raw argument tokens before
+the first literal `--`, including tokens after an invalid argument
+or flag. Recognize exact `--format=json` and `--format json` forms;
+for repeats, the last explicit format occurrence wins. A missing
+value or value beginning with `--` is unreadable, not JSON intent.
+An invalid or unreadable final format MUST fall back to stderr text
+errors. Tokens after `--` MUST NOT select format. This narrow lexical
+rule MUST NOT repair invalid arguments or allow service execution.
+Requested mode follows readable `--dry-run` Boolean intent; invalid
+Boolean intent MUST yield null. Early parse errors MUST NOT enter
+workspace hooks or initialize logging. Root error/usage printing MUST
+NOT append another stdout document or replace the structured result.
+
+On stdout write failure, return nonzero and preserve both the write
+error and any underlying service error. Do not retry with a second
+JSON document or turn partial cleanup into apparent success. Emit
+available recovery instructions and exact partial progress to stderr,
+even without verbose, when stderr remains writable. Output failure
+MUST NOT trigger rollback, retries of deletion, or new exit semantics.
 
 ### 6. Confine removal and revalidate candidate identity
 
@@ -420,7 +543,7 @@ specification's implementation scope.
 ## Risks / Trade-offs
 
 - Independent callers ignore host locks → document the accepted support
-  boundary in command help, preview, execution output, and guidance.
+  boundary in command help and guidance, without routine output noise.
 - Host interruption can block later cleanup → retain activity records
   and fail closed, with documented manual recovery after writers stop;
   automatic process-killing recovery is outside this increment.

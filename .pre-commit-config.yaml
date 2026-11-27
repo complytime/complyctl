@@ -6,7 +6,9 @@ repos:
       rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c #v6.0.0
       hooks:
           - id: trailing-whitespace
+            exclude: '^(vendor/|\.opencode/commands/uf\.(review-council|review-pr|address-feedback)\.md$)'
           - id: end-of-file-fixer
+            exclude: '^(vendor/|\.opencode/commands/uf\.(review-council|review-pr|address-feedback)\.md$)'
           - id: check-yaml
           - id: check-added-large-files
             exclude: "^internal/complytime/testdata/openscap/ssg-rhel-ds.xml$"
@@ -14,6 +16,7 @@ repos:
       rev: fb24a639f7c938759fe56eeebbb7713b69d60494 #v0.5.1
       hooks:
           - id: go-fmt
+            exclude: ^vendor/
           #- id: go-imports
           #- id: no-go-testing
           #- id: golangci-lint
@@ -22,6 +25,7 @@ repos:
     - repo: local
       hooks:
           - id: check-spdx
+            exclude: ^vendor/
             name: Check and fix SPDX line in source files
             entry: python ./scripts/check-and-fix-spdx.py
             language: system

@@ -4,6 +4,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,9 +27,11 @@ type Provider interface {
 
 // Manager handles provider discovery, lifecycle, and request routing.
 type Manager struct {
-	discovery *Discovery
-	plugins   map[string]*LoadedProvider
-	logger    hclog.Logger
+	discovery        *Discovery
+	plugins          map[string]*LoadedProvider
+	logger           hclog.Logger
+	clients          []*Client
+	startupUncertain bool
 }
 
 // LoadedProvider pairs discovery metadata with a live gRPC client.
@@ -62,8 +65,13 @@ func (m *Manager) LoadProviders() error {
 	for _, info := range providerInfos {
 		client, err := NewClient(info.ExecutablePath, goPluginLogger)
 		if err != nil {
+			// NewClient has already attempted teardown, but failed startup
+			// cannot establish the normal provider-operation boundary.
+			m.startupUncertain = true
 			return fmt.Errorf("failed to create client for provider %s: %w", info.ProviderID, err)
 		}
+		// Retain even skipped or superseded clients for shutdown accounting.
+		m.clients = append(m.clients, client)
 
 		descCtx, descCancel := context.WithTimeout(context.Background(), describeTimeout)
 		descResp, descErr := client.Describe(descCtx, &DescribeRequest{})
@@ -123,6 +131,24 @@ func (m *Manager) ListProviders() []*LoadedProvider {
 // Cleanup kills all managed provider subprocesses. Call via defer after LoadProviders.
 func (m *Manager) Cleanup() {
 	goplugin.CleanupClients()
+}
+
+// CleanupNormal closes only this manager's subprocesses and reports whether all
+// started clients completed RPCs and exited normally. Any RPC error (including
+// cancellation), failed startup, prior exit, or forced termination returns an
+// error, even if the provider PID has stopped. Handled errors in successful RPC
+// responses do not imply uncertain completion. Repeated calls retain the result.
+// Call after all RPCs and publication have finished, never concurrently with them.
+// This is a host-operation boundary, not proof about arbitrary descendant tools.
+func (m *Manager) CleanupNormal() error {
+	var err error
+	if m.startupUncertain {
+		err = fmt.Errorf("provider startup did not complete normally")
+	}
+	for _, client := range m.clients {
+		err = errors.Join(err, client.closeNormal())
+	}
+	return err
 }
 
 // RouteGenerate dispatches a GenerateRequest to the provider matching evaluatorID.

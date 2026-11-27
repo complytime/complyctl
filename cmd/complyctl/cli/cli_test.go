@@ -2846,7 +2846,7 @@ func TestInvalidateGenerationForComplypack_InvalidatesOnFetch(t *testing.T) {
 	require.NoError(t, err)
 
 	// 4. Call invalidateGenerationForComplypack.
-	invalidateGenerationForComplypack(loadedState, "registry.example.com/packs/opa", baseDir)
+	require.NoError(t, invalidateGenerationForComplypack(loadedState, "registry.example.com/packs/opa", baseDir))
 
 	// 5. Verify generation state file is removed.
 	loaded, err := policy.LoadGenerationState(baseDir, "test-policy")
@@ -2878,7 +2878,7 @@ func TestInvalidateGenerationForComplypack_NoOpWhenRepositoryUnknown(t *testing.
 	loadedState, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	invalidateGenerationForComplypack(loadedState, "registry.example.com/packs/unknown", baseDir)
+	require.NoError(t, invalidateGenerationForComplypack(loadedState, "registry.example.com/packs/unknown", baseDir))
 
 	// Generation state should be preserved.
 	loaded, err := policy.LoadGenerationState(baseDir, "test-policy")
@@ -2914,7 +2914,7 @@ func TestInvalidateGenerationForComplypack_NestedPolicyID(t *testing.T) {
 	loadedState, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	invalidateGenerationForComplypack(loadedState, "registry.example.com/packs/opa", baseDir)
+	require.NoError(t, invalidateGenerationForComplypack(loadedState, "registry.example.com/packs/opa", baseDir))
 
 	loaded, err := policy.LoadGenerationState(baseDir, "policies/nested-policy")
 	assert.NoError(t, err)
@@ -2950,7 +2950,7 @@ func TestInvalidateGenerationForComplypack_NoOpWhenEvaluatorIDEmpty(t *testing.T
 	loadedState, err := cache.LoadState(cacheDir)
 	require.NoError(t, err)
 
-	invalidateGenerationForComplypack(loadedState, "registry.example.com/packs/opa", baseDir)
+	require.NoError(t, invalidateGenerationForComplypack(loadedState, "registry.example.com/packs/opa", baseDir))
 
 	// Generation state should be preserved.
 	loaded, err := policy.LoadGenerationState(baseDir, "test-policy")
@@ -3078,7 +3078,7 @@ func TestDebugFlagDescription(t *testing.T) {
 	cmd := New()
 	f := cmd.PersistentFlags().Lookup("debug")
 	require.NotNil(t, f)
-	assert.Equal(t, "output debug logs to stderr and log file", f.Usage)
+	assert.Equal(t, "output debug logs to stderr and log file (clean uses stderr only)", f.Usage)
 }
 
 // TestEnableDebug_NonexistentLogDir verifies that when the workspace directory

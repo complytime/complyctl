@@ -9,8 +9,9 @@ as preflighted groups, coordinated with supported complyctl activity.
 
 ### Requirement: FR-001 Explicit workspace-scoped command
 
-The CLI MUST provide `clean --older-than <days>d` with optional
-`--dry-run`, no positional arguments, and no implicit age default.
+The CLI MUST provide `clean --older-than <duration>` with optional
+`--dry-run`, `--verbose`, and `--format text|json`. It MUST accept no
+positional arguments and MUST NOT have an implicit age default.
 It MUST honor the existing workspace flag, environment variable, and
 default precedence. It MUST NOT require registry access, credentials,
 provider installation, or policy resolution to clean existing evidence.
@@ -26,13 +27,25 @@ provider installation, or policy resolution to clean existing evidence.
 - **WHEN** cleanup is invoked
 - **THEN** it returns nonzero before changing the workspace
 
-### Requirement: FR-002 Positive day-based threshold
+### Requirement: FR-002 Positive single-unit duration threshold
 
-The threshold MUST contain a positive whole number followed by `d`.
-A day MUST mean 24 hours. Missing, zero, negative, fractional,
-whitespace-padded, unsupported-unit, and overflowing thresholds MUST
-fail before mutation. The command MUST capture one UTC time and cutoff
-for the entire invocation.
+The threshold MUST match `[1-9][0-9]*[dhm]`: a positive decimal integer
+and exactly one lowercase day, hour, or minute unit. It MUST reject
+integer parse overflow and apply the selected unit's bound before
+multiplication. One captured UTC time MUST determine one exclusive
+cutoff for the invocation.
+
+#### Scenario: Duration grammar and unit conversion
+- **GIVEN** an explicit cleanup threshold
+- **WHEN** the parser validates and converts it
+- **THEN** a day MUST mean 24 hours, an hour 60 minutes, and a minute
+  60 seconds, not calendar subtraction
+- **AND** missing, zero, leading-zero, signed, fractional, compound,
+  whitespace-containing, unsupported-unit, and overflowing values
+  MUST fail before mutation
+- **AND** integer parsing MUST reject overflow
+- **AND** before multiplication, the count MUST be bounded by
+  `floor(MaxInt64 / unitNanoseconds)` for the selected unit
 
 #### Scenario: Valid threshold
 - **GIVEN** the invocation time is 2026-11-18T12:00:00Z
@@ -40,8 +53,25 @@ for the entire invocation.
 - **THEN** the cutoff is 2026-10-19T12:00:00Z for every candidate
 
 #### Scenario: Invalid threshold
-- **WHEN** the threshold is `0d`, `-1d`, `1.5d`, `30h`, or overflows
+- **WHEN** input is `0d`, `01h`, `+1m`, `-1d`, `1.5d`, or `1h30m`
+- **OR** it contains whitespace, lacks a unit, uses `D` or `s`,
+  or exceeds the unit's bound
 - **THEN** cleanup fails without deleting evidence
+
+#### Scenario: Equivalent units and exclusive boundaries
+- **GIVEN** one fixed UTC invocation time
+- **WHEN** thresholds are `1d`, `24h`, and `1440m`
+- **THEN** they produce identical cutoffs and group decisions
+- **AND** evaluations exactly at the cutoff remain retained
+- **AND** `1h` and `60m` also produce identical decisions
+- **AND** daylight saving and calendar boundaries do not affect age
+
+#### Scenario: Maximum safe multiplication by unit
+- **GIVEN** the duration representation is signed 64-bit nanoseconds
+- **WHEN** parsing `106751d`, `2562047h`, or `153722867m`
+- **THEN** each is accepted without arithmetic overflow
+- **AND** increasing any count by one fails before multiplication
+- **AND** an integer too large to parse also fails without mutation
 
 ### Requirement: FR-003 Collection-start age selection
 
@@ -111,8 +141,14 @@ Cleanup MUST delete an eligible group's managed reports and supporting
 evaluations together in scope, after whole-group preflight. It MUST
 finish evidence removal before starting report removal. If preflight
 fails, every group member MUST remain unchanged. Retained reports
-MUST NOT have their references rewritten to newer evidence. Help and
-preview MUST explain report deletion and the non-transactional limit.
+MUST NOT have their references rewritten to newer evidence.
+
+#### Scenario: Explain irreversible expiry without routine noise
+- **WHEN** the user reads help or evidence documentation
+- **THEN** it MUST explain irreversible report/evidence deletion and
+  the non-transactional limit
+- **AND** preview MUST label planned removals and state no deletion
+  occurred, without repeating reference warnings on successful runs
 
 #### Scenario: Expire a fully eligible report group
 - **GIVEN** all reports and evidence in a group pass preflight
@@ -134,15 +170,17 @@ preview MUST explain report deletion and the non-transactional limit.
 ### Requirement: FR-007 Non-mutating preview
 
 `--dry-run` MUST use the same cutoff, grouping, whole-group preflight,
-and coordination checks as execution and report every group member
-without changing workspace files. It MUST NOT create a lock file,
+and coordination checks as execution, with concise default output
+and full group/member detail in verbose text and JSON. It MUST NOT
+change workspace files or create a lock file,
 activity record, configuration, debug log, or report. A preview MUST
 NOT authorize or freeze candidates for a later cleanup invocation.
 
 #### Scenario: Preview a workspace with accumulated evidence
 - **GIVEN** eligible evidence and no coordination files exist
 - **WHEN** the user requests a preview, including with debug enabled
-- **THEN** paths and reasons are printed
+- **THEN** the default summary clearly states no deletion occurred
+- **AND** verbose text and JSON expose paths and reasons
 - **AND** workspace bytes remain unchanged
 - **AND** diagnostics use streams rather than new log files
 
@@ -265,16 +303,59 @@ they MUST NOT authorize extra deletion roots or remote access.
 
 ### Requirement: FR-013 Results and exit status
 
-Output MUST identify workspace, cutoff, stable group membership,
-per-member status, reasons, and totals. A blocked preflight MUST name
-the blocking member and show the entire group retained. No matches
-and normal age exclusions MUST return zero. Busy, unsafe or incomplete
-discovery, preflight access failures, and deletion errors MUST return
-nonzero. Independent safe groups MUST remain independently actionable.
+No matches and normal age exclusions MUST return zero. Busy, unsafe
+or incomplete discovery, preflight access failures, and deletion
+errors MUST return nonzero. Independent safe groups MUST remain
+independently actionable. Text MUST be concise by default and keep
+actionable failures visible; verbose text and JSON MUST expose full
+outcome detail.
+
+#### Scenario: Default summary and detailed outcome presentation
+- **GIVEN** cleanup has service outcomes to render
+- **WHEN** the user selects text output
+- **THEN** text MUST be the default format and follow these contracts
+
+Default output MUST identify the
+workspace and summarize unique report/evaluation deleted and kept
+counts, using would-delete counts for preview. It MUST explain
+ordinary age retention without calling it a `Blocker`. Fully deleted
+counts MUST NOT include partial members; partial/failed outcomes MUST
+be identified separately. Verbose text MUST add exact UTC captured
+time/cutoff, paths, stable group/member reasons, exclusions, and
+removal progress. JSON MUST retain full detail regardless of verbose.
+
+Actionable safety, access, discovery, coordination, and partial-failure
+diagnostics MUST remain visible in nonverbose text and JSON error/group
+fields. A failed preflight MUST name the affected member and retained
+group even alongside normal age reasons. Generic platform and safety
+reference text MUST reside in help/documentation rather than repeated
+successful output.
 
 #### Scenario: No matches or repeated cleanup
 - **WHEN** no eligible evaluation remains
 - **THEN** cleanup succeeds with zero deleted items
+
+#### Scenario: Concise ordinary age retention
+- **GIVEN** one report references one evaluation newer than `30d`
+- **WHEN** execution uses default text output
+- **THEN** stdout shows the resolved workspace first
+- **AND** it says no report/evaluation groups qualify for deletion
+- **AND** it summarizes one kept report and one kept evaluation
+- **AND** it explains the newer-than-30-day-cutoff reason
+- **AND** it omits member paths, `Blocker`, and routine safety warnings
+
+#### Scenario: Mixed age and safety retention
+- **GIVEN** results contain an ordinary age reason and a safety failure
+- **WHEN** rendered without verbose in text or JSON
+- **THEN** the safety failure remains actionable with affected paths
+- **AND** age retention does not hide the failure or nonzero exit
+
+#### Scenario: Verbose preview stays read-only
+- **GIVEN** a synthetic workspace with eligible and excluded entries
+- **WHEN** preview runs in default, verbose, or JSON mode with debug
+- **THEN** summaries distinguish would-delete from actual deletion
+- **AND** verbose text and JSON include members and exclusions
+- **AND** no workspace bytes, logs, or coordination files change
 
 #### Scenario: Blocked group and independent eligible group
 - **GIVEN** one group has a preflight access failure
@@ -368,3 +449,98 @@ files MUST NOT be required or promised.
 - **WHEN** an unexpected error interrupts report removal
 - **THEN** cleanup stops the group and reports exact partial progress
 - **AND** it does not report the group as fully deleted
+
+### Requirement: FR-017 Versioned structured cleanup output
+
+`--format` MUST accept only `text` or `json`, defaulting to `text`.
+JSON MUST emit one stdout document and newline on success or failure
+when stdout is writable. Diagnostics MUST go to stderr only. JSON
+MUST NOT contain progress documents, banners, usage, or debug text.
+`--verbose` MUST NOT filter JSON data or change its schema.
+
+#### Scenario: Complete versioned result envelope
+- **GIVEN** a cleanup result or error with known or unknown context
+- **WHEN** the command renders JSON
+- **THEN** it MUST use the following complete envelope contract
+
+Schema version 1 MUST include `schema_version`, `mode`, `workspace`,
+`captured_time`, `cutoff`, `totals`, `groups`, `exclusions`,
+`removed_paths`, and `error`, as defined in design decision 5a.
+Mode MUST be `preview` or `execution`, or null if intent is unreadable.
+Workspace MUST be the resolved absolute path when known. Times MUST
+be exact captured UTC RFC 3339 values when known. Unknown fields and
+totals MUST be null, not invented values or zeroes. Unknown inventory
+MUST be null, distinct from known-empty arrays. Partial inventories
+MUST preserve known entries and mark incomplete totals unknown.
+
+Groups and members MUST expose typed statuses, stable reason codes,
+affected paths, and exact removal progress from service-owned data.
+Exclusions MUST expose structured outcomes. Renderers MUST NOT parse
+English messages to infer status, reason codes, or error categories.
+Structured errors MUST include code, message, paths, recovery steps,
+and causes where applicable. Exact removed paths MUST include actual
+contained-path removals before a member fails. JSON MUST NOT claim
+planned, remaining, or failed removals succeeded. These additions MUST
+NOT change grouping, eligibility, deletion order, coordination, or
+existing exit decisions.
+
+#### Scenario: One JSON document on success and service failure
+- **GIVEN** preview, successful execution, or partial deletion failure
+- **WHEN** output uses JSON with or without verbose and debug
+- **THEN** stdout decodes once and the next decode reaches EOF
+- **AND** schema and complete outcome detail do not depend on verbose
+- **AND** diagnostics appear only on stderr without file logging
+- **AND** partial failures retain exact removed paths and group errors
+- **AND** incomplete members do not count as fully deleted or kept
+
+### Requirement: FR-018 Early errors and output failures
+
+Readable JSON intent MUST cover validation and flag-parse failures,
+even after bad arguments/flags, using decision 5a's clean-local token
+rule. Normal Cobra validation MUST remain authoritative. Output
+failure MUST preserve nonzero and any underlying service error.
+
+#### Scenario: Error rendering without broad command changes
+- **GIVEN** clean validation fails before service invocation
+- **WHEN** the command selects the error format
+- **THEN** clean-local handling MUST follow decision 5a before `--`,
+  with the last explicit format occurrence winning
+- **AND** invalid or unreadable final format MUST use stderr text
+- **AND** the probe MUST NOT repair input, execute cleanup, initialize
+  workspace hooks, or create logs
+- **AND** unrelated command changes and broad root rewrites remain
+  outside scope
+
+#### Scenario: Preserve available context on early and write errors
+- **GIVEN** early validation or output writing fails
+- **WHEN** cleanup reports the failure
+- **THEN** it MUST follow these context and error preservation rules
+
+Early JSON errors MUST preserve known request data, set unknown
+workspace/times/totals/inventory null, and include a structured error.
+Known no-removal progress MUST be empty, not unknown. Output write
+failure MUST return nonzero and preserve any underlying service error
+alongside the write error. Available recovery and partial-progress
+details MUST fall back to stderr when writable, even without verbose.
+It MUST NOT emit a replacement JSON document or retry deletion.
+
+#### Scenario: JSON validation envelope before service invocation
+- **GIVEN** missing age, extra arguments, or a malformed/unknown flag
+- **AND** readable `--format json` or `--format=json` precedes `--`
+- **WHEN** cleanup validates the invocation, in either token order
+- **THEN** it returns nonzero with exactly one JSON error document
+- **AND** unknown fields/totals are null and removed paths are empty
+- **AND** no service, workspace hooks, or file logging are started
+
+#### Scenario: Deterministic format recovery boundaries
+- **WHEN** repeated formats, a missing value, or `--` occur
+- **THEN** the last explicit format before `--` selects error rendering
+- **AND** unreadable or invalid final format uses stderr text errors
+- **AND** tokens after `--` do not select JSON or repair invalid input
+
+#### Scenario: Stdout fails after partial cleanup
+- **GIVEN** cleanup has a service error with known partial removals
+- **WHEN** text or JSON output encounters a failing stdout writer
+- **THEN** the command remains nonzero and preserves both errors
+- **AND** writable stderr receives exact progress and recovery details
+- **AND** no deletion retries, rollback, or success claims occur

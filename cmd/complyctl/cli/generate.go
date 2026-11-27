@@ -15,6 +15,7 @@ import (
 	"github.com/complytime/complyctl/internal/output"
 	"github.com/complytime/complyctl/internal/policy"
 	"github.com/complytime/complyctl/internal/terminal"
+	"github.com/complytime/complyctl/internal/workspacecoord"
 	"github.com/complytime/complyctl/pkg/provider"
 )
 
@@ -98,6 +99,12 @@ func (o *generateOptions) run(ctx context.Context) error {
 }
 
 func (o *generateOptions) generatePolicy(ctx context.Context, cfg *complytime.WorkspaceConfig, entry complytime.PolicyEntry, baseDir string) error {
+	return withProviderOperation(baseDir, workspacecoord.OperationGenerate, func(op *providerOperation) error {
+		return o.generateProtected(ctx, cfg, entry, baseDir, op)
+	})
+}
+
+func (o *generateOptions) generateProtected(ctx context.Context, cfg *complytime.WorkspaceConfig, entry complytime.PolicyEntry, baseDir string, op *providerOperation) error {
 	ref, err := complytime.ParsePolicyRef(entry.URL)
 	if err != nil {
 		return fmt.Errorf("invalid policy reference %q: %w", entry.URL, err)
@@ -114,11 +121,10 @@ func (o *generateOptions) generatePolicy(ctx context.Context, cfg *complytime.Wo
 		return fmt.Errorf("failed to identify resolved policy tree: %w", err)
 	}
 
-	mgr, err := loadProviders(o.providerDir)
+	mgr, err := op.loadProviders(o.providerDir)
 	if err != nil {
 		return err
 	}
-	defer mgr.Cleanup()
 
 	configs := policy.ExtractAssessmentConfigs(graph)
 	groups := policy.GroupByEvaluator(configs, graph)

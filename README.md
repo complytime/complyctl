@@ -21,7 +21,7 @@ Providers are standalone executables that integrate complyctl with policy engine
 │  │  policies    │   layers (YAML)      │ init / get / list     │ │
 │  └──────────────┘                      │ generate / scan       │ │
 │                                        │ doctor / providers    │ │
-│                                        │ version               │ │
+│                                        │ clean / version       │ │
 │                                        └─────┬────────┬────────┘ │
 │                                              │        │          │
 │                                 ┌────────────┘        │          │
@@ -67,6 +67,7 @@ Providers are standalone executables that integrate complyctl with policy engine
 
 - [Installation](./docs/INSTALLATION.md)
 - [Quick Start](./docs/QUICK_START.md)
+- [Evidence provenance and cleanup](./docs/EVIDENCE.md)
 - [Provider Guide](https://github.com/complytime/complytime-providers/blob/main/docs/provider-guide.md)
 - [E2E Testing](./tests/e2e/README.md)
 - [Testing Environment](./docs/TESTING_ENVIRONMENT.md)
@@ -80,12 +81,13 @@ Providers are standalone executables that integrate complyctl with policy engine
 | `list` | List cached Gemara policies |
 | `generate` | Generate policy graph and invoke providers |
 | `scan` | Scan targets and produce compliance reports |
+| `clean --older-than <days>d [--dry-run]` | Expire managed reports and supporting evaluations; preview first ([scope and safety](./docs/EVIDENCE.md#cleanup-grouping-and-preview)) |
 | `doctor` | Run pre-flight diagnostics on the workspace |
 | `providers` | List discovered scanning providers and their health status |
 | `version` | Print version |
 
 Global flags:
-- `--debug` / `-d` — output debug logs to stderr and log file
+- `--debug` / `-d` — output debug logs to stderr and log file (`clean` uses stderr only)
 - `--workspace` / `-w` — workspace directory (project root containing `.complytime/`, defaults to current directory)
 
 ### Run Commands from Any Directory

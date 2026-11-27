@@ -23,6 +23,7 @@ make build                # compile complyctl to ./bin/
 make build-test-provider  # build test provider for E2E tests
 make clean                # remove build artifacts
 make vendor               # go mod tidy + verify + vendor
+make man                  # regenerate docs/man/complyctl.1 (requires pandoc)
 ```
 
 ### Test
@@ -164,11 +165,13 @@ internal/
 ├── cache/           # OCI layout cache management
 ├── complytime/      # workspace config and export logic
 ├── doctor/          # pre-flight diagnostics
+├── evidencecleanup/ # report/evaluation grouping, preview, confined expiry
 ├── output/          # report formatters (OSCAL, SARIF, Markdown)
 ├── policy/          # policy resolution and assessment
 ├── registry/        # OCI registry client
 ├── terminal/        # TUI components (spinner, bubbles)
-└── version/         # version info (injected via ldflags)
+├── version/         # version info (injected via ldflags)
+└── workspacecoord/  # workspace locks and provider activity records
 openspec/            # OpenSpec tactical specification schemas
 pkg/
 ├── log/             # structured logging
@@ -354,6 +357,7 @@ packages organized by domain responsibility.
 <!-- MANUAL ADDITIONS END -->
 
 ## Recent Changes
+- evidence-cleanup: `complyctl clean --older-than <days>d [--dry-run]` delegates to `internal/evidencecleanup/` (`Preview` or `Run`); `internal/workspacecoord/` coordinates scan/generate, relevant get artifact removal, init, and cleanup with locks and activity records. Cleanup expires managed report/evaluation groups, removes evidence first, and reports partial failures without rollback. Diagnostics are stream-only, including debug; age is required and workspace selection uses flag, environment, then current directory. Linux cleanup allows local ext4/XFS/Btrfs/tmpfs; Darwin allows APFS, with amd64/arm64 backends. Current SARIF lacks provenance and blocks planning. See `docs/EVIDENCE.md` for managed scope, normal-completion versus forced/interrupted activity, and manual recovery; platform targets do not certify completed native runtime or live cross-repository validation.
 - resolve-cross-repo-evidence-mappings: Cross-repo harness follows invocation-specific JSON logs and mapped Ampel/Snappy evidence; `COMPLYCTL_BIN_DIR` selects both prebuilt hosts with harness-owned fixtures; `make test-cross-repo-evidence` runs offline regressions; export and CUE validation include JSON/YAML; live retained acceptance remains required before merge
 - fix-homebrew-publish-auth: Homebrew publishing exports step-scoped `GH_TOKEN` for API and Git credential-helper authentication; `make test-homebrew-publish` exercises the actual workflow offline, including the legacy-token regression; release recovery remains PR-based without moving tags
 - release-notes-preview: `make release-notes-preview` uses `scripts/release-notes-preview.py` to preview the latest canonical release to committed HEAD without publishing; `make test-release-notes-preview` runs offline regression tests; prerequisites and usage are in `docs/RELEASE_PROCESS.md`

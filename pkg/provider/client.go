@@ -5,6 +5,9 @@ package provider
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"sync"
+	"sync/atomic"
 
 	pluginv2 "github.com/complytime/complyctl/api/plugin"
 	goplugin "github.com/hashicorp/go-plugin"
@@ -195,12 +198,38 @@ type Client struct {
 	executablePath string
 	gopluginClient *goplugin.Client
 	grpcClient     pluginv2.PluginClient
+	cmd            *exec.Cmd
+	uncertain      atomic.Bool
+	closeOnce      sync.Once
+	closeErr       error
 }
 
+// Close shuts down the managed provider. It is safe to call repeatedly.
+// Callers needing confirmation of normal shutdown must use Manager.CleanupNormal.
 func (c *Client) Close() {
-	if c.gopluginClient != nil {
+	// Legacy callers have no shutdown-result contract. Coordinated operations
+	// consume this same cached result through Manager.CleanupNormal instead.
+	_ = c.closeNormal()
+}
+
+func (c *Client) closeNormal() error {
+	c.closeOnce.Do(func() {
+		if c.gopluginClient == nil {
+			c.closeErr = fmt.Errorf("provider %s has no managed process", c.executablePath)
+			return
+		}
+		exited := c.gopluginClient.Exited()
 		c.gopluginClient.Kill()
-	}
+		// Kill waits for the process-wait goroutine, but returns no status and
+		// may force-kill. Per Testability, inspect our own exec.Cmd only after
+		// that join; PID disappearance or returning from Kill is not evidence
+		// of normal completion. This does not certify arbitrary descendants.
+		if exited || c.uncertain.Load() || c.cmd == nil ||
+			c.cmd.ProcessState == nil || !c.cmd.ProcessState.Success() {
+			c.closeErr = fmt.Errorf("provider %s completion or shutdown is uncertain", c.executablePath)
+		}
+	})
+	return c.closeErr
 }
 
 func (c *Client) Describe(ctx context.Context, req *DescribeRequest) (*DescribeResponse, error) {
@@ -208,6 +237,7 @@ func (c *Client) Describe(ctx context.Context, req *DescribeRequest) (*DescribeR
 
 	protoResp, err := c.grpcClient.Describe(ctx, &pluginv2.DescribeRequest{})
 	if err != nil {
+		c.uncertain.Store(true)
 		return nil, fmt.Errorf("Describe RPC failed: %w", err)
 	}
 
@@ -238,6 +268,7 @@ func (c *Client) Generate(ctx context.Context, req *GenerateRequest) (*GenerateR
 		ComplypackContentPath: req.ComplypackContentPath,
 	})
 	if err != nil {
+		c.uncertain.Store(true)
 		return nil, fmt.Errorf("Generate RPC failed: %w", err)
 	}
 
@@ -260,6 +291,7 @@ func (c *Client) Scan(ctx context.Context, req *ScanRequest) (*ScanResponse, err
 		Targets: protoTargets,
 	})
 	if err != nil {
+		c.uncertain.Store(true)
 		return nil, fmt.Errorf("Scan RPC failed: %w", err)
 	}
 

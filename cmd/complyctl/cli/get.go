@@ -762,9 +762,11 @@ func syncSingleComplypack(
 				"Complypack not cryptographically verified",
 				"complypack", entry.EffectiveID())
 		}
-		invalidateGenerationForComplypack(
+		if err := invalidateGenerationForComplypack(
 			state, ref.Repository, baseDir,
-		)
+		); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -772,14 +774,19 @@ func syncSingleComplypack(
 
 // invalidateGenerationForComplypack removes workspace generation state and
 // evaluator artifacts when a complypack has been re-fetched. Errors are logged
-// as warnings — they do not fail the get command.
-func invalidateGenerationForComplypack(state *cache.State, repository, baseDir string) {
+// as warnings, except coordination failures which stop removal and fail get.
+func invalidateGenerationForComplypack(state *cache.State, repository, baseDir string) error {
 	ps, exists := state.GetComplypackState(repository)
 	if !exists || ps.EvaluatorID == "" {
-		return
+		return nil
 	}
-	evalID := ps.EvaluatorID
+	return withWorkspaceMutation(baseDir, func() error {
+		invalidateEvaluatorArtifacts(ps.EvaluatorID, repository, baseDir)
+		return nil
+	})
+}
 
+func invalidateEvaluatorArtifacts(evalID, repository, baseDir string) {
 	skipWarnings, err := policy.InvalidateForEvaluator(baseDir, evalID)
 	for _, w := range skipWarnings {
 		logger.Debug("Generation state invalidation", "warning", w)

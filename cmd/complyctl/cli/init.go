@@ -42,6 +42,12 @@ func (o *initOptions) run() error {
 	if err != nil {
 		return err
 	}
+	return withWorkspaceMutation(baseDir, func() error {
+		return o.initializeWorkspace(baseDir)
+	})
+}
+
+func (o *initOptions) initializeWorkspace(baseDir string) error {
 	workspace := complytime.NewWorkspace(baseDir)
 
 	if workspace.Exists() {

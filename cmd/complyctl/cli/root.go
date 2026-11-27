@@ -128,6 +128,7 @@ func New() *cobra.Command {
 		getCmd(&opts),
 		scanCmd(&opts),
 		generateCmd(&opts),
+		cleanCmd(&opts),
 		listCmd(&opts),
 		providersCmd(&opts),
 		doctorCmd(&opts),
@@ -139,6 +140,8 @@ func New() *cobra.Command {
 		} else {
 			lw.SetWorkspace(".")
 		}
+		// Reestablish file logging if a preceding clean invocation selected streams.
+		logger = log.NewLogger(lw)
 		enableDebug(&opts, lw, os.Stderr)
 		if opts.Debug {
 			resolvedBase := lw.baseDir

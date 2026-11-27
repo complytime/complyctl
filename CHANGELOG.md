@@ -19,6 +19,17 @@
 
 ### Added
 
+- `complyctl clean --older-than <days>d` expires workspace-local managed
+  reports and supporting evaluations as whole preflighted groups, with
+  `--dry-run` preview and host coordination to protect participating
+  scans. Cleanup removes evidence before reports; expiry is irreversible
+  and unexpected failures can leave partial deletion without rollback.
+  Linux allows local ext4, XFS, Btrfs, and tmpfs; macOS allows APFS.
+  Unresolved activity and unprovable report relationships fail closed;
+  current managed SARIF reports block cleanup because provenance is
+  missing. See [cleanup guidance](docs/EVIDENCE.md#cleanup-grouping-and-preview)
+  for scope, exclusions, and manual recovery.
+  Spec: `openspec/changes/evidence-cleanup/specs/evidence-cleanup/spec.md`.
 - Cross-repository validation follows the scan's mapped Ampel/Snappy
   evidence instead of filename globs, supports explicit prebuilt hosts via
   `COMPLYCTL_BIN_DIR`, and exports/schema-validates JSON and YAML logs.
@@ -84,6 +95,17 @@
   temporarily removed (go-vendor-tools unavailable).
 
 ### Fixed
+
+- Project hooks preserve upstream bytes and license notices by excluding
+  root `vendor/` from `trailing-whitespace`, `end-of-file-fixer`, `go-fmt`,
+  and `check-spdx`. Only the whitespace/EOF hooks additionally preserve
+  these exact scaffolded paths: `.opencode/commands/uf.review-council.md`,
+  `.opencode/commands/uf.review-pr.md`, and
+  `.opencode/commands/uf.address-feedback.md`. These exceptions are not
+  repairs; other commands and archived specs remain checked. Added
+  `make test-pre-commit-scope` for isolated real-hook regression coverage.
+  Spec: `openspec/changes/fix-pre-commit-vendor-scope/specs/project-hook-scope/spec.md`
+  (#972)
 
 - Acceptance-test lint findings resolved with request-local trust
   explanations for test registry access and owner-only configuration

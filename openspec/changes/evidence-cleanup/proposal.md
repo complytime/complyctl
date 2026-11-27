@@ -11,7 +11,7 @@ Epic: <https://redhat.atlassian.net/browse/GRCAUTO-283>.
 
 ## What Changes
 
-- Add `complyctl clean --older-than <days>d` and `--dry-run` for
+- Add `complyctl clean --older-than <duration>` and `--dry-run` for
   workspace-scoped cleanup of reports and their supporting evidence.
 - Group managed EvaluationLog, OSCAL, SARIF, and Markdown reports with
   their referenced AMPEL, OPA, and OpenSCAP evaluation directories.
@@ -23,8 +23,15 @@ Epic: <https://redhat.atlassian.net/browse/GRCAUTO-283>.
   and relationships can be established safely, without migration or
   a new provider marker. Preserve ambiguous groups with a reason.
 - Measure age from the directory's UTC collection-start timestamp.
-  Require a positive whole number of 24-hour days and preserve entries
-  exactly at the cutoff or newer.
+  Accept a strict positive integer with one lowercase `d`, `h`, or `m`.
+  Days remain exact 24-hour periods; preserve entries at the cutoff
+  or newer, using one captured UTC time per invocation.
+- Default to concise report/evaluation deleted and kept summaries.
+  Add `--verbose` for paths, membership, reasons, and removal progress,
+  and `--format text|json` with text as the default. JSON MUST provide
+  one versioned stdout document, including readable-format validation
+  errors, structured service outcomes, and exact partial progress.
+  Actionable failures MUST remain visible without verbose output.
 - Delete a fully eligible group's evidence first, then its reports.
   An unexpected deletion failure stops that group, retains any reports
   not yet deleted, reports partial progress, and returns nonzero.
@@ -53,10 +60,18 @@ also confirmed that rollback after an unexpected deletion failure is
 not required. Record this as team-lead confirmation relayed by the
 user, not as independently verified Jira approval or a Jira update.
 
-Earlier user decisions retain day-based age rules, cleanup of existing
+Earlier user decisions retain collection-start age, cleanup of existing
 accumulation, Linux/macOS support, manual interrupted-scan recovery,
 and the complyctl-only concurrency boundary. Independent older hosts
 and direct provider callers remain outside that boundary.
+
+For PR #991, the user accepted feedback item 2 (duration units) and
+item 3 (output), and confirmed proceeding through the question tool.
+These amendments supersede day-only input and always-detailed output.
+Item 1 (mount tests, Testing Farm, and gates) remains HELD. This update
+MUST NOT change eligibility, grouping, deletion, coordination, or exit
+semantics. Implementation MUST wait until the parent commits and
+pushes these specification updates. This phase changes specs only.
 
 Automatic cleanup, persistent retention settings, CLI-log expiry,
 external or renamed report-copy discovery, archival, compression,
